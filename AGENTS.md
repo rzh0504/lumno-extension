@@ -5,19 +5,23 @@
 
 ### 1) 仅打包运行必需文件
 - `manifest.json`
-- `background.js`
-- `newtab.html`
-- `newtab.js`
-- `options.html`
-- `options.js`
-- `blacklist-utils.js`
-- `input-ui.js`
-- `document-pip-picker.js`
-- `hotkey-listener.js`
-- `auto-pip-blacklist.js`
-- `site-auto-pip.js`
-- `youtube-auto-pip.js`
-- `youtube-auto-pip-page.js`
+- `src/background/background.js`
+- `src/background/pip-ownership.js`
+- `src/newtab/newtab.html`
+- `src/newtab/newtab.js`
+- `src/options/options.html`
+- `src/options/options.js`
+- `src/shared/blacklist-utils.js`
+- `src/shared/settings.js`
+- `src/overlay/shell.js`
+- `src/overlay/input-ui.js`
+- `src/overlay/lifecycle.js`
+- `src/content/document-pip-picker.js`
+- `src/content/hotkey-listener.js`
+- `src/content/auto-pip-blacklist.js`
+- `src/content/site-auto-pip.js`
+- `src/content/youtube-auto-pip.js`
+- `src/content/youtube-auto-pip-page.js`
 - `_locales/`
 - `assets/`
 
@@ -38,12 +42,7 @@ VERSION=$(node -p "require('./manifest.json').version")
 ZIP="dist/lumno-store-v${VERSION}.zip"
 rm -f "$ZIP"
 zip -r "$ZIP" \
-  manifest.json background.js \
-  newtab.html newtab.js \
-  options.html options.js \
-  blacklist-utils.js \
-  input-ui.js document-pip-picker.js hotkey-listener.js auto-pip-blacklist.js \
-  site-auto-pip.js youtube-auto-pip.js youtube-auto-pip-page.js \
+  manifest.json src \
   _locales assets \
   -x "*.DS_Store"
 ```
@@ -54,8 +53,8 @@ zip -r "$ZIP" \
 - 确认 `manifest` 引用资源都在包内。
 
 ## 搜索逻辑一致性规范（必须）
-- 任何涉及“搜索建议/排序/打分/匹配权重”的改动，必须同步检查 `background.js` 与 `newtab.js`，避免入口行为不一致。
-- `newtab.js` 的输入建议默认通过 `chrome.runtime.sendMessage({ action: 'getSearchSuggestions' })` 复用 `background.js` 结果；若新增本地排序分支，必须与后台同权重策略并在 PR 说明中注明。
+- 任何涉及“搜索建议/排序/打分/匹配权重”的改动，必须同步检查 `src/background/background.js` 与 `src/newtab/newtab.js`，避免入口行为不一致。
+- `src/newtab/newtab.js` 的输入建议默认通过 `chrome.runtime.sendMessage({ action: 'getSearchSuggestions' })` 复用 `src/background/background.js` 结果；若新增本地排序分支，必须与后台同权重策略并在 PR 说明中注明。
 - 涉及 URL 路径关键词（如 `/release/`）或最近访问频次（`lastVisitTime`、`visitCount`、`typedCount`）的权重调整时，必须做双入口回归：普通网页浮层 + 新标签页浮层。
 
 ## 代码修改策略（必须）
@@ -67,8 +66,8 @@ zip -r "$ZIP" \
 ## 样式治理规范（必须）
 - 后续写代码时，默认避免新增 `!important`，也不要把 `style.setProperty(..., 'important')` 当作常规实现手段。
 - 优先使用稳定类名、CSS 变量、明确的承载层级，以及“外层保护壳 + 内层内容层”的分层方式解决样式优先级问题。
-- `newtab.html`、`newtab.js`、`options.html`、`options.js` 这类自有页面，原则上不应再新增 `!important`；若必须新增，需要先证明普通层叠、变量或结构调整无法满足。
-- 对注入路径（尤其 `background.js`、`input-ui.js`）保持保守：只有在宿主页面样式污染、几何定位同步、进入/退出动画保护这类明确高风险位点，才允许保留少量 `!important`。
+- `src/newtab/newtab.html`、`src/newtab/newtab.js`、`src/options/options.html`、`src/options/options.js` 这类自有页面，原则上不应再新增 `!important`；若必须新增，需要先证明普通层叠、变量或结构调整无法满足。
+- 对注入路径（尤其 `src/background/background.js`、`src/overlay/input-ui.js`）保持保守：只有在宿主页面样式污染、几何定位同步、进入/退出动画保护这类明确高风险位点，才允许保留少量 `!important`。
 - 任何涉及浮层容器、输入框壳层、tooltip、toast、站内搜索前缀、AI 特效承载层的样式改动，优先检查 `overflow`、`contain`、`transform`、`backdrop-filter` 与挂载层级，不要先用 `!important` 硬压。
 - 若确实需要保留或新增 `!important`，必须把范围收敛到最小，并确认不会影响已有样式、加载时机与快捷键行为。
 

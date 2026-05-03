@@ -1,12 +1,24 @@
 
 try {
-  importScripts('blacklist-utils.js');
+  importScripts(chrome.runtime.getURL('src/shared/blacklist-utils.js'));
 } catch (error) {
   console.warn('Lumno: failed to load blacklist utils.', error);
 }
 
 try {
-  importScripts('assets/vendor/pinyin-pro.js');
+  importScripts(chrome.runtime.getURL('src/shared/settings.js'));
+} catch (error) {
+  console.warn('Lumno: failed to load settings utils.', error);
+}
+
+try {
+  importScripts(chrome.runtime.getURL('src/background/pip-ownership.js'));
+} catch (error) {
+  console.warn('Lumno: failed to load PiP ownership utils.', error);
+}
+
+try {
+  importScripts(chrome.runtime.getURL('assets/vendor/pinyin-pro.js'));
 } catch (error) {
   console.warn('Lumno: failed to load pinyin support.', error);
 }
@@ -16,268 +28,6 @@ function isBrowserExtensionProtocol(protocol) {
   return normalized === 'chrome-extension:' ||
     normalized === 'moz-extension:' ||
     normalized === 'ms-browser-extension:';
-}
-
-const GLOBAL_PIP_OWNER_STORAGE_KEY = '_x_lumno_global_pip_owner_2026_';
-let globalPipOwnerCache = null;
-let globalPipOwnerCacheLoaded = false;
-
-function getSessionStorageArea() {
-  if (!chrome || !chrome.storage) {
-    return null;
-  }
-  return chrome.storage.session || chrome.storage.local || null;
-}
-
-function normalizePipOwnerRecord(value) {
-  if (!value || typeof value !== 'object') {
-    return null;
-  }
-  const kind = value.kind === 'document' ? 'document' : (value.kind === 'video' ? 'video' : '');
-  const tabId = Number(value.tabId);
-  if (!kind || !Number.isInteger(tabId) || tabId < 0) {
-    return null;
-  }
-  const frameId = Number.isInteger(Number(value.frameId)) ? Number(value.frameId) : 0;
-  const token = typeof value.token === 'string' && value.token
-    ? value.token
-    : '';
-  if (!token) {
-    return null;
-  }
-  return {
-    kind: kind,
-    tabId: tabId,
-    frameId: frameId,
-    token: token,
-    url: typeof value.url === 'string' ? value.url : '',
-    updatedAt: Number.isFinite(Number(value.updatedAt)) ? Number(value.updatedAt) : Date.now()
-  };
-}
-
-function getGlobalPipOwnerRecord() {
-  if (globalPipOwnerCacheLoaded) {
-    return Promise.resolve(globalPipOwnerCache);
-  }
-  const storageArea = getSessionStorageArea();
-  if (!storageArea || typeof storageArea.get !== 'function') {
-    globalPipOwnerCacheLoaded = true;
-    globalPipOwnerCache = null;
-    return Promise.resolve(null);
-  }
-  return new Promise((resolve) => {
-    storageArea.get([GLOBAL_PIP_OWNER_STORAGE_KEY], (result) => {
-      const normalized = normalizePipOwnerRecord(
-        result ? result[GLOBAL_PIP_OWNER_STORAGE_KEY] : null
-      );
-      globalPipOwnerCacheLoaded = true;
-      globalPipOwnerCache = normalized;
-      resolve(normalized);
-    });
-  });
-}
-
-function setGlobalPipOwnerRecord(record) {
-  const normalized = normalizePipOwnerRecord(record);
-  globalPipOwnerCacheLoaded = true;
-  globalPipOwnerCache = normalized;
-  const storageArea = getSessionStorageArea();
-  if (!storageArea || typeof storageArea.set !== 'function') {
-    return Promise.resolve(normalized);
-  }
-  return new Promise((resolve) => {
-    storageArea.set({ [GLOBAL_PIP_OWNER_STORAGE_KEY]: normalized }, () => {
-      resolve(normalized);
-    });
-  });
-}
-
-function clearGlobalPipOwnerRecord(expectedToken) {
-  const shouldClear = !expectedToken ||
-    !globalPipOwnerCache ||
-    globalPipOwnerCache.token === expectedToken;
-  if (!shouldClear) {
-    return Promise.resolve(false);
-  }
-  globalPipOwnerCacheLoaded = true;
-  globalPipOwnerCache = null;
-  const storageArea = getSessionStorageArea();
-  if (!storageArea || typeof storageArea.remove !== 'function') {
-    return Promise.resolve(true);
-  }
-  return new Promise((resolve) => {
-    storageArea.remove(GLOBAL_PIP_OWNER_STORAGE_KEY, () => {
-      resolve(true);
-    });
-  });
-}
-
-function createGlobalPipOwnerToken() {
-  if (typeof crypto !== 'undefined' && crypto && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `pip-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function getPipSenderContext(sender) {
-  const senderTab = sender && sender.tab ? sender.tab : null;
-  const tabId = senderTab && typeof senderTab.id === 'number' ? senderTab.id : null;
-  if (typeof tabId !== 'number') {
-    return null;
-  }
-  return {
-    tabId: tabId,
-    frameId: sender && typeof sender.frameId === 'number' ? sender.frameId : 0,
-    url: getResolvedTabUrl(senderTab)
-  };
-}
-
-function isSameGlobalPipOwner(owner, context, kind) {
-  if (!owner || !context) {
-    return false;
-  }
-  return owner.kind === kind &&
-    owner.tabId === context.tabId &&
-    owner.frameId === context.frameId;
-}
-
-function sendMessageToTab(tabId, message) {
-  return new Promise((resolve) => {
-    if (!chrome || !chrome.tabs || typeof chrome.tabs.sendMessage !== 'function') {
-      resolve({ ok: false, reason: 'tabs-sendMessage-unavailable' });
-      return;
-    }
-    try {
-      chrome.tabs.sendMessage(tabId, message, (response) => {
-        if (chrome.runtime && chrome.runtime.lastError) {
-          resolve({
-            ok: false,
-            reason: chrome.runtime.lastError.message || 'sendMessage-failed'
-          });
-          return;
-        }
-        resolve(response && typeof response === 'object'
-          ? response
-          : { ok: false, reason: 'empty-response' });
-      });
-    } catch (error) {
-      resolve({ ok: false, reason: String(error) });
-    }
-  });
-}
-
-async function forceSurrenderGlobalPipOwner(owner, requestedKind) {
-  if (!owner) {
-    return { ok: true, cleared: false };
-  }
-  const result = await sendMessageToTab(owner.tabId, {
-    action: 'lumno:pip-force-surrender',
-    reason: requestedKind === 'document' ? 'document-owner-takeover' : 'video-owner-takeover',
-    ownerKind: owner.kind
-  });
-  if (result && result.ok) {
-    await clearGlobalPipOwnerRecord(owner.token);
-    return { ok: true, cleared: true };
-  }
-  const errorReason = String(result && result.reason ? result.reason : '');
-  const isStaleOwner = errorReason.includes('Receiving end does not exist') ||
-    errorReason.includes('No tab with id') ||
-    errorReason.includes('message port closed');
-  if (isStaleOwner) {
-    await clearGlobalPipOwnerRecord(owner.token);
-    return { ok: true, cleared: true };
-  }
-  return {
-    ok: false,
-    reason: result && result.reason ? result.reason : 'surrender-failed'
-  };
-}
-
-async function requestGlobalPipOwnership(sender, kind) {
-  const context = getPipSenderContext(sender);
-  if (!context) {
-    return { ok: false, granted: false, reason: 'no-tab' };
-  }
-  if (kind !== 'video' && kind !== 'document') {
-    return { ok: false, granted: false, reason: 'invalid-kind' };
-  }
-
-  const currentOwner = await getGlobalPipOwnerRecord();
-  if (currentOwner && isSameGlobalPipOwner(currentOwner, context, kind)) {
-    return {
-      ok: true,
-      granted: true,
-      token: currentOwner.token,
-      owner: currentOwner
-    };
-  }
-
-  if (currentOwner) {
-    if (currentOwner.kind === 'document' && kind === 'video') {
-      return {
-        ok: false,
-        granted: false,
-        reason: 'document-owner-active',
-        owner: currentOwner
-      };
-    }
-    const surrenderResult = await forceSurrenderGlobalPipOwner(currentOwner, kind);
-    if (!surrenderResult.ok) {
-      return {
-        ok: false,
-        granted: false,
-        reason: surrenderResult.reason || 'owner-busy',
-        owner: currentOwner
-      };
-    }
-  }
-
-  const nextOwner = {
-    kind: kind,
-    tabId: context.tabId,
-    frameId: context.frameId,
-    token: createGlobalPipOwnerToken(),
-    url: context.url,
-    updatedAt: Date.now()
-  };
-  await setGlobalPipOwnerRecord(nextOwner);
-  return {
-    ok: true,
-    granted: true,
-    token: nextOwner.token,
-    owner: nextOwner
-  };
-}
-
-async function releaseGlobalPipOwnership(sender, token) {
-  const context = getPipSenderContext(sender);
-  if (!context) {
-    return { ok: false, released: false, reason: 'no-tab' };
-  }
-  const currentOwner = await getGlobalPipOwnerRecord();
-  if (!currentOwner) {
-    return { ok: true, released: true, reason: 'no-owner' };
-  }
-  const matchesToken = typeof token === 'string' && token && currentOwner.token === token;
-  const matchesSender = currentOwner.tabId === context.tabId &&
-    currentOwner.frameId === context.frameId;
-  if (!matchesToken && !matchesSender) {
-    return { ok: true, released: false, reason: 'owner-mismatch' };
-  }
-  await clearGlobalPipOwnerRecord(currentOwner.token);
-  return { ok: true, released: true };
-}
-
-function clearGlobalPipOwnerForTabId(tabId) {
-  if (typeof tabId !== 'number') {
-    return;
-  }
-  getGlobalPipOwnerRecord().then((owner) => {
-    if (!owner || owner.tabId !== tabId) {
-      return;
-    }
-    clearGlobalPipOwnerRecord(owner.token).catch(() => {});
-  }).catch(() => {});
 }
 
 function isRestrictedUrl(url) {
@@ -428,7 +178,7 @@ function getExtensionDetailsUrl() {
 }
 
 function buildNewtabFallbackUrl(options) {
-  const newtabUrl = new URL(chrome.runtime.getURL('newtab.html'));
+  const newtabUrl = new URL(chrome.runtime.getURL('src/newtab/newtab.html'));
   newtabUrl.searchParams.set('focus', '1');
   if (options && options.notice === 'file-access') {
     newtabUrl.searchParams.set('notice', 'file-access');
@@ -467,12 +217,40 @@ function getResolvedTabUrl(tab) {
   return pendingUrl;
 }
 
+const pipOwnership = globalThis.LumnoPipOwnership && typeof globalThis.LumnoPipOwnership.create === 'function'
+  ? globalThis.LumnoPipOwnership.create({
+    chromeApi: chrome,
+    getResolvedTabUrl: getResolvedTabUrl
+  })
+  : null;
+
+async function requestGlobalPipOwnership(sender, kind) {
+  if (!pipOwnership || typeof pipOwnership.requestGlobalPipOwnership !== 'function') {
+    return { ok: false, granted: false, reason: 'pip-ownership-unavailable' };
+  }
+  return pipOwnership.requestGlobalPipOwnership(sender, kind);
+}
+
+async function releaseGlobalPipOwnership(sender, token) {
+  if (!pipOwnership || typeof pipOwnership.releaseGlobalPipOwnership !== 'function') {
+    return { ok: false, released: false, reason: 'pip-ownership-unavailable' };
+  }
+  return pipOwnership.releaseGlobalPipOwnership(sender, token);
+}
+
+function clearGlobalPipOwnerForTabId(tabId) {
+  if (!pipOwnership || typeof pipOwnership.clearGlobalPipOwnerForTabId !== 'function') {
+    return;
+  }
+  pipOwnership.clearGlobalPipOwnerForTabId(tabId);
+}
+
 function isLumnoNewtabUrl(url) {
   const value = String(url || '');
   if (!value || !chrome || !chrome.runtime || typeof chrome.runtime.getURL !== 'function') {
     return false;
   }
-  const lumnoNewtabPrefix = chrome.runtime.getURL('newtab.html');
+  const lumnoNewtabPrefix = chrome.runtime.getURL('src/newtab/newtab.html');
   return value === lumnoNewtabPrefix || value.startsWith(`${lumnoNewtabPrefix}?`);
 }
 
@@ -624,7 +402,7 @@ function requestFocusVisibleNewtabInput(source, tabId) {
 function openExtensionOptionsPage(callback) {
   const done = typeof callback === 'function' ? callback : () => {};
   const fallbackOpen = () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('options.html') }, () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('src/options/options.html') }, () => {
       done(!(chrome.runtime && chrome.runtime.lastError));
     });
   };
@@ -1634,14 +1412,14 @@ function openOverlayOnTab(activeTab, tabs, source) {
     openNewtabFallbackForUrl(activeUrl);
     return;
   }
-  logHotkeyDebug('inject-start', { tabId: activeTab.id, file: 'input-ui.js', source: source || '' });
+  logHotkeyDebug('inject-start', { tabId: activeTab.id, file: 'src/shared/settings.js,src/overlay/input-ui.js,src/overlay/shell.js,src/overlay/lifecycle.js', source: source || '' });
   chrome.scripting.executeScript({
     target: {tabId: activeTab.id},
-    files: ['input-ui.js']
+    files: ['src/shared/settings.js', 'src/overlay/input-ui.js', 'src/overlay/shell.js', 'src/overlay/lifecycle.js']
   }, function() {
     if (chrome.runtime.lastError) {
       logHotkeyDebug('inject-failed', {
-        step: 'input-ui.js',
+        step: 'src/shared/settings.js,src/overlay/input-ui.js,src/overlay/shell.js,src/overlay/lifecycle.js',
         tabId: activeTab.id,
         error: chrome.runtime.lastError.message || 'unknown',
         source: source || ''
@@ -1803,11 +1581,11 @@ function openDocumentPipPickerOnTab(activeTab, source) {
   const injectAndInvoke = (invokeMode) => {
     chrome.scripting.executeScript({
       target: { tabId: activeTab.id },
-      files: ['document-pip-picker.js']
+      files: ['src/content/document-pip-picker.js']
     }, () => {
       if (chrome.runtime.lastError) {
         logHotkeyDebug('document-pip-inject-failed', {
-          step: 'document-pip-picker.js',
+          step: 'src/content/document-pip-picker.js',
           tabId: activeTab.id,
           error: chrome.runtime.lastError.message || 'unknown',
           source: source || ''
@@ -2102,271 +1880,6 @@ if (chrome && chrome.tabs && chrome.tabs.onUpdated) {
 if (chrome && chrome.tabs && chrome.tabs.onMoved) {
   chrome.tabs.onMoved.addListener(() => {
     schedulePersistPinnedTabSnapshot();
-  });
-}
-
-function waitForTabComplete(tabId, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    let timeoutId = null;
-    const finish = (tab, error) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      chrome.tabs.onUpdated.removeListener(handleUpdated);
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve(tab || null);
-    };
-    const handleUpdated = (updatedTabId, changeInfo, tab) => {
-      if (updatedTabId !== tabId) {
-        return;
-      }
-      if (changeInfo && changeInfo.status === 'complete') {
-        finish(tab || null);
-      }
-    };
-    chrome.tabs.onUpdated.addListener(handleUpdated);
-    chrome.tabs.get(tabId, (tab) => {
-      if (chrome.runtime && chrome.runtime.lastError) {
-        finish(null, new Error(chrome.runtime.lastError.message || 'tab-unavailable'));
-        return;
-      }
-      if (tab && tab.status === 'complete') {
-        finish(tab);
-      }
-    });
-    timeoutId = setTimeout(() => {
-      chrome.tabs.get(tabId, (tab) => {
-        if (chrome.runtime && chrome.runtime.lastError) {
-          finish(null, new Error(chrome.runtime.lastError.message || 'tab-unavailable'));
-          return;
-        }
-        finish(tab || null);
-      });
-    }, Math.max(1000, Number(timeoutMs) || 15000));
-  });
-}
-
-function submitGeminiPromptInTab(tabId, prompt) {
-  return new Promise((resolve) => {
-    chrome.scripting.executeScript({
-      target: { tabId: tabId },
-      func: async (rawPrompt) => {
-        const promptText = String(rawPrompt || '').trim();
-        if (!promptText) {
-          return { ok: false, reason: 'empty-prompt' };
-        }
-        const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
-        const isVisible = (element) => {
-          if (!element) {
-            return false;
-          }
-          const style = window.getComputedStyle(element);
-          if (style.display === 'none' || style.visibility === 'hidden') {
-            return false;
-          }
-          const rect = element.getBoundingClientRect();
-          return rect.width > 0 && rect.height > 0;
-        };
-        const isActionableButton = (element) => {
-          if (!isVisible(element) || element.disabled) {
-            return false;
-          }
-          const style = window.getComputedStyle(element);
-          const ariaDisabled = String(element.getAttribute('aria-disabled') || '').toLowerCase();
-          return (
-            ariaDisabled !== 'true' &&
-            style.pointerEvents !== 'none' &&
-            style.visibility !== 'hidden' &&
-            style.display !== 'none' &&
-            style.opacity !== '0'
-          );
-        };
-        const editorSelectors = [
-          '.ql-editor[contenteditable="true"][role="textbox"]',
-          '[contenteditable="true"][role="textbox"][aria-label*="Gemini"]',
-          '[contenteditable="true"][role="textbox"][aria-label*="gemini"]',
-          '[contenteditable="true"][data-placeholder*="Gemini"]',
-          '[contenteditable="true"][data-placeholder*="gemini"]',
-          'rich-textarea .ql-editor[contenteditable="true"]',
-          'textarea[aria-label*="Gemini"]',
-          'textarea[aria-label*="gemini"]',
-          'div[role="textbox"][contenteditable="true"]',
-          'textarea'
-        ];
-        const sendButtonSelectors = [
-          'button[aria-label="发送"]',
-          'button[aria-label="Send"]',
-          'button[aria-label*="发送"]',
-          'button[aria-label*="提交"]',
-          'button[aria-label*="Send"]',
-          'button[aria-label*="send" i]',
-          'button[aria-label*="submit" i]'
-        ];
-        const escapeHtml = (value) => value
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;');
-        const dispatchInput = (element) => {
-          element.dispatchEvent(new InputEvent('input', {
-            bubbles: true,
-            cancelable: true,
-            data: promptText,
-            inputType: 'insertText'
-          }));
-          element.dispatchEvent(new Event('change', { bubbles: true }));
-        };
-        const findEditor = () => {
-          for (const selector of editorSelectors) {
-            const editor = Array.from(document.querySelectorAll(selector)).find(isVisible);
-            if (editor) {
-              return editor;
-            }
-          }
-          return null;
-        };
-        const findSendButton = () => {
-          for (const selector of sendButtonSelectors) {
-            const button = Array.from(document.querySelectorAll(selector))
-              .find((item) => isVisible(item));
-            if (button) {
-              return button;
-            }
-          }
-          return null;
-        };
-        const setPrompt = (editor) => {
-          editor.focus();
-          if (editor instanceof HTMLTextAreaElement || editor instanceof HTMLInputElement) {
-            editor.value = promptText;
-            dispatchInput(editor);
-            return editor.value === promptText;
-          }
-          const selection = window.getSelection();
-          if (selection) {
-            const range = document.createRange();
-            range.selectNodeContents(editor);
-            selection.removeAllRanges();
-            selection.addRange(range);
-          }
-          if (typeof document.execCommand === 'function') {
-            document.execCommand('insertText', false, promptText);
-          }
-          const currentText = String(editor.innerText || editor.textContent || '').trim();
-          if (currentText !== promptText) {
-            editor.innerHTML = `<p>${escapeHtml(promptText)}</p>`;
-          }
-          dispatchInput(editor);
-          return String(editor.innerText || editor.textContent || '').trim() === promptText;
-        };
-        const pressEnter = (editor) => {
-          ['keydown', 'keypress', 'keyup'].forEach((type) => {
-            editor.dispatchEvent(new KeyboardEvent(type, {
-              key: 'Enter',
-              code: 'Enter',
-              bubbles: true,
-              cancelable: true
-            }));
-          });
-        };
-        for (let attempt = 0; attempt < 12; attempt += 1) {
-          const editor = findEditor();
-          if (!editor) {
-            await sleep(400);
-            continue;
-          }
-          const populated = setPrompt(editor);
-          if (!populated) {
-            await sleep(250);
-            continue;
-          }
-          for (let sendAttempt = 0; sendAttempt < 24; sendAttempt += 1) {
-            const sendButton = findSendButton();
-            if (sendButton && isActionableButton(sendButton)) {
-              sendButton.click();
-              return { ok: true, method: 'button' };
-            }
-            await sleep(sendAttempt < 4 ? 150 : 250);
-          }
-          pressEnter(editor);
-          return { ok: true, method: 'enter' };
-        }
-        return { ok: false, reason: 'editor-not-found' };
-      },
-      args: [prompt]
-    }, (results) => {
-      if (chrome.runtime && chrome.runtime.lastError) {
-        resolve({ ok: false, reason: chrome.runtime.lastError.message || 'execute-script-failed' });
-        return;
-      }
-      const result = Array.isArray(results) && results[0] ? results[0].result : null;
-      resolve(result && typeof result === 'object' ? result : { ok: false, reason: 'empty-script-result' });
-    });
-  });
-}
-
-function runInteractiveSiteSearchProvider(provider, query, sender, disposition) {
-  const prompt = String(query || '').trim();
-  const entryUrl = getSiteSearchProviderEntryUrl(provider);
-  const targetDisposition = disposition === 'currentTab' ? 'currentTab' : 'newTab';
-  return new Promise((resolve) => {
-    if (!entryUrl || !prompt || !isInteractiveSiteSearchProvider(provider)) {
-      resolve({ ok: false, reason: 'invalid-provider-request' });
-      return;
-    }
-    const finish = (result) => {
-      resolve(result && typeof result === 'object' ? result : { ok: false, reason: 'unknown' });
-    };
-    const handleReadyTab = (tab) => {
-      if (!tab || typeof tab.id !== 'number') {
-        finish({ ok: false, reason: 'tab-unavailable' });
-        return;
-      }
-      waitForTabComplete(tab.id, 15000)
-        .catch(() => tab)
-        .then(() => submitGeminiPromptInTab(tab.id, prompt))
-        .then((result) => {
-          finish({
-            ok: Boolean(result && result.ok),
-            tabId: tab.id,
-            url: entryUrl,
-            method: result && result.method ? result.method : '',
-            reason: result && result.reason ? result.reason : ''
-          });
-        })
-        .catch((error) => {
-          finish({
-            ok: false,
-            tabId: tab.id,
-            url: entryUrl,
-            reason: error && error.message ? error.message : 'interactive-site-search-failed'
-          });
-        });
-    };
-    if (targetDisposition === 'currentTab' && sender && sender.tab && typeof sender.tab.id === 'number') {
-      chrome.tabs.update(sender.tab.id, { url: entryUrl, active: true }, (tab) => {
-        if (chrome.runtime && chrome.runtime.lastError) {
-          finish({ ok: false, reason: chrome.runtime.lastError.message || 'tab-update-failed' });
-          return;
-        }
-        handleReadyTab(tab);
-      });
-      return;
-    }
-    chrome.tabs.create({ url: entryUrl, active: true }, (tab) => {
-      if (chrome.runtime && chrome.runtime.lastError) {
-        finish({ ok: false, reason: chrome.runtime.lastError.message || 'tab-create-failed' });
-        return;
-      }
-      handleReadyTab(tab);
-    });
   });
 }
 
@@ -3248,16 +2761,6 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       sendResponse({ items: items });
     });
     return true;
-  } else if (request.action === 'runSiteSearchProviderQuery') {
-    runInteractiveSiteSearchProvider(
-      request.provider,
-      request.query,
-      sender,
-      request.disposition
-    ).then((result) => {
-      sendResponse(result);
-    });
-    return true;
   } else if (request.action === 'getShortcutRules') {
     loadShortcutRules().then((items) => {
       sendResponse({ items: items });
@@ -3365,7 +2868,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     });
     return true;
   } else if (request.action === 'openNewTab') {
-    const newtabUrl = chrome.runtime.getURL('newtab.html?focus=1');
+    const newtabUrl = chrome.runtime.getURL('src/newtab/newtab.html?focus=1');
     chrome.tabs.create({ url: newtabUrl }, () => {
       sendResponse({ ok: !(chrome.runtime && chrome.runtime.lastError) });
     });
@@ -4033,21 +3536,10 @@ if (chrome && chrome.tabs) {
 }
 
 function normalizeLocaleForMessages(locale) {
-  const raw = String(locale || '').trim();
-  if (!raw) {
-    return 'en';
-  }
-  const lower = raw.toLowerCase();
-  if (lower.startsWith('zh')) {
-    if (lower.includes('hk')) {
-      return 'zh_HK';
-    }
-    if (lower.includes('tw') || lower.includes('mo') || lower.includes('hant')) {
-      return 'zh_TW';
-    }
-    return 'zh_CN';
-  }
-  return 'en';
+  const settings = globalThis.LumnoSettings || {};
+  return typeof settings.normalizeLocale === 'function'
+    ? settings.normalizeLocale(locale)
+    : 'en';
 }
 
 function isLocalNetworkHost(hostname) {
@@ -4221,13 +3713,10 @@ function getChromeFaviconUrl(url) {
 }
 
 function normalizeThemePreference(theme) {
-  if (theme === 'dark') {
-    return 'dark';
-  }
-  if (theme === 'light') {
-    return 'light';
-  }
-  return '';
+  const settings = globalThis.LumnoSettings || {};
+  return typeof settings.normalizeThemePreference === 'function'
+    ? settings.normalizeThemePreference(theme)
+    : '';
 }
 
 function hasThemeTokenInUrl(url, token) {
@@ -4654,26 +4143,13 @@ function sanitizeSiteSearchProviders(items) {
   }
   return items
     .filter((item) => item && item.key && item.template)
-    .map((item) => {
-      const template = normalizeSiteSearchTemplate(item.template);
-      return {
-        key: String(item.key).trim(),
-        aliases: Array.isArray(item.aliases) ? item.aliases.filter(Boolean) : [],
-        name: item.name || item.key,
-        template: template,
-        action: String(item.action || '').trim(),
-        submitStrategy: String(item.submitStrategy || '').trim()
-      };
-    })
-    .filter((item) => {
-      if (!item.key || !item.template) {
-        return false;
-      }
-      if (item.template.includes('{query}')) {
-        return true;
-      }
-      return isAiSiteSearchProvider(item);
-    });
+    .map((item) => ({
+      key: String(item.key).trim(),
+      aliases: Array.isArray(item.aliases) ? item.aliases.filter(Boolean) : [],
+      name: item.name || item.key,
+      template: normalizeSiteSearchTemplate(item.template)
+    }))
+    .filter((item) => item.key && item.template && item.template.includes('{query}'));
 }
 
 function loadCustomSiteSearchProviders() {
@@ -4750,58 +4226,10 @@ function isUrlBlockedBySearchBlacklist(url, items) {
 
 function buildBlacklistProbeUrlFromTemplate(template, query) {
   const rawTemplate = String(template || '');
-  if (!rawTemplate) {
+  if (!rawTemplate || !rawTemplate.includes('{query}')) {
     return '';
-  }
-  if (!rawTemplate.includes('{query}')) {
-    return rawTemplate;
   }
   return rawTemplate.replace(/\{query\}/g, encodeURIComponent(String(query || '')));
-}
-
-function hasOpenAndSubmitSiteSearchAction(provider) {
-  return Boolean(
-    provider &&
-    String(provider.action || '').trim() === 'openAndSubmit'
-  );
-}
-
-function isAiSiteSearchProvider(provider) {
-  if (!provider) {
-    return false;
-  }
-  if (hasOpenAndSubmitSiteSearchAction(provider)) {
-    return true;
-  }
-  const template = normalizeSiteSearchTemplate(provider.template);
-  return Boolean(template) && !template.includes('{query}');
-}
-
-function isInteractiveSiteSearchProvider(provider) {
-  return Boolean(
-    hasOpenAndSubmitSiteSearchAction(provider) &&
-    String(provider.submitStrategy || '').trim() === 'geminiPrompt'
-  );
-}
-
-function inheritSiteSearchProviderBehavior(provider, baseProvider) {
-  if (!provider) {
-    return provider;
-  }
-  return {
-    ...provider,
-    action: String(provider.action || (baseProvider && baseProvider.action) || '').trim(),
-    submitStrategy: String(
-      provider.submitStrategy || (baseProvider && baseProvider.submitStrategy) || ''
-    ).trim()
-  };
-}
-
-function getSiteSearchProviderEntryUrl(provider) {
-  if (!provider || !provider.template) {
-    return '';
-  }
-  return String(provider.template).replace(/\{query\}/g, '');
 }
 
 function isSuggestionBlockedBySearchBlacklist(suggestion, items, queryForProvider) {
@@ -4832,7 +4260,6 @@ function filterBlacklistedSuggestions(list, items, queryForProvider) {
 function mergeCustomProviders(baseItems, customItems) {
   const merged = [];
   const seen = new Set();
-  const baseMap = new Map((baseItems || []).map((item) => [String(item && item.key ? item.key : '').toLowerCase(), item]));
   customItems.forEach((item) => {
     if (item && item.disabled) {
       return;
@@ -4842,7 +4269,7 @@ function mergeCustomProviders(baseItems, customItems) {
       return;
     }
     seen.add(key);
-    merged.push(inheritSiteSearchProviderBehavior(item, baseMap.get(key)));
+    merged.push(item);
   });
   baseItems.forEach((item) => {
     const key = String(item.key || '').toLowerCase();
@@ -5249,8 +4676,8 @@ function getFallbackHistoryItemsCached() {
   return callChromeApiWithTimeout((done) => {
     chrome.history.search({
       text: '',
-      maxResults: 600,
-      startTime: Date.now() - (365 * 24 * 60 * 60 * 1000)
+      maxResults: 240,
+      startTime: Date.now() - (90 * 24 * 60 * 60 * 1000)
     }, (items) => {
       const list = Array.isArray(items) ? items : [];
       historyFallbackCache = {
@@ -5347,8 +4774,7 @@ function getTitlePinyinMatchScore(title, normalizedQuery) {
       reason: 'full-prefix'
     };
   }
-  const allowLooseFullContains = normalizedQuery.length >= 3;
-  if (allowLooseFullContains && index.full.includes(normalizedQuery)) {
+  if (index.full.includes(normalizedQuery)) {
     return {
       score: 14,
       reason: 'full-contains'
@@ -5373,1442 +4799,21 @@ function getTitlePinyinMatchScore(title, normalizedQuery) {
   };
 }
 
-const SEARCH_POLICY = {
-  lookupWindowDays: 180,
-  fallbackHistoryWindowDays: 365,
-  lookupMaxResults: 120,
-  fallbackHistoryMaxResults: 600,
-  maxEngineSuggestions: 5,
-  candidatePoolLimit: 20,
-  finalSuggestionLimit: 12,
-  fallbackTopSiteLimit: 5,
-  topSiteRepresentativeHostLimit: 1,
-  topSiteRepresentativeClusterLimit: 1,
-  primaryHostLimit: 3,
-  primaryClusterLimit: 1,
-  secondaryHostLimit: 5,
-  secondaryClusterLimit: 2
-};
-
-const SEARCH_DEDUP_IGNORED_QUERY_PARAM_NAMES = new Set([
-  'entry',
-  'reason',
-  'ref',
-  'ref_src',
-  'source',
-  'from',
-  'from_source',
-  'feature',
-  'feature_source',
-  'campaign',
-  'campaign_id',
-  'campaign_source',
-  'channel',
-  'via',
-  'trk',
-  'track',
-  'tracking',
-  'tracking_id',
-  'spm',
-  'si'
-]);
-
-const SEARCH_SETTINGS_INTENT_TERMS = new Set([
-  'setting',
-  'settings',
-  'option',
-  'options',
-  'config',
-  'configure',
-  'preference',
-  'preferences',
-  'prefs',
-  '设置',
-  '选项',
-  '配置',
-  '偏好',
-  '管理'
-]);
-
-const SEARCH_PATH_INTENT_TERMS = new Set([
-  'release',
-  'releases',
-  'issue',
-  'issues',
-  'pull',
-  'pulls',
-  'docs',
-  'doc',
-  'wiki',
-  'guide',
-  'guides',
-  'pricing',
-  'price',
-  'download',
-  'admin',
-  'bookmark',
-  'bookmarks',
-  'chat',
-  'message',
-  'messages',
-  'dm',
-  'dms',
-  'setting',
-  'settings',
-  'profile',
-  'account',
-  'notification',
-  'notifications',
-  '设置',
-  '通知',
-  '文档',
-  '价格',
-  '下载',
-  '发布'
-]);
-
-const SEARCH_INFORMATIONAL_TERMS = new Set([
-  'how',
-  'what',
-  'why',
-  'when',
-  'where',
-  'tutorial',
-  'tutorials',
-  'guide',
-  'guides',
-  'learn',
-  'docs',
-  'doc',
-  'help',
-  'review',
-  'reviews',
-  'compare',
-  'comparison',
-  'price',
-  'pricing',
-  'news',
-  '下载',
-  '教程',
-  '文档',
-  '帮助',
-  '对比',
-  '价格',
-  '评测',
-  '为什么',
-  '怎么',
-  '如何'
-]);
-
-const SEARCH_HOME_TITLE_TERMS = new Set([
-  'home',
-  'homepage',
-  'overview',
-  'workspace',
-  'console',
-  'dashboard',
-  '首页',
-  '主页',
-  '概览',
-  '控制台',
-  '工作台'
-]);
-
-const SEARCH_SITE_CONFIG = {
-  'lumno.kubai.design': {
-    ignoreAllSearchParamsPaths: new Set(['/', '/release', '/onboarding'])
-  },
-  'analytics.google.com': {
-    directNavigationUrl: 'https://analytics.google.com/analytics/web/',
-    directNavigationTitle: 'Google Analytics | 首页'
-  },
-  'github.com': {
-    repoAreaCategories: new Map([
-      ['issues', 'repo-issues'],
-      ['pulls', 'repo-pulls'],
-      ['discussions', 'repo-discussions'],
-      ['actions', 'repo-actions'],
-      ['wiki', 'repo-wiki'],
-      ['releases', 'repo-releases']
-    ])
-  },
-  'x.com': {
-    directNavigationUrl: 'https://x.com/',
-    directNavigationTitle: 'X'
-  }
-};
-
-function shouldIgnoreSearchDedupQueryParam(paramName) {
-  const normalized = String(paramName || '').trim().toLowerCase();
-  if (!normalized) {
-    return false;
-  }
-  return normalized.startsWith('utm_') || SEARCH_DEDUP_IGNORED_QUERY_PARAM_NAMES.has(normalized);
-}
-
-function buildSearchDedupUrlKey(url) {
-  if (!url || typeof url !== 'string') {
-    return '';
-  }
-  try {
-    const parsed = new URL(url);
-    parsed.protocol = String(parsed.protocol || '').toLowerCase();
-    parsed.hostname = normalizeHost(parsed.hostname);
-    if ((parsed.protocol === 'http:' && parsed.port === '80') || (parsed.protocol === 'https:' && parsed.port === '443')) {
-      parsed.port = '';
-    }
-    parsed.hash = '';
-    const normalizedPathname = parsed.pathname !== '/'
-      ? (parsed.pathname.replace(/\/+$/, '') || '/')
-      : '/';
-    parsed.pathname = normalizedPathname;
-    const normalizedHost = normalizeHost(parsed.hostname);
-    const siteConfig = SEARCH_SITE_CONFIG[normalizedHost] || null;
-    const ignoreAllSearchParamsPaths = siteConfig && siteConfig.ignoreAllSearchParamsPaths
-      ? siteConfig.ignoreAllSearchParamsPaths
-      : null;
-    const shouldIgnoreAllSearchParams = Boolean(
-      ignoreAllSearchParamsPaths && ignoreAllSearchParamsPaths.has(normalizedPathname)
-    );
-    const nextParams = new URLSearchParams();
-    if (!shouldIgnoreAllSearchParams) {
-      Array.from(parsed.searchParams.entries())
-        .filter(([key]) => !shouldIgnoreSearchDedupQueryParam(key))
-        .sort(([keyA, valueA], [keyB, valueB]) => {
-          if (keyA === keyB) {
-            return String(valueA).localeCompare(String(valueB));
-          }
-          return String(keyA).localeCompare(String(keyB));
-        })
-        .forEach(([key, value]) => {
-          nextParams.append(key, value);
-        });
-    }
-    parsed.search = nextParams.toString() ? `?${nextParams.toString()}` : '';
-    return parsed.toString();
-  } catch (e) {
-    return String(url).trim().toLowerCase();
-  }
-}
-
-function shouldReplaceDedupedSearchItem(candidate, existing) {
-  if (!existing) {
-    return true;
-  }
-  const candidateVisit = Number(candidate && candidate.lastVisitTime) || 0;
-  const existingVisit = Number(existing && existing.lastVisitTime) || 0;
-  if (candidateVisit !== existingVisit) {
-    return candidateVisit > existingVisit;
-  }
-  const candidateTyped = Number(candidate && candidate.typedCount) || 0;
-  const existingTyped = Number(existing && existing.typedCount) || 0;
-  if (candidateTyped !== existingTyped) {
-    return candidateTyped > existingTyped;
-  }
-  const candidateVisitCount = Number(candidate && candidate.visitCount) || 0;
-  const existingVisitCount = Number(existing && existing.visitCount) || 0;
-  if (candidateVisitCount !== existingVisitCount) {
-    return candidateVisitCount > existingVisitCount;
-  }
-  const candidateTitleLength = String(candidate && candidate.title || '').trim().length;
-  const existingTitleLength = String(existing && existing.title || '').trim().length;
-  return candidateTitleLength > existingTitleLength;
-}
-
-function normalizeSearchDedupTitle(title) {
-  return String(title || '')
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function buildSearchDedupEntryKey(item) {
-  if (!item) {
-    return '';
-  }
-  const urlKey = typeof item.url === 'string' && item.url
-    ? buildSearchDedupUrlKey(item.url)
-    : '';
-  const titleKey = normalizeSearchDedupTitle(item.title);
-  if (urlKey && titleKey) {
-    return `url:${urlKey}::title:${titleKey}`;
-  }
-  if (urlKey) {
-    return `url:${urlKey}`;
-  }
-  if (titleKey) {
-    return `title:${titleKey}`;
-  }
-  return `id:${item.id || ''}:${String(item.title || '').trim()}`;
-}
-
-const SEARCH_UTILITY_SEGMENTS = new Set([
-  'settings',
-  'setting',
-  'preferences',
-  'preference',
-  'prefs',
-  'profile',
-  'profiles',
-  'account',
-  'accounts',
-  'notification',
-  'notifications',
-  'activity',
-  'activities',
-  'like',
-  'likes',
-  'admin',
-  'dashboard',
-  'manage',
-  'management',
-  'billing',
-  'payment',
-  'payments'
-]);
-
-const SEARCH_ACTION_SEGMENTS = new Set([
-  'new',
-  'edit',
-  'create',
-  'update',
-  'delete',
-  'compose'
-]);
-
-function splitSearchTerms(value) {
-  return Array.from(new Set(
-    String(value || '')
-      .toLowerCase()
-      .split(/[^a-z0-9\u4e00-\u9fff]+/i)
-      .map((item) => item.trim())
-      .filter(Boolean)
-  ));
-}
-
-function buildSearchQueryContext(query) {
-  const lookupQuery = String(query || '');
-  const queryLower = lookupQuery.trim().toLowerCase();
-  const normalizedPinyinQuery = shouldUseTitlePinyinMatch(lookupQuery)
-    ? normalizeAsciiQueryForPinyin(lookupQuery)
-    : '';
-  const coreQueryTerms = splitSearchTerms(queryLower);
-  const queryTerms = splitSearchTerms(queryLower);
-  if (queryLower && !queryTerms.includes(queryLower)) {
-    queryTerms.unshift(queryLower);
-  }
-  return {
-    lookupQuery,
-    queryLower,
-    normalizedPinyinQuery,
-    useTitlePinyinMatch: Boolean(normalizedPinyinQuery),
-    coreQueryTerms,
-    queryTerms,
-    intentType: classifySearchIntent(lookupQuery, queryTerms),
-    hasSettingsIntent: queryTerms.some((term) => SEARCH_SETTINGS_INTENT_TERMS.has(term)),
-    hasInformationalIntent: queryTerms.some((term) => SEARCH_INFORMATIONAL_TERMS.has(term))
-  };
-}
-
-function hasSearchHomeTitle(title) {
-  const titleTerms = splitSearchTerms(String(title || '').toLowerCase());
-  return titleTerms.some((term) => SEARCH_HOME_TITLE_TERMS.has(term));
-}
-
-function isSearchLikelyBrandProductQuery(context) {
-  if (!context || context.intentType !== 'object') {
-    return false;
-  }
-  if (context.hasInformationalIntent || context.hasSettingsIntent) {
-    return false;
-  }
-  if (!Array.isArray(context.queryTerms) || context.queryTerms.length !== 2) {
-    return false;
-  }
-  return context.queryLower.length <= 28;
-}
-
-function isSearchLikelyDirectNavigationQuery(context) {
-  if (!context || context.hasInformationalIntent) {
-    return false;
-  }
-  return context.intentType === 'brand' || isSearchLikelyBrandProductQuery(context);
-}
-
-function getSearchBrandHostMatchScore(host, context) {
-  if (!host || !context || context.intentType !== 'brand') {
-    return 0;
-  }
-  const query = String(context.queryLower || '').trim();
-  if (!query) {
-    return 0;
-  }
-  const hostLabels = normalizeHost(host).split('.').filter(Boolean);
-  let score = 0;
-  hostLabels.forEach((label) => {
-    if (label === query) {
-      score = Math.max(score, 100);
-      return;
-    }
-    if (query.length >= 2 && label.startsWith(query)) {
-      score = Math.max(score, 60);
-    }
-  });
-  return score;
-}
-
-function getSearchNavigationRepresentativeSignal(item, context) {
-  if (!item || !item.url) {
-    return 0;
-  }
-  const info = getSearchSuggestionClusterInfo(item.url);
-  const titleLower = String(item.title || '').toLowerCase();
-  const hasHomeTitle = hasSearchHomeTitle(titleLower);
-  let signal = 0;
-
-  if (info.category === 'site-root' || info.category === 'repo-root') {
-    signal += 4;
-  } else if (info.category === 'section' || info.category === 'landing') {
-    signal += 3;
-  } else if (hasHomeTitle && info.category !== 'utility' && info.category !== 'action') {
-    signal += 3;
-  } else if (info.category === 'content' && info.depth <= 2) {
-    signal += 1;
-  }
-
-  if (info.category === 'utility' || info.category === 'action' || info.category === 'user') {
-    signal -= 3;
-  } else if (info.category === 'content' && info.depth >= 2 && !hasHomeTitle) {
-    signal -= 1;
-  }
-
-  if (titleLower === context.queryLower) {
-    signal += 4;
-  } else if (titleLower.startsWith(context.queryLower)) {
-    signal += 3;
-  } else if (context.queryTerms.every((term) => term && titleLower.includes(term))) {
-    signal += 2;
-  }
-
-  try {
-    const hostLabels = normalizeHost(new URL(item.url).hostname).split('.').filter(Boolean);
-    context.queryTerms.forEach((term) => {
-      if (!term) {
-        return;
-      }
-      if (hostLabels.includes(term)) {
-        signal += 2;
-        return;
-      }
-      if (term.length >= 2 && hostLabels.some((label) => label.startsWith(term))) {
-        signal += 1;
-      }
-    });
-  } catch (e) {
-    // Ignore invalid URL.
-  }
-
-  if (item.type === 'topSite' || item.isTopSite) {
-    signal += 1;
-  } else if (item.type === 'bookmark') {
-    signal += 1;
-  }
-
-  return signal;
-}
-
-function getSearchDirectNavigationAdjustment(item, sourceType, context) {
-  if (!isSearchLikelyDirectNavigationQuery(context) || !item || !item.url) {
-    return 0;
-  }
-  const info = getSearchSuggestionClusterInfo(item.url);
-  const hasHomeTitle = hasSearchHomeTitle(item.title);
-  const representativeSignal = getSearchNavigationRepresentativeSignal(item, context);
-  const titleLower = String(item.title || '').toLowerCase();
-  const pathTokens = [];
-  let hostname = '';
-  let hostLabels = [];
-  try {
-    const parsedUrl = new URL(item.url);
-    hostname = normalizeHost(parsedUrl.hostname);
-    hostLabels = hostname.split('.').filter(Boolean);
-    decodeURIComponent(String(parsedUrl.pathname || '').toLowerCase())
-      .split('/')
-      .filter(Boolean)
-      .forEach((segment) => {
-        const segmentTokens = segment.split(/[^a-z0-9\u4e00-\u9fff]+/i).filter(Boolean);
-        if (segmentTokens.length > 0) {
-          pathTokens.push(...segmentTokens);
-        }
-      });
-  } catch (e) {
-    hostname = '';
-    hostLabels = [];
-  }
-  const coverageStats = getSearchTermCoverageStats(context, {
-    titleLower,
-    hostname,
-    urlLower: String(item.url || '').toLowerCase(),
-    titleTokens: splitSearchTerms(titleLower),
-    hostLabels,
-    pathTokens
-  });
-  let adjustment = 0;
-
-  if (context.intentType === 'brand') {
-    if (info.category === 'site-root' || info.category === 'repo-root') {
-      adjustment += 70;
-    } else if (info.category === 'section' || info.category === 'landing') {
-      adjustment += 32;
-    } else if (hasHomeTitle) {
-      adjustment += 42;
-    } else if (info.category === 'content' && info.depth >= 2) {
-      adjustment -= 28;
-    }
-  } else if (isSearchLikelyBrandProductQuery(context)) {
-    if (info.category === 'site-root' || info.category === 'repo-root') {
-      adjustment += 34;
-    } else if (info.category === 'section' || info.category === 'landing' || hasHomeTitle) {
-      adjustment += 28;
-    } else if (info.category === 'content' && info.depth >= 2) {
-      adjustment -= 12;
-    }
-  }
-
-  if (representativeSignal >= 6) {
-    adjustment += 18;
-  } else if (representativeSignal <= 0) {
-    adjustment -= 12;
-  }
-
-  if ((info.category === 'utility' || info.category === 'action' || info.category === 'user') && !context.hasSettingsIntent) {
-    adjustment -= 36;
-  }
-
-  if (sourceType === 'topSite' && (info.category === 'site-root' || hasHomeTitle)) {
-    adjustment += 10;
-  }
-
-  if (coverageStats.total >= 2 && !coverageStats.allMatched) {
-    if (info.category === 'site-root' || info.category === 'section' || info.category === 'landing') {
-      adjustment -= Math.min(42, coverageStats.missingCount * 22);
-    }
-    if (representativeSignal >= 6) {
-      adjustment -= 10;
-    }
-  }
-
-  return adjustment;
-}
-
-function getSearchEngineSuggestionScore(context, localSuggestions) {
-  const candidates = Array.isArray(localSuggestions) ? localSuggestions : [];
-  const hasStrongLocalDirectMatch = candidates.some((suggestion) => (
-    suggestion &&
-    suggestion.type !== 'googleSuggest' &&
-    getSearchNavigationRepresentativeSignal(suggestion, context) >= 6
-  ));
-
-  if (context.intentType === 'brand') {
-    return hasStrongLocalDirectMatch ? 18 : 48;
-  }
-  if (isSearchLikelyBrandProductQuery(context)) {
-    return hasStrongLocalDirectMatch ? 34 : 78;
-  }
-  if (context.intentType === 'path' || context.intentType === 'revisit') {
-    return 52;
-  }
-  if (context.hasInformationalIntent) {
-    return 220;
-  }
-  return 160;
-}
-
-function looksLikeVersionSegment(segment) {
-  const value = String(segment || '').trim().toLowerCase();
-  if (!value) {
-    return false;
-  }
-  return /^v?\d+(\.\d+){1,3}([.-][a-z0-9]+)?$/i.test(value);
-}
-
-function looksLikeOpaqueIdSegment(segment) {
-  const value = String(segment || '').trim().toLowerCase();
-  if (!value) {
-    return false;
-  }
-  if (/^\d+$/.test(value)) {
-    return true;
-  }
-  if (/^[0-9a-f]{8,}$/i.test(value)) {
-    return true;
-  }
-  if (/^[0-9a-f]{8}-[0-9a-f-]{8,}$/i.test(value)) {
-    return true;
-  }
-  return false;
-}
-
-function normalizeClusterSegment(segment) {
-  const value = String(segment || '').trim().toLowerCase();
-  if (!value) {
-    return '';
-  }
-  if (looksLikeVersionSegment(value)) {
-    return ':version';
-  }
-  if (looksLikeOpaqueIdSegment(value)) {
-    return ':id';
-  }
-  return value;
-}
-
-function getSearchSuggestionClusterInfo(url) {
-  if (!url) {
-    return {
-      host: '',
-      category: 'unknown',
-      clusterKey: '',
-      depth: 0,
-      path: '/'
-    };
-  }
-  try {
-    const parsed = new URL(url);
-    const host = normalizeHost(parsed.hostname);
-    const path = parsed.pathname !== '/' ? (parsed.pathname.replace(/\/+$/, '') || '/') : '/';
-    const rawSegments = path.split('/').filter(Boolean).map((item) => decodeURIComponent(item).toLowerCase());
-    const segments = rawSegments.map(normalizeClusterSegment);
-    const first = segments[0] || '';
-    const second = segments[1] || '';
-    const third = segments[2] || '';
-
-    const siteConfig = SEARCH_SITE_CONFIG[host] || null;
-    if (host === 'github.com' && segments.length >= 2) {
-      const repoBase = `${host}/${segments[0]}/${segments[1]}`;
-      if (segments.length === 2) {
-        return { host, category: 'repo-root', clusterKey: repoBase, depth: segments.length, path };
-      }
-      const repoAreaCategories = siteConfig && siteConfig.repoAreaCategories
-        ? siteConfig.repoAreaCategories
-        : null;
-      if (repoAreaCategories && repoAreaCategories.has(third)) {
-        return { host, category: repoAreaCategories.get(third), clusterKey: `${repoBase}/${third}`, depth: segments.length, path };
-      }
-      if (third === 'tree' || third === 'blob') {
-        const area = segments[4] || segments[3] || 'root';
-        return { host, category: 'repo-code', clusterKey: `${repoBase}/code/${area}`, depth: segments.length, path };
-      }
-      return { host, category: 'repo-child', clusterKey: `${repoBase}/${third || 'root'}`, depth: segments.length, path };
-    }
-
-    if (segments.length === 0) {
-      return { host, category: 'site-root', clusterKey: `${host}/`, depth: 0, path };
-    }
-
-    if (SEARCH_UTILITY_SEGMENTS.has(first)) {
-      return { host, category: 'utility', clusterKey: `${host}/utility/${first}`, depth: segments.length, path };
-    }
-
-    if (SEARCH_ACTION_SEGMENTS.has(first)) {
-      return { host, category: 'action', clusterKey: `${host}/action/${first}`, depth: segments.length, path };
-    }
-
-    if ((first === 'u' || first === 'user' || first === 'users' || first === 'profile' || first === 'profiles') && second) {
-      return { host, category: 'user', clusterKey: `${host}/user/${second}`, depth: segments.length, path };
-    }
-
-    if (first === 'release' || first === 'releases' || first === 'onboarding' || first === 'changelog') {
-      return { host, category: 'landing', clusterKey: `${host}/${first}`, depth: segments.length, path };
-    }
-
-    if (first === 'docs' || first === 'doc' || first === 'wiki' || first === 'help' || first === 'guide' || first === 'guides') {
-      const docKey = second || 'root';
-      return { host, category: 'docs', clusterKey: `${host}/${first}/${docKey}`, depth: segments.length, path };
-    }
-
-    if (segments.length === 1) {
-      return { host, category: 'section', clusterKey: `${host}/${first}`, depth: segments.length, path };
-    }
-
-    return { host, category: 'content', clusterKey: `${host}/${first}/${second}`, depth: segments.length, path };
-  } catch (e) {
-    return {
-      host: '',
-      category: 'unknown',
-      clusterKey: String(url).trim().toLowerCase(),
-      depth: 0,
-      path: '/'
-    };
-  }
-}
-
-function looksLikeNavigationQuery(query) {
-  const value = String(query || '').trim().toLowerCase();
-  if (!value) {
-    return false;
-  }
-  if (value.includes('://')) {
-    return true;
-  }
-  if (/^[a-z0-9-]+(\.[a-z0-9-]+)+([/#?].*)?$/i.test(value)) {
-    return true;
-  }
-  return false;
-}
-
-function classifySearchIntent(query, queryTerms) {
-  const raw = String(query || '').trim().toLowerCase();
-  const terms = Array.isArray(queryTerms) ? queryTerms.filter(Boolean) : [];
-  if (looksLikeNavigationQuery(raw)) {
-    return 'navigation';
-  }
-
-  if (terms.some((term) => SEARCH_PATH_INTENT_TERMS.has(term))) {
-    return 'path';
-  }
-
-  if (terms.some((term) => looksLikeVersionSegment(term)) || /v?\d+(\.\d+){1,3}/i.test(raw)) {
-    return 'revisit';
-  }
-
-  if (terms.length >= 2) {
-    if (terms.some((term) => /\d/.test(term))) {
-      return 'revisit';
-    }
-    return 'object';
-  }
-
-  if (terms.length === 1) {
-    return 'brand';
-  }
-
-  return 'object';
-}
-
-function getSearchSourceAdjustment(sourceType, intentType) {
-  const source = String(sourceType || '');
-  const intent = String(intentType || 'object');
-
-  if (intent === 'navigation' || intent === 'brand') {
-    if (source === 'bookmark') {
-      return 24;
-    }
-    if (source === 'topSite') {
-      return 20;
-    }
-    if (source === 'history') {
-      return 4;
-    }
-  }
-
-  if (intent === 'path' || intent === 'revisit') {
-    if (source === 'history') {
-      return 18;
-    }
-    if (source === 'bookmark') {
-      return 10;
-    }
-    if (source === 'topSite') {
-      return 8;
-    }
-  }
-
-  if (intent === 'object') {
-    if (source === 'bookmark') {
-      return 18;
-    }
-    if (source === 'history') {
-      return 12;
-    }
-    if (source === 'topSite') {
-      return 10;
-    }
-  }
-
-  return 0;
-}
-
-function matchesSearchQueryText(item, context) {
-  if (!item || !item.url) {
-    return false;
-  }
-  const titleLower = item.title ? item.title.toLowerCase() : '';
-  const urlLower = item.url.toLowerCase();
-  const titleTokens = splitSearchTerms(titleLower);
-  let hostname = '';
-  let hostLabels = [];
-  try {
-    hostname = normalizeHost(new URL(item.url).hostname);
-    hostLabels = hostname.split('.').filter(Boolean);
-  } catch (e) {
-    hostname = '';
-    hostLabels = [];
-  }
-  const matchesTerm = (term) => {
-    if (!term) {
-      return false;
-    }
-    if (
-      titleLower === term ||
-      titleLower.startsWith(term) ||
-      titleTokens.includes(term) ||
-      titleTokens.some((token) => token.startsWith(term))
-    ) {
-      return true;
-    }
-    if (
-      hostname.startsWith(term) ||
-      hostLabels.includes(term) ||
-      hostLabels.some((label) => label.startsWith(term))
-    ) {
-      return true;
-    }
-    if (shouldAllowLooseTextContains(term) && (titleLower.includes(term) || urlLower.includes(term))) {
-      return true;
-    }
-    return false;
-  };
-  if (
-    matchesTerm(context.queryLower)
-  ) {
-    return true;
-  }
-  return context.queryTerms.some((term) => matchesTerm(term));
-}
-
-function matchesSearchTitlePinyin(item, context) {
-  if (!context.useTitlePinyinMatch || !item || !item.title) {
-    return false;
-  }
-  return getTitlePinyinMatchScore(item.title, context.normalizedPinyinQuery).score > 0;
-}
-
-function isShortAsciiSearchTerm(term) {
-  const value = String(term || '').trim().toLowerCase();
-  if (!value) {
-    return false;
-  }
-  return /^[a-z0-9]+$/i.test(value) && value.length <= 2;
-}
-
-function shouldAllowLooseTextContains(term) {
-  const value = String(term || '').trim().toLowerCase();
-  if (!value) {
-    return false;
-  }
-  if (/[\u4e00-\u9fff]/.test(value)) {
-    return true;
-  }
-  return !isShortAsciiSearchTerm(value);
-}
-
-function getSearchTermCoverageStats(context, candidateParts) {
-  const terms = Array.isArray(context && context.coreQueryTerms) && context.coreQueryTerms.length > 0
-    ? context.coreQueryTerms
-    : splitSearchTerms(context && context.queryLower ? context.queryLower : '');
-  if (terms.length === 0) {
-    return {
-      total: 0,
-      matchedCount: 0,
-      missingCount: 0,
-      allMatched: false
-    };
-  }
-  const normalizedCandidate = candidateParts && typeof candidateParts === 'object'
-    ? candidateParts
-    : {};
-  const titleLower = String(normalizedCandidate.titleLower || '');
-  const hostname = String(normalizedCandidate.hostname || '');
-  const urlLower = String(normalizedCandidate.urlLower || '');
-  const titleTokens = Array.isArray(normalizedCandidate.titleTokens) ? normalizedCandidate.titleTokens : [];
-  const hostLabels = Array.isArray(normalizedCandidate.hostLabels) ? normalizedCandidate.hostLabels : [];
-  const pathTokens = Array.isArray(normalizedCandidate.pathTokens) ? normalizedCandidate.pathTokens : [];
-  let matchedCount = 0;
-
-  terms.forEach((term) => {
-    if (!term) {
-      return;
-    }
-    const matched = (
-      titleTokens.includes(term) ||
-      hostLabels.includes(term) ||
-      pathTokens.includes(term) ||
-      titleTokens.some((token) => token.startsWith(term)) ||
-      hostLabels.some((label) => label.startsWith(term)) ||
-      pathTokens.some((token) => token.startsWith(term)) ||
-      (shouldAllowLooseTextContains(term) && (
-        titleLower.includes(term) ||
-        hostname.includes(term) ||
-        urlLower.includes(term)
-      ))
-    );
-    if (matched) {
-      matchedCount += 1;
-    }
-  });
-
-  return {
-    total: terms.length,
-    matchedCount,
-    missingCount: Math.max(0, terms.length - matchedCount),
-    allMatched: matchedCount === terms.length
-  };
-}
-
-function getSearchSuggestionCategoryAdjustment(item, context, coverageStats) {
-  if (!item || !item.url) {
-    return 0;
-  }
-  const info = getSearchSuggestionClusterInfo(item.url);
-  const querySet = new Set(Array.isArray(context && context.queryTerms) ? context.queryTerms : []);
-  const hasSettingsIntent = Boolean(context && context.hasSettingsIntent);
-  const hasActionIntent = querySet.has('new') || querySet.has('edit') || querySet.has('create') || querySet.has('settings') || querySet.has('设置');
-  let adjustment = 0;
-
-  if (info.category === 'site-root' || info.category === 'repo-root') {
-    adjustment += 18;
-  } else if (info.category === 'section') {
-    adjustment += 8;
-  } else if (info.category === 'landing' || info.category === 'docs') {
-    adjustment += 10;
-  }
-
-  if (item.type === 'topSite' || item.isTopSite) {
-    if (info.category === 'site-root' || info.category === 'repo-root') {
-      adjustment += 20;
-    } else if (info.category === 'section' || info.category === 'landing') {
-      adjustment += 10;
-    } else {
-      adjustment += 4;
-    }
-  }
-
-  if (info.depth >= 3 && info.category !== 'docs' && info.category !== 'repo-code') {
-    adjustment -= Math.min(16, (info.depth - 2) * 4);
-  }
-
-  if (info.category === 'utility') {
-    adjustment -= hasSettingsIntent ? 10 : 95;
-  }
-
-  if (info.category === 'action') {
-    adjustment -= hasActionIntent ? 8 : 80;
-  }
-
-  if (info.category === 'repo-code') {
-    adjustment -= 18;
-  }
-
-  if (info.category === 'repo-child' && info.depth >= 4) {
-    adjustment -= 14;
-  }
-
-  if (coverageStats && coverageStats.total >= 2) {
-    const isRepresentativePage =
-      info.category === 'site-root' ||
-      info.category === 'repo-root' ||
-      info.category === 'section' ||
-      info.category === 'landing';
-    if (coverageStats.allMatched) {
-      if (info.category === 'repo-root') {
-        adjustment += 18;
-      } else if (!isRepresentativePage) {
-        adjustment += 12;
-      }
-    } else if (isRepresentativePage) {
-      adjustment -= Math.min(36, coverageStats.missingCount * 18);
-      if ((item.type === 'topSite' || item.isTopSite) && info.category !== 'repo-root') {
-        adjustment -= 6;
-      }
-    }
-  }
-
-  return adjustment;
-}
-
-function getOwnExtensionUtilityPenalty(item, hasSettingsIntent) {
-  if (!item || !item.url || !isOwnExtensionUrl(item.url) || hasSettingsIntent) {
-    return 0;
-  }
-  try {
-    const parsedUrl = new URL(item.url);
-    const pathnameLower = String(parsedUrl.pathname || '').toLowerCase();
-    if (pathnameLower.endsWith('/options.html') || pathnameLower.endsWith('options.html')) {
-      return 110;
-    }
-  } catch (e) {
-    return 0;
-  }
-  return 0;
-}
-
-function getRecentPopularityBoost(suggestion) {
-  if (!suggestion) {
-    return 0;
-  }
-  let boost = 0;
-  const visitCount = Number(suggestion.visitCount) > 0 ? Number(suggestion.visitCount) : 0;
-  const typedCount = Number(suggestion.typedCount) > 0 ? Number(suggestion.typedCount) : 0;
-  if (visitCount > 0) {
-    boost += Math.min(10, Math.log2(visitCount + 1) * 2.5);
-  }
-  if (typedCount > 0) {
-    boost += Math.min(6, typedCount * 1.25);
-  }
-  const lastVisitTime = Number(suggestion.lastVisitTime) || 0;
-  if (lastVisitTime > 0) {
-    const hoursSinceVisit = (Date.now() - lastVisitTime) / (1000 * 60 * 60);
-    if (hoursSinceVisit < 2) boost += 10;
-    else if (hoursSinceVisit < 24) boost += 6;
-    else if (hoursSinceVisit < 72) boost += 3;
-  }
-  return boost;
-}
-
-function getSearchSuggestionSourceRank(suggestion) {
-  if (!suggestion) {
-    return 0;
-  }
-  if (suggestion.type === 'bookmark') {
-    return 3;
-  }
-  if (suggestion.type === 'history') {
-    return 2;
-  }
-  if (suggestion.type === 'topSite' || suggestion.isTopSite) {
-    return 1;
-  }
-  return 0;
-}
-
-function compareSearchSuggestions(a, b) {
-  const scoreDiff = ((b.score || 0) + getRecentPopularityBoost(b)) -
-    ((a.score || 0) + getRecentPopularityBoost(a));
-  if (scoreDiff !== 0) {
-    return scoreDiff;
-  }
-  const sourceRankDiff = getSearchSuggestionSourceRank(b) - getSearchSuggestionSourceRank(a);
-  if (sourceRankDiff !== 0) {
-    return sourceRankDiff;
-  }
-  const visitDiff = (Number(b.visitCount) || 0) - (Number(a.visitCount) || 0);
-  if (visitDiff !== 0) {
-    return visitDiff;
-  }
-  const aVisit = a.lastVisitTime || 0;
-  const bVisit = b.lastVisitTime || 0;
-  return bVisit - aVisit;
-}
-
-function createSearchSuggestion(item, sourceType, score, extras) {
-  return {
-    type: sourceType,
-    title: item.title || item.url,
-    url: item.url,
-    favicon: extras && extras.favicon ? extras.favicon : '',
-    score,
-    lastVisitTime: Number(item.lastVisitTime) || 0,
-    visitCount: Number(item.visitCount) || 0,
-    typedCount: Number(item.typedCount) || 0,
-    reasons: extras && Array.isArray(extras.reasons) ? extras.reasons : [],
-    ...(extras || {})
-  };
-}
-
-function buildSearchSuggestionReasons(item, sourceType, context) {
-  const reasons = [];
-  if (sourceType === 'bookmark') {
-    reasons.push('来源：书签');
-  } else if (sourceType === 'topSite') {
-    reasons.push('来源：常用站点');
-  } else if (sourceType === 'history') {
-    reasons.push('来源：浏览历史');
-  }
-  const pinyinMatch = getTitlePinyinMatchScore(item && item.title, context.normalizedPinyinQuery);
-  if (pinyinMatch.reason === 'initials-exact' || pinyinMatch.reason === 'initials-prefix') {
-    reasons.push('标题首字母匹配');
-  } else if (pinyinMatch.score > 0) {
-    reasons.push('标题拼音匹配');
-  }
-  if (item && item.lastVisitTime) {
-    const hoursSinceVisit = (Date.now() - item.lastVisitTime) / (1000 * 60 * 60);
-    if (hoursSinceVisit < 24) {
-      reasons.push('最近 24 小时访问');
-    } else if (hoursSinceVisit < 72) {
-      reasons.push('最近 3 天访问');
-    }
-  }
-  const visitCount = Number(item && item.visitCount) || 0;
-  if (visitCount > 1) {
-    reasons.push(`访问 ${visitCount} 次`);
-  }
-  return reasons.slice(0, 3);
-}
-
-function buildSearchBrandDirectSuggestion(candidates, context) {
-  if (context.intentType !== 'brand' || context.hasInformationalIntent) {
-    return null;
-  }
-  const hostGroups = new Map();
-  (Array.isArray(candidates) ? candidates : []).forEach((suggestion) => {
-    if (!suggestion || !suggestion.url || suggestion.type === 'googleSuggest') {
-      return;
-    }
-    const info = getSearchSuggestionClusterInfo(suggestion.url);
-    if (!info.host) {
-      return;
-    }
-    const list = hostGroups.get(info.host) || [];
-    list.push(suggestion);
-    hostGroups.set(info.host, list);
-  });
-
-  let bestGroup = null;
-  hostGroups.forEach((group, host) => {
-    const hostScore = getSearchBrandHostMatchScore(host, context);
-    if (hostScore <= 0) {
-      return;
-    }
-    const sourceSuggestion = group
-      .slice()
-      .sort((a, b) => {
-        const signalDiff = getSearchNavigationRepresentativeSignal(b, context) -
-          getSearchNavigationRepresentativeSignal(a, context);
-        if (signalDiff !== 0) {
-          return signalDiff;
-        }
-        return (b.score || 0) - (a.score || 0);
-      })[0];
-    const hasRepresentative = group.some((suggestion) => {
-      const info = getSearchSuggestionClusterInfo(suggestion && suggestion.url);
-      return info.category === 'site-root' ||
-        info.category === 'repo-root' ||
-        info.category === 'section' ||
-        info.category === 'landing' ||
-        hasSearchHomeTitle(suggestion && suggestion.title);
-    });
-    const totalScore = hostScore +
-      Math.max(0, getSearchNavigationRepresentativeSignal(sourceSuggestion, context)) +
-      Math.min(8, group.length * 2);
-    if (!bestGroup || totalScore > bestGroup.totalScore) {
-      bestGroup = {
-        host,
-        sourceSuggestion,
-        hasRepresentative,
-        totalScore
-      };
-    }
-  });
-
-  if (!bestGroup || bestGroup.hasRepresentative || !bestGroup.sourceSuggestion) {
-    return null;
-  }
-
-  const siteConfig = SEARCH_SITE_CONFIG[bestGroup.host] || null;
-  const directUrl = siteConfig && siteConfig.directNavigationUrl
-    ? siteConfig.directNavigationUrl
-    : `https://${bestGroup.host}/`;
-  const directTitle = siteConfig && siteConfig.directNavigationTitle
-    ? siteConfig.directNavigationTitle
-    : (bestGroup.sourceSuggestion.title || bestGroup.host);
-  const sourceType = bestGroup.sourceSuggestion.type === 'bookmark'
-    ? 'bookmark'
-    : ((bestGroup.sourceSuggestion.type === 'topSite' || bestGroup.sourceSuggestion.isTopSite) ? 'topSite' : 'history');
-  const directItem = {
-    title: directTitle,
-    url: directUrl,
-    lastVisitTime: bestGroup.sourceSuggestion.lastVisitTime || 0,
-    visitCount: Number(bestGroup.sourceSuggestion.visitCount) || 0,
-    typedCount: Number(bestGroup.sourceSuggestion.typedCount) || 0
-  };
-  const baseScore = calculateSearchRelevanceScore(directItem, sourceType, context);
-  if (baseScore <= 0) {
-    return null;
-  }
-  const reasons = ['站点直达']
-    .concat(buildSearchSuggestionReasons(directItem, sourceType, context))
-    .slice(0, 3);
-  return createSearchSuggestion(directItem, sourceType, baseScore + 36, {
-    favicon: buildSearchSuggestionFavicon(directUrl),
-    reasons,
-    isTopSite: true,
-    isSyntheticDirect: true
-  });
-}
-
-function calculateSearchRelevanceScore(item, sourceType, context) {
-  const titleLower = item.title ? item.title.toLowerCase() : '';
-  const urlLower = item.url.toLowerCase();
-  let hostname = '';
-  let hostLabels = [];
-  let titleTokens = [];
-  let pathTokens = [];
-  let textScore = 0;
-  let behaviorScore = 0;
-  let sourceScore = 0;
-  let coverageStats = null;
-
-  if (titleLower === context.queryLower) textScore += 140;
-  if (titleLower.startsWith(context.queryLower)) textScore += 70;
-
-  titleTokens = splitSearchTerms(titleLower);
-  if (titleTokens.includes(context.queryLower)) {
-    textScore += 45;
-  }
-
-  context.queryTerms.forEach((word) => {
-    if (!word) {
-      return;
-    }
-    if (titleTokens.includes(word)) {
-      textScore += 24;
-      return;
-    }
-    if (titleTokens.some((token) => token.startsWith(word))) {
-      textScore += 14;
-      return;
-    }
-    if (shouldAllowLooseTextContains(word) && titleLower.includes(word)) textScore += 8;
-  });
-
-  if (shouldAllowLooseTextContains(context.queryLower) && titleLower.includes(context.queryLower)) textScore += 24;
-
-  try {
-    hostname = normalizeHost(new URL(item.url).hostname);
-    hostLabels = hostname.split('.').filter(Boolean);
-    if (shouldAllowLooseTextContains(context.queryLower) && hostname.includes(context.queryLower)) textScore += 14;
-    if (hostname.startsWith(context.queryLower)) textScore += 20;
-    if (hostLabels.includes(context.queryLower)) {
-      textScore += 42;
-    }
-    context.queryTerms.forEach((word) => {
-      if (!word) {
-        return;
-      }
-      if (hostLabels.includes(word)) {
-        textScore += 28;
-        return;
-      }
-      if (hostLabels.some((label) => label.startsWith(word))) {
-        textScore += 16;
-        return;
-      }
-      if (shouldAllowLooseTextContains(word) && hostname.includes(word)) {
-        textScore += 8;
-      }
-    });
-  } catch (e) {
-    // Ignore invalid URL.
-  }
-
-  if (shouldAllowLooseTextContains(context.queryLower) && urlLower.includes(context.queryLower)) textScore += 10;
-  try {
-    const parsedUrl = new URL(item.url);
-    const pathnameLower = String(parsedUrl.pathname || '').toLowerCase();
-    const decodedPathnameLower = decodeURIComponent(pathnameLower);
-    const pathSegments = decodedPathnameLower.split('/').filter(Boolean);
-    pathSegments.forEach((segment) => {
-      const segmentTokens = segment.split(/[^a-z0-9\u4e00-\u9fff]+/i).filter(Boolean);
-      if (segmentTokens.length > 0) {
-        pathTokens.push(...segmentTokens);
-      }
-    });
-    if (decodedPathnameLower && context.queryTerms.length > 0) {
-      context.queryTerms.forEach((word) => {
-        if (!word) {
-          return;
-        }
-        if (pathTokens.includes(word)) {
-          textScore += 32;
-          return;
-        }
-        if (pathTokens.some((token) => token.startsWith(word))) {
-          textScore += 18;
-          return;
-        }
-        if (shouldAllowLooseTextContains(word) && pathTokens.some((token) => token.includes(word))) {
-          textScore += 10;
-          return;
-        }
-        if (shouldAllowLooseTextContains(word) && decodedPathnameLower.includes(word)) {
-          textScore += 8;
-        }
-      });
-    }
-  } catch (e) {
-    // Ignore invalid URL parsing/decoding errors.
-  }
-
-  coverageStats = getSearchTermCoverageStats(context, {
-    titleLower,
-    hostname,
-    urlLower,
-    titleTokens,
-    hostLabels,
-    pathTokens
-  });
-
-  textScore += getTitlePinyinMatchScore(item.title, context.normalizedPinyinQuery).score;
-
-  if (hostname && shouldBlockFaviconForHost(hostname)) {
-    if (titleLower === context.queryLower) textScore += 60;
-    else if (titleLower.startsWith(context.queryLower)) textScore += 42;
-    else if (shouldAllowLooseTextContains(context.queryLower) && titleLower.includes(context.queryLower)) textScore += 24;
-    else if (shouldAllowLooseTextContains(context.queryLower) && urlLower.includes(context.queryLower)) textScore += 20;
-  }
-
-  if (textScore <= 0) {
-    return 0;
-  }
-
-  if (item.lastVisitTime) {
-    const daysSinceVisit = (Date.now() - item.lastVisitTime) / (1000 * 60 * 60 * 24);
-    if (daysSinceVisit < 1) behaviorScore += 10;
-    else if (daysSinceVisit < 7) behaviorScore += 5;
-    else if (daysSinceVisit < 30) behaviorScore += 2;
-  }
-
-  const visitCount = Number(item.visitCount) > 0 ? Number(item.visitCount) : 0;
-  const typedCount = Number(item.typedCount) > 0 ? Number(item.typedCount) : 0;
-  if (visitCount > 0) {
-    behaviorScore += Math.min(18, Math.log2(visitCount + 1) * 4);
-  }
-  if (typedCount > 0) {
-    behaviorScore += Math.min(12, typedCount * 2);
-  }
-  if (item.lastVisitTime) {
-    const hoursSinceVisit = (Date.now() - item.lastVisitTime) / (1000 * 60 * 60);
-    if (hoursSinceVisit < 2) behaviorScore += 20;
-    else if (hoursSinceVisit < 24) behaviorScore += 14;
-    else if (hoursSinceVisit < 72) behaviorScore += 8;
-  }
-
-  if (sourceType === 'bookmark') {
-    sourceScore += 12;
-  } else if (sourceType === 'history') {
-    sourceScore += 4;
-  } else if (sourceType === 'topSite') {
-    sourceScore += 6;
-  }
-  sourceScore += getSearchSourceAdjustment(sourceType, context.intentType);
-
-  return textScore +
-    behaviorScore +
-    sourceScore +
-    getSearchSuggestionCategoryAdjustment(item, context, coverageStats) +
-    getSearchDirectNavigationAdjustment(item, sourceType, context) -
-    getOwnExtensionUtilityPenalty(item, context.hasSettingsIntent);
-}
-
-function buildSearchSuggestionFavicon(url) {
-  if (isOwnExtensionUrl(url)) {
-    return getOwnExtensionFaviconUrl();
-  }
-  try {
-    const urlObj = new URL(url);
-    const host = normalizeHost(urlObj.hostname);
-    return shouldBlockFaviconForHost(host) ? '' : getGoogleFaviconUrl(host);
-  } catch (e) {
-    const fallbackHost = extractHostFromInput(url);
-    return shouldBlockFaviconForHost(fallbackHost) ? '' : url + '/favicon.ico';
-  }
-}
-
-function collectSearchMatches(items, context, searchBlacklistItems) {
-  return (Array.isArray(items) ? items : []).filter((item) => (
-    (matchesSearchQueryText(item, context) || matchesSearchTitlePinyin(item, context)) &&
-    !isUrlBlockedBySearchBlacklist(item && item.url, searchBlacklistItems)
-  ));
-}
-
-function applySearchSuggestionHostDiversity(list) {
-  const candidates = Array.isArray(list) ? list : [];
-  const selected = [];
-  const selectedKeys = new Set();
-  const hostCounts = new Map();
-  const clusterCounts = new Map();
-  const hostHasTopSiteRepresentative = new Set();
-
-  const tryTake = (suggestion, hostLimit, clusterLimit) => {
-    if (!suggestion) {
-      return false;
-    }
-    const dedupKey = buildSearchDedupEntryKey(suggestion);
-    if (!dedupKey || selectedKeys.has(dedupKey)) {
-      return false;
-    }
-    const info = getSearchSuggestionClusterInfo(suggestion.url);
-    const hostKey = info.host || '__nohost__';
-    const clusterKey = info.clusterKey || dedupKey;
-    const currentHostCount = hostCounts.get(hostKey) || 0;
-    const currentClusterCount = clusterCounts.get(clusterKey) || 0;
-    if (currentHostCount >= hostLimit || currentClusterCount >= clusterLimit) {
-      return false;
-    }
-    selected.push(suggestion);
-    selectedKeys.add(dedupKey);
-    hostCounts.set(hostKey, currentHostCount + 1);
-    clusterCounts.set(clusterKey, currentClusterCount + 1);
-    return true;
-  };
-
-  candidates.forEach((suggestion) => {
-    if (!suggestion || !(suggestion.type === 'topSite' || suggestion.isTopSite)) {
-      return;
-    }
-    const info = getSearchSuggestionClusterInfo(suggestion.url);
-    const hostKey = info.host || '__nohost__';
-    if (hostHasTopSiteRepresentative.has(hostKey)) {
-      return;
-    }
-    const isRepresentativeCategory =
-      info.category === 'site-root' ||
-      info.category === 'repo-root' ||
-      info.category === 'section' ||
-      info.category === 'landing';
-    if (!isRepresentativeCategory) {
-      return;
-    }
-    if (tryTake(
-      suggestion,
-      SEARCH_POLICY.topSiteRepresentativeHostLimit,
-      SEARCH_POLICY.topSiteRepresentativeClusterLimit
-    )) {
-      hostHasTopSiteRepresentative.add(hostKey);
-    }
-  });
-
-  candidates.forEach((suggestion) => {
-    tryTake(suggestion, SEARCH_POLICY.primaryHostLimit, SEARCH_POLICY.primaryClusterLimit);
-  });
-
-  if (selected.length < SEARCH_POLICY.finalSuggestionLimit) {
-    candidates.forEach((suggestion) => {
-      tryTake(suggestion, SEARCH_POLICY.secondaryHostLimit, SEARCH_POLICY.secondaryClusterLimit);
-    });
-  }
-
-  return selected.slice(0, SEARCH_POLICY.finalSuggestionLimit);
-}
-
 function mergeItemsByUrl(itemGroups) {
   const merged = [];
-  const mergedIndexByKey = new Map();
+  const seenKeys = new Set();
   (Array.isArray(itemGroups) ? itemGroups : []).forEach((items) => {
     (Array.isArray(items) ? items : []).forEach((item) => {
       if (!item) {
         return;
       }
-      const urlKey = buildSearchDedupEntryKey(item);
-      const existingIndex = mergedIndexByKey.get(urlKey);
-      if (typeof existingIndex === 'number') {
-        if (shouldReplaceDedupedSearchItem(item, merged[existingIndex])) {
-          merged[existingIndex] = item;
-        }
+      const urlKey = typeof item.url === 'string' && item.url
+        ? `url:${item.url}`
+        : `id:${item.id || ''}:${item.title || ''}`;
+      if (seenKeys.has(urlKey)) {
         return;
       }
-      mergedIndexByKey.set(urlKey, merged.length);
+      seenKeys.add(urlKey);
       merged.push(item);
     });
   });
@@ -6818,12 +4823,15 @@ function mergeItemsByUrl(itemGroups) {
 // Function to get search suggestions from history and top sites
 async function getSearchSuggestions(query) {
   const suggestions = [];
-  const context = buildSearchQueryContext(query);
-  if (!context.queryLower) {
-    return [];
-  }
-  const lookupStartTime = Date.now() - (SEARCH_POLICY.lookupWindowDays * 24 * 60 * 60 * 1000);
+  const lookupQuery = String(query || '');
+  const queryLower = String(lookupQuery || '').trim().toLowerCase();
+  const normalizedPinyinQuery = shouldUseTitlePinyinMatch(lookupQuery)
+    ? normalizeAsciiQueryForPinyin(lookupQuery)
+    : '';
+  const useTitlePinyinMatch = Boolean(normalizedPinyinQuery);
+  const lookupStartTime = Date.now() - (30 * 24 * 60 * 60 * 1000);
   const lookupEndTime = Date.now();
+  const lookupMaxResults = 50;
 
   try {
     const [
@@ -6837,172 +4845,71 @@ async function getSearchSuggestions(query) {
     ] = await Promise.all([
       withTimeout(
         fetchSearchSuggestionsForEngine(query)
-        .then((items) => (Array.isArray(items) ? items.slice(0, SEARCH_POLICY.maxEngineSuggestions) : []))
+        .then((items) => (Array.isArray(items) ? items.slice(0, 5) : []))
         .catch(() => []),
         SEARCH_ENGINE_SUGGEST_TIMEOUT_MS,
         []
       ),
       callChromeApiWithTimeout((done) => {
         chrome.history.search({
-          text: context.lookupQuery,
-          maxResults: SEARCH_POLICY.lookupMaxResults,
+          text: lookupQuery,
+          maxResults: lookupMaxResults,
           startTime: lookupStartTime,
           endTime: lookupEndTime
         }, done);
       }, [], LOCAL_SUGGEST_SOURCE_TIMEOUT_MS),
       getTopSitesCached(),
       callChromeApiWithTimeout((done) => {
-        chrome.bookmarks.search({ query: context.lookupQuery }, done);
+        chrome.bookmarks.search({ query: lookupQuery }, done);
       }, [], LOCAL_SUGGEST_SOURCE_TIMEOUT_MS),
       getFallbackHistoryItemsCached(),
       getAllBookmarksCached(),
       loadSearchBlacklistItems()
     ]);
-    const fallbackHistoryMatches = collectSearchMatches(fallbackHistoryItems, context, searchBlacklistItems);
-    const historyItemsMerged = mergeItemsByUrl([
-      Array.isArray(historyItemsRaw) ? historyItemsRaw : [],
-      fallbackHistoryMatches
-    ]);
-    const historyItems = collectSearchMatches(historyItemsMerged, context, searchBlacklistItems);
-    const bookmarkTextMatches = collectSearchMatches(allBookmarks, context, searchBlacklistItems);
-    const bookmarksMerged = mergeItemsByUrl([
-      Array.isArray(bookmarksRaw) ? bookmarksRaw : [],
-      bookmarkTextMatches
-    ]);
-    const bookmarks = collectSearchMatches(bookmarksMerged, context, searchBlacklistItems);
-
-    const bookmarkNodeMap = (Array.isArray(bookmarks) && bookmarks.length > 0)
-      ? await getBookmarkNodeMapCached()
-      : new Map();
-
-    const rootFolderTitles = new Set([
-      'Bookmarks bar',
-      'Other bookmarks',
-      'Mobile bookmarks',
-      '书签栏',
-      '其他书签',
-      '移动设备书签'
-    ]);
-    const suggestionIndexByKey = new Map();
-    const fallbackTopSites = [];
-
-    function buildBookmarkPath(bookmark) {
-      const pathParts = [];
-      let parentId = bookmark && bookmark.parentId ? bookmark.parentId : bookmark && bookmark.id;
-      while (parentId) {
-        const node = bookmarkNodeMap.get(parentId);
-        if (!node) {
-          break;
-        }
-        const isRootFolder = !node.parentId && rootFolderTitles.has(node.title);
-        if (!node.hasUrl && node.title && !isRootFolder) {
-          pathParts.unshift(node.title);
-        }
-        parentId = node.parentId;
-      }
-      return pathParts.join('/');
-    }
-
-    function upsertSuggestion(item, sourceType, extras) {
+    const matchesLookupText = (item) => {
       if (!item || !item.url) {
-        return null;
+        return false;
       }
-      const itemKey = buildSearchDedupEntryKey(item);
-      const baseScore = calculateSearchRelevanceScore(item, sourceType, context);
-      if (baseScore <= 0) {
-        return null;
+      const titleLower = item.title ? item.title.toLowerCase() : '';
+      const urlLower = item.url.toLowerCase();
+      return Boolean(queryLower) && (titleLower.includes(queryLower) || urlLower.includes(queryLower));
+    };
+    const matchesTitlePinyin = (item) => {
+      if (!useTitlePinyinMatch || !item || !item.title) {
+        return false;
       }
-      const normalizedExtras = extras && typeof extras === 'object' ? { ...extras } : {};
-      const scoreAdjustment = Number(normalizedExtras.scoreAdjustment) || 0;
-      delete normalizedExtras.scoreAdjustment;
-      const suggestion = createSearchSuggestion(item, sourceType, baseScore + scoreAdjustment, {
-        favicon: buildSearchSuggestionFavicon(item.url),
-        reasons: buildSearchSuggestionReasons(item, sourceType, context),
-        ...normalizedExtras
-      });
-      const existingIndex = suggestionIndexByKey.get(itemKey);
-      if (typeof existingIndex === 'number') {
-        suggestions[existingIndex] = suggestion;
-      } else {
-        suggestionIndexByKey.set(itemKey, suggestions.length);
-        suggestions.push(suggestion);
-      }
-      return suggestion;
+      return getTitlePinyinMatchScore(item.title, normalizedPinyinQuery).score > 0;
+    };
+
+    let historyItems = mergeItemsByUrl([
+      Array.isArray(historyItemsRaw) ? historyItemsRaw : [],
+      useTitlePinyinMatch
+        ? (Array.isArray(fallbackHistoryItems) ? fallbackHistoryItems.filter((item) => matchesTitlePinyin(item)) : [])
+        : []
+    ]).filter((item) => !isUrlBlockedBySearchBlacklist(item && item.url, searchBlacklistItems));
+    if (historyItems.length === 0 && lookupQuery && lookupQuery.trim().length > 0) {
+      historyItems = Array.isArray(fallbackHistoryItems)
+        ? fallbackHistoryItems.filter((item) => (
+          (matchesLookupText(item) || matchesTitlePinyin(item)) &&
+          !isUrlBlockedBySearchBlacklist(item && item.url, searchBlacklistItems)
+        ))
+        : [];
     }
+    const bookmarks = mergeItemsByUrl([
+      Array.isArray(bookmarksRaw) ? bookmarksRaw : [],
+      useTitlePinyinMatch
+        ? (Array.isArray(allBookmarks) ? allBookmarks.filter((item) => matchesTitlePinyin(item)) : [])
+        : []
+    ]).filter((item) => !isUrlBlockedBySearchBlacklist(item && item.url, searchBlacklistItems));
 
-    historyItems.forEach((item) => {
-      if (!item || !item.title || isSearchEngineResultUrl(item.url)) {
-        return;
-      }
-      upsertSuggestion(item, 'history');
-    });
-
-    (Array.isArray(topSites) ? topSites : []).forEach((site) => {
-      if (!site || !site.url || isUrlBlockedBySearchBlacklist(site.url, searchBlacklistItems)) {
-        return;
-      }
-      const itemKey = buildSearchDedupEntryKey(site);
-      const existingIndex = suggestionIndexByKey.get(itemKey);
-      if (typeof existingIndex === 'number') {
-        const existing = suggestions[existingIndex];
-        suggestions[existingIndex] = {
-          ...existing,
-          isTopSite: true,
-          score: (existing.score || 0) + 6
-        };
-        return;
-      }
-
-      const titleLower = site.title ? site.title.toLowerCase() : '';
-      let scoreAdjustment = 4;
-      try {
-        const hostname = normalizeHost(new URL(site.url).hostname);
-        if (hostname.startsWith(context.queryLower)) {
-          scoreAdjustment += 8;
-        }
-      } catch (e) {
-        // Ignore invalid URLs.
-      }
-      if (titleLower.startsWith(context.queryLower)) {
-        scoreAdjustment += 6;
-      }
-      const suggestion = upsertSuggestion(site, 'topSite', { isTopSite: true, scoreAdjustment });
-      if (!suggestion) {
-        fallbackTopSites.push(site);
-      }
-    });
-
-    bookmarks.forEach((bookmark) => {
-      if (!bookmark || !bookmark.url) {
-        return;
-      }
-      upsertSuggestion(bookmark, 'bookmark', {
-        path: buildBookmarkPath(bookmark),
-        scoreAdjustment: 4
-      });
-    });
-
-    const brandDirectSuggestion = buildSearchBrandDirectSuggestion(suggestions, context);
-    if (brandDirectSuggestion) {
-      const directKey = buildSearchDedupEntryKey(brandDirectSuggestion);
-      const existingIndex = suggestionIndexByKey.get(directKey);
-      if (typeof existingIndex === 'number') {
-        suggestions[existingIndex] = brandDirectSuggestion;
-      } else {
-        suggestionIndexByKey.set(directKey, suggestions.length);
-        suggestions.push(brandDirectSuggestion);
-      }
-    }
-
-    const engineSuggestionScore = getSearchEngineSuggestionScore(context, suggestions);
     engineSuggestions.forEach((suggestion) => {
-      if (suggestion && suggestion !== context.lookupQuery) {
+      if (suggestion && suggestion !== lookupQuery) {
         const suggestionItem = {
           type: 'googleSuggest',
           title: suggestion,
           url: buildDefaultSearchUrl(suggestion),
           favicon: getDefaultSearchEngineFaviconUrl(),
-          score: engineSuggestionScore,
+          score: 200,
           searchQuery: suggestion,
           forceSearch: true,
           reasons: ['来源：搜索建议']
@@ -7013,36 +4920,475 @@ async function getSearchSuggestions(query) {
       }
     });
 
-    suggestions.sort(compareSearchSuggestions);
+    const bookmarkNodeMap = (Array.isArray(bookmarks) && bookmarks.length > 0)
+      ? await getBookmarkNodeMapCached()
+      : new Map();
 
+    const queryWords = queryLower.split(/\s+/).filter((word) => word.length > 0);
+    const rootFolderTitles = new Set([
+      'Bookmarks bar',
+      'Other bookmarks',
+      'Mobile bookmarks',
+      '书签栏',
+      '其他书签',
+      '移动设备书签'
+    ]);
+
+    // Helper function to calculate relevance score
+    function calculateRelevanceScore(item) {
+      const titleLower = item.title ? item.title.toLowerCase() : '';
+      const urlLower = item.url.toLowerCase();
+      let hostname = '';
+      let textScore = 0;
+      let pinyinTitleScore = 0;
+      let behaviorScore = 0;
+
+      // Exact title match (highest priority)
+      if (titleLower === queryLower) textScore += 100;
+
+      // Title starts with query
+      if (titleLower.startsWith(queryLower)) textScore += 50;
+
+      // Query words in title
+      queryWords.forEach(word => {
+        if (titleLower.includes(word)) textScore += 20;
+      });
+
+      // Partial title match
+      if (titleLower.includes(queryLower)) textScore += 15;
+
+      // URL domain match
+      try {
+        hostname = normalizeHost(new URL(item.url).hostname);
+        if (hostname.includes(queryLower)) textScore += 10;
+        if (hostname.startsWith(queryLower)) textScore += 20;
+      } catch (e) {
+        // Invalid URL, skip domain scoring
+      }
+
+      // URL path match: boost token-level hits so "/release/"-like keywords rank higher.
+      if (urlLower.includes(queryLower)) textScore += 8;
+      try {
+        const parsedUrl = new URL(item.url);
+        const pathnameLower = String(parsedUrl.pathname || '').toLowerCase();
+        const decodedPathnameLower = decodeURIComponent(pathnameLower);
+        const pathSegments = decodedPathnameLower.split('/').filter(Boolean);
+        const pathTokens = [];
+        pathSegments.forEach((segment) => {
+          const segmentTokens = segment.split(/[^a-z0-9\u4e00-\u9fff]+/i).filter(Boolean);
+          if (segmentTokens.length > 0) {
+            pathTokens.push(...segmentTokens);
+          }
+        });
+        if (decodedPathnameLower && queryWords.length > 0) {
+          queryWords.forEach((word) => {
+            if (!word) {
+              return;
+            }
+            if (pathTokens.includes(word)) {
+              textScore += 30;
+              return;
+            }
+            const hasPrefixToken = pathTokens.some((token) => token.startsWith(word));
+            if (hasPrefixToken) {
+              textScore += 20;
+              return;
+            }
+            const hasPartialToken = pathTokens.some((token) => token.includes(word));
+            if (hasPartialToken) {
+              textScore += 12;
+              return;
+            }
+            if (decodedPathnameLower.includes(word)) {
+              textScore += 8;
+            }
+          });
+        }
+      } catch (e) {
+        // Ignore invalid URL parsing/decoding errors.
+      }
+
+      pinyinTitleScore = getTitlePinyinMatchScore(item.title, normalizedPinyinQuery).score;
+      textScore += pinyinTitleScore;
+
+      // Local-network/dev pages should surface earlier for quick workflows.
+      if (hostname && shouldBlockFaviconForHost(hostname)) {
+        if (titleLower === queryLower) textScore += 90;
+        else if (titleLower.startsWith(queryLower)) textScore += 70;
+        else if (titleLower.includes(queryLower)) textScore += 45;
+        else if (urlLower.includes(queryLower)) textScore += 20;
+      }
+
+      // Do not surface generic high-frequency sites for natural-language searches
+      // unless there is at least some textual match against title/url/hostname/path.
+      if (textScore <= 0) {
+        return 0;
+      }
+
+      // Recency bonus (for history items)
+      if (item.lastVisitTime) {
+        const daysSinceVisit = (Date.now() - item.lastVisitTime) / (1000 * 60 * 60 * 24);
+        if (daysSinceVisit < 1) behaviorScore += 10;
+        else if (daysSinceVisit < 7) behaviorScore += 5;
+        else if (daysSinceVisit < 30) behaviorScore += 2;
+      }
+
+      // Visit-frequency and strong recency boosts for history ranking.
+      const visitCount = Number(item.visitCount) > 0 ? Number(item.visitCount) : 0;
+      const typedCount = Number(item.typedCount) > 0 ? Number(item.typedCount) : 0;
+      if (visitCount > 0) {
+        behaviorScore += Math.min(24, Math.log2(visitCount + 1) * 6);
+      }
+      if (typedCount > 0) {
+        behaviorScore += Math.min(12, typedCount * 2);
+      }
+      if (item.lastVisitTime) {
+        const hoursSinceVisit = (Date.now() - item.lastVisitTime) / (1000 * 60 * 60);
+        if (hoursSinceVisit < 2) behaviorScore += 28;
+        else if (hoursSinceVisit < 24) behaviorScore += 18;
+        else if (hoursSinceVisit < 72) behaviorScore += 10;
+      }
+      return textScore + behaviorScore;
+    }
+
+    function buildSuggestionReasons(item, sourceType) {
+      const reasons = [];
+      if (sourceType === 'bookmark') {
+        reasons.push('来源：书签');
+      } else if (sourceType === 'topSite') {
+        reasons.push('来源：常用站点');
+      } else if (sourceType === 'history') {
+        reasons.push('来源：浏览历史');
+      }
+      const pinyinMatch = getTitlePinyinMatchScore(item && item.title, normalizedPinyinQuery);
+      if (pinyinMatch.reason === 'initials-exact' || pinyinMatch.reason === 'initials-prefix') {
+        reasons.push('标题首字母匹配');
+      } else if (pinyinMatch.score > 0) {
+        reasons.push('标题拼音匹配');
+      }
+      if (item && item.lastVisitTime) {
+        const hoursSinceVisit = (Date.now() - item.lastVisitTime) / (1000 * 60 * 60);
+        if (hoursSinceVisit < 24) {
+          reasons.push('最近 24 小时访问');
+        } else if (hoursSinceVisit < 72) {
+          reasons.push('最近 3 天访问');
+        }
+      }
+      const visitCount = Number(item && item.visitCount) || 0;
+      if (visitCount > 1) {
+        reasons.push(`访问 ${visitCount} 次`);
+      }
+      return reasons.slice(0, 3);
+    }
+
+    // Process history items with scoring
+    const processedUrls = new Set();
+    const suggestionByUrl = new Map();
+    const suggestionIndexByUrl = new Map();
+    historyItems.forEach(item => {
+      if (isSearchEngineResultUrl(item.url)) {
+        return;
+      }
+      if (item.title && !processedUrls.has(item.url)) {
+        const score = calculateRelevanceScore(item);
+        if (score > 0) {
+          // Get favicon URL using Google's favicon service (more reliable)
+        let faviconUrl = '';
+        if (isOwnExtensionUrl(item.url)) {
+          faviconUrl = getOwnExtensionFaviconUrl();
+        } else {
+          try {
+            const urlObj = new URL(item.url);
+            const host = normalizeHost(urlObj.hostname);
+            faviconUrl = shouldBlockFaviconForHost(host) ? '' : getGoogleFaviconUrl(host);
+          } catch (e) {
+            // Fallback to direct favicon URL (skip local network)
+            const fallbackHost = extractHostFromInput(item.url);
+            faviconUrl = shouldBlockFaviconForHost(fallbackHost) ? '' : item.url + '/favicon.ico';
+          }
+        }
+
+          const suggestion = {
+            type: 'history',
+            title: item.title,
+            url: item.url,
+            favicon: faviconUrl,
+            score: score,
+            lastVisitTime: item.lastVisitTime || 0,
+            visitCount: Number(item.visitCount) || 0,
+            typedCount: Number(item.typedCount) || 0,
+            reasons: buildSuggestionReasons(item, 'history')
+          };
+          suggestions.push(suggestion);
+          processedUrls.add(item.url);
+          suggestionByUrl.set(item.url, suggestion);
+          suggestionIndexByUrl.set(item.url, suggestions.length - 1);
+        }
+      }
+    });
+
+    // Process top sites with scoring
+    const fallbackTopSites = [];
+    topSites.forEach(site => {
+      if (isUrlBlockedBySearchBlacklist(site && site.url, searchBlacklistItems)) {
+        return;
+      }
+      if (!site || !site.url || processedUrls.has(site.url)) {
+        if (site && site.url) {
+          const existing = suggestionByUrl.get(site.url);
+          if (existing) {
+            existing.isTopSite = true;
+            existing.score = (existing.score || 0) + 10;
+          }
+        }
+        return;
+      }
+      const score = calculateRelevanceScore(site);
+      let adjustedScore = score;
+      if (score > 0) {
+        adjustedScore += 20; // Boost top sites so they surface earlier
+        const titleLower = site.title ? site.title.toLowerCase() : '';
+        try {
+          const hostname = normalizeHost(new URL(site.url).hostname);
+          if (hostname.startsWith(queryLower)) {
+            adjustedScore += 15;
+          }
+        } catch (e) {
+          // Ignore invalid URLs
+        }
+        if (titleLower.startsWith(queryLower)) {
+          adjustedScore += 10;
+        }
+      }
+      if (score > 0) {
+        let faviconUrl = '';
+        if (isOwnExtensionUrl(site.url)) {
+          faviconUrl = getOwnExtensionFaviconUrl();
+        } else {
+          try {
+            const urlObj = new URL(site.url);
+            const host = normalizeHost(urlObj.hostname);
+            faviconUrl = shouldBlockFaviconForHost(host) ? '' : getGoogleFaviconUrl(host);
+          } catch (e) {
+            const fallbackHost = extractHostFromInput(site.url);
+            faviconUrl = shouldBlockFaviconForHost(fallbackHost) ? '' : site.url + '/favicon.ico';
+          }
+        }
+
+        const suggestion = {
+          type: 'topSite',
+          title: site.title || site.url,
+          url: site.url,
+          favicon: faviconUrl,
+          score: adjustedScore,
+          reasons: buildSuggestionReasons(site, 'topSite')
+        };
+        suggestions.push(suggestion);
+        processedUrls.add(site.url);
+        suggestionByUrl.set(site.url, suggestion);
+        suggestionIndexByUrl.set(site.url, suggestions.length - 1);
+      } else {
+        fallbackTopSites.push(site);
+      }
+    });
+
+    // Process bookmarks with scoring
+    bookmarks.forEach(bookmark => {
+      if (!bookmark.url) {
+        return;
+      }
+      const existingSuggestion = suggestionByUrl.get(bookmark.url);
+      const shouldReplaceExisting = existingSuggestion && existingSuggestion.type !== 'bookmark';
+      if (!processedUrls.has(bookmark.url) || shouldReplaceExisting) {
+        const score = calculateRelevanceScore(bookmark);
+        // Boost bookmark score slightly to prioritize them
+        if (score > 0) {
+          const adjustedScore = score + 5; // Bonus for bookmarks
+
+          // Get favicon URL using Google's favicon service
+          let faviconUrl = '';
+          if (isOwnExtensionUrl(bookmark.url)) {
+            faviconUrl = getOwnExtensionFaviconUrl();
+          } else {
+            try {
+              const urlObj = new URL(bookmark.url);
+              const host = normalizeHost(urlObj.hostname);
+              faviconUrl = shouldBlockFaviconForHost(host) ? '' : getGoogleFaviconUrl(host);
+            } catch (e) {
+              // Fallback to direct favicon URL (skip local network)
+              const fallbackHost = extractHostFromInput(bookmark.url);
+              faviconUrl = shouldBlockFaviconForHost(fallbackHost) ? '' : bookmark.url + '/favicon.ico';
+            }
+          }
+
+          const pathParts = [];
+          let parentId = bookmark.id;
+          if (bookmark.parentId) {
+            parentId = bookmark.parentId;
+          }
+          while (parentId) {
+            const node = bookmarkNodeMap.get(parentId);
+            if (!node) {
+              break;
+            }
+            const isRootFolder = !node.parentId && rootFolderTitles.has(node.title);
+            if (!node.hasUrl && node.title && !isRootFolder) {
+              pathParts.unshift(node.title);
+            }
+            parentId = node.parentId;
+          }
+          const bookmarkPath = pathParts.join('/');
+
+          const suggestion = {
+            type: 'bookmark',
+            title: bookmark.title || bookmark.url,
+            url: bookmark.url,
+            favicon: faviconUrl,
+            path: bookmarkPath,
+            score: adjustedScore,
+            reasons: buildSuggestionReasons(bookmark, 'bookmark')
+          };
+          const existingIndex = suggestionIndexByUrl.get(bookmark.url);
+          if (shouldReplaceExisting && typeof existingIndex === 'number') {
+            suggestions[existingIndex] = suggestion;
+            suggestionIndexByUrl.set(bookmark.url, existingIndex);
+          } else {
+            suggestions.push(suggestion);
+            suggestionIndexByUrl.set(bookmark.url, suggestions.length - 1);
+          }
+          processedUrls.add(bookmark.url);
+          suggestionByUrl.set(bookmark.url, suggestion);
+        }
+      }
+    });
+
+    function getRecentPopularityBoost(suggestion) {
+      if (!suggestion) {
+        return 0;
+      }
+      let boost = 0;
+      const visitCount = Number(suggestion.visitCount) > 0 ? Number(suggestion.visitCount) : 0;
+      const typedCount = Number(suggestion.typedCount) > 0 ? Number(suggestion.typedCount) : 0;
+      if (visitCount > 0) {
+        boost += Math.min(16, Math.log2(visitCount + 1) * 4);
+      }
+      if (typedCount > 0) {
+        boost += Math.min(8, typedCount * 1.5);
+      }
+      const lastVisitTime = Number(suggestion.lastVisitTime) || 0;
+      if (lastVisitTime > 0) {
+        const hoursSinceVisit = (Date.now() - lastVisitTime) / (1000 * 60 * 60);
+        if (hoursSinceVisit < 2) boost += 16;
+        else if (hoursSinceVisit < 24) boost += 10;
+        else if (hoursSinceVisit < 72) boost += 6;
+      }
+      return boost;
+    }
+
+    // Sort by top site, then relevance + recent-popularity boost, then recency.
+    suggestions.sort((a, b) => {
+      const aTop = a.isTopSite || a.type === 'topSite';
+      const bTop = b.isTopSite || b.type === 'topSite';
+      if (aTop !== bTop) {
+        return aTop ? -1 : 1;
+      }
+      const scoreDiff = ((b.score || 0) + getRecentPopularityBoost(b)) -
+        ((a.score || 0) + getRecentPopularityBoost(a));
+      if (scoreDiff !== 0) {
+        return scoreDiff;
+      }
+      const visitDiff = (Number(b.visitCount) || 0) - (Number(a.visitCount) || 0);
+      if (visitDiff !== 0) {
+        return visitDiff;
+      }
+      const aVisit = a.lastVisitTime || 0;
+      const bVisit = b.lastVisitTime || 0;
+      return bVisit - aVisit;
+    });
+
+    // Remove duplicates and limit results
     const uniqueSuggestions = [];
-    const seenSuggestionKeys = new Set();
-    for (let i = 0; i < suggestions.length && uniqueSuggestions.length < SEARCH_POLICY.candidatePoolLimit; i += 1) {
+    const seenSuggestionUrls = new Set();
+    for (let i = 0; i < suggestions.length && uniqueSuggestions.length < 12; i += 1) {
       const suggestion = suggestions[i];
-      const suggestionKey = buildSearchDedupEntryKey(suggestion);
-      if (!suggestionKey || seenSuggestionKeys.has(suggestionKey)) {
+      const suggestionUrl = suggestion && suggestion.url ? suggestion.url : '';
+      if (!suggestionUrl || seenSuggestionUrls.has(suggestionUrl)) {
         continue;
       }
-      seenSuggestionKeys.add(suggestionKey);
+      seenSuggestionUrls.add(suggestionUrl);
       uniqueSuggestions.push(suggestion);
     }
 
-    let finalSuggestions = applySearchSuggestionHostDiversity(
-      filterBlacklistedSuggestions(uniqueSuggestions, searchBlacklistItems, context.lookupQuery)
-    );
+    // Also remove duplicates by title to avoid similar entries
+    const dedupedByTitle = [];
+    const titleIndexMap = new Map();
+    uniqueSuggestions.forEach((suggestion) => {
+      const titleKey = (suggestion.title || '').toLowerCase();
+      if (!titleKey) {
+        dedupedByTitle.push(suggestion);
+        return;
+      }
+      if (!titleIndexMap.has(titleKey)) {
+        titleIndexMap.set(titleKey, dedupedByTitle.length);
+        dedupedByTitle.push(suggestion);
+        return;
+      }
+      const existingIndex = titleIndexMap.get(titleKey);
+      const existing = dedupedByTitle[existingIndex];
+      if (suggestion.type === 'bookmark' && existing.type !== 'bookmark') {
+        dedupedByTitle[existingIndex] = suggestion;
+      }
+    });
+    let finalSuggestions = filterBlacklistedSuggestions(dedupedByTitle, searchBlacklistItems, lookupQuery);
+
+    const hostCounts = new Map();
+    finalSuggestions = finalSuggestions.filter((suggestion) => {
+      if (!suggestion.url) {
+        return true;
+      }
+      let hostname = '';
+      try {
+        hostname = normalizeHost(new URL(suggestion.url).hostname);
+      } catch (e) {
+        return true;
+      }
+      const current = hostCounts.get(hostname) || 0;
+      if (current >= 2) {
+        return false;
+      }
+      hostCounts.set(hostname, current + 1);
+      return true;
+    }).slice(0, 8);
 
     if (finalSuggestions.length === 0 && fallbackTopSites.length > 0) {
-      const fallbackResults = fallbackTopSites
-        .slice(0, SEARCH_POLICY.fallbackTopSiteLimit)
-        .map((site, index) => createSearchSuggestion(site, 'topSite', 1 - index, {
-          favicon: buildSearchSuggestionFavicon(site.url),
+      const fallbackResults = fallbackTopSites.slice(0, 3).map((site, index) => {
+        let faviconUrl = '';
+        if (isOwnExtensionUrl(site.url)) {
+          faviconUrl = getOwnExtensionFaviconUrl();
+        } else {
+          try {
+            const urlObj = new URL(site.url);
+            const host = normalizeHost(urlObj.hostname);
+            faviconUrl = shouldBlockFaviconForHost(host) ? '' : getGoogleFaviconUrl(host);
+          } catch (e) {
+            const fallbackHost = extractHostFromInput(site.url);
+            faviconUrl = shouldBlockFaviconForHost(fallbackHost) ? '' : site.url + '/favicon.ico';
+          }
+        }
+        return {
+          type: 'topSite',
+          title: site.title || site.url,
+          url: site.url,
+          favicon: faviconUrl,
+          score: 1 - index,
           reasons: ['来源：常用站点']
-        }));
-      finalSuggestions = filterBlacklistedSuggestions(fallbackResults, searchBlacklistItems, context.lookupQuery);
+        };
+      });
+      finalSuggestions = filterBlacklistedSuggestions(fallbackResults, searchBlacklistItems, lookupQuery);
     }
-    
+
     return finalSuggestions;
-    
+
   } catch (error) {
     console.error('Error getting search suggestions:', error);
     return [];
@@ -7066,15 +5412,16 @@ async function getSearchSuggestions(query) {
   let keydownHandler = null;
   let overlayKeyCaptureHandler = null;
   let clickOutsideHandler = null;
-  let overlayEnterAnimationRafA = null;
-  let overlayEnterAnimationRafB = null;
-  let overlayScrollPauseResumeTimer = null;
   let overlayScrollPauseHandler = null;
-  let overlayViewportResizeHandler = null;
-  let overlayVisualViewportTarget = null;
-  let overlayBaseDevicePixelRatio = null;
-  let overlayBaseTopPx = null;
-  let overlayInitialTabZoomFactor = 1;
+  const SETTINGS = window.LumnoSettings || {};
+  const overlayLifecycle = window.LumnoOverlayLifecycle;
+  if (!overlayLifecycle ||
+      typeof overlayLifecycle.createFrameTracker !== 'function' ||
+      typeof overlayLifecycle.createViewportSizeSync !== 'function' ||
+      typeof overlayLifecycle.createAntiTranslateGuard !== 'function') {
+    console.warn('Lumno: overlay lifecycle helper not available.');
+    return;
+  }
   const normalizedOverlayContext = (overlayContext && typeof overlayContext === 'object') ? overlayContext : {};
   const requestedTabZoomFactorRaw = Number(normalizedOverlayContext.tabZoomFactor);
   const initialPrefillQuery = typeof normalizedOverlayContext.prefillQuery === 'string'
@@ -7132,6 +5479,18 @@ async function getSearchSuggestions(query) {
   const requestedTabZoomFactor = Number.isFinite(requestedTabZoomFactorRaw) && requestedTabZoomFactorRaw > 0
     ? requestedTabZoomFactorRaw
     : 1;
+  const overlayFrameTracker = overlayLifecycle.createFrameTracker(window);
+  const overlayViewportSizeSync = overlayLifecycle.createViewportSizeSync(window, {
+    getSizePreset: () => getOverlaySizePreset(overlaySizeMode),
+    getRequestedTabZoomFactor: () => requestedTabZoomFactor,
+    shouldIgnoreTabZoomCompensation: () => shouldIgnoreTabZoomCompensation
+  });
+  const overlayAntiTranslateGuard = overlayLifecycle.createAntiTranslateGuard(window, {
+    applyNoTranslate,
+    applyNoTranslateDeep,
+    restoreProtectedNode,
+    restoreProtectedAncestors
+  });
   const THEME_STORAGE_KEY = '_x_extension_theme_mode_2024_unique_';
   const LANGUAGE_STORAGE_KEY = '_x_extension_language_2024_unique_';
   const LANGUAGE_MESSAGES_STORAGE_KEY = '_x_extension_language_messages_2024_unique_';
@@ -7150,9 +5509,6 @@ async function getSearchSuggestions(query) {
   const RI_CSS_URL = (chrome && chrome.runtime && chrome.runtime.getURL)
     ? chrome.runtime.getURL('assets/remixicon/fonts/remixicon.css')
     : 'assets/remixicon/fonts/remixicon.css';
-  const REMIX_ICON_MAP_URL = (chrome && chrome.runtime && chrome.runtime.getURL)
-    ? chrome.runtime.getURL('assets/remixicon/lumno-remix-icon-map.json')
-    : 'assets/remixicon/lumno-remix-icon-map.json';
   const OPEN_SANS_CSS_URL = (chrome && chrome.runtime && chrome.runtime.getURL)
     ? chrome.runtime.getURL('assets/fonts/open-sans/open-sans.css')
     : 'assets/fonts/open-sans/open-sans.css';
@@ -7162,7 +5518,6 @@ async function getSearchSuggestions(query) {
   let overlaySizeMode = 'standard';
   let overlaySearchBlacklistItems = [];
   let overlayThemeListenerAttached = false;
-  let remixIconSvgMap = null;
 
   function normalizeOverlaySearchBlacklistItems(items) {
     if (globalThis.LumnoBlacklistUtils && typeof globalThis.LumnoBlacklistUtils.normalizeItems === 'function') {
@@ -7173,11 +5528,8 @@ async function getSearchSuggestions(query) {
 
   function buildOverlayBlacklistProbeUrlFromTemplate(template, query) {
     const rawTemplate = String(template || '');
-    if (!rawTemplate) {
+    if (!rawTemplate || !rawTemplate.includes('{query}')) {
       return '';
-    }
-    if (!rawTemplate.includes('{query}')) {
-      return rawTemplate;
     }
     return rawTemplate.replace(/\{query\}/g, encodeURIComponent(String(query || '')));
   }
@@ -7227,7 +5579,9 @@ async function getSearchSuggestions(query) {
   }
 
   function normalizeSearchResultPriority(value) {
-    return value === 'search' ? 'search' : 'autocomplete';
+    return typeof SETTINGS.normalizeSearchResultPriority === 'function'
+      ? SETTINGS.normalizeSearchResultPriority(value)
+      : (value === 'search' ? 'search' : 'autocomplete');
   }
 
   function isInjectedBrowserExtensionProtocol(protocol) {
@@ -7379,137 +5733,12 @@ async function getSearchSuggestions(query) {
     return false;
   }
 
-  const OVERLAY_ANTI_TRANSLATE_GUARD_WINDOW_MS = 1500;
-  const OVERLAY_ANTI_TRANSLATE_MAX_MUTATIONS_PER_WINDOW = 120;
-  const OVERLAY_ANTI_TRANSLATE_MAX_CALLBACKS_PER_WINDOW = 12;
-  const OVERLAY_ANTI_TRANSLATE_BACKOFF_MS = 900;
-  const OVERLAY_ANTI_TRANSLATE_SCROLL_PAUSE_MS = 180;
-
-  let overlayAntiTranslateObserver = null;
-  let overlayAntiTranslateObserverState = null;
-
   function stopOverlayAntiTranslateObserver() {
-    if (overlayScrollPauseResumeTimer !== null) {
-      clearTimeout(overlayScrollPauseResumeTimer);
-      overlayScrollPauseResumeTimer = null;
-    }
-    if (overlayAntiTranslateObserverState && overlayAntiTranslateObserverState.flushTimer) {
-      clearTimeout(overlayAntiTranslateObserverState.flushTimer);
-    }
-    if (overlayAntiTranslateObserverState && overlayAntiTranslateObserverState.resumeTimer) {
-      clearTimeout(overlayAntiTranslateObserverState.resumeTimer);
-    }
-    overlayAntiTranslateObserverState = null;
-    if (overlayAntiTranslateObserver) {
-      overlayAntiTranslateObserver.disconnect();
-      overlayAntiTranslateObserver = null;
-    }
-  }
-
-  function observeOverlayAntiTranslateRoot(root) {
-    if (!overlayAntiTranslateObserver || !root || !root.isConnected) {
-      return;
-    }
-    overlayAntiTranslateObserver.observe(root, {
-      childList: true,
-      characterData: true,
-      subtree: true
-    });
-  }
-
-  function restoreProtectedSubtree(root) {
-    if (!root || root.nodeType !== Node.ELEMENT_NODE) {
-      return;
-    }
-    const nodes = [root];
-    if (typeof root.querySelectorAll === 'function') {
-      root.querySelectorAll('*').forEach((node) => {
-        nodes.push(node);
-      });
-    }
-    nodes.forEach((node) => {
-      restoreProtectedNode(node);
-    });
+    overlayAntiTranslateGuard.stop();
   }
 
   function pauseOverlayAntiTranslateObserverForScroll() {
-    const state = overlayAntiTranslateObserverState;
-    if (!state || state.paused) {
-      return;
-    }
-    state.paused = true;
-    if (state.flushTimer) {
-      clearTimeout(state.flushTimer);
-      state.flushTimer = null;
-    }
-    if (overlayAntiTranslateObserver) {
-      overlayAntiTranslateObserver.disconnect();
-    }
-    if (overlayScrollPauseResumeTimer !== null) {
-      clearTimeout(overlayScrollPauseResumeTimer);
-    }
-    overlayScrollPauseResumeTimer = setTimeout(() => {
-      overlayScrollPauseResumeTimer = null;
-      const activeState = overlayAntiTranslateObserverState;
-      if (!activeState || activeState !== state || activeState.resumeTimer) {
-        return;
-      }
-      if (!state.root || !state.root.isConnected) {
-        return;
-      }
-      state.guardWindowStartedAt = 0;
-      state.mutationCountInWindow = 0;
-      state.callbackCountInWindow = 0;
-      state.pendingProtectedNodes.clear();
-      state.pendingNoTranslateRoots.clear();
-      state.paused = false;
-      observeOverlayAntiTranslateRoot(state.root);
-    }, OVERLAY_ANTI_TRANSLATE_SCROLL_PAUSE_MS);
-  }
-
-  function backoffOverlayAntiTranslateObserver(reason, detail) {
-    const state = overlayAntiTranslateObserverState;
-    if (!state || state.paused) {
-      return;
-    }
-    state.paused = true;
-    if (state.flushTimer) {
-      clearTimeout(state.flushTimer);
-      state.flushTimer = null;
-    }
-    if (overlayAntiTranslateObserver) {
-      overlayAntiTranslateObserver.disconnect();
-    }
-    state.pendingProtectedNodes.clear();
-    state.pendingNoTranslateRoots.clear();
-    if (state.resumeTimer) {
-      clearTimeout(state.resumeTimer);
-    }
-    state.resumeTimer = setTimeout(() => {
-      const activeState = overlayAntiTranslateObserverState;
-      if (!activeState || activeState !== state) {
-        return;
-      }
-      state.resumeTimer = null;
-      if (!state.root || !state.root.isConnected) {
-        return;
-      }
-      applyNoTranslateDeep(state.root);
-      restoreProtectedSubtree(state.root);
-      state.guardWindowStartedAt = 0;
-      state.mutationCountInWindow = 0;
-      state.callbackCountInWindow = 0;
-      state.paused = false;
-      observeOverlayAntiTranslateRoot(state.root);
-    }, OVERLAY_ANTI_TRANSLATE_BACKOFF_MS);
-    try {
-      console.warn('[Lumno] Backing off overlay anti-translate observer to avoid DOM churn', {
-        reason: reason || 'unknown',
-        detail: detail || null
-      });
-    } catch (error) {
-      // Ignore console serialization failures.
-    }
+    overlayAntiTranslateGuard.pauseForScroll();
   }
 
   function setInlineLabelWithIcon(container, labelText, iconHtml) {
@@ -7519,112 +5748,27 @@ async function getSearchSuggestions(query) {
     container.textContent = '';
     const label = document.createElement('span');
     setProtectedPlainText(label, labelText);
-    label.className = 'x-ov-inline-label';
+    label.style.cssText = `
+      all: unset !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      line-height: 1 !important;
+    `;
     const icon = document.createElement('span');
     applyNoTranslate(icon);
     icon.innerHTML = iconHtml;
-    icon.className = 'x-ov-inline-label-icon';
+    icon.style.cssText = `
+      all: unset !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      line-height: 1 !important;
+    `;
     container.appendChild(label);
     container.appendChild(icon);
   }
 
   function startOverlayAntiTranslateObserver(root) {
-    stopOverlayAntiTranslateObserver();
-    if (!root || typeof MutationObserver !== 'function') {
-      return;
-    }
-    let isRestoring = false;
-    overlayAntiTranslateObserverState = {
-      root: root,
-      flushTimer: null,
-      pendingProtectedNodes: new Set(),
-      pendingNoTranslateRoots: new Set(),
-      guardWindowStartedAt: 0,
-      mutationCountInWindow: 0,
-      callbackCountInWindow: 0,
-      paused: false,
-      resumeTimer: null
-    };
-    overlayAntiTranslateObserver = new MutationObserver((mutations) => {
-      const state = overlayAntiTranslateObserverState;
-      if (isRestoring || !state || state.paused) {
-        return;
-      }
-      const now = Date.now();
-      if (!state.guardWindowStartedAt || now - state.guardWindowStartedAt > OVERLAY_ANTI_TRANSLATE_GUARD_WINDOW_MS) {
-        state.guardWindowStartedAt = now;
-        state.mutationCountInWindow = 0;
-        state.callbackCountInWindow = 0;
-      }
-      state.mutationCountInWindow += mutations.length;
-      state.callbackCountInWindow += 1;
-      if (state.mutationCountInWindow > OVERLAY_ANTI_TRANSLATE_MAX_MUTATIONS_PER_WINDOW ||
-          state.callbackCountInWindow > OVERLAY_ANTI_TRANSLATE_MAX_CALLBACKS_PER_WINDOW) {
-        backoffOverlayAntiTranslateObserver('mutation-budget-exceeded', {
-          mutationCountInWindow: state.mutationCountInWindow,
-          callbackCountInWindow: state.callbackCountInWindow
-        });
-        return;
-      }
-      mutations.forEach((mutation) => {
-        if (mutation.target) {
-          const restored = restoreProtectedAncestors(mutation.target, root);
-          if (!restored && mutation.target.nodeType === Node.ELEMENT_NODE) {
-            state.pendingNoTranslateRoots.add(mutation.target);
-          }
-        }
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            state.pendingNoTranslateRoots.add(node);
-          }
-          let current = node && node.nodeType === Node.ELEMENT_NODE
-            ? node
-            : node && node.parentElement
-              ? node.parentElement
-              : null;
-          while (current) {
-            if (typeof current._xProtectedRender === 'function') {
-              state.pendingProtectedNodes.add(current);
-              break;
-            }
-            if (current === root) {
-              break;
-            }
-            current = current.parentElement;
-          }
-        });
-      });
-      if (state.pendingProtectedNodes.size <= 0 && state.pendingNoTranslateRoots.size <= 0) {
-        return;
-      }
-      if (state.flushTimer) {
-        return;
-      }
-      state.flushTimer = setTimeout(() => {
-        const activeState = overlayAntiTranslateObserverState;
-        if (!activeState || activeState !== state || activeState.paused) {
-          return;
-        }
-        state.flushTimer = null;
-        const noTranslateRoots = Array.from(state.pendingNoTranslateRoots);
-        const protectedNodes = Array.from(state.pendingProtectedNodes);
-        state.pendingNoTranslateRoots.clear();
-        state.pendingProtectedNodes.clear();
-        isRestoring = true;
-        if (overlayAntiTranslateObserver) {
-          overlayAntiTranslateObserver.disconnect();
-        }
-        noTranslateRoots.forEach((node) => {
-          applyNoTranslate(node);
-        });
-        protectedNodes.forEach((node) => {
-          restoreProtectedNode(node);
-        });
-        isRestoring = false;
-        observeOverlayAntiTranslateRoot(root);
-      }, 0);
-    });
-    observeOverlayAntiTranslateRoot(root);
+    overlayAntiTranslateGuard.start(root);
   }
 
   let modeBadge = null;
@@ -7641,61 +5785,19 @@ async function getSearchSuggestions(query) {
     searchTemplate: ''
   };
 
-  async function loadRemixIconSvgMap() {
-    if (remixIconSvgMap) {
-      return remixIconSvgMap;
-    }
-    if (!REMIX_ICON_MAP_URL || typeof fetch !== 'function') {
-      remixIconSvgMap = {};
-      return remixIconSvgMap;
-    }
-    try {
-      const response = await fetch(REMIX_ICON_MAP_URL);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const payload = await response.json();
-      const icons = payload && payload.icons && typeof payload.icons === 'object'
-        ? payload.icons
-        : (payload && typeof payload === 'object' ? payload : {});
-      remixIconSvgMap = icons || {};
-    } catch (error) {
-      console.warn('Lumno: failed to load local Remix SVG map for overlay.', error);
-      remixIconSvgMap = {};
-    }
-    return remixIconSvgMap;
-  }
-
-  function getRemixSvgMarkup(id, sizeClass, extraClass) {
-    const svg = remixIconSvgMap && remixIconSvgMap[id];
-    if (!svg) {
-      return '';
-    }
-    const size = String(sizeClass || 'ri-size-16').trim() || 'ri-size-16';
-    const extra = String(extraClass || '').trim();
-    const sizeMatch = size.match(/ri-size-(\d+)/);
-    const sizeValue = sizeMatch ? `${sizeMatch[1]}px` : '16px';
-    const className = extra
-      ? `ri-icon x-lumno-ri-svg ${size} ${extra}`
-      : `ri-icon x-lumno-ri-svg ${size}`;
-    return `<span class="${className}" aria-hidden="true" data-ri-icon="${String(id || '').replace(/"/g, '&quot;')}" style="--ri-size: ${sizeValue};">${svg}</span>`;
-  }
-
-  async function ensureRemixIconStyles(root) {
-    const targetRoot = root && typeof root.appendChild === 'function'
-      ? root
-      : (document.head || document.documentElement);
-    if (!targetRoot || typeof targetRoot.querySelector !== 'function') {
+  async function ensureRemixIconStyles() {
+    if (document.getElementById('_x_extension_remixicon_css_2024_unique_')) {
       return;
     }
-    if (targetRoot.querySelector('#_x_extension_remixicon_css_2024_unique_')) {
+    const host = document.head || document.documentElement;
+    if (!host) {
       return;
     }
     const link = document.createElement('link');
     link.id = '_x_extension_remixicon_css_2024_unique_';
     link.rel = 'stylesheet';
     link.href = RI_CSS_URL;
-    targetRoot.appendChild(link);
+    host.appendChild(link);
   }
 
   async function ensureOpenSansStyles() {
@@ -7713,26 +5815,13 @@ async function getSearchSuggestions(query) {
     host.appendChild(link);
   }
 
-  await loadRemixIconSvgMap();
   await ensureOpenSansStyles();
   await ensureRemixIconStyles();
 
   function normalizeLocale(locale) {
-    const raw = String(locale || '').trim();
-    if (!raw) {
-      return 'en';
-    }
-    const lower = raw.toLowerCase();
-    if (lower.startsWith('zh')) {
-      if (lower.includes('hk')) {
-        return 'zh_HK';
-      }
-      if (lower.includes('tw') || lower.includes('mo') || lower.includes('hant')) {
-        return 'zh_TW';
-      }
-      return 'zh_CN';
-    }
-    return 'en';
+    return typeof SETTINGS.normalizeLocale === 'function'
+      ? SETTINGS.normalizeLocale(locale)
+      : 'en';
   }
 
   function getSystemLocale() {
@@ -7836,27 +5925,21 @@ async function getSearchSuggestions(query) {
   }
 
   function normalizeOverlayTabPriorityMode(mode) {
-    if (mode === 'switchTabFirst') {
-      return true;
-    }
-    if (mode === 'newtabFirst') {
-      return false;
-    }
-    if (mode === false) {
-      return false;
-    }
-    return true;
+    return typeof SETTINGS.normalizeOverlayTabPriorityMode === 'function'
+      ? SETTINGS.normalizeOverlayTabPriorityMode(mode)
+      : mode !== 'newtabFirst' && mode !== false;
   }
 
   function normalizeTabRankScoreDebugMode(mode) {
-    return mode === true;
+    return typeof SETTINGS.normalizeTabRankScoreDebugMode === 'function'
+      ? SETTINGS.normalizeTabRankScoreDebugMode(mode)
+      : mode === true;
   }
 
   function normalizeOverlaySizeMode(mode) {
-    if (mode === 'compact' || mode === 'large') {
-      return mode;
-    }
-    return 'standard';
+    return typeof SETTINGS.normalizeOverlaySizeMode === 'function'
+      ? SETTINGS.normalizeOverlaySizeMode(mode)
+      : ((mode === 'compact' || mode === 'large') ? mode : 'standard');
   }
 
   function getOverlaySizePreset(mode) {
@@ -7889,13 +5972,10 @@ async function getSearchSuggestions(query) {
   }
 
   function getRiSvg(id, sizeClass, extraClass) {
-    const localSvgMarkup = getRemixSvgMarkup(id, sizeClass, extraClass);
-    if (localSvgMarkup) {
-      return localSvgMarkup;
-    }
     const size = sizeClass || 'ri-size-16';
     const extra = extraClass ? ` ${extraClass}` : '';
-    return '<i class="ri-icon ' + size + extra + ' ' + id + '" aria-hidden="true"></i>';
+    return '<i class="ri-icon ' + size + extra + ' ' + id + '" aria-hidden="true" ' +
+      'style="font-style: normal !important; font-variant: normal !important; text-transform: none !important;"></i>';
   }
 
   function buildSearchUrlFromTemplate(template, query) {
@@ -8093,106 +6173,24 @@ async function getSearchSuggestions(query) {
     return isLocalNetworkHost(normalizedHost);
   }
   function clearOverlayEnterAnimationFrames() {
-    if (overlayEnterAnimationRafA !== null) {
-      cancelAnimationFrame(overlayEnterAnimationRafA);
-      overlayEnterAnimationRafA = null;
-    }
-    if (overlayEnterAnimationRafB !== null) {
-      cancelAnimationFrame(overlayEnterAnimationRafB);
-      overlayEnterAnimationRafB = null;
-    }
+    overlayFrameTracker.clear();
   }
 
   function stopOverlayViewportSizeSync() {
-    if (!overlayViewportResizeHandler) {
-      overlayBaseDevicePixelRatio = null;
-      overlayBaseTopPx = null;
-      overlayInitialTabZoomFactor = 1;
-      return;
-    }
-    window.removeEventListener('resize', overlayViewportResizeHandler);
-    if (overlayVisualViewportTarget && typeof overlayVisualViewportTarget.removeEventListener === 'function') {
-      overlayVisualViewportTarget.removeEventListener('resize', overlayViewportResizeHandler);
-    }
-    overlayViewportResizeHandler = null;
-    overlayVisualViewportTarget = null;
-    overlayBaseDevicePixelRatio = null;
-    overlayBaseTopPx = null;
-    overlayInitialTabZoomFactor = 1;
+    overlayViewportSizeSync.stop();
   }
 
   function applyOverlaySizeForPageZoom(overlayElement) {
-    if (!overlayElement || !overlayElement.isConnected) {
-      return;
-    }
-    const sizePreset = getOverlaySizePreset(overlaySizeMode);
-    const visualViewport = window.visualViewport;
-    const viewportWidth = visualViewport && Number.isFinite(visualViewport.width) && visualViewport.width > 0
-      ? visualViewport.width
-      : (window.innerWidth || document.documentElement.clientWidth || 0);
-    const viewportHeight = visualViewport && Number.isFinite(visualViewport.height) && visualViewport.height > 0
-      ? visualViewport.height
-      : (window.innerHeight || document.documentElement.clientHeight || 0);
-    const currentDpr = Number.isFinite(window.devicePixelRatio) && window.devicePixelRatio > 0
-      ? window.devicePixelRatio
-      : 1;
-    const baseDpr = Number.isFinite(overlayBaseDevicePixelRatio) && overlayBaseDevicePixelRatio > 0
-      ? overlayBaseDevicePixelRatio
-      : currentDpr;
-    const dprScaleDelta = currentDpr / baseDpr;
-    const tabZoomFactor = Number.isFinite(overlayInitialTabZoomFactor) && overlayInitialTabZoomFactor > 0
-      ? overlayInitialTabZoomFactor
-      : 1;
-    // 不对双指手势缩放做反向补偿，保持与网页一致缩放感知。
-    const zoomScale = tabZoomFactor * dprScaleDelta;
-    const safeZoomScale = Math.max(0.5, Math.min(3, zoomScale));
-    const presetUiScale = Number.isFinite(sizePreset.uiScale) && sizePreset.uiScale > 0
-      ? sizePreset.uiScale
-      : 1;
-    const finalOverlayZoom = (1 / safeZoomScale) * presetUiScale;
-    const safeFinalOverlayZoom = Math.max(0.35, Math.min(4, finalOverlayZoom));
-    const maxWidth = Math.max(280, viewportWidth - 24);
-    const baseTop = Number.isFinite(overlayBaseTopPx) && overlayBaseTopPx > 0
-      ? overlayBaseTopPx
-      : (viewportHeight * 0.2);
-    const compensatedTop = baseTop * safeZoomScale;
-    const topPx = Math.max(16, Math.min(compensatedTop, Math.max(16, viewportHeight - 120)));
-    overlayElement.style.setProperty('width', `${sizePreset.width}px`, 'important');
-    overlayElement.style.setProperty('max-width', `${maxWidth}px`, 'important');
-    overlayElement.style.setProperty('max-height', `${sizePreset.maxHeightVh}vh`, 'important');
-    overlayElement.style.setProperty('top', `${topPx}px`, 'important');
-    overlayElement.style.setProperty('zoom', `${safeFinalOverlayZoom}`, 'important');
+    overlayViewportSizeSync.apply(overlayElement);
   }
 
   function startOverlayViewportSizeSync(overlayElement) {
-    stopOverlayViewportSizeSync();
-    if (!overlayElement) {
-      return;
-    }
-    overlayBaseDevicePixelRatio = Number.isFinite(window.devicePixelRatio) && window.devicePixelRatio > 0
-      ? window.devicePixelRatio
-      : 1;
-    overlayInitialTabZoomFactor = shouldIgnoreTabZoomCompensation ? 1 : requestedTabZoomFactor;
-    const visualViewport = window.visualViewport;
-    const viewportHeight = visualViewport && Number.isFinite(visualViewport.height) && visualViewport.height > 0
-      ? visualViewport.height
-      : (window.innerHeight || document.documentElement.clientHeight || 0);
-    overlayBaseTopPx = viewportHeight * 0.2;
-    overlayViewportResizeHandler = () => {
-      applyOverlaySizeForPageZoom(overlayElement);
-    };
-    window.addEventListener('resize', overlayViewportResizeHandler);
-    if (visualViewport && typeof visualViewport.addEventListener === 'function') {
-      visualViewport.addEventListener('resize', overlayViewportResizeHandler);
-      overlayVisualViewportTarget = visualViewport;
-    }
-    applyOverlaySizeForPageZoom(overlayElement);
+    overlayViewportSizeSync.start(overlayElement);
   }
 
   // Helper function to remove overlay and clean up styles
   function removeOverlay(overlayElement) {
     clearOverlayEnterAnimationFrames();
-    clearSiteSearchShellAnimation();
     stopOverlayViewportSizeSync();
     stopOverlayAntiTranslateObserver();
     if (overlayElement) {
@@ -8272,63 +6270,27 @@ async function getSearchSuggestions(query) {
     }
     window.removeEventListener('resize', updateSiteSearchPrefixLayout);
   }
-  
+
   // Check if the overlay already exists
   let overlay = document.getElementById('_x_extension_overlay_2024_unique_');
-  
+
   if (overlay) {
     // If it exists, remove it (toggle off)
     removeOverlay(overlay);
   } else {
     // If it doesn't exist, create it (toggle on)
-    overlay = document.createElement('div');
-    overlay.id = '_x_extension_overlay_2024_unique_';
-    applyNoTranslate(overlay);
+    const overlayShell = window.LumnoOverlayShell;
+    if (!overlayShell || typeof overlayShell.createOverlayElement !== 'function') {
+      console.warn('Lumno: overlay shell helper not available.');
+      return;
+    }
     const initialOverlaySizePreset = getOverlaySizePreset(overlaySizeMode);
-    overlay.style.cssText = `
-      position: fixed !important;
-      top: 20vh !important;
-      left: 50% !important;
-      transform: translateX(-50%) translateY(10px) scale(0.985) !important;
-      transform-origin: top center !important;
-      width: ${initialOverlaySizePreset.width}px !important;
-      max-width: calc(100vw - 24px) !important;
-      max-height: ${initialOverlaySizePreset.maxHeightVh}vh !important;
-      z-index: 2147483647 !important;
-      background: var(--x-ov-bg, rgba(255, 255, 255, 0.95));
-      backdrop-filter: blur(var(--x-ov-blur, 24px)) saturate(var(--x-ov-saturate, 165%));
-      -webkit-backdrop-filter: blur(var(--x-ov-blur, 24px)) saturate(var(--x-ov-saturate, 165%));
-      border: 1px solid var(--x-ov-border, rgba(0, 0, 0, 0.08));
-      border-radius: 28px;
-      box-shadow: var(--x-ov-shadow, 0 17px 120px 0 rgba(0, 0, 0, 0.05), 0 32px 44.5px 0 rgba(0, 0, 0, 0.10), 0 80px 120px 0 rgba(0, 0, 0, 0.15));
-      display: block;
-      overflow: visible;
-      contain: layout style;
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1;
-      text-decoration: none;
-      list-style: none;
-      outline: none;
-      color: var(--x-ov-text, #111827);
-      font-size: 100%;
-      font: inherit;
-      vertical-align: baseline;
-      opacity: 0;
-      filter: blur(6px);
-      will-change: transform, opacity, filter;
-      transition: transform 340ms cubic-bezier(0.2, 1, 0.36, 1), opacity 220ms ease, filter 300ms ease;
-    `;
-
-    const overlayShadowRoot = overlay.attachShadow({ mode: 'open' });
-
-    await ensureRemixIconStyles(overlayShadowRoot);
-
-    const overlayPanel = document.createElement('div');
-    overlayPanel.className = 'x-ov-panel';
-    applyNoTranslate(overlayPanel);
+    overlay = overlayShell.createOverlayElement(document, {
+      id: '_x_extension_overlay_2024_unique_',
+      width: initialOverlaySizePreset.width,
+      maxHeightVh: initialOverlaySizePreset.maxHeightVh
+    });
+    applyNoTranslate(overlay);
 
 
     const applyOverlayTheme = (mode) => {
@@ -8367,695 +6329,12 @@ async function getSearchSuggestions(query) {
         overlayThemeListenerAttached = false;
       }
     };
-    
+
     // 使用系统字体，避免外链字体依赖。
-    
-    // Add style to hide scrollbars for WebKit browsers
-    const scrollbarStyle = document.createElement('style');
-    scrollbarStyle.id = '_x_extension_scrollbar_style_2024_unique_';
-    scrollbarStyle.textContent = `
-      *::-webkit-scrollbar {
-        display: none;
-      }
-      * {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-    `;
-    overlayShadowRoot.appendChild(scrollbarStyle);
 
-    const overlayThemeStyle = document.createElement('style');
-    overlayThemeStyle.id = '_x_extension_overlay_theme_style_2024_unique_';
-    overlayThemeStyle.textContent = `
-      #_x_extension_overlay_2024_unique_ .x-ov-panel {
-        all: unset;
-        position: relative;
-        z-index: 1;
-        width: 100%;
-        height: 100%;
-        max-width: 100%;
-        max-height: 100%;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        overflow: visible;
-        border-radius: inherit;
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        background: transparent;
-      }
-      #_x_extension_overlay_2024_unique_ .ri-icon {
-        width: var(--ri-size, 16px);
-        height: var(--ri-size, 16px);
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        line-height: 1;
-        font-size: var(--ri-size, 16px);
-        flex-shrink: 0;
-        font-style: normal;
-        font-variant: normal;
-        text-transform: none;
-      }
-      #_x_extension_overlay_2024_unique_ button .ri-icon,
-      #_x_extension_overlay_2024_unique_ [role="button"] .ri-icon,
-      #_x_extension_overlay_2024_unique_ a .ri-icon {
-        cursor: inherit;
-        pointer-events: none;
-      }
-      #_x_extension_overlay_2024_unique_ .ri-icon::before {
-        font-style: normal;
-        font-variant: normal;
-        text-transform: none;
-      }
-      #_x_extension_overlay_2024_unique_ .ri-size-8 { --ri-size: 8px; }
-      #_x_extension_overlay_2024_unique_ .ri-size-12 { --ri-size: 12px; }
-      #_x_extension_overlay_2024_unique_ .ri-size-16 { --ri-size: 16px; }
-      #_x_extension_overlay_2024_unique_ .ri-size-20 { --ri-size: 20px; }
-      #_x_extension_overlay_2024_unique_ .ri-size-24 { --ri-size: 24px; }
-      #_x_extension_overlay_2024_unique_ .x-ov-inline-icon {
-        all: unset;
-        width: 16px;
-        height: 16px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        line-height: 1;
-        text-decoration: none;
-        list-style: none;
-        outline: none;
-        background: transparent;
-        color: inherit;
-        font-size: 100%;
-        font: inherit;
-        vertical-align: baseline;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-inline-icon--subtext {
-        color: var(--x-ov-subtext, #9CA3AF);
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-action-tag {
-        all: unset;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        background: var(--x-ext-tag-bg, #EEF6FF);
-        color: var(--x-ext-tag-text, #1E3A8A);
-        border: 1px solid var(--x-ext-tag-border, #BFDBFE);
-        padding: 4px 10px 4px 8px;
-        border-radius: 999px;
-        font-size: 11px;
-        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        line-height: 1;
-        text-decoration: none;
-        list-style: none;
-        outline: none;
-        box-sizing: border-box;
-        vertical-align: middle;
-        white-space: nowrap;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-action-tag-label {
-        all: unset;
-        font-weight: 500;
-        line-height: 1;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-action-tag-keycap {
-        all: unset;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 2px 7px;
-        border-radius: 6px;
-        background: var(--x-ext-key-bg, #FFFFFF);
-        color: var(--x-ext-key-text, #1E3A8A);
-        border: 1px solid var(--x-ext-key-border, #BFDBFE);
-        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
-        font-size: 10px;
-        font-weight: 500;
-        line-height: 1;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-top-action-tooltip {
-        all: unset;
-        position: absolute;
-        left: 8px;
-        top: 8px;
-        display: block;
-        visibility: hidden;
-        width: max-content;
-        max-width: 420px;
-        padding: 8px 12px;
-        border-radius: 10px;
-        background: #0F172A;
-        color: #F9FAFB;
-        border: 1px solid rgba(15, 23, 42, 0.12);
-        font-size: 13px;
-        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        font-weight: 500;
-        line-height: 1.35;
-        white-space: normal;
-        overflow-wrap: break-word;
-        text-align: left;
-        box-sizing: border-box;
-        pointer-events: none;
-        z-index: 4;
-        box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
-        opacity: 0;
-        transform: translateY(4px);
-        transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-toolbar-button {
-        all: unset;
-        position: absolute;
-        right: 14px;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 30px;
-        height: 30px;
-        border-radius: 8px;
-        z-index: 2;
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        line-height: 1;
-        text-decoration: none;
-        list-style: none;
-        outline: none;
-        background: transparent;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0;
-        color: var(--x-ext-input-icon, #9CA3AF);
-        cursor: pointer;
-        transition: background-color 140ms ease, color 140ms ease, transform 160ms ease;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-mode-badge {
-        all: unset;
-        position: absolute;
-        right: 86px;
-        top: 50%;
-        transform: translateY(-50%);
-        display: none;
-        align-items: center;
-        gap: 6px;
-        background: var(--x-ov-tag-bg, #F3F4F6);
-        color: var(--x-ov-tag-text, #6B7280);
-        border: 1px solid var(--x-ov-border, rgba(0, 0, 0, 0.08));
-        border-radius: 999px;
-        padding: 4px 8px;
-        font-size: 11px;
-        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        font-weight: 500;
-        line-height: 1;
-        white-space: nowrap;
-        max-width: 180px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        box-sizing: border-box;
-        pointer-events: none;
-        z-index: 1;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-site-search-prefix {
-        all: unset;
-        position: absolute;
-        top: 50%;
-        transform: translateY(-50%);
-        left: 50px;
-        display: none;
-        align-items: center;
-        max-width: 0;
-        padding: 0 8px;
-        height: 22px;
-        border-radius: 8px;
-        border: none;
-        background: var(--x-ext-tag-bg, #EEF6FF);
-        color: #FFFFFF;
-        box-sizing: border-box;
-        overflow: hidden;
-        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        font-size: 12px;
-        font-weight: 500;
-        line-height: 1;
-        pointer-events: none;
-        z-index: 1;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-site-search-prefix-label {
-        all: unset;
-        display: block;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        line-height: 1;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-suggestions-container {
-        all: unset;
-        width: 100%;
-        flex: 1 1 auto;
-        min-height: 0;
-        max-height: 50vh;
-        overflow-y: auto;
-        overscroll-behavior: contain;
-        scrollbar-width: none;
-        -ms-overflow-style: none;
-        background: transparent;
-        border-radius: 0 0 28px 28px;
-        padding: 12px;
-        box-sizing: border-box;
-        display: block;
-        line-height: 1;
-        text-decoration: none;
-        list-style: none;
-        outline: none;
-        color: inherit;
-        font-size: 100%;
-        font: inherit;
-        vertical-align: baseline;
-        position: relative;
-        z-index: 2;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-suggestion-item {
-        all: unset;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 12px 16px;
-        background: transparent;
-        border: 1px solid transparent;
-        border-radius: 16px;
-        cursor: pointer;
-        transition: background-color 0.2s ease;
-        box-sizing: border-box;
-        margin: 0;
-        line-height: 1.5;
-        text-decoration: none;
-        list-style: none;
-        outline: none;
-        color: inherit;
-        font-size: 100%;
-        font: inherit;
-        vertical-align: baseline;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-suggestion-left {
-        all: unset;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        flex: 1;
-        min-width: 0;
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        line-height: 1;
-        text-decoration: none;
-        list-style: none;
-        outline: none;
-        background: transparent;
-        color: inherit;
-        font-size: 100%;
-        font: inherit;
-        vertical-align: baseline;
-        transition: gap 160ms ease, transform 160ms ease;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-suggestion-favicon {
-        all: unset;
-        width: 16px;
-        height: 16px;
-        border-radius: 2px;
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        line-height: 1;
-        text-decoration: none;
-        list-style: none;
-        outline: none;
-        background: transparent;
-        color: inherit;
-        font-size: 100%;
-        font: inherit;
-        vertical-align: baseline;
-        display: block;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-suggestion-favicon--contain {
-        object-fit: contain;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-suggestion-icon-slot {
-        all: unset;
-        width: 24px;
-        height: 24px;
-        flex: 0 0 24px;
-        flex-shrink: 0;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        line-height: 1;
-        text-decoration: none;
-        list-style: none;
-        outline: none;
-        background: transparent;
-        transition: background-color 0.2s ease;
-        color: var(--x-ov-subtext, #9CA3AF);
-        font-size: 100%;
-        font: inherit;
-        vertical-align: baseline;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-suggestion-text {
-        all: unset;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        flex: 1;
-        min-width: 0;
-        overflow: visible;
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0 8px 0 0;
-        line-height: 1;
-        text-decoration: none;
-        list-style: none;
-        outline: none;
-        background: transparent;
-        color: inherit;
-        font-size: 100%;
-        font: inherit;
-        vertical-align: baseline;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-suggestion-title {
-        all: unset;
-        color: var(--x-ov-text, #111827);
-        font-size: 14px;
-        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        font-weight: 400;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 100%;
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        line-height: 1.5;
-        text-decoration: none;
-        list-style: none;
-        outline: none;
-        background: transparent;
-        display: inline-block;
-        vertical-align: baseline;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-suggestion-reason {
-        all: unset;
-        color: var(--x-ov-subtext, #6B7280);
-        font-size: 11px;
-        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        line-height: 1.2;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 100%;
-        display: inline-block;
-        vertical-align: middle;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-meta-tag {
-        all: unset;
-        background: var(--x-ov-tag-bg, #F3F4F6);
-        color: var(--x-ov-tag-text, #6B7280);
-        font-size: 10px;
-        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        padding: 4px 6px;
-        border-radius: 8px;
-        box-sizing: border-box;
-        line-height: 1.2;
-        text-decoration: none;
-        list-style: none;
-        outline: none;
-        border: 1px solid transparent;
-        display: inline-flex;
-        align-items: center;
-        vertical-align: middle;
-        flex-shrink: 0;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-meta-tag--bookmark {
-        background: var(--x-ov-bookmark-tag-bg, #FEF3C7);
-        color: var(--x-ov-bookmark-tag-text, #D97706);
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-bookmark-path {
-        all: unset;
-        color: var(--x-ov-link, #2563EB);
-        font-size: 12px;
-        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        text-decoration: none;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 100%;
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        line-height: 1.2;
-        display: inline-block;
-        vertical-align: middle;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-right-side {
-        all: unset;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        flex-shrink: 0;
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        line-height: 1;
-        text-decoration: none;
-        list-style: none;
-        outline: none;
-        background: transparent;
-        color: inherit;
-        font-size: 100%;
-        font: inherit;
-        vertical-align: baseline;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-action-tags {
-        all: unset;
-        display: none;
-        align-items: center;
-        gap: 6px;
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        line-height: 1;
-        text-decoration: none;
-        list-style: none;
-        outline: none;
-        background: transparent;
-        color: inherit;
-        font-size: 100%;
-        font: inherit;
-        vertical-align: baseline;
-        flex-shrink: 0;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-visit-button {
-        all: unset;
-        background: transparent;
-        color: var(--x-ov-subtext, #9CA3AF);
-        border: 1px solid transparent;
-        border-radius: 16px;
-        font-size: 12px;
-        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        cursor: pointer;
-        padding: 6px 12px;
-        box-sizing: border-box;
-        margin: 0;
-        line-height: 1;
-        text-decoration: none;
-        list-style: none;
-        outline: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        vertical-align: baseline;
-        transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 160ms ease;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-history-delete-slot {
-        all: unset;
-        width: 0;
-        height: 28px;
-        flex: 0 0 auto;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        overflow: visible;
-        line-height: 1;
-        text-decoration: none;
-        list-style: none;
-        outline: none;
-        background: transparent;
-        vertical-align: baseline;
-        opacity: 0;
-        transition: width 180ms ease, margin-left 180ms ease, opacity 160ms ease;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-history-delete-button {
-        all: unset;
-        width: 24px;
-        height: 24px;
-        flex: 0 0 24px;
-        border-radius: 8px;
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        line-height: 1;
-        text-decoration: none;
-        list-style: none;
-        outline: none;
-        background: transparent;
-        color: var(--x-ext-input-icon, #9CA3AF);
-        display: inline-flex;
-        visibility: hidden;
-        pointer-events: none;
-        opacity: 0;
-        align-items: center;
-        justify-content: center;
-        font-size: 0;
-        cursor: pointer;
-        transform: translateX(4px);
-        transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 160ms ease, opacity 160ms ease, visibility 160ms ease;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-inline-label {
-        all: unset;
-        display: inline-flex;
-        align-items: center;
-        line-height: 1;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-inline-label-icon {
-        all: unset;
-        display: inline-flex;
-        align-items: center;
-        line-height: 1;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-empty-state {
-        all: unset;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        padding: 16px 14px;
-        margin: 0;
-        border: none;
-        border-radius: 14px;
-        color: var(--x-ov-subtext, #6B7280);
-        box-sizing: border-box;
-        line-height: 1.4;
-        text-decoration: none;
-        list-style: none;
-        outline: none;
-        font-size: 13px;
-        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        vertical-align: baseline;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-empty-icon {
-        all: unset;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--x-ov-subtext, #9CA3AF);
-        line-height: 1;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-empty-text {
-        all: unset;
-        line-height: 1.35;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-url-line {
-        all: unset;
-        color: var(--x-ov-link, #2563EB);
-        font-size: 12px;
-        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        text-decoration: none;
-        display: inline-block;
-        max-width: 60%;
-        line-height: 1.4;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-switch-button {
-        all: unset;
-        background: transparent;
-        color: var(--x-ov-subtext, #4B5563);
-        border: none;
-        border-radius: 6px;
-        font-size: 12px;
-        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        cursor: pointer;
-        transition: background-color 0.2s ease;
-        height: 26px;
-        padding: 0 12px;
-        box-sizing: border-box;
-        margin: 0;
-        line-height: 1;
-        text-decoration: none;
-        list-style: none;
-        outline: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        vertical-align: baseline;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-switch-button-label,
-      #_x_extension_overlay_2024_unique_ .x-ov-switch-button-icon {
-        all: unset;
-        display: inline-flex;
-        align-items: center;
-        line-height: 1;
-      }
-      #_x_extension_overlay_2024_unique_ .x-ov-rank-debug {
-        all: unset;
-        display: inline-flex;
-        align-items: center;
-        margin-left: 8px;
-        padding: 1px 6px;
-        border-radius: 999px;
-        color: var(--x-ov-subtext, #6B7280);
-        background: color-mix(in srgb, var(--x-ov-bg, #FFFFFF) 70%, #94A3B8 30%);
-        border: 1px solid color-mix(in srgb, var(--x-ov-border, rgba(0, 0, 0, 0.08)) 75%, #94A3B8 25%);
-        font-size: 10px;
-        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        line-height: 1.2;
-        white-space: nowrap;
-        vertical-align: baseline;
-        flex-shrink: 0;
-      }
-      #_x_extension_search_input_2024_unique_ {
-        text-align: left;
-      }
-      #_x_extension_search_input_2024_unique_::placeholder {
-        color: var(--x-ov-placeholder, #9CA3AF);
-        opacity: 0.68;
-        text-align: left;
-      }
-      #_x_extension_search_input_2024_unique_::-webkit-input-placeholder {
-        color: var(--x-ov-placeholder, #9CA3AF);
-        opacity: 0.68;
-      }
-      #_x_extension_search_input_2024_unique_::selection {
-        background: #CFE8FF;
-        color: #1E3A8A;
-      }
-    `;
-    overlayThemeStyle.textContent = overlayThemeStyle.textContent.replaceAll('#_x_extension_overlay_2024_unique_ ', '');
-    overlayShadowRoot.appendChild(overlayThemeStyle);
+    overlayShell.appendOverlayStyleNodes(document);
 
-    
+
     if (typeof window._x_extension_createSearchInput_2024_unique_ !== 'function') {
       console.warn('Lumno: input UI helper not available.');
       removeOverlay(overlay);
@@ -9077,35 +6356,62 @@ async function getSearchSuggestions(query) {
     });
     const searchInput = inputParts.input;
     const inputContainer = inputParts.container;
-    const inputChromeLayer = inputParts.chromeLayer || inputContainer;
     const rightIcon = inputParts.rightIcon;
     const overlayInputHeight = 56;
     applyNoTranslate(searchInput);
     applyNoTranslate(inputContainer);
     applyNoTranslate(rightIcon);
     if (inputContainer) {
-      inputContainer.style.height = `${overlayInputHeight}px`;
-      inputContainer.style.minHeight = `${overlayInputHeight}px`;
-      inputContainer.style.maxHeight = `${overlayInputHeight}px`;
-      inputContainer.style.overflow = 'visible';
+      inputContainer.style.setProperty('height', `${overlayInputHeight}px`, 'important');
+      inputContainer.style.setProperty('min-height', `${overlayInputHeight}px`, 'important');
+      inputContainer.style.setProperty('max-height', `${overlayInputHeight}px`, 'important');
+      inputContainer.style.setProperty('overflow', 'visible', 'important');
     }
     if (searchInput) {
-      searchInput.style.height = `${overlayInputHeight}px`;
-      searchInput.style.minHeight = `${overlayInputHeight}px`;
-      searchInput.style.maxHeight = `${overlayInputHeight}px`;
-      searchInput.style.lineHeight = '1.3';
-      searchInput.style.paddingTop = '0';
-      searchInput.style.paddingBottom = '0';
-      searchInput.style.paddingRight = '92px';
+      searchInput.style.setProperty('height', `${overlayInputHeight}px`, 'important');
+      searchInput.style.setProperty('min-height', `${overlayInputHeight}px`, 'important');
+      searchInput.style.setProperty('max-height', `${overlayInputHeight}px`, 'important');
+      searchInput.style.setProperty('line-height', '1.3', 'important');
+      searchInput.style.setProperty('padding-top', '0', 'important');
+      searchInput.style.setProperty('padding-bottom', '0', 'important');
+      searchInput.style.setProperty('padding-right', '92px', 'important');
     }
     if (rightIcon) {
-      rightIcon.style.right = '50px';
+      rightIcon.style.setProperty('right', '50px', 'important');
     }
     const topActionTooltip = document.createElement('div');
     applyNoTranslate(topActionTooltip);
     topActionTooltip.id = '_x_extension_top_action_tooltip_2026_unique_';
-    topActionTooltip.className = 'x-ov-top-action-tooltip';
-    overlayPanel.appendChild(topActionTooltip);
+    topActionTooltip.style.cssText = `
+      all: unset !important;
+      position: absolute !important;
+      left: 8px !important;
+      top: 8px !important;
+      display: block !important;
+      visibility: hidden !important;
+      width: max-content !important;
+      max-width: 420px !important;
+      padding: 8px 12px !important;
+      border-radius: 10px !important;
+      background: #0F172A !important;
+      color: #F9FAFB !important;
+      border: 1px solid rgba(15, 23, 42, 0.12) !important;
+      font-size: 12px !important;
+      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+      font-weight: 500 !important;
+      line-height: 1.35 !important;
+      white-space: normal !important;
+      overflow-wrap: break-word !important;
+      text-align: left !important;
+      box-sizing: border-box !important;
+      pointer-events: none !important;
+      z-index: 4 !important;
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18) !important;
+      opacity: 0 !important;
+      transform: translateY(4px) !important;
+      transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease !important;
+    `;
+    overlay.appendChild(topActionTooltip);
     let topActionTooltipHideTimer = null;
     const showTopActionTooltip = (button, text) => {
       if (!button || !text || !topActionTooltip) {
@@ -9117,19 +6423,27 @@ async function getSearchSuggestions(query) {
       }
       topActionTooltip.textContent = text;
       const isDark = overlay && overlay.getAttribute('data-theme') === 'dark';
-      topActionTooltip.style.background = isDark ? '#020617' : '#0F172A';
-      topActionTooltip.style.color = '#F8FAFC';
-      topActionTooltip.style.border = isDark ? '1px solid rgba(255, 255, 255, 0.2)' : '1px solid rgba(15, 23, 42, 0.12)';
-      topActionTooltip.style.boxShadow = isDark ? '0 14px 30px rgba(0, 0, 0, 0.45)' : '0 10px 22px rgba(0, 0, 0, 0.18)';
+      topActionTooltip.style.setProperty('background', isDark ? '#020617' : '#0F172A', 'important');
+      topActionTooltip.style.setProperty('color', '#F8FAFC', 'important');
+      topActionTooltip.style.setProperty(
+        'border',
+        isDark ? '1px solid rgba(255, 255, 255, 0.2)' : '1px solid rgba(15, 23, 42, 0.12)',
+        'important'
+      );
+      topActionTooltip.style.setProperty(
+        'box-shadow',
+        isDark ? '0 14px 30px rgba(0, 0, 0, 0.45)' : '0 10px 22px rgba(0, 0, 0, 0.18)',
+        'important'
+      );
       const overlayRect = overlay.getBoundingClientRect();
       const buttonRect = button.getBoundingClientRect();
       const availableWidth = Math.max(180, Math.floor(overlayRect.width - 16));
       const resolvedMaxWidth = Math.min(420, availableWidth);
-      topActionTooltip.style.maxWidth = `${resolvedMaxWidth}px`;
-      topActionTooltip.style.width = 'max-content';
-      topActionTooltip.style.visibility = 'hidden';
-      topActionTooltip.style.opacity = '0';
-      topActionTooltip.style.transform = 'translateY(4px)';
+      topActionTooltip.style.setProperty('max-width', `${resolvedMaxWidth}px`, 'important');
+      topActionTooltip.style.setProperty('width', 'max-content', 'important');
+      topActionTooltip.style.setProperty('visibility', 'hidden', 'important');
+      topActionTooltip.style.setProperty('opacity', '0', 'important');
+      topActionTooltip.style.setProperty('transform', 'translateY(4px)', 'important');
       const tooltipRect = topActionTooltip.getBoundingClientRect();
       const spacing = 10;
       let tooltipTop = Math.round(buttonRect.top - overlayRect.top - tooltipRect.height - spacing);
@@ -9142,25 +6456,25 @@ async function getSearchSuggestions(query) {
       const minLeft = 8;
       const maxLeft = Math.max(minLeft, Math.round(overlayRect.width - tooltipRect.width - 8));
       tooltipLeft = Math.max(minLeft, Math.min(maxLeft, tooltipLeft));
-      topActionTooltip.style.top = `${tooltipTop}px`;
-      topActionTooltip.style.left = `${tooltipLeft}px`;
-      topActionTooltip.style.visibility = 'visible';
+      topActionTooltip.style.setProperty('top', `${tooltipTop}px`, 'important');
+      topActionTooltip.style.setProperty('left', `${tooltipLeft}px`, 'important');
+      topActionTooltip.style.setProperty('visibility', 'visible', 'important');
       requestAnimationFrame(() => {
-        topActionTooltip.style.opacity = '1';
-        topActionTooltip.style.transform = 'translateY(0)';
+        topActionTooltip.style.setProperty('opacity', '1', 'important');
+        topActionTooltip.style.setProperty('transform', 'translateY(0)', 'important');
       });
     };
     const hideTopActionTooltip = () => {
       if (!topActionTooltip) {
         return;
       }
-      topActionTooltip.style.opacity = '0';
-      topActionTooltip.style.transform = 'translateY(4px)';
+      topActionTooltip.style.setProperty('opacity', '0', 'important');
+      topActionTooltip.style.setProperty('transform', 'translateY(4px)', 'important');
       if (topActionTooltipHideTimer) {
         clearTimeout(topActionTooltipHideTimer);
       }
       topActionTooltipHideTimer = setTimeout(() => {
-        topActionTooltip.style.visibility = 'hidden';
+        topActionTooltip.style.setProperty('visibility', 'hidden', 'important');
       }, 120);
     };
     const closeOtherTabsButton = document.createElement('button');
@@ -9169,43 +6483,102 @@ async function getSearchSuggestions(query) {
     closeOtherTabsButton.type = 'button';
     closeOtherTabsButton.innerHTML = getRiSvg('ri-brush-2-line', 'ri-size-16');
     closeOtherTabsButton.setAttribute('aria-label', t('overlay_close_other_tabs_tooltip', '清理本页外的其他标签页（除置顶与群组）'));
-    closeOtherTabsButton.className = 'x-ov-toolbar-button';
+    closeOtherTabsButton.style.cssText = `
+      all: unset !important;
+      position: absolute !important;
+      right: 14px !important;
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+      width: 30px !important;
+      height: 30px !important;
+      border-radius: 8px !important;
+      z-index: 2 !important;
+      box-sizing: border-box !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      line-height: 1 !important;
+      text-decoration: none !important;
+      list-style: none !important;
+      outline: none !important;
+      background: transparent !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      font-size: 0 !important;
+      color: var(--x-ext-input-icon, #9CA3AF) !important;
+      cursor: pointer !important;
+      transition: background-color 140ms ease, color 140ms ease, transform 160ms ease !important;
+    `;
+    const closeOtherTabsIcon = closeOtherTabsButton.querySelector('.ri-icon');
+    if (closeOtherTabsIcon) {
+      closeOtherTabsIcon.style.setProperty('display', 'inline-flex', 'important');
+      closeOtherTabsIcon.style.setProperty('align-items', 'center', 'important');
+      closeOtherTabsIcon.style.setProperty('justify-content', 'center', 'important');
+      closeOtherTabsIcon.style.setProperty('line-height', '1', 'important');
+      closeOtherTabsIcon.style.setProperty('transform', 'none', 'important');
+      closeOtherTabsIcon.style.setProperty('pointer-events', 'none', 'important');
+      closeOtherTabsIcon.style.setProperty('cursor', 'pointer', 'important');
+    }
     const resetCloseOtherTabsButtonVisualState = () => {
-      closeOtherTabsButton.style.background = 'transparent';
-      closeOtherTabsButton.style.color = 'var(--x-ext-input-icon, #9CA3AF)';
-      closeOtherTabsButton.style.transform = 'translateY(-50%)';
+      closeOtherTabsButton.style.setProperty('background', 'transparent', 'important');
+      closeOtherTabsButton.style.setProperty('color', 'var(--x-ext-input-icon, #9CA3AF)', 'important');
+      closeOtherTabsButton.style.setProperty('transform', 'translateY(-50%)', 'important');
     };
     resetCloseOtherTabsButtonVisualState();
     closeOtherTabsButton.addEventListener('mouseenter', () => {
-      closeOtherTabsButton.style.background = 'var(--x-ext-input-icon-hover-bg, rgba(148, 163, 184, 0.16))';
-      closeOtherTabsButton.style.color = 'var(--x-ext-input-icon-hover, #4B5563)';
-      closeOtherTabsButton.style.transform = 'translateY(-50%) scale(1.06)';
+      closeOtherTabsButton.style.setProperty('background', 'var(--x-ext-input-icon-hover-bg, rgba(148, 163, 184, 0.16))', 'important');
+      closeOtherTabsButton.style.setProperty('color', 'var(--x-ext-input-icon-hover, #4B5563)', 'important');
+      closeOtherTabsButton.style.setProperty('transform', 'translateY(-50%) scale(1.06)', 'important');
     });
     closeOtherTabsButton.addEventListener('mouseleave', resetCloseOtherTabsButtonVisualState);
     closeOtherTabsButton.addEventListener('blur', resetCloseOtherTabsButtonVisualState);
     closeOtherTabsButton.addEventListener('pointerup', resetCloseOtherTabsButtonVisualState);
     closeOtherTabsButton.addEventListener('pointercancel', resetCloseOtherTabsButtonVisualState);
-    inputChromeLayer.appendChild(closeOtherTabsButton);
+    inputContainer.appendChild(closeOtherTabsButton);
     modeBadge = document.createElement('div');
     modeBadge.id = '_x_extension_mode_badge_2024_unique_';
     applyNoTranslate(modeBadge);
-    modeBadge.className = 'x-ov-mode-badge';
-    modeBadge.style.display = 'none';
-    inputChromeLayer.appendChild(modeBadge);
+    modeBadge.style.cssText = `
+      all: unset !important;
+      position: absolute !important;
+      right: 86px !important;
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+      display: none !important;
+      align-items: center !important;
+      gap: 6px !important;
+      background: var(--x-ov-tag-bg, #F3F4F6) !important;
+      color: var(--x-ov-tag-text, #6B7280) !important;
+      border: 1px solid var(--x-ov-border, rgba(0, 0, 0, 0.08)) !important;
+      border-radius: 999px !important;
+      padding: 4px 8px !important;
+      font-size: 11px !important;
+      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+      font-weight: 500 !important;
+      line-height: 1 !important;
+      white-space: nowrap !important;
+      max-width: 180px !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      box-sizing: border-box !important;
+      pointer-events: none !important;
+      z-index: 1 !important;
+    `;
+    inputContainer.appendChild(modeBadge);
 
     function updateInputRightPadding() {
       if (!searchInput) {
         return;
       }
       const baseRightReserve = 92;
-      const badgeVisible = Boolean(modeBadge && window.getComputedStyle(modeBadge).display !== 'none');
+      const badgeVisible = Boolean(modeBadge && modeBadge.style.getPropertyValue('display') !== 'none');
       if (!badgeVisible) {
-        searchInput.style.paddingRight = `${baseRightReserve}px`;
+        searchInput.style.setProperty('padding-right', `${baseRightReserve}px`, 'important');
         return;
       }
       const badgeWidth = Math.ceil(modeBadge.getBoundingClientRect().width || 0);
       const totalReserve = Math.max(baseRightReserve, 86 + badgeWidth + 12);
-      searchInput.style.paddingRight = `${totalReserve}px`;
+      searchInput.style.setProperty('padding-right', `${totalReserve}px`, 'important');
     }
 
 
@@ -9332,7 +6705,7 @@ async function getSearchSuggestions(query) {
       }
       const shouldShow = isModeCommand(rawValue || '');
       if (!shouldShow) {
-        modeBadge.style.display = 'none';
+        modeBadge.style.setProperty('display', 'none', 'important');
         updateInputRightPadding();
         return;
       }
@@ -9353,7 +6726,7 @@ async function getSearchSuggestions(query) {
           mode: getThemeModeLabel(overlayThemeMode)
         });
       }
-      modeBadge.style.display = 'inline-flex';
+      modeBadge.style.setProperty('display', 'inline-flex', 'important');
       updateInputRightPadding();
     }
 
@@ -9468,11 +6841,11 @@ async function getSearchSuggestions(query) {
       selectedIndex = -1;
       updateSelection();
     });
-    
+
     searchInput.addEventListener('blur', function() {
       // Don't change selectedIndex here to allow keyboard navigation
     });
-    
+
     let tabs = [];
     let currentOverlayTabId = null;
     if (initialOverlayTabs.length > 0) {
@@ -9502,7 +6875,6 @@ async function getSearchSuggestions(query) {
     }
     let siteSearchState = null;
     let openTabsSearchModeActive = false;
-    let siteSearchShellAnimationTimers = [];
     const defaultPlaceholder = searchInput.placeholder;
     let siteSearchProvidersCache = null;
     let pendingProviderReload = false;
@@ -9510,7 +6882,6 @@ async function getSearchSuggestions(query) {
       { key: 'yt', aliases: ['youtube'], name: 'YouTube', template: 'https://www.youtube.com/results?search_query={query}' },
       { key: 'bb', aliases: ['bilibili', 'bili'], name: 'Bilibili', template: 'https://search.bilibili.com/all?keyword={query}' },
       { key: 'gh', aliases: ['github'], name: 'GitHub', template: 'https://github.com/search?q={query}' },
-      { key: 'gm', aliases: ['gemini'], name: 'Gemini', template: 'https://gemini.google.com/app', action: 'openAndSubmit', submitStrategy: 'geminiPrompt' },
       { key: 'so', aliases: ['baidu', 'bd'], name: 'Baidu', template: 'https://www.baidu.com/s?wd={query}' },
       { key: 'bi', aliases: ['bing'], name: 'Bing', template: 'https://www.bing.com/search?q={query}' },
       { key: 'gg', aliases: ['google'], name: 'Google', template: 'https://www.google.com/search?q={query}' },
@@ -9928,28 +7299,28 @@ async function getSearchSuggestions(query) {
       const resolved = resolveOverlayTheme(mode);
       const tokens = overlayThemeTokens[resolved] || overlayThemeTokens.light;
       target.setAttribute('data-theme', resolved);
-      target.style.setProperty('--x-ov-bg', tokens.bg);
-      target.style.setProperty('--x-ov-border', tokens.border);
-      target.style.setProperty('--x-ov-shadow', tokens.shadow);
-      target.style.setProperty('--x-ov-text', tokens.text);
-      target.style.setProperty('--x-ov-subtext', tokens.subtext);
-      target.style.setProperty('--x-ov-link', tokens.link);
-      target.style.setProperty('--x-ov-placeholder', tokens.placeholder);
-      target.style.setProperty('--x-ov-hover-bg', tokens.hoverBg);
-      target.style.setProperty('--x-ov-tag-bg', tokens.tagBg);
-      target.style.setProperty('--x-ov-tag-text', tokens.tagText);
-      target.style.setProperty('--x-ov-bookmark-tag-bg', tokens.bookmarkTagBg);
-      target.style.setProperty('--x-ov-bookmark-tag-text', tokens.bookmarkTagText);
-      target.style.setProperty('--x-ov-blur', tokens.blur);
-      target.style.setProperty('--x-ov-saturate', tokens.saturate);
-      target.style.setProperty('--x-ext-input-text', tokens.text);
-      target.style.setProperty('--x-ext-input-caret', tokens.link);
-      target.style.setProperty('--x-ext-input-icon', tokens.subtext);
-      target.style.setProperty('--x-ext-input-icon-hover-bg', tokens.hoverBg);
-      target.style.setProperty('--x-ext-input-icon-hover', tokens.text);
-      target.style.setProperty('--x-ext-input-underline', tokens.underline);
-      target.style.setProperty('--x-ext-input-divider-inset', tokens.dividerInset);
-      target.style.setProperty('--x-ext-input-divider-opacity', tokens.dividerOpacity);
+      target.style.setProperty('--x-ov-bg', tokens.bg, 'important');
+      target.style.setProperty('--x-ov-border', tokens.border, 'important');
+      target.style.setProperty('--x-ov-shadow', tokens.shadow, 'important');
+      target.style.setProperty('--x-ov-text', tokens.text, 'important');
+      target.style.setProperty('--x-ov-subtext', tokens.subtext, 'important');
+      target.style.setProperty('--x-ov-link', tokens.link, 'important');
+      target.style.setProperty('--x-ov-placeholder', tokens.placeholder, 'important');
+      target.style.setProperty('--x-ov-hover-bg', tokens.hoverBg, 'important');
+      target.style.setProperty('--x-ov-tag-bg', tokens.tagBg, 'important');
+      target.style.setProperty('--x-ov-tag-text', tokens.tagText, 'important');
+      target.style.setProperty('--x-ov-bookmark-tag-bg', tokens.bookmarkTagBg, 'important');
+      target.style.setProperty('--x-ov-bookmark-tag-text', tokens.bookmarkTagText, 'important');
+      target.style.setProperty('--x-ov-blur', tokens.blur, 'important');
+      target.style.setProperty('--x-ov-saturate', tokens.saturate, 'important');
+      target.style.setProperty('--x-ext-input-text', tokens.text, 'important');
+      target.style.setProperty('--x-ext-input-caret', tokens.link, 'important');
+      target.style.setProperty('--x-ext-input-icon', tokens.subtext, 'important');
+      target.style.setProperty('--x-ext-input-icon-hover-bg', tokens.hoverBg, 'important');
+      target.style.setProperty('--x-ext-input-icon-hover', tokens.text, 'important');
+      target.style.setProperty('--x-ext-input-underline', tokens.underline, 'important');
+      target.style.setProperty('--x-ext-input-divider-inset', tokens.dividerInset, 'important');
+      target.style.setProperty('--x-ext-input-divider-opacity', tokens.dividerOpacity, 'important');
     }
 
     if (storageArea) {
@@ -10253,36 +7624,6 @@ async function getSearchSuggestions(query) {
       ];
     }
 
-    function rgbToHsl(rgb) {
-      const r = rgb[0] / 255;
-      const g = rgb[1] / 255;
-      const b = rgb[2] / 255;
-      const max = Math.max(r, g, b);
-      const min = Math.min(r, g, b);
-      const delta = max - min;
-      let h = 0;
-      const l = (max + min) / 2;
-      let s = 0;
-      if (delta !== 0) {
-        s = delta / (1 - Math.abs(2 * l - 1));
-        switch (max) {
-          case r:
-            h = 60 * (((g - b) / delta) % 6);
-            break;
-          case g:
-            h = 60 * (((b - r) / delta) + 2);
-            break;
-          default:
-            h = 60 * (((r - g) / delta) + 4);
-            break;
-        }
-      }
-      if (h < 0) {
-        h += 360;
-      }
-      return [h, s, l];
-    }
-
     function buildFallbackThemeForHost(hostname) {
       if (!hostname) {
         return null;
@@ -10314,7 +7655,7 @@ async function getSearchSuggestions(query) {
       const visualCenter = (targetSize - 1) / 2;
       try {
         if (!(img.complete && img.naturalWidth > 0 && img.naturalHeight > 0)) {
-          img.style.transform = 'none';
+          img.style.setProperty('transform', 'none', 'important');
           return;
         }
         const canvas = document.createElement('canvas');
@@ -10322,7 +7663,7 @@ async function getSearchSuggestions(query) {
         canvas.height = targetSize;
         const context = canvas.getContext('2d', { willReadFrequently: true });
         if (!context) {
-          img.style.transform = 'none';
+          img.style.setProperty('transform', 'none', 'important');
           return;
         }
         context.clearRect(0, 0, targetSize, targetSize);
@@ -10343,7 +7684,7 @@ async function getSearchSuggestions(query) {
           }
         }
         if (sumAlpha <= 0) {
-          img.style.transform = 'none';
+          img.style.setProperty('transform', 'none', 'important');
           return;
         }
         const contentCenterX = weightedX / sumAlpha;
@@ -10357,9 +7698,9 @@ async function getSearchSuggestions(query) {
         if (Math.abs(offsetY) < 0.4) {
           offsetY = 0;
         }
-        img.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+        img.style.setProperty('transform', `translate(${offsetX}px, ${offsetY}px)`, 'important');
       } catch (e) {
-        img.style.transform = 'none';
+        img.style.setProperty('transform', 'none', 'important');
       }
     }
 
@@ -10367,8 +7708,8 @@ async function getSearchSuggestions(query) {
       if (!img) {
         return;
       }
-      img.style.objectFit = 'contain';
-      img.style.objectPosition = 'center center';
+      img.style.setProperty('object-fit', 'contain', 'important');
+      img.style.setProperty('object-position', 'center center', 'important');
       applyFaviconOpticalShift(img);
     }
 
@@ -10641,15 +7982,15 @@ async function getSearchSuggestions(query) {
         return;
       }
       const resolvedTheme = getThemeForMode(theme);
-      target.style.setProperty('--x-ext-mark-bg', resolvedTheme.markBg);
-      target.style.setProperty('--x-ext-mark-text', resolvedTheme.markText);
-      target.style.setProperty('--x-ext-tag-bg', resolvedTheme.tagBg);
-      target.style.setProperty('--x-ext-tag-text', resolvedTheme.tagText);
-      target.style.setProperty('--x-ext-tag-border', resolvedTheme.tagBorder);
-      target.style.setProperty('--x-ext-key-bg', resolvedTheme.keyBg);
-      target.style.setProperty('--x-ext-key-text', resolvedTheme.keyText);
-      target.style.setProperty('--x-ext-key-border', resolvedTheme.keyBorder);
-      target.style.setProperty('--x-ext-icon-color', resolvedTheme.accent);
+      target.style.setProperty('--x-ext-mark-bg', resolvedTheme.markBg, 'important');
+      target.style.setProperty('--x-ext-mark-text', resolvedTheme.markText, 'important');
+      target.style.setProperty('--x-ext-tag-bg', resolvedTheme.tagBg, 'important');
+      target.style.setProperty('--x-ext-tag-text', resolvedTheme.tagText, 'important');
+      target.style.setProperty('--x-ext-tag-border', resolvedTheme.tagBorder, 'important');
+      target.style.setProperty('--x-ext-key-bg', resolvedTheme.keyBg, 'important');
+      target.style.setProperty('--x-ext-key-text', resolvedTheme.keyText, 'important');
+      target.style.setProperty('--x-ext-key-border', resolvedTheme.keyBorder, 'important');
+      target.style.setProperty('--x-ext-icon-color', resolvedTheme.accent, 'important');
     }
 
     function applyMarkVariables(target, theme) {
@@ -10657,8 +7998,8 @@ async function getSearchSuggestions(query) {
         return;
       }
       const resolvedTheme = getThemeForMode(theme);
-      target.style.setProperty('--x-ext-mark-bg', resolvedTheme.markBg);
-      target.style.setProperty('--x-ext-mark-text', resolvedTheme.markText);
+      target.style.setProperty('--x-ext-mark-bg', resolvedTheme.markBg, 'important');
+      target.style.setProperty('--x-ext-mark-text', resolvedTheme.markText, 'important');
     }
 
     const iconPreloadCache = new Map();
@@ -10821,21 +8162,21 @@ async function getSearchSuggestions(query) {
         img.setAttribute('data-favicon-has-appeared', 'true');
         applyFaviconOpticalShift(img);
         if (!shouldAnimate) {
-          img.style.filter = 'none';
-          img.style.opacity = '1';
-          img.style.transition = 'none';
+          img.style.setProperty('filter', 'none', 'important');
+          img.style.setProperty('opacity', '1', 'important');
+          img.style.setProperty('transition', 'none', 'important');
           return;
         }
-        img.style.transition = 'none';
-        img.style.filter = 'blur(4px)';
-        img.style.opacity = '0.72';
+        img.style.setProperty('transition', 'none', 'important');
+        img.style.setProperty('filter', 'blur(4px)', 'important');
+        img.style.setProperty('opacity', '0.72', 'important');
         requestAnimationFrame(() => {
           if (!img || token !== img._xFaviconLoadToken) {
             return;
           }
-          img.style.transition = 'filter 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 240ms cubic-bezier(0.22, 1, 0.36, 1)';
-          img.style.filter = 'blur(0)';
-          img.style.opacity = '1';
+          img.style.setProperty('transition', 'filter 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 240ms cubic-bezier(0.22, 1, 0.36, 1)', 'important');
+          img.style.setProperty('filter', 'blur(0)', 'important');
+          img.style.setProperty('opacity', '1', 'important');
         });
       };
       img.addEventListener('load', finalize, { once: true });
@@ -10967,7 +8308,7 @@ async function getSearchSuggestions(query) {
       if (!applied && !reused) {
         return false;
       }
-      img.style.visibility = 'visible';
+      img.style.setProperty('visibility', 'visible', 'important');
       if (!isChromeMonogramFaviconUrl(nextUrl) && state.cacheKey) {
         resolvedFaviconUrlCache.set(state.cacheKey, nextUrl);
       }
@@ -11028,7 +8369,7 @@ async function getSearchSuggestions(query) {
             return;
           }
           setFaviconSrcWithAnimation(img, candidate);
-          img.style.visibility = 'visible';
+          img.style.setProperty('visibility', 'visible', 'important');
           if (state.cacheKey) {
             resolvedFaviconUrlCache.set(state.cacheKey, candidate);
           }
@@ -11088,7 +8429,7 @@ async function getSearchSuggestions(query) {
           return;
         }
         if (!resolvedCandidatesLoaded) {
-          img.style.visibility = 'hidden';
+          img.style.setProperty('visibility', 'hidden', 'important');
           return;
         }
         finalizeOverlayThemeAwareFaviconFailure(img, state);
@@ -11252,19 +8593,56 @@ async function getSearchSuggestions(query) {
       });
     }
 
-    function createInlineIcon(iconHtml, classNames) {
-      const icon = document.createElement('span');
-      icon.innerHTML = iconHtml;
-      icon.className = classNames ? `x-ov-inline-icon ${classNames}` : 'x-ov-inline-icon';
+  function createSearchIcon() {
+    const icon = document.createElement('span');
+    icon.innerHTML = getRiSvg('ri-search-line', 'ri-size-16');
+      icon.style.cssText = `
+        all: unset !important;
+        width: 16px !important;
+        height: 16px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-sizing: border-box !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1 !important;
+        text-decoration: none !important;
+        list-style: none !important;
+        outline: none !important;
+        background: transparent !important;
+        color: inherit !important;
+        font-size: 100% !important;
+        font: inherit !important;
+        vertical-align: baseline !important;
+      `;
       return icon;
     }
 
-    function createSearchIcon(classNames) {
-      return createInlineIcon(getRiSvg('ri-search-line', 'ri-size-16'), classNames);
-    }
-
-    function createLinkIcon(classNames) {
-      return createInlineIcon(getRiSvg('ri-link', 'ri-size-16'), classNames);
+    function createLinkIcon() {
+      const icon = document.createElement('span');
+      icon.innerHTML = getRiSvg('ri-link', 'ri-size-16');
+      icon.style.cssText = `
+        all: unset !important;
+        width: 16px !important;
+        height: 16px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-sizing: border-box !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1 !important;
+        text-decoration: none !important;
+        list-style: none !important;
+        outline: none !important;
+        background: transparent !important;
+        color: inherit !important;
+        font-size: 100% !important;
+        font: inherit !important;
+        vertical-align: baseline !important;
+      `;
+      return icon;
     }
 
     function getNonFaviconIconBg() {
@@ -11306,130 +8684,56 @@ async function getSearchSuggestions(query) {
     function createActionTag(labelText, keyLabel) {
       const tag = document.createElement('span');
       applyNoTranslate(tag);
-      tag.className = 'x-ov-action-tag';
+      tag.style.cssText = `
+        all: unset !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        background: var(--x-ext-tag-bg, #EEF6FF) !important;
+        color: var(--x-ext-tag-text, #1E3A8A) !important;
+        border: 1px solid var(--x-ext-tag-border, #BFDBFE) !important;
+        padding: 4px 10px 4px 8px !important;
+        border-radius: 999px !important;
+        font-size: 11px !important;
+        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+        line-height: 1 !important;
+        text-decoration: none !important;
+        list-style: none !important;
+        outline: none !important;
+        box-sizing: border-box !important;
+        vertical-align: middle !important;
+        white-space: nowrap !important;
+      `;
 
       const label = document.createElement('span');
       setProtectedPlainText(label, labelText);
-      label.className = 'x-ov-action-tag-label';
+      label.style.cssText = `
+        all: unset !important;
+        font-weight: 500 !important;
+        line-height: 1 !important;
+      `;
 
       const keycap = document.createElement('span');
       setProtectedPlainText(keycap, keyLabel);
-      keycap.className = 'x-ov-action-tag-keycap';
+      keycap.style.cssText = `
+        all: unset !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 2px 7px !important;
+        border-radius: 6px !important;
+        background: var(--x-ext-key-bg, #FFFFFF) !important;
+        color: var(--x-ext-key-text, #1E3A8A) !important;
+        border: 1px solid var(--x-ext-key-border, #BFDBFE) !important;
+        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12) !important;
+        font-size: 10px !important;
+        font-weight: 500 !important;
+        line-height: 1 !important;
+      `;
 
       tag.appendChild(label);
       tag.appendChild(keycap);
       return tag;
-    }
-
-    function createSuggestionFavicon(options) {
-      const config = options || {};
-      const favicon = document.createElement('img');
-      favicon.decoding = 'async';
-      favicon.loading = 'eager';
-      favicon.referrerPolicy = 'no-referrer';
-      if (config.highPriority) {
-        favicon.fetchPriority = 'high';
-      }
-      favicon.className = config.contain
-        ? 'x-ov-suggestion-favicon x-ov-suggestion-favicon--contain'
-        : 'x-ov-suggestion-favicon';
-      return favicon;
-    }
-
-    function createSuggestionItemShell(options) {
-      const config = options || {};
-      const item = document.createElement('div');
-      item.className = 'x-ov-suggestion-item';
-      item.style.background = config.background || 'transparent';
-      item.style.border = config.border || '1px solid transparent';
-      item.style.margin = `0 0 ${config.marginBottom || '0'} 0`;
-      return item;
-    }
-
-    function createSuggestionLeft() {
-      const left = document.createElement('div');
-      left.className = 'x-ov-suggestion-left';
-      return left;
-    }
-
-    function createSuggestionIconSlot() {
-      const slot = document.createElement('span');
-      slot.className = 'x-ov-suggestion-icon-slot';
-      return slot;
-    }
-
-    function createSuggestionTextWrapper() {
-      const text = document.createElement('div');
-      text.className = 'x-ov-suggestion-text';
-      return text;
-    }
-
-    function createSuggestionTitle() {
-      const title = document.createElement('span');
-      title.className = 'x-ov-suggestion-title';
-      return title;
-    }
-
-    function createSuggestionReasonLine() {
-      const reason = document.createElement('span');
-      reason.className = 'x-ov-suggestion-reason';
-      return reason;
-    }
-
-    function createOverlayMetaTag(options) {
-      const config = options || {};
-      const tag = document.createElement('span');
-      applyNoTranslate(tag);
-      tag.className = config.bookmark ? 'x-ov-meta-tag x-ov-meta-tag--bookmark' : 'x-ov-meta-tag';
-      return tag;
-    }
-
-    function createOverlayRightSide() {
-      const right = document.createElement('div');
-      right.className = 'x-ov-right-side';
-      return right;
-    }
-
-    function createOverlayActionTags() {
-      const tags = document.createElement('div');
-      tags.className = 'x-ov-action-tags';
-      return tags;
-    }
-
-    function createOverlayVisitButton() {
-      const button = document.createElement('button');
-      applyNoTranslate(button);
-      button.className = 'x-ov-visit-button';
-      return button;
-    }
-
-    function createOverlayHistoryDeleteSlot() {
-      const slot = document.createElement('div');
-      applyNoTranslate(slot);
-      slot.className = 'x-ov-history-delete-slot';
-      return slot;
-    }
-
-    function createOverlayHistoryDeleteButton() {
-      const button = document.createElement('button');
-      applyNoTranslate(button);
-      button.className = 'x-ov-history-delete-button';
-      return button;
-    }
-
-    function createOverlaySwitchButton() {
-      const button = document.createElement('button');
-      applyNoTranslate(button);
-      button.className = 'x-ov-switch-button';
-      return button;
-    }
-
-    function createOverlayRankDebugChip(text) {
-      const chip = document.createElement('span');
-      applyNoTranslate(chip);
-      chip.className = 'x-ov-rank-debug';
-      setProtectedPlainText(chip, text);
-      return chip;
     }
 
     function getThemeSourceForSuggestion(suggestion) {
@@ -11458,16 +8762,22 @@ async function getSearchSuggestions(query) {
 
     const siteSearchPrefix = document.createElement('span');
     siteSearchPrefix.id = '_x_extension_site_search_prefix_2024_unique_';
-    siteSearchPrefix.className = 'x-ov-site-search-prefix';
-    siteSearchPrefix.style.display = 'none';
-    siteSearchPrefix.style.maxWidth = '0px';
-    const siteSearchPrefixLabel = document.createElement('span');
-    applyNoTranslate(siteSearchPrefixLabel);
-    siteSearchPrefixLabel.className = 'x-ov-site-search-prefix-label';
-    siteSearchPrefix.appendChild(siteSearchPrefixLabel);
-    inputChromeLayer.appendChild(siteSearchPrefix);
-    inputContainer.style.position = 'relative';
-    inputContainer.style.zIndex = '2';
+    siteSearchPrefix.style.cssText = `
+      all: unset !important;
+      position: absolute !important;
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+      left: 50px !important;
+      display: none !important;
+      white-space: nowrap !important;
+      font-size: 16px !important;
+      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+      line-height: 1 !important;
+      color: var(--x-ov-subtext, #6B7280) !important;
+      pointer-events: none !important;
+      z-index: 1 !important;
+    `;
+    inputContainer.appendChild(siteSearchPrefix);
 
     function getBaseInputPaddingLeft() {
       if (baseInputPaddingLeft === null) {
@@ -11479,68 +8789,40 @@ async function getSearchSuggestions(query) {
 
     function updateSiteSearchPrefixLayout() {
       const basePadding = getBaseInputPaddingLeft();
-      siteSearchPrefix.style.left = `${basePadding}px`;
+      siteSearchPrefix.style.setProperty('left', `${basePadding}px`, 'important');
       if (siteSearchPrefix.style.display === 'none') {
-        siteSearchPrefix.style.maxWidth = '0px';
-        searchInput.style.paddingLeft = `${basePadding}px`;
+        searchInput.style.setProperty('padding-left', `${basePadding}px`, 'important');
         return;
       }
-      const inputContainerWidth = inputContainer ? inputContainer.getBoundingClientRect().width : 0;
-      const availableWidth = Math.max(72, Math.floor(inputContainerWidth - basePadding - 108));
-      siteSearchPrefix.style.maxWidth = `${availableWidth}px`;
       const prefixWidth = siteSearchPrefix.getBoundingClientRect().width;
       const paddedLeft = Math.max(basePadding + prefixWidth + prefixGap, basePadding);
-      searchInput.style.paddingLeft = `${paddedLeft}px`;
+      searchInput.style.setProperty('padding-left', `${paddedLeft}px`, 'important');
     }
 
     function setInputModePrefix(prefixText, theme) {
-      setProtectedPlainText(siteSearchPrefixLabel, prefixText);
-      siteSearchPrefix.style.display = 'inline-flex';
-      const resolvedTheme = getThemeForMode(theme || defaultTheme);
-      const accentRgb = resolvedTheme && (resolvedTheme.accentRgb || parseCssColor(resolvedTheme.accent))
-        ? (resolvedTheme.accentRgb || parseCssColor(resolvedTheme.accent))
-        : defaultAccentColor;
-      const [h, s, l] = rgbToHsl(accentRgb);
-      let nextS = s;
-      let nextL = l;
-      if (s < 0.52) {
-        nextS = Math.min(0.78, s + 0.18 + ((0.52 - s) * 0.42));
+      siteSearchPrefix.textContent = prefixText;
+      siteSearchPrefix.style.setProperty('display', 'inline-flex', 'important');
+      const resolvedTheme = theme ? getThemeForMode(theme) : null;
+      if (resolvedTheme && resolvedTheme.placeholderText) {
+        siteSearchPrefix.style.setProperty('color', resolvedTheme.placeholderText, 'important');
       }
-      if (l > 0.58) {
-        nextL = Math.max(0.42, l - (0.08 + ((l - 0.58) * 0.55)));
-      } else if (l < 0.34) {
-        nextL = Math.min(0.46, l + 0.06);
-      }
-      const compensatedAccent = hslToRgb(h, nextS, nextL);
-      const backgroundColor = rgbToCss(mixColor(compensatedAccent, [255, 255, 255], isOverlayDarkMode() ? 0.02 : 0.05));
-      const shadowAlpha = isOverlayDarkMode() ? 0.26 : 0.22;
-      const shadowSoftAlpha = isOverlayDarkMode() ? 0.14 : 0.12;
-      const tagShadow = `0 4px 10px rgba(${compensatedAccent[0]}, ${compensatedAccent[1]}, ${compensatedAccent[2]}, ${shadowAlpha}), 0 1px 2px rgba(${compensatedAccent[0]}, ${compensatedAccent[1]}, ${compensatedAccent[2]}, ${shadowSoftAlpha})`;
-      siteSearchPrefix.style.background = backgroundColor;
-      siteSearchPrefix.style.color = '#FFFFFF';
-      siteSearchPrefix.style.border = 'none';
-      siteSearchPrefix.style.boxShadow = tagShadow;
       searchInput.placeholder = '';
-      if (resolvedTheme && resolvedTheme.accent) {
-        searchInput.style.caretColor = resolvedTheme.accent;
+      if (resolvedTheme && resolvedTheme.placeholderText) {
+        searchInput.style.setProperty('caret-color', resolvedTheme.placeholderText, 'important');
       }
       updateSiteSearchPrefixLayout();
     }
 
     function clearInputModePrefix() {
-      siteSearchPrefixLabel.textContent = '';
-      siteSearchPrefix.style.display = 'none';
-      siteSearchPrefix.style.background = 'var(--x-ext-tag-bg, #EEF6FF)';
-      siteSearchPrefix.style.color = '#FFFFFF';
-      siteSearchPrefix.style.border = 'none';
-      siteSearchPrefix.style.boxShadow = 'none';
+      siteSearchPrefix.textContent = '';
+      siteSearchPrefix.style.setProperty('display', 'none', 'important');
       searchInput.placeholder = defaultPlaceholderText || defaultPlaceholder;
-      searchInput.style.caretColor = defaultCaretColor;
+      searchInput.style.setProperty('caret-color', defaultCaretColor, 'important');
       updateSiteSearchPrefixLayout();
     }
 
     function setSiteSearchPrefix(provider, theme) {
-      const prefixText = formatMessage('search_in_site', '在 {site} 中搜索', {
+      const prefixText = formatMessage('search_in_site_prefix', '在 {site} 中搜索｜', {
         site: getSiteSearchDisplayName(provider)
       });
       setInputModePrefix(prefixText, theme);
@@ -11735,13 +9017,6 @@ async function getSearchSuggestions(query) {
       return Boolean(targetNoSearch && currentNoSearch && targetNoSearch === currentNoSearch);
     }
 
-    function shouldAutoPromoteMatchedOpenTabSuggestion(suggestion, rawQuery) {
-      if (!suggestion || typeof suggestion._xMatchedTabId !== 'number') {
-        return false;
-      }
-      return getStrongNavigationMatchScore(suggestion, rawQuery) >= 140;
-    }
-
     function getAutocompleteCandidate(allSuggestions, rawQuery) {
       if (!Array.isArray(allSuggestions) || !rawQuery) {
         return null;
@@ -11802,142 +9077,6 @@ async function getSearchSuggestions(query) {
         }
       }
       return null;
-    }
-
-    function splitNavigationMatchTerms(value) {
-      return Array.from(new Set(
-        String(value || '')
-          .toLowerCase()
-          .split(/[^a-z0-9\u4e00-\u9fff]+/i)
-          .map((item) => item.trim())
-          .filter(Boolean)
-      ));
-    }
-
-    function buildComparableNavigationUrl(url) {
-      try {
-        const parsed = new URL(String(url || '').trim());
-        parsed.protocol = String(parsed.protocol || '').toLowerCase();
-        parsed.hostname = normalizeHost(parsed.hostname);
-        if ((parsed.protocol === 'http:' && parsed.port === '80') || (parsed.protocol === 'https:' && parsed.port === '443')) {
-          parsed.port = '';
-        }
-        parsed.hash = '';
-        parsed.pathname = parsed.pathname !== '/'
-          ? (parsed.pathname.replace(/\/+$/, '') || '/')
-          : '/';
-        return parsed.toString().toLowerCase();
-      } catch (e) {
-        return String(url || '').trim().toLowerCase();
-      }
-    }
-
-    function getNavigationSuggestionPathDepth(url) {
-      try {
-        return new URL(String(url || '').trim()).pathname.split('/').filter(Boolean).length;
-      } catch (e) {
-        return Number.MAX_SAFE_INTEGER;
-      }
-    }
-
-    function getStrongNavigationMatchScore(suggestion, rawQuery) {
-      if (!suggestion || !suggestion.url || suggestion.type === 'newtab' || suggestion.type === 'googleSuggest') {
-        return 0;
-      }
-      const query = String(rawQuery || '').trim();
-      if (!query) {
-        return 0;
-      }
-
-      const queryLower = query.toLowerCase();
-      const directUrl = getDirectNavigationUrl(query);
-      const suggestionUrlKey = buildComparableNavigationUrl(suggestion.url);
-      const suggestionUrlText = (getUrlDisplay(suggestion.url) || '').toLowerCase();
-      const titleLower = String(suggestion.title || '').toLowerCase();
-
-      if (directUrl) {
-        const directUrlKey = buildComparableNavigationUrl(directUrl);
-        if (suggestion.type !== 'directUrl' && suggestionUrlKey === directUrlKey) {
-          return 520;
-        }
-        if (suggestionUrlText && suggestionUrlText === queryLower) {
-          return suggestion.type === 'directUrl' ? 420 : 480;
-        }
-        if (suggestion.type === 'directUrl' && suggestionUrlKey === directUrlKey) {
-          return 400;
-        }
-        if (suggestionUrlText && suggestionUrlText.startsWith(queryLower)) {
-          return suggestion.type === 'directUrl' ? 320 : 280;
-        }
-        return 0;
-      }
-
-      if (/\s/.test(query) || queryLower.length < 4) {
-        return 0;
-      }
-
-      const genericTerms = new Set(['home', 'login', 'account', 'settings', 'dashboard', 'search', 'docs', 'help', 'api']);
-      if (genericTerms.has(queryLower)) {
-        return 0;
-      }
-
-      let score = 0;
-      const titleTerms = splitNavigationMatchTerms(titleLower);
-      if (titleTerms.includes(queryLower)) {
-        score += 140;
-      } else if (titleLower.startsWith(queryLower)) {
-        score += 100;
-      } else if (titleLower.includes(queryLower)) {
-        score += 42;
-      } else {
-        return 0;
-      }
-
-      const depth = getNavigationSuggestionPathDepth(suggestion.url);
-      if (depth === 0) {
-        score += 90;
-      } else if (depth === 1) {
-        score += 36;
-      } else if (Number.isFinite(depth)) {
-        score -= Math.min(32, (depth - 1) * 8);
-      }
-
-      if (/(^|[\s-])(home|首页)([\s-]|$)/i.test(titleLower)) {
-        score += 28;
-      }
-      if (suggestion.type === 'bookmark') {
-        score += 16;
-      } else if (suggestion.type === 'history') {
-        score += 10;
-      } else if (suggestion.type === 'topSite' || suggestion.isTopSite) {
-        score += 12;
-      }
-
-      return score;
-    }
-
-    function promoteStrongNavigationMatch(list, rawQuery) {
-      if (!Array.isArray(list)) {
-        return null;
-      }
-      let bestIndex = -1;
-      let bestScore = 0;
-      for (let i = 0; i < list.length; i += 1) {
-        const score = getStrongNavigationMatchScore(list[i], rawQuery);
-        if (score > bestScore) {
-          bestScore = score;
-          bestIndex = i;
-        }
-      }
-      if (bestScore < 140 || bestIndex < 0) {
-        return null;
-      }
-      if (bestIndex > 0) {
-        const [picked] = list.splice(bestIndex, 1);
-        list.unshift(picked);
-        return picked;
-      }
-      return list[0] || null;
     }
 
     function getDomainPrefixCandidate(allSuggestions, rawQuery) {
@@ -12131,88 +9270,9 @@ async function getSearchSuggestions(query) {
       return template.replace(/\{query\}/g, encodeURIComponent(query));
     }
 
-    function hasOpenAndSubmitSiteSearchAction(provider) {
-      return Boolean(
-        provider &&
-        String(provider.action || '').trim() === 'openAndSubmit'
-      );
-    }
-
-    function normalizeSiteSearchTemplate(template) {
-      return String(template || '')
-        .trim()
-        .replace(/\{searchTerms\}/g, '{query}');
-    }
-
-    function isAiSiteSearchProvider(provider) {
-      if (!provider) {
-        return false;
-      }
-      if (hasOpenAndSubmitSiteSearchAction(provider)) {
-        return true;
-      }
-      const template = normalizeSiteSearchTemplate(provider.template);
-      return Boolean(template) && !template.includes('{query}');
-    }
-
-    function isInteractiveSiteSearchProvider(provider) {
-      return Boolean(
-        hasOpenAndSubmitSiteSearchAction(provider) &&
-        String(provider.submitStrategy || '').trim() === 'geminiPrompt'
-      );
-    }
-
-    function inheritSiteSearchProviderBehavior(provider, baseProvider) {
-      if (!provider) {
-        return provider;
-      }
-      return {
-        ...provider,
-        action: String(provider.action || (baseProvider && baseProvider.action) || '').trim(),
-        submitStrategy: String(
-          provider.submitStrategy || (baseProvider && baseProvider.submitStrategy) || ''
-        ).trim()
-      };
-    }
-
-    function shouldRestrictInteractiveSiteSearchSuggestions(provider, query) {
-      return Boolean(
-        isInteractiveSiteSearchProvider(provider) &&
-        String(query || '').trim()
-      );
-    }
-
-    function openSiteSearchProviderQuery(provider, query) {
-      const trimmedQuery = String(query || '').trim();
-      if (!provider || !trimmedQuery) {
-        return false;
-      }
-      if (isInteractiveSiteSearchProvider(provider)) {
-        chrome.runtime.sendMessage({
-          action: 'runSiteSearchProviderQuery',
-          provider: provider,
-          query: trimmedQuery,
-          disposition: 'newTab'
-        });
-        return true;
-      }
-      const siteUrl = buildSearchUrl(provider.template, trimmedQuery);
-      if (!siteUrl) {
-        return false;
-      }
-      chrome.runtime.sendMessage({
-        action: 'createTab',
-        url: siteUrl
-      });
-      return true;
-    }
-
     function getProviderIcon(provider) {
       if (provider && provider.icon) {
         return provider.icon;
-      }
-      if (provider && provider.iconUrl) {
-        return provider.iconUrl;
       }
       const template = provider && provider.template ? provider.template : '';
       try {
@@ -12227,7 +9287,6 @@ async function getSearchSuggestions(query) {
     function mergeCustomProvidersLocal(baseItems, customItems) {
       const merged = [];
       const seen = new Set();
-      const baseMap = new Map((baseItems || []).map((item) => [String(item && item.key ? item.key : '').toLowerCase(), item]));
       (customItems || []).forEach((item) => {
         if (item && item.disabled) {
           return;
@@ -12237,7 +9296,7 @@ async function getSearchSuggestions(query) {
           return;
         }
         seen.add(key);
-        merged.push(inheritSiteSearchProviderBehavior(item, baseMap.get(key)));
+        merged.push(item);
       });
       (baseItems || []).forEach((item) => {
         const key = String(item && item.key ? item.key : '').toLowerCase();
@@ -12335,6 +9394,8 @@ async function getSearchSuggestions(query) {
           }, function(response) {
             if (response && response.suggestions) {
               updateSearchSuggestions(response.suggestions, latestOverlayQuery);
+            } else {
+              updateSearchSuggestions([], latestOverlayQuery);
             }
           });
         }
@@ -12689,62 +9750,6 @@ async function getSearchSuggestions(query) {
         }
       });
       clearSearchSuggestions();
-      playSiteSearchShellAnimation();
-    }
-
-    function clearSiteSearchShellAnimation() {
-      if (siteSearchShellAnimationTimers.length > 0) {
-        siteSearchShellAnimationTimers.forEach((timer) => clearTimeout(timer));
-        siteSearchShellAnimationTimers = [];
-      }
-    }
-
-    function playSiteSearchShellAnimation() {
-      if (!overlay || !overlay.isConnected) {
-        return;
-      }
-      const settleTransform = 'translateX(-50%) translateY(0) scale(1)';
-      const shrinkTransform = 'translateX(-50%) translateY(0) scale(0.972)';
-      const reboundTransform = 'translateX(-50%) translateY(0) scale(1.012)';
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        clearSiteSearchShellAnimation();
-        overlay.style.setProperty('transform', settleTransform, 'important');
-        return;
-      }
-      clearSiteSearchShellAnimation();
-      overlay.style.setProperty('transform-origin', 'top center', 'important');
-      overlay.style.setProperty('transition', 'none', 'important');
-      overlay.style.setProperty('transform', settleTransform, 'important');
-      void overlay.offsetWidth;
-      overlay.style.setProperty('transition', 'transform 180ms cubic-bezier(0.32, 0.72, 0, 1), opacity 220ms ease, filter 300ms ease', 'important');
-      requestAnimationFrame(() => {
-        if (!overlay || !overlay.isConnected) {
-          return;
-        }
-        overlay.style.setProperty('transform', shrinkTransform, 'important');
-        siteSearchShellAnimationTimers.push(setTimeout(() => {
-          if (!overlay || !overlay.isConnected) {
-            return;
-          }
-          overlay.style.setProperty('transition', 'transform 210ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 220ms ease, filter 300ms ease', 'important');
-          overlay.style.setProperty('transform', reboundTransform, 'important');
-        }, 165));
-        siteSearchShellAnimationTimers.push(setTimeout(() => {
-          if (!overlay || !overlay.isConnected) {
-            return;
-          }
-          overlay.style.setProperty('transition', 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease, filter 300ms ease', 'important');
-          overlay.style.setProperty('transform', settleTransform, 'important');
-        }, 335));
-        siteSearchShellAnimationTimers.push(setTimeout(() => {
-          if (!overlay || !overlay.isConnected) {
-            return;
-          }
-          siteSearchShellAnimationTimers = [];
-          overlay.style.setProperty('transition', 'transform 340ms cubic-bezier(0.2, 1, 0.36, 1), opacity 220ms ease, filter 300ms ease', 'important');
-          overlay.style.setProperty('transform', settleTransform, 'important');
-        }, 585));
-      });
     }
 
     function clearSiteSearch() {
@@ -12847,14 +9852,6 @@ async function getSearchSuggestions(query) {
     searchInput.addEventListener('input', function(event) {
       const rawValue = this.value;
       const query = rawValue.trim();
-      if (overlay && overlay.dataset) {
-        overlay.dataset.debugInputQuery = query;
-        overlay.dataset.debugInputRaw = rawValue;
-      }
-      console.log('[Lumno overlay debug] input', {
-        rawValue: rawValue,
-        query: query
-      });
       updateModeBadge(rawValue);
       const inputType = event && event.inputType;
       const isPaste = inputType === 'insertFromPaste';
@@ -12899,20 +9896,6 @@ async function getSearchSuggestions(query) {
           query: query,
           context: 'overlay'
         }, function(response) {
-          if (overlay && overlay.dataset) {
-            overlay.dataset.debugCallbackQuery = query;
-            overlay.dataset.debugCallbackCount = response && Array.isArray(response.suggestions)
-              ? String(response.suggestions.length)
-              : 'null';
-            overlay.dataset.debugCallbackLastError = chrome.runtime && chrome.runtime.lastError
-              ? String(chrome.runtime.lastError.message || 'lastError')
-              : '';
-          }
-          console.log('[Lumno overlay debug] suggestions callback', {
-            query: query,
-            hasLastError: Boolean(chrome.runtime && chrome.runtime.lastError),
-            responseCount: response && Array.isArray(response.suggestions) ? response.suggestions.length : null
-          });
           if (response && response.suggestions) {
             updateSearchSuggestions(response.suggestions, query);
           }
@@ -12926,7 +9909,7 @@ async function getSearchSuggestions(query) {
         clearSearchSuggestions();
       }
     });
-    
+
     // Add click outside to close functionality
     clickOutsideHandler = function(e) {
       if (!overlay.contains(e.target)) {
@@ -12935,7 +9918,7 @@ async function getSearchSuggestions(query) {
       }
     };
     document.addEventListener('click', clickOutsideHandler);
-    
+
     function handleTabKey(e) {
       if (siteSearchState || openTabsSearchModeActive) {
         return false;
@@ -13064,9 +10047,6 @@ async function getSearchSuggestions(query) {
     const suggestionItems = [];
     let currentSuggestions = []; // Store current suggestions for keyboard navigation
     let lastRenderedQuery = '';
-    let suggestionPointerClientX = null;
-    let suggestionPointerClientY = null;
-    let isPointerInsideSuggestions = false;
 
     function getAutoHighlightIndex() {
       return suggestionItems.findIndex((item) => Boolean(item && item._xIsAutocompleteTop));
@@ -13087,7 +10067,7 @@ async function getSearchSuggestions(query) {
       }
       return index === 0;
     }
-    
+
     keydownHandler = function(e) {
       if (isImeCompositionEvent(e)) {
         return;
@@ -13157,14 +10137,14 @@ async function getSearchSuggestions(query) {
           applyThemeModeChange(getNextThemeMode(overlayThemeMode || 'system'));
           return;
         }
-        
+
         const activeSuggestionIndex = selectedIndex >= 0
           ? selectedIndex
           : ((query.length > 0 || openTabsSearchModeActive) ? getAutoHighlightIndex() : -1);
         if (activeSuggestionIndex >= 0 && suggestionItems[activeSuggestionIndex]) {
           // Check if we're showing search suggestions or tab suggestions
           const isSearchSuggestion = query.length > 0 && !openTabsSearchModeActive;
-          
+
           if (isSearchSuggestion && currentSuggestions[activeSuggestionIndex]) {
             const selectedSuggestion = currentSuggestions[activeSuggestionIndex];
             if (selectedSuggestion.type === 'modeSwitch') {
@@ -13193,9 +10173,7 @@ async function getSearchSuggestions(query) {
               searchInput.focus();
               return;
             }
-            if (selectedSuggestion.provider && selectedSuggestion.searchQuery) {
-              openSiteSearchProviderQuery(selectedSuggestion.provider, selectedSuggestion.searchQuery);
-            } else if (shouldSwitchMatchedTabSuggestion(selectedSuggestion, activeSuggestionIndex)) {
+            if (shouldSwitchMatchedTabSuggestion(selectedSuggestion, activeSuggestionIndex)) {
               chrome.runtime.sendMessage({
                 action: 'switchToTab',
                 tabId: selectedSuggestion._xMatchedTabId
@@ -13235,7 +10213,12 @@ async function getSearchSuggestions(query) {
           document.removeEventListener('keydown', captureTabHandler, true);
         } else if (query) {
           if (siteSearchState) {
-            if (openSiteSearchProviderQuery(siteSearchState, query)) {
+            const siteUrl = buildSearchUrl(siteSearchState.template, query);
+            if (siteUrl) {
+              chrome.runtime.sendMessage({
+                action: 'createTab',
+                url: siteUrl
+              });
               removeOverlay(overlay);
               document.removeEventListener('click', clickOutsideHandler);
               document.removeEventListener('keydown', keydownHandler);
@@ -13245,27 +10228,16 @@ async function getSearchSuggestions(query) {
           }
           const currentRawInput = (latestRawInputValue || searchInput.value || '').trim();
           if (inlineSearchState && inlineSearchState.isAuto &&
-              inlineSearchState.rawInput === currentRawInput) {
-            if (inlineSearchState.provider && inlineSearchState.query) {
-              if (openSiteSearchProviderQuery(inlineSearchState.provider, inlineSearchState.query)) {
-                removeOverlay(overlay);
-                document.removeEventListener('click', clickOutsideHandler);
-                document.removeEventListener('keydown', keydownHandler);
-                document.removeEventListener('keydown', captureTabHandler, true);
-                return;
-              }
-            }
-            if (inlineSearchState.url) {
-              chrome.runtime.sendMessage({
-                action: 'createTab',
-                url: inlineSearchState.url
-              });
-              removeOverlay(overlay);
-              document.removeEventListener('click', clickOutsideHandler);
-              document.removeEventListener('keydown', keydownHandler);
-              document.removeEventListener('keydown', captureTabHandler, true);
-              return;
-            }
+              inlineSearchState.url && inlineSearchState.rawInput === currentRawInput) {
+            chrome.runtime.sendMessage({
+              action: 'createTab',
+              url: inlineSearchState.url
+            });
+            removeOverlay(overlay);
+            document.removeEventListener('click', clickOutsideHandler);
+            document.removeEventListener('keydown', keydownHandler);
+            document.removeEventListener('keydown', captureTabHandler, true);
+            return;
           }
           if (autocompleteState && autocompleteState.url) {
             chrome.runtime.sendMessage({
@@ -13323,98 +10295,16 @@ async function getSearchSuggestions(query) {
 
     window.addEventListener('keydown', overlayKeyCaptureHandler, true);
     document.addEventListener('keydown', keydownHandler);
-    
+
     function applySearchSuggestionHighlight(item, theme) {
       const highlight = getHighlightColors(theme);
-      item.style.background = highlight.bg;
-      item.style.border = `1px solid ${highlight.border}`;
-    }
-
-    function resolveSuggestionItemFromPointer() {
-      if (!isPointerInsideSuggestions ||
-          suggestionPointerClientX == null ||
-          suggestionPointerClientY == null ||
-          !overlayShadowRoot ||
-          typeof overlayShadowRoot.elementFromPoint !== 'function') {
-        return null;
-      }
-      let hoveredNode = overlayShadowRoot.elementFromPoint(
-        suggestionPointerClientX,
-        suggestionPointerClientY
-      );
-      if (!hoveredNode) {
-        return null;
-      }
-      if (hoveredNode.nodeType !== Node.ELEMENT_NODE) {
-        hoveredNode = hoveredNode.parentElement;
-      }
-      const hoveredItem = hoveredNode && typeof hoveredNode.closest === 'function'
-        ? hoveredNode.closest('.x-ov-suggestion-item')
-        : null;
-      if (!hoveredItem || suggestionItems.indexOf(hoveredItem) === -1) {
-        return null;
-      }
-      return hoveredItem;
-    }
-
-    function syncHoveredSuggestionFromPointer() {
-      const hoveredItem = resolveSuggestionItemFromPointer();
-      let hasChanges = false;
-      suggestionItems.forEach((item) => {
-        const nextHovering = item === hoveredItem;
-        if (Boolean(item._xIsHovering) !== nextHovering) {
-          item._xIsHovering = nextHovering;
-          hasChanges = true;
-        }
-      });
-      if (hasChanges) {
-        updateSelection();
-      }
-    }
-
-    function updateSuggestionPointerFromEvent(event) {
-      if (!event) {
-        return;
-      }
-      suggestionPointerClientX = event.clientX;
-      suggestionPointerClientY = event.clientY;
-      isPointerInsideSuggestions = true;
-      syncHoveredSuggestionFromPointer();
-    }
-
-    function clearHoveredSuggestionFromPointer() {
-      isPointerInsideSuggestions = false;
-      suggestionPointerClientX = null;
-      suggestionPointerClientY = null;
-      let hasChanges = false;
-      suggestionItems.forEach((item) => {
-        if (item && item._xIsHovering) {
-          item._xIsHovering = false;
-          hasChanges = true;
-        }
-      });
-      if (hasChanges) {
-        updateSelection();
-      }
-    }
-
-    function applySuggestionHoverState(item, theme) {
-      if (!item) {
-        return;
-      }
-      if (theme && theme._xIsBrand) {
-        const hover = getHoverColors(theme);
-        item.style.background = hover.bg;
-        item.style.border = `1px solid ${hover.border}`;
-        return;
-      }
-      item.style.background = 'var(--x-ov-hover-bg)';
-      item.style.border = '1px solid transparent';
+      item.style.setProperty('background', highlight.bg, 'important');
+      item.style.setProperty('border', `1px solid ${highlight.border}`, 'important');
     }
 
     function resetSearchSuggestion(item) {
-      item.style.background = 'transparent';
-      item.style.border = '1px solid transparent';
+      item.style.setProperty('background', 'transparent', 'important');
+      item.style.setProperty('border', '1px solid transparent', 'important');
     }
 
     function applySearchActionStyles(item, theme, isActive) {
@@ -13423,103 +10313,113 @@ async function getSearchSuggestions(query) {
       const shouldHideSourceTags = Boolean(item._xHasSwitchAction);
       if (item._xVisitButton) {
         const shouldHide = Boolean(item._xAlwaysHideVisitButton || (isActive && item._xHasActionTags));
-        item._xVisitButton.style.display = shouldHide ? 'none' : 'inline-flex';
+        item._xVisitButton.style.setProperty('display', shouldHide ? 'none' : 'inline-flex', 'important');
         if (shouldHide) {
-          item._xVisitButton.style.backgroundColor = 'transparent';
-          item._xVisitButton.style.border = '1px solid transparent';
+          item._xVisitButton.style.setProperty('background-color', 'transparent', 'important');
+          item._xVisitButton.style.setProperty('border', '1px solid transparent', 'important');
         }
         if (isActive) {
-          item._xVisitButton.style.color = resolvedTheme.buttonText;
-          item._xVisitButton.style.backgroundColor = resolvedTheme.buttonBg;
-          item._xVisitButton.style.border = `1px solid ${resolvedTheme.buttonBorder}`;
+          item._xVisitButton.style.setProperty('color', resolvedTheme.buttonText, 'important');
+          item._xVisitButton.style.setProperty('background-color', resolvedTheme.buttonBg, 'important');
+          item._xVisitButton.style.setProperty('border', `1px solid ${resolvedTheme.buttonBorder}`, 'important');
         } else {
-          item._xVisitButton.style.color = 'var(--x-ov-subtext, #9CA3AF)';
-          item._xVisitButton.style.backgroundColor = 'transparent';
-          item._xVisitButton.style.border = '1px solid transparent';
+          item._xVisitButton.style.setProperty('color', 'var(--x-ov-subtext, #9CA3AF)', 'important');
+          item._xVisitButton.style.setProperty('background-color', 'transparent', 'important');
+          item._xVisitButton.style.setProperty('border', '1px solid transparent', 'important');
         }
       }
       if (item._xHistoryDeleteButton) {
         const shouldShowHistoryDelete = Boolean(item._xHasHistoryDeleteButton && item._xIsHovering);
         if (item._xHistoryDeleteSlot) {
-          item._xHistoryDeleteSlot.style.width = shouldShowHistoryDelete ? '28px' : '0px';
-          item._xHistoryDeleteSlot.style.marginLeft = shouldShowHistoryDelete ? '8px' : '0px';
-          item._xHistoryDeleteSlot.style.opacity = shouldShowHistoryDelete ? '1' : '0';
-          item._xHistoryDeleteSlot.style.pointerEvents = shouldShowHistoryDelete ? 'auto' : 'none';
+          item._xHistoryDeleteSlot.style.setProperty('width', shouldShowHistoryDelete ? '28px' : '0px', 'important');
+          item._xHistoryDeleteSlot.style.setProperty('margin-left', shouldShowHistoryDelete ? '8px' : '0px', 'important');
+          item._xHistoryDeleteSlot.style.setProperty('opacity', shouldShowHistoryDelete ? '1' : '0', 'important');
+          item._xHistoryDeleteSlot.style.setProperty('pointer-events', shouldShowHistoryDelete ? 'auto' : 'none', 'important');
         }
-        item._xHistoryDeleteButton.style.visibility = shouldShowHistoryDelete ? 'visible' : 'hidden';
-        item._xHistoryDeleteButton.style.pointerEvents = shouldShowHistoryDelete ? 'auto' : 'none';
-        item._xHistoryDeleteButton.style.opacity = shouldShowHistoryDelete ? '1' : '0';
-        item._xHistoryDeleteButton.style.transform = shouldShowHistoryDelete ? 'translateX(0)' : 'translateX(4px)';
+        item._xHistoryDeleteButton.style.setProperty('visibility', shouldShowHistoryDelete ? 'visible' : 'hidden', 'important');
+        item._xHistoryDeleteButton.style.setProperty('pointer-events', shouldShowHistoryDelete ? 'auto' : 'none', 'important');
+        item._xHistoryDeleteButton.style.setProperty('opacity', shouldShowHistoryDelete ? '1' : '0', 'important');
+        item._xHistoryDeleteButton.style.setProperty(
+          'transform',
+          shouldShowHistoryDelete ? 'translateX(0)' : 'translateX(4px)',
+          'important'
+        );
         if (shouldShowHistoryDelete) {
-          item._xHistoryDeleteButton.style.color = isActive
-            ? resolvedTheme.buttonText
-            : 'var(--x-ext-input-icon, #9CA3AF)';
-          item._xHistoryDeleteButton.style.background = isActive ? resolvedTheme.buttonBg : 'transparent';
-          item._xHistoryDeleteButton.style.border = isActive
-            ? `1px solid ${resolvedTheme.buttonBorder}`
-            : '1px solid transparent';
+          item._xHistoryDeleteButton.style.setProperty(
+            'color',
+            isActive ? resolvedTheme.buttonText : 'var(--x-ext-input-icon, #9CA3AF)',
+            'important'
+          );
+          item._xHistoryDeleteButton.style.setProperty(
+            'background',
+            isActive ? resolvedTheme.buttonBg : 'transparent',
+            'important'
+          );
+          item._xHistoryDeleteButton.style.setProperty(
+            'border',
+            isActive ? `1px solid ${resolvedTheme.buttonBorder}` : '1px solid transparent',
+            'important'
+          );
         } else {
-          item._xHistoryDeleteButton.style.background = 'transparent';
-          item._xHistoryDeleteButton.style.border = '1px solid transparent';
-          item._xHistoryDeleteButton.style.color = 'var(--x-ext-input-icon, #9CA3AF)';
+          item._xHistoryDeleteButton.style.setProperty('background', 'transparent', 'important');
+          item._xHistoryDeleteButton.style.setProperty('border', '1px solid transparent', 'important');
+          item._xHistoryDeleteButton.style.setProperty('color', 'var(--x-ext-input-icon, #9CA3AF)', 'important');
         }
       }
       if (item._xHistoryTag) {
-        item._xHistoryTag.style.display = shouldHideSourceTags ? 'none' : 'inline-flex';
+        item._xHistoryTag.style.setProperty('display', shouldHideSourceTags ? 'none' : 'inline-flex', 'important');
         if (isActive) {
-          item._xHistoryTag.style.background = resolvedTheme.tagBg;
-          item._xHistoryTag.style.color = resolvedTheme.tagText;
-          item._xHistoryTag.style.border = `1px solid ${resolvedTheme.tagBorder}`;
+          item._xHistoryTag.style.setProperty('background', resolvedTheme.tagBg, 'important');
+          item._xHistoryTag.style.setProperty('color', resolvedTheme.tagText, 'important');
+          item._xHistoryTag.style.setProperty('border', `1px solid ${resolvedTheme.tagBorder}`, 'important');
         } else {
-          item._xHistoryTag.style.background = item._xHistoryTag._xDefaultBg || 'var(--x-ov-tag-bg, #F3F4F6)';
-          item._xHistoryTag.style.color = item._xHistoryTag._xDefaultText || 'var(--x-ov-tag-text, #6B7280)';
-          item._xHistoryTag.style.border = `1px solid ${item._xHistoryTag._xDefaultBorder || 'transparent'}`;
+          item._xHistoryTag.style.setProperty('background', item._xHistoryTag._xDefaultBg || 'var(--x-ov-tag-bg, #F3F4F6)', 'important');
+          item._xHistoryTag.style.setProperty('color', item._xHistoryTag._xDefaultText || 'var(--x-ov-tag-text, #6B7280)', 'important');
+          item._xHistoryTag.style.setProperty('border', `1px solid ${item._xHistoryTag._xDefaultBorder || 'transparent'}`, 'important');
         }
       }
       if (item._xBookmarkTag) {
-        item._xBookmarkTag.style.display = shouldHideSourceTags ? 'none' : 'inline-flex';
+        item._xBookmarkTag.style.setProperty('display', shouldHideSourceTags ? 'none' : 'inline-flex', 'important');
         if (isActive) {
-          item._xBookmarkTag.style.background = resolvedTheme.tagBg;
-          item._xBookmarkTag.style.color = resolvedTheme.tagText;
-          item._xBookmarkTag.style.border = `1px solid ${resolvedTheme.tagBorder}`;
+          item._xBookmarkTag.style.setProperty('background', resolvedTheme.tagBg, 'important');
+          item._xBookmarkTag.style.setProperty('color', resolvedTheme.tagText, 'important');
+          item._xBookmarkTag.style.setProperty('border', `1px solid ${resolvedTheme.tagBorder}`, 'important');
         } else {
-          item._xBookmarkTag.style.background =
-            item._xBookmarkTag._xDefaultBg || 'var(--x-ov-bookmark-tag-bg, #FEF3C7)';
-          item._xBookmarkTag.style.color =
-            item._xBookmarkTag._xDefaultText || 'var(--x-ov-bookmark-tag-text, #D97706)';
-          item._xBookmarkTag.style.border = `1px solid ${item._xBookmarkTag._xDefaultBorder || 'transparent'}`;
+          item._xBookmarkTag.style.setProperty('background', item._xBookmarkTag._xDefaultBg || 'var(--x-ov-bookmark-tag-bg, #FEF3C7)', 'important');
+          item._xBookmarkTag.style.setProperty('color', item._xBookmarkTag._xDefaultText || 'var(--x-ov-bookmark-tag-text, #D97706)', 'important');
+          item._xBookmarkTag.style.setProperty('border', `1px solid ${item._xBookmarkTag._xDefaultBorder || 'transparent'}`, 'important');
         }
       }
       if (item._xTopSiteTag) {
-        item._xTopSiteTag.style.display = shouldHideSourceTags ? 'none' : 'inline-flex';
+        item._xTopSiteTag.style.setProperty('display', shouldHideSourceTags ? 'none' : 'inline-flex', 'important');
         if (isActive) {
-          item._xTopSiteTag.style.background = resolvedTheme.tagBg;
-          item._xTopSiteTag.style.color = resolvedTheme.tagText;
-          item._xTopSiteTag.style.border = `1px solid ${resolvedTheme.tagBorder}`;
+          item._xTopSiteTag.style.setProperty('background', resolvedTheme.tagBg, 'important');
+          item._xTopSiteTag.style.setProperty('color', resolvedTheme.tagText, 'important');
+          item._xTopSiteTag.style.setProperty('border', `1px solid ${resolvedTheme.tagBorder}`, 'important');
         } else {
-          item._xTopSiteTag.style.background = item._xTopSiteTag._xDefaultBg || 'var(--x-ov-tag-bg, #F3F4F6)';
-          item._xTopSiteTag.style.color = item._xTopSiteTag._xDefaultText || 'var(--x-ov-tag-text, #6B7280)';
-          item._xTopSiteTag.style.border = `1px solid ${item._xTopSiteTag._xDefaultBorder || 'transparent'}`;
+          item._xTopSiteTag.style.setProperty('background', item._xTopSiteTag._xDefaultBg || 'var(--x-ov-tag-bg, #F3F4F6)', 'important');
+          item._xTopSiteTag.style.setProperty('color', item._xTopSiteTag._xDefaultText || 'var(--x-ov-tag-text, #6B7280)', 'important');
+          item._xTopSiteTag.style.setProperty('border', `1px solid ${item._xTopSiteTag._xDefaultBorder || 'transparent'}`, 'important');
         }
       }
       if (item._xOpenTabTag) {
-        item._xOpenTabTag.style.display = item._xHasSwitchAction ? 'inline-flex' : 'none';
+        item._xOpenTabTag.style.setProperty('display', item._xHasSwitchAction ? 'inline-flex' : 'none', 'important');
         if (isActive) {
-          item._xOpenTabTag.style.background = resolvedTheme.tagBg;
-          item._xOpenTabTag.style.color = resolvedTheme.tagText;
-          item._xOpenTabTag.style.border = `1px solid ${resolvedTheme.tagBorder}`;
+          item._xOpenTabTag.style.setProperty('background', resolvedTheme.tagBg, 'important');
+          item._xOpenTabTag.style.setProperty('color', resolvedTheme.tagText, 'important');
+          item._xOpenTabTag.style.setProperty('border', `1px solid ${resolvedTheme.tagBorder}`, 'important');
         } else {
-          item._xOpenTabTag.style.background = item._xOpenTabTag._xDefaultBg || 'var(--x-ov-tag-bg, #F3F4F6)';
-          item._xOpenTabTag.style.color = item._xOpenTabTag._xDefaultText || 'var(--x-ov-tag-text, #6B7280)';
-          item._xOpenTabTag.style.border = `1px solid ${item._xOpenTabTag._xDefaultBorder || 'transparent'}`;
+          item._xOpenTabTag.style.setProperty('background', item._xOpenTabTag._xDefaultBg || 'var(--x-ov-tag-bg, #F3F4F6)', 'important');
+          item._xOpenTabTag.style.setProperty('color', item._xOpenTabTag._xDefaultText || 'var(--x-ov-tag-text, #6B7280)', 'important');
+          item._xOpenTabTag.style.setProperty('border', `1px solid ${item._xOpenTabTag._xDefaultBorder || 'transparent'}`, 'important');
         }
       }
       if (item._xTagContainer) {
         const shouldShow = isActive && item._xHasActionTags;
-        item._xTagContainer.style.display = shouldShow ? 'inline-flex' : 'none';
+        item._xTagContainer.style.setProperty('display', shouldShow ? 'inline-flex' : 'none', 'important');
       }
       if (item._xTitle) {
-        item._xTitle.style.fontWeight = isActive ? '600' : '400';
+        item._xTitle.style.setProperty('font-weight', isActive ? '600' : '400', 'important');
       }
     }
 
@@ -13528,26 +10428,25 @@ async function getSearchSuggestions(query) {
         const isSelected = index === selectedIndex;
         const shouldAutoHighlight = selectedIndex === -1 && item._xIsAutocompleteTop;
         const isHighlighted = isSelected || shouldAutoHighlight;
-        const isHovering = Boolean(item._xIsHovering);
         if (item._xIsSearchSuggestion) {
           const theme = item._xTheme || defaultTheme;
           const shouldUseBlue = !(theme && theme._xIsBrand) && (isSelected || item._xIsAutocompleteTop);
           const highlightTheme = shouldUseBlue ? urlHighlightTheme : theme;
           if (isHighlighted) {
             applySearchSuggestionHighlight(item, highlightTheme);
-          } else if (isHovering) {
-            applySuggestionHoverState(item, theme);
           } else {
             resetSearchSuggestion(item);
           }
-          applySearchActionStyles(item, theme, Boolean(isHighlighted || isHovering));
-          setNonFaviconIconBg(item, Boolean(isHighlighted || isHovering));
+          applySearchActionStyles(item, theme, isHighlighted);
+          setNonFaviconIconBg(item, Boolean(isHighlighted || item._xIsHovering));
           if (item._xDirectIconWrap) {
-            const shouldShow = Boolean((isHighlighted || isHovering) && theme && theme._xIsBrand);
+            const shouldShow = isHighlighted && theme && theme._xIsBrand;
             const resolvedTheme = getThemeForMode(theme || defaultTheme);
-            item._xDirectIconWrap.style.color = shouldShow
-              ? resolvedTheme.accent
-              : 'var(--x-ov-subtext, #9CA3AF)';
+            item._xDirectIconWrap.style.setProperty(
+              'color',
+              shouldShow ? resolvedTheme.accent : 'var(--x-ov-subtext, #9CA3AF)',
+              'important'
+            );
           }
           return;
         }
@@ -13557,37 +10456,39 @@ async function getSearchSuggestions(query) {
         const highlightTheme = shouldUseBlue ? urlHighlightTheme : theme;
         if (isHighlighted) {
           applySearchSuggestionHighlight(item, highlightTheme);
-        } else if (isHovering) {
-          applySuggestionHoverState(item, theme);
           if (item._xEntryActionTag) {
             const palette = getOverlayActionTagPalette();
-            item._xEntryActionTag.style.setProperty('--x-ext-tag-bg', palette.tagBg);
-            item._xEntryActionTag.style.setProperty('--x-ext-tag-text', palette.tagText);
-            item._xEntryActionTag.style.setProperty('--x-ext-tag-border', palette.tagBorder);
-            item._xEntryActionTag.style.setProperty('--x-ext-key-bg', palette.keyBg);
-            item._xEntryActionTag.style.setProperty('--x-ext-key-text', palette.keyText);
-            item._xEntryActionTag.style.setProperty('--x-ext-key-border', palette.keyBorder);
+            item._xEntryActionTag.style.setProperty('--x-ext-tag-bg', palette.tagBg, 'important');
+            item._xEntryActionTag.style.setProperty('--x-ext-tag-text', palette.tagText, 'important');
+            item._xEntryActionTag.style.setProperty('--x-ext-tag-border', palette.tagBorder, 'important');
+            item._xEntryActionTag.style.setProperty('--x-ext-key-bg', palette.keyBg, 'important');
+            item._xEntryActionTag.style.setProperty('--x-ext-key-text', palette.keyText, 'important');
+            item._xEntryActionTag.style.setProperty('--x-ext-key-border', palette.keyBorder, 'important');
           }
           if (item._xSwitchButton) {
-            item._xSwitchButton.style.color = 'var(--x-ov-text, #1F2937)';
+            item._xSwitchButton.style.setProperty('color', 'var(--x-ov-text, #1F2937)', 'important');
             const shouldShowTags = Boolean(item._xTagContainer && item._xHasActionTags);
-            item._xSwitchButton.style.display = shouldShowTags ? 'none' : 'inline-flex';
+            item._xSwitchButton.style.setProperty('display', shouldShowTags ? 'none' : 'inline-flex', 'important');
           }
           if (item._xTagContainer) {
-            item._xTagContainer.style.display = item._xHasActionTags ? 'inline-flex' : 'none';
+            item._xTagContainer.style.setProperty(
+              'display',
+              item._xHasActionTags ? 'inline-flex' : 'none',
+              'important'
+            );
           }
         } else {
           resetSearchSuggestion(item);
           if (item._xSwitchButton) {
-            item._xSwitchButton.style.color = 'var(--x-ov-subtext, #9CA3AF)';
-            item._xSwitchButton.style.display = 'inline-flex';
+            item._xSwitchButton.style.setProperty('color', 'var(--x-ov-subtext, #9CA3AF)', 'important');
+            item._xSwitchButton.style.setProperty('display', 'inline-flex', 'important');
           }
           if (item._xTagContainer) {
-            item._xTagContainer.style.display = 'none';
+            item._xTagContainer.style.setProperty('display', 'none', 'important');
           }
         }
         if (item._xTitle) {
-          item._xTitle.style.fontWeight = isHighlighted ? '600' : '400';
+          item._xTitle.style.setProperty('font-weight', isHighlighted ? '600' : '400', 'important');
         }
       });
     }
@@ -13600,11 +10501,11 @@ async function getSearchSuggestions(query) {
       if (toHeight <= fromHeight + 1) {
         return;
       }
-      container.style.height = `${fromHeight}px`;
-      container.style.overflow = 'hidden';
-      container.style.transition = 'height 180ms ease';
+      container.style.setProperty('height', `${fromHeight}px`, 'important');
+      container.style.setProperty('overflow', 'hidden', 'important');
+      container.style.setProperty('transition', 'height 180ms ease', 'important');
       requestAnimationFrame(() => {
-        container.style.height = `${toHeight}px`;
+        container.style.setProperty('height', `${toHeight}px`, 'important');
       });
       const cleanup = () => {
         container.style.removeProperty('height');
@@ -13620,17 +10521,44 @@ async function getSearchSuggestions(query) {
       const isDark = isOverlayDarkMode();
       const empty = document.createElement('div');
       applyNoTranslate(empty);
-      empty.className = 'x-ov-empty-state';
-      empty.style.background = isDark
-        ? 'transparent'
-        : 'color-mix(in srgb, var(--x-ov-bg, #FFFFFF) 90%, var(--x-ov-hover-bg, #F3F4F6) 10%)';
+      empty.style.cssText = `
+        all: unset !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 8px !important;
+        padding: 16px 14px !important;
+        margin: 0 !important;
+        border: none !important;
+        border-radius: 14px !important;
+        background: ${isDark ? 'transparent' : 'color-mix(in srgb, var(--x-ov-bg, #FFFFFF) 90%, var(--x-ov-hover-bg, #F3F4F6) 10%)'} !important;
+        color: var(--x-ov-subtext, #6B7280) !important;
+        box-sizing: border-box !important;
+        line-height: 1.4 !important;
+        text-decoration: none !important;
+        list-style: none !important;
+        outline: none !important;
+        font-size: 13px !important;
+        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+        vertical-align: baseline !important;
+      `;
       const icon = document.createElement('span');
       applyNoTranslate(icon);
       icon.innerHTML = getRiSvg('ri-file-3-line', 'ri-size-16');
-      icon.className = 'x-ov-empty-icon';
+      icon.style.cssText = `
+        all: unset !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        color: var(--x-ov-subtext, #9CA3AF) !important;
+        line-height: 1 !important;
+      `;
       const text = document.createElement('span');
       setProtectedPlainText(text, message || t('overlay_empty_result', '无匹配结果'));
-      text.className = 'x-ov-empty-text';
+      text.style.cssText = `
+        all: unset !important;
+        line-height: 1.35 !important;
+      `;
       empty.appendChild(icon);
       empty.appendChild(text);
       suggestionsContainer.appendChild(empty);
@@ -13661,42 +10589,169 @@ async function getSearchSuggestions(query) {
         applyNoTranslate(entryItem);
         entryItem.id = '_x_extension_open_tabs_mode_entry_2026_unique_';
         const entryIsLast = totalItems === 1;
-        entryItem.className = 'x-ov-suggestion-item';
-        entryItem.style.margin = `0 0 ${entryIsLast ? '0' : '4px'} 0`;
+        entryItem.style.cssText = `
+          all: unset !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: space-between !important;
+          padding: 12px 16px !important;
+          background: transparent !important;
+          border: 1px solid transparent !important;
+          border-radius: 16px !important;
+          cursor: pointer !important;
+          transition: background-color 0.2s ease !important;
+          box-sizing: border-box !important;
+          margin: 0 0 ${entryIsLast ? '0' : '4px'} 0 !important;
+          line-height: 1.5 !important;
+          text-decoration: none !important;
+          list-style: none !important;
+          outline: none !important;
+          color: inherit !important;
+          font-size: 100% !important;
+          font: inherit !important;
+          vertical-align: baseline !important;
+        `;
         entryItem._xIsSearchSuggestion = false;
         entryItem._xIsOpenTabsModeEntry = true;
         entryItem._xIsAutocompleteTop = false;
         entryItem._xTheme = defaultTheme;
         suggestionItems.push(entryItem);
 
-        const entryLeft = createSuggestionLeft();
-        const entryIconSlot = createSuggestionIconSlot();
-        const entryIcon = createSearchIcon();
+        const entryLeft = document.createElement('div');
+        entryLeft.style.cssText = `
+          all: unset !important;
+          display: flex !important;
+          align-items: center !important;
+          gap: 12px !important;
+          flex: 1 !important;
+          min-width: 0 !important;
+          box-sizing: border-box !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          line-height: 1 !important;
+          text-decoration: none !important;
+          list-style: none !important;
+          outline: none !important;
+          background: transparent !important;
+          color: inherit !important;
+          font-size: 100% !important;
+          font: inherit !important;
+          vertical-align: baseline !important;
+        `;
+        const entryIconSlot = document.createElement('span');
+        entryIconSlot.style.cssText = `
+          all: unset !important;
+          width: 24px !important;
+          height: 24px !important;
+          flex: 0 0 24px !important;
+          flex-shrink: 0 !important;
+          border-radius: 8px !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          box-sizing: border-box !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          line-height: 1 !important;
+          text-decoration: none !important;
+          list-style: none !important;
+          outline: none !important;
+          background: transparent !important;
+          transition: background-color 0.2s ease !important;
+          color: var(--x-ov-subtext, #9CA3AF) !important;
+          font-size: 100% !important;
+          font: inherit !important;
+          vertical-align: baseline !important;
+        `;
+        const entryIcon = document.createElement('span');
+        entryIcon.innerHTML = getRiSvg('ri-search-line', 'ri-size-16');
         entryIconSlot.appendChild(entryIcon);
         entryItem._xIconWrap = entryIconSlot;
         entryItem._xIconIsFavicon = false;
 
-        const entryTitle = createSuggestionTitle();
+        const entryTitle = document.createElement('span');
         applyNoTranslate(entryTitle);
         setProtectedPlainText(entryTitle, t('search_open_tabs_only_entry', '搜索已打开标签页'));
+        entryTitle.style.cssText = `
+          all: unset !important;
+          color: var(--x-ov-text, #111827) !important;
+          font-size: 14px !important;
+          font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+          white-space: nowrap !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+          max-width: 100% !important;
+          box-sizing: border-box !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          line-height: 1.5 !important;
+          text-decoration: none !important;
+          list-style: none !important;
+          outline: none !important;
+          background: transparent !important;
+          display: inline-block !important;
+          vertical-align: baseline !important;
+        `;
         entryItem._xTitle = entryTitle;
 
-        const entryActionTags = createOverlayActionTags();
+        const entryActionTags = document.createElement('div');
+        entryActionTags.style.cssText = `
+          all: unset !important;
+          display: none !important;
+          align-items: center !important;
+          gap: 6px !important;
+          box-sizing: border-box !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          line-height: 1 !important;
+          text-decoration: none !important;
+          list-style: none !important;
+          outline: none !important;
+          background: transparent !important;
+          color: inherit !important;
+          font-size: 100% !important;
+          font: inherit !important;
+          vertical-align: baseline !important;
+          flex-shrink: 0 !important;
+        `;
         const entryActionTag = createActionTag(t('action_search', '搜索'), 'Tab');
-        entryActionTag.style.cursor = 'pointer';
+        entryActionTag.style.setProperty('cursor', 'pointer', 'important');
         const entryTagPalette = getOverlayActionTagPalette();
-        entryActionTag.style.setProperty('--x-ext-tag-bg', entryTagPalette.tagBg);
-        entryActionTag.style.setProperty('--x-ext-tag-text', entryTagPalette.tagText);
-        entryActionTag.style.setProperty('--x-ext-tag-border', entryTagPalette.tagBorder);
-        entryActionTag.style.setProperty('--x-ext-key-bg', entryTagPalette.keyBg);
-        entryActionTag.style.setProperty('--x-ext-key-text', entryTagPalette.keyText);
-        entryActionTag.style.setProperty('--x-ext-key-border', entryTagPalette.keyBorder);
+        entryActionTag.style.setProperty('--x-ext-tag-bg', entryTagPalette.tagBg, 'important');
+        entryActionTag.style.setProperty('--x-ext-tag-text', entryTagPalette.tagText, 'important');
+        entryActionTag.style.setProperty('--x-ext-tag-border', entryTagPalette.tagBorder, 'important');
+        entryActionTag.style.setProperty('--x-ext-key-bg', entryTagPalette.keyBg, 'important');
+        entryActionTag.style.setProperty('--x-ext-key-text', entryTagPalette.keyText, 'important');
+        entryActionTag.style.setProperty('--x-ext-key-border', entryTagPalette.keyBorder, 'important');
         entryItem._xEntryActionTag = entryActionTag;
         entryActionTags.appendChild(entryActionTag);
         entryItem._xTagContainer = entryActionTags;
         entryItem._xHasActionTags = true;
 
-        const entryVisitButton = createOverlayVisitButton();
+        const entryVisitButton = document.createElement('button');
+        applyNoTranslate(entryVisitButton);
+        entryVisitButton.style.cssText = `
+          all: unset !important;
+          background: transparent !important;
+          color: var(--x-ov-subtext, #9CA3AF) !important;
+          border: 1px solid transparent !important;
+          border-radius: 16px !important;
+          font-size: 12px !important;
+          font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+          cursor: pointer !important;
+          transition: background-color 0.2s ease !important;
+          padding: 6px 12px !important;
+          box-sizing: border-box !important;
+          margin: 0 !important;
+          line-height: 1 !important;
+          text-decoration: none !important;
+          list-style: none !important;
+          outline: none !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          gap: 4px !important;
+          vertical-align: baseline !important;
+        `;
         setInlineLabelWithIcon(
           entryVisitButton,
           t('action_search', '搜索'),
@@ -13711,7 +10766,8 @@ async function getSearchSuggestions(query) {
             if (selectedIndex === -1 && this._xIsAutocompleteTop) {
               return;
             }
-            updateSelection();
+            this.style.setProperty('background-color', 'var(--x-ov-hover-bg)', 'important');
+            this.style.setProperty('border', '1px solid transparent', 'important');
           }
         });
         entryItem.addEventListener('mouseleave', function() {
@@ -13734,7 +10790,26 @@ async function getSearchSuggestions(query) {
 
         entryLeft.appendChild(entryIconSlot);
         entryLeft.appendChild(entryTitle);
-        const entryRight = createOverlayRightSide();
+        const entryRight = document.createElement('div');
+        entryRight.style.cssText = `
+          all: unset !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          gap: 8px !important;
+          flex-shrink: 0 !important;
+          box-sizing: border-box !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          line-height: 1 !important;
+          text-decoration: none !important;
+          list-style: none !important;
+          outline: none !important;
+          background: transparent !important;
+          color: inherit !important;
+          font-size: 100% !important;
+          font: inherit !important;
+          vertical-align: baseline !important;
+        `;
         entryRight.appendChild(entryActionTags);
         entryRight.appendChild(entryVisitButton);
         entryItem.appendChild(entryLeft);
@@ -13748,10 +10823,30 @@ async function getSearchSuggestions(query) {
         applyNoTranslate(suggestionItem);
         suggestionItem.id = `_x_extension_suggestion_item_${index}_2024_unique_`;
         const isLastItem = index === totalItems - 1;
-        suggestionItem.className = 'x-ov-suggestion-item';
-        suggestionItem.style.margin = `0 0 ${isLastItem ? '0' : '4px'} 0`;
+        suggestionItem.style.cssText = `
+          all: unset !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: space-between !important;
+          padding: 12px 16px !important;
+          background: transparent !important;
+          border: 1px solid transparent !important;
+          border-radius: 16px !important;
+          cursor: pointer !important;
+          transition: background-color 0.2s ease !important;
+          box-sizing: border-box !important;
+          margin: 0 0 ${isLastItem ? '0' : '4px'} 0 !important;
+          line-height: 1.5 !important;
+          text-decoration: none !important;
+          list-style: none !important;
+          outline: none !important;
+          color: inherit !important;
+          font-size: 100% !important;
+          font: inherit !important;
+          vertical-align: baseline !important;
+        `;
         suggestionItem._xIsSearchSuggestion = false;
-        
+
         // Store reference to suggestion item
         suggestionItems.push(suggestionItem);
         suggestionItem._xIsAutocompleteTop = tabIndex === 0;
@@ -13759,8 +10854,28 @@ async function getSearchSuggestions(query) {
         suggestionItem._xTabId = tab && typeof tab.id === 'number' ? tab.id : null;
 
         // Create left side with icon and title
-        const leftSide = createSuggestionLeft();
+        const leftSide = document.createElement('div');
         leftSide.id = `_x_extension_left_side_${index}_2024_unique_`;
+        leftSide.style.cssText = `
+          all: unset !important;
+          display: flex !important;
+          align-items: center !important;
+          gap: 12px !important;
+          flex: 1 !important;
+          min-width: 0 !important;
+          box-sizing: border-box !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          line-height: 1 !important;
+          text-decoration: none !important;
+          list-style: none !important;
+          outline: none !important;
+          background: transparent !important;
+          color: inherit !important;
+          font-size: 100% !important;
+          font: inherit !important;
+          vertical-align: baseline !important;
+        `;
 
         // Create favicon
         let favicon = null;
@@ -13776,8 +10891,33 @@ async function getSearchSuggestions(query) {
         if (useFallback) {
           iconNode = createLinkIcon();
         } else {
-          favicon = createSuggestionFavicon({ highPriority: index < 4 });
+          favicon = document.createElement('img');
           favicon.id = `_x_extension_favicon_${index}_2024_unique_`;
+          favicon.decoding = 'async';
+          favicon.loading = 'eager';
+          favicon.referrerPolicy = 'no-referrer';
+          if (index < 4) {
+            favicon.fetchPriority = 'high';
+          }
+          favicon.style.cssText = `
+            all: unset !important;
+            width: 16px !important;
+            height: 16px !important;
+            border-radius: 2px !important;
+            box-sizing: border-box !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 1 !important;
+            text-decoration: none !important;
+            list-style: none !important;
+            outline: none !important;
+            background: transparent !important;
+            color: inherit !important;
+            font-size: 100% !important;
+            font: inherit !important;
+            vertical-align: baseline !important;
+            display: block !important;
+          `;
           applyFaviconOpticalAlignment(favicon);
           attachResolvedFaviconWithFallbacks(
             favicon,
@@ -13793,33 +10933,130 @@ async function getSearchSuggestions(query) {
           iconNode = favicon;
           isFaviconIcon = true;
         }
-        const iconSlot = createSuggestionIconSlot();
+        const iconSlot = document.createElement('span');
+        iconSlot.style.cssText = `
+          all: unset !important;
+          width: 24px !important;
+          height: 24px !important;
+          flex: 0 0 24px !important;
+          flex-shrink: 0 !important;
+          border-radius: 8px !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          box-sizing: border-box !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          line-height: 1 !important;
+          text-decoration: none !important;
+          list-style: none !important;
+          outline: none !important;
+          background: transparent !important;
+          transition: background-color 0.2s ease !important;
+          color: var(--x-ov-subtext, #9CA3AF) !important;
+          font-size: 100% !important;
+          font: inherit !important;
+          vertical-align: baseline !important;
+        `;
         iconSlot.appendChild(iconNode);
         suggestionItem._xIconWrap = iconSlot;
         suggestionItem._xIconIsFavicon = isFaviconIcon;
 
         // Create title
-        const title = createSuggestionTitle();
+        const title = document.createElement('span');
         applyNoTranslate(title);
         title.id = `_x_extension_title_${index}_2024_unique_`;
         setProtectedPlainText(title, tab.title || t('untitled', '无标题'));
+        title.style.cssText = `
+          all: unset !important;
+          color: var(--x-ov-text, #111827) !important;
+          font-size: 14px !important;
+          font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+          white-space: nowrap !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+          max-width: 100% !important;
+          box-sizing: border-box !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          line-height: 1.5 !important;
+          text-decoration: none !important;
+          list-style: none !important;
+          outline: none !important;
+          background: transparent !important;
+          display: inline-block !important;
+          vertical-align: baseline !important;
+        `;
         suggestionItem._xTitle = title;
 
         // Create switch button
-        const switchButton = createOverlaySwitchButton();
+        const switchButton = document.createElement('button');
+        applyNoTranslate(switchButton);
         switchButton.id = `_x_extension_switch_button_${index}_2024_unique_`;
+        switchButton.style.cssText = `
+          all: unset !important;
+          background: transparent !important;
+          color: var(--x-ov-subtext, #4B5563) !important;
+          border: none !important;
+          border-radius: 6px !important;
+          font-size: 12px !important;
+          font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+          cursor: pointer !important;
+          transition: background-color 0.2s ease !important;
+          height: 26px !important;
+          padding: 0 12px !important;
+          box-sizing: border-box !important;
+          margin: 0 !important;
+          line-height: 1 !important;
+          text-decoration: none !important;
+          list-style: none !important;
+          outline: none !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          gap: 4px !important;
+          vertical-align: baseline !important;
+        `;
         const switchButtonLabel = document.createElement('span');
         setProtectedPlainText(switchButtonLabel, t('switch_to_tab', '切换到标签页'));
-        switchButtonLabel.className = 'x-ov-switch-button-label';
+        switchButtonLabel.style.cssText = `
+          all: unset !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          line-height: 1 !important;
+        `;
         const switchButtonIcon = document.createElement('span');
         applyNoTranslate(switchButtonIcon);
         switchButtonIcon.innerHTML = getRiSvg('ri-arrow-right-line', 'ri-size-12');
-        switchButtonIcon.className = 'x-ov-switch-button-icon';
+        switchButtonIcon.style.cssText = `
+          all: unset !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          line-height: 1 !important;
+        `;
         switchButton.appendChild(switchButtonLabel);
         switchButton.appendChild(switchButtonIcon);
         suggestionItem._xSwitchButton = switchButton;
 
-        const actionTags = createOverlayActionTags();
+        const actionTags = document.createElement('div');
+        actionTags.style.cssText = `
+          all: unset !important;
+          display: none !important;
+          align-items: center !important;
+          gap: 6px !important;
+          box-sizing: border-box !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          line-height: 1 !important;
+          text-decoration: none !important;
+          list-style: none !important;
+          outline: none !important;
+          background: transparent !important;
+          color: inherit !important;
+          font-size: 100% !important;
+          font: inherit !important;
+          vertical-align: baseline !important;
+          flex-shrink: 0 !important;
+        `;
         actionTags.appendChild(createActionTag(t('action_switch', '切换'), 'Enter'));
         suggestionItem._xTagContainer = actionTags;
         suggestionItem._xHasActionTags = actionTags.childNodes.length > 0;
@@ -13832,7 +11069,15 @@ async function getSearchSuggestions(query) {
             if (selectedIndex === -1 && this._xIsAutocompleteTop) {
               return;
             }
-            updateSelection();
+            const theme = this._xTheme;
+            if (theme && theme._xIsBrand) {
+              const hover = getHoverColors(theme);
+              this.style.setProperty('background-color', hover.bg, 'important');
+              this.style.setProperty('border', `1px solid ${hover.border}`, 'important');
+            } else {
+              this.style.setProperty('background-color', 'var(--x-ov-hover-bg)', 'important');
+              this.style.setProperty('border', '1px solid transparent', 'important');
+            }
           }
         });
 
@@ -13867,10 +11112,48 @@ async function getSearchSuggestions(query) {
         leftSide.appendChild(iconSlot);
         leftSide.appendChild(title);
         if (overlayTabScoreDebugEnabled) {
-          const rankDebug = createOverlayRankDebugChip(formatTabRankDebugText(tab));
+          const rankDebug = document.createElement('span');
+          applyNoTranslate(rankDebug);
+          setProtectedPlainText(rankDebug, formatTabRankDebugText(tab));
+          rankDebug.style.cssText = `
+            all: unset !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            margin-left: 8px !important;
+            padding: 1px 6px !important;
+            border-radius: 999px !important;
+            color: var(--x-ov-subtext, #6B7280) !important;
+            background: color-mix(in srgb, var(--x-ov-bg, #FFFFFF) 70%, #94A3B8 30%) !important;
+            border: 1px solid color-mix(in srgb, var(--x-ov-border, rgba(0, 0, 0, 0.08)) 75%, #94A3B8 25%) !important;
+            font-size: 10px !important;
+            font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+            line-height: 1.2 !important;
+            white-space: nowrap !important;
+            vertical-align: baseline !important;
+            flex-shrink: 0 !important;
+          `;
           leftSide.appendChild(rankDebug);
         }
-        const rightSide = createOverlayRightSide();
+        const rightSide = document.createElement('div');
+        rightSide.style.cssText = `
+          all: unset !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          gap: 8px !important;
+          flex-shrink: 0 !important;
+          box-sizing: border-box !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          line-height: 1 !important;
+          text-decoration: none !important;
+          list-style: none !important;
+          outline: none !important;
+          background: transparent !important;
+          color: inherit !important;
+          font-size: 100% !important;
+          font: inherit !important;
+          vertical-align: baseline !important;
+        `;
         rightSide.appendChild(actionTags);
         rightSide.appendChild(switchButton);
         suggestionItem.appendChild(leftSide);
@@ -13896,7 +11179,6 @@ async function getSearchSuggestions(query) {
       });
 
       selectedIndex = -1;
-      syncHoveredSuggestionFromPointer();
       updateSelection();
     }
 
@@ -13914,7 +11196,7 @@ async function getSearchSuggestions(query) {
         renderTabSuggestions(filteredTabs);
       });
     }
-    
+
     function getBrowserInternalScheme() {
       const ua = navigator.userAgent || '';
       if (ua.includes('Edg/')) {
@@ -14147,16 +11429,6 @@ async function getSearchSuggestions(query) {
     }
 
     function updateSearchSuggestions(suggestions, query) {
-      if (overlay && overlay.dataset) {
-        overlay.dataset.debugUpdateQuery = query;
-        overlay.dataset.debugUpdateLatestQuery = latestOverlayQuery;
-        overlay.dataset.debugUpdateCount = Array.isArray(suggestions) ? String(suggestions.length) : 'null';
-      }
-      console.log('[Lumno overlay debug] updateSearchSuggestions', {
-        query: query,
-        latestOverlayQuery: latestOverlayQuery,
-        suggestionCount: Array.isArray(suggestions) ? suggestions.length : null
-      });
       if (query !== latestOverlayQuery) {
         return;
       }
@@ -14174,7 +11446,7 @@ async function getSearchSuggestions(query) {
           });
         }
       }
-      
+
       // Add New Tab suggestion as first item
       const newTabSuggestion = modeCommandActive
         ? null
@@ -14211,7 +11483,22 @@ async function getSearchSuggestions(query) {
         }
         const urlLine = document.createElement('span');
         setProtectedPlainText(urlLine, url);
-        urlLine.className = 'x-ov-url-line';
+        urlLine.style.cssText = `
+          all: unset !important;
+          color: var(--x-ov-link, #2563EB) !important;
+          font-size: 12px !important;
+          font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+          text-decoration: none !important;
+          display: inline-block !important;
+          max-width: 60% !important;
+          line-height: 1.4 !important;
+          white-space: nowrap !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+          box-sizing: border-box !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        `;
         return urlLine;
       }
 
@@ -14265,8 +11552,7 @@ async function getSearchSuggestions(query) {
               }),
               url: inlineUrl,
               favicon: getProviderIcon(inlineCandidate.provider),
-              provider: inlineCandidate.provider,
-              searchQuery: inlineCandidate.query
+              provider: inlineCandidate.provider
             };
           }
         }
@@ -14299,18 +11585,9 @@ async function getSearchSuggestions(query) {
               }),
               url: siteUrl,
               favicon: getProviderIcon(siteSearchState),
-              provider: siteSearchState,
-              searchQuery: query
+              provider: siteSearchState
             });
           }
-        }
-        if (shouldRestrictInteractiveSiteSearchSuggestions(siteSearchState, query)) {
-          const primaryInteractiveSuggestion = allSuggestions.find((item) =>
-            item &&
-            item.provider === siteSearchState &&
-            item.searchQuery === query
-          );
-          allSuggestions = primaryInteractiveSuggestion ? [primaryInteractiveSuggestion] : [];
         }
         allSuggestions = filterOverlayBlacklistedSuggestions(allSuggestions, query);
         const onlyKeywordSuggestions = allSuggestions.length > 0 &&
@@ -14319,7 +11596,6 @@ async function getSearchSuggestions(query) {
         let autocompleteCandidate = null;
         let primaryHighlightIndex = -1;
         let primaryHighlightReason = 'none';
-        let strongNavigationMatch = null;
         let topSiteMatch = null;
         let siteSearchPrompt = null;
         const inlineEnabled = Boolean(inlineSuggestion);
@@ -14329,17 +11605,12 @@ async function getSearchSuggestions(query) {
         const preferAutocompleteFirst = overlaySearchResultPriorityMode !== 'search';
         if (!modeCommandActive && !hasCommand) {
           if (!siteSearchState && !inlineEnabled && preferAutocompleteFirst) {
-            strongNavigationMatch = promoteStrongNavigationMatch(allSuggestions, latestRawInputValue.trim());
-            if (strongNavigationMatch) {
-              primaryHighlightIndex = 0;
-              primaryHighlightReason = 'navigation';
-            }
             topSiteMatch = promoteTopSiteMatch(allSuggestions, latestRawInputValue.trim());
           }
           siteSearchTrigger = (!siteSearchState && !inlineEnabled)
             ? getSiteSearchTriggerCandidate(rawTagInput, providersForTags, topSiteMatch)
             : null;
-          if (siteSearchTrigger && !topSiteMatch && !strongNavigationMatch) {
+          if (siteSearchTrigger && !topSiteMatch) {
             siteSearchPrompt = {
               type: 'siteSearchPrompt',
               title: formatMessage('search_in_site', '在 {site} 中搜索', {
@@ -14357,7 +11628,7 @@ async function getSearchSuggestions(query) {
               siteSearchPrompt = null;
             }
           }
-          if (!siteSearchState && !inlineEnabled && !siteSearchPrompt && !strongNavigationMatch && preferAutocompleteFirst) {
+          if (!siteSearchState && !inlineEnabled && !siteSearchPrompt && preferAutocompleteFirst) {
             autocompleteCandidate = getAutocompleteCandidate(allSuggestions, latestRawInputValue);
             if (autocompleteCandidate) {
               const candidateIndex = allSuggestions.findIndex((suggestion) => {
@@ -14389,7 +11660,7 @@ async function getSearchSuggestions(query) {
             allSuggestions = filterOverlayBlacklistedSuggestions(allSuggestions, query);
             primaryHighlightIndex = 0;
             primaryHighlightReason = 'inline';
-          } else if (!siteSearchPrompt && !strongNavigationMatch && topSiteMatch && preferAutocompleteFirst) {
+          } else if (!siteSearchPrompt && topSiteMatch && preferAutocompleteFirst) {
             primaryHighlightIndex = 0;
             primaryHighlightReason = 'topSite';
           }
@@ -14398,8 +11669,7 @@ async function getSearchSuggestions(query) {
               ? allSuggestions.findIndex((item) =>
                 item &&
                 item.type !== 'newtab' &&
-                item._xMatchedTabId === currentOverlayTabId &&
-                shouldAutoPromoteMatchedOpenTabSuggestion(item, latestRawInputValue.trim())
+                item._xMatchedTabId === currentOverlayTabId
               )
               : -1;
             if (preferredCurrentTabMatchIndex >= 0) {
@@ -14414,8 +11684,7 @@ async function getSearchSuggestions(query) {
               const openTabMatchIndex = allSuggestions.findIndex((item) =>
                 item &&
                 item.type !== 'newtab' &&
-                typeof item._xMatchedTabId === 'number' &&
-                shouldAutoPromoteMatchedOpenTabSuggestion(item, latestRawInputValue.trim())
+                typeof item._xMatchedTabId === 'number'
               );
               if (openTabMatchIndex >= 0) {
                 if (openTabMatchIndex > 0) {
@@ -14438,13 +11707,7 @@ async function getSearchSuggestions(query) {
           applyAutocomplete(allSuggestions, primarySuggestion, primaryHighlightReason);
           const inlineAutoHighlight = Boolean(inlineSuggestion && primaryHighlightIndex === 0);
           inlineSearchState = inlineSuggestion
-            ? {
-              url: inlineSuggestion.url,
-              rawInput: rawTagInputForInline,
-              isAuto: inlineAutoHighlight,
-              provider: inlineSuggestion.provider || null,
-              query: inlineSuggestion.searchQuery || ''
-            }
+            ? { url: inlineSuggestion.url, rawInput: rawTagInputForInline, isAuto: inlineAutoHighlight }
             : null;
           const resolvedProvider = mergedProvider || siteSearchTrigger;
           siteSearchTriggerState = resolvedProvider
@@ -14487,7 +11750,7 @@ async function getSearchSuggestions(query) {
         currentSuggestions = allSuggestions; // Store current suggestions including ChatGPT
         lastRenderedQuery = query;
         warmIconCache(allSuggestions);
-        
+
         // Add search suggestions
         allSuggestions.forEach((suggestion, index) => {
           if (index < startIndex) {
@@ -14516,24 +11779,85 @@ async function getSearchSuggestions(query) {
             }
           }
           const initialHighlight = isPrimaryHighlight ? getHighlightColors(immediateTheme) : null;
-          suggestionItem.className = 'x-ov-suggestion-item';
-          suggestionItem.style.background = isPrimaryHighlight ? initialHighlight.bg : 'transparent';
-          suggestionItem.style.border = isPrimaryHighlight ? `1px solid ${initialHighlight.border}` : '1px solid transparent';
-          suggestionItem.style.margin = `0 0 ${isLastItem ? '0' : '4px'} 0`;
-          
+          suggestionItem.style.cssText = `
+            all: unset !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            padding: 12px 16px !important;
+            background: ${isPrimaryHighlight ? initialHighlight.bg : 'transparent'} !important;
+            border: ${isPrimaryHighlight ? `1px solid ${initialHighlight.border}` : '1px solid transparent'} !important;
+            border-radius: 16px !important;
+            margin-bottom: ${isLastItem ? '0' : '4px'} !important;
+            cursor: pointer !important;
+            transition: background-color 0.2s ease !important;
+            box-sizing: border-box !important;
+            margin: 0 0 ${isLastItem ? '0' : '4px'} 0 !important;
+            line-height: 1.5 !important;
+            text-decoration: none !important;
+            list-style: none !important;
+            outline: none !important;
+            color: inherit !important;
+            font-size: 100% !important;
+            font: inherit !important;
+            vertical-align: baseline !important;
+          `;
+
           suggestionItems.push(suggestionItem);
           suggestionItem._xIsSearchSuggestion = true;
           suggestionItem._xIsAutocompleteTop = isPrimaryHighlight;
           suggestionItem._xTheme = immediateTheme;
           applyThemeVariables(suggestionItem, immediateTheme);
-          
+
           // Create left side with icon and title
-          const leftSide = createSuggestionLeft();
-          
+          const leftSide = document.createElement('div');
+          leftSide.style.cssText = `
+            all: unset !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 12px !important;
+            flex: 1 !important;
+            min-width: 0 !important;
+            box-sizing: border-box !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 1 !important;
+            text-decoration: none !important;
+            list-style: none !important;
+            outline: none !important;
+            background: transparent !important;
+            color: inherit !important;
+            font-size: 100% !important;
+            font: inherit !important;
+            vertical-align: baseline !important;
+            transition: gap 160ms ease, transform 160ms ease !important;
+          `;
+
           let iconNode = null;
           let iconWrapper = null;
           if (suggestion.type === 'browserPage') {
-            const themedIcon = createLinkIcon();
+            const themedIcon = document.createElement('span');
+            themedIcon.innerHTML = getRiSvg('ri-link', 'ri-size-16');
+            themedIcon.style.cssText = `
+              all: unset !important;
+              width: 16px !important;
+              height: 16px !important;
+              display: flex !important;
+              align-items: center !important;
+              justify-content: center !important;
+              box-sizing: border-box !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              line-height: 1 !important;
+              text-decoration: none !important;
+              list-style: none !important;
+              outline: none !important;
+              background: transparent !important;
+              color: inherit !important;
+              font-size: 100% !important;
+              font: inherit !important;
+              vertical-align: baseline !important;
+            `;
             iconNode = themedIcon;
           } else if (suggestion.type === 'directUrl') {
             const directUrlHost = suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : '';
@@ -14544,24 +11868,93 @@ async function getSearchSuggestions(query) {
               ? createLinkIcon()
               : createSearchIcon();
           } else if (suggestion.type === 'commandNewTab') {
-            const plusIcon = createInlineIcon(getRiSvg('ri-add-line', 'ri-size-16'), 'x-ov-inline-icon--subtext');
+            const plusIcon = document.createElement('span');
+            plusIcon.innerHTML = getRiSvg('ri-add-line', 'ri-size-16');
+            plusIcon.style.cssText = `
+              all: unset !important;
+              width: 16px !important;
+              height: 16px !important;
+              display: flex !important;
+              align-items: center !important;
+              justify-content: center !important;
+              box-sizing: border-box !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              line-height: 1 !important;
+              text-decoration: none !important;
+              list-style: none !important;
+              outline: none !important;
+              background: transparent !important;
+              color: var(--x-ov-subtext, #9CA3AF) !important;
+              font-size: 100% !important;
+              font: inherit !important;
+              vertical-align: baseline !important;
+            `;
             iconNode = plusIcon;
           } else if (suggestion.type === 'commandSettings') {
-            const gearIcon = createInlineIcon(getRiSvg('ri-settings-3-line', 'ri-size-16'), 'x-ov-inline-icon--subtext');
+            const gearIcon = document.createElement('span');
+            gearIcon.innerHTML = getRiSvg('ri-settings-3-line', 'ri-size-16');
+            gearIcon.style.cssText = `
+              all: unset !important;
+              width: 16px !important;
+              height: 16px !important;
+              display: flex !important;
+              align-items: center !important;
+              justify-content: center !important;
+              box-sizing: border-box !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              line-height: 1 !important;
+              text-decoration: none !important;
+              list-style: none !important;
+              outline: none !important;
+              background: transparent !important;
+              color: var(--x-ov-subtext, #9CA3AF) !important;
+              font-size: 100% !important;
+              font: inherit !important;
+              vertical-align: baseline !important;
+            `;
             iconNode = gearIcon;
           } else if (suggestion.type === 'modeSwitch' && suggestion.favicon) {
-            const favicon = createSuggestionFavicon({ highPriority: index < 4 });
+            const favicon = document.createElement('img');
+            favicon.decoding = 'async';
+            favicon.loading = 'eager';
+            favicon.referrerPolicy = 'no-referrer';
+            if (index < 4) {
+              favicon.fetchPriority = 'high';
+            }
+            favicon.style.cssText = `
+              all: unset !important;
+              width: 16px !important;
+              height: 16px !important;
+              border-radius: 2px !important;
+              box-sizing: border-box !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              line-height: 1 !important;
+              text-decoration: none !important;
+              list-style: none !important;
+              outline: none !important;
+              background: transparent !important;
+              color: inherit !important;
+              font-size: 100% !important;
+              font: inherit !important;
+              vertical-align: baseline !important;
+              display: block !important;
+            `;
             applyFaviconOpticalAlignment(favicon);
             favicon.src = suggestion.favicon || '';
             favicon.onerror = function() {
-              const fallbackDiv = createSearchIcon('x-ov-inline-icon--subtext');
+              const fallbackDiv = createSearchIcon();
+              fallbackDiv.style.setProperty('color', 'var(--x-ov-subtext, #9CA3AF)', 'important');
               if (favicon.parentNode) {
                 favicon.parentNode.replaceChild(fallbackDiv, favicon);
               }
             };
             iconNode = favicon;
           } else if (suggestion.type === 'newtab' || suggestion.type === 'googleSuggest') {
-            const searchIcon = createSearchIcon('x-ov-inline-icon--subtext');
+            const searchIcon = createSearchIcon();
+            searchIcon.style.setProperty('color', 'var(--x-ov-subtext, #9CA3AF)', 'important');
             iconNode = searchIcon;
           } else {
             const suggestionHost = suggestion.url ? getHostFromUrl(suggestion.url) : '';
@@ -14569,15 +11962,38 @@ async function getSearchSuggestions(query) {
               iconNode = createLinkIcon();
             } else if (suggestion.favicon) {
               // Create icon for suggestions - always use img for all types
-              const favicon = createSuggestionFavicon({
-                highPriority: index < 4,
-                contain: true
-              });
+              const favicon = document.createElement('img');
+              favicon.decoding = 'async';
+              favicon.loading = 'eager';
+              favicon.referrerPolicy = 'no-referrer';
+              if (index < 4) {
+                favicon.fetchPriority = 'high';
+              }
               attachFaviconData(
                 favicon,
                 suggestion.favicon || '',
                 suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : ''
               );
+              favicon.style.cssText = `
+                all: unset !important;
+                width: 16px !important;
+                height: 16px !important;
+                border-radius: 2px !important;
+                box-sizing: border-box !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                line-height: 1 !important;
+                text-decoration: none !important;
+                list-style: none !important;
+                outline: none !important;
+                background: transparent !important;
+                color: inherit !important;
+                font-size: 100% !important;
+                font: inherit !important;
+                vertical-align: baseline !important;
+                display: block !important;
+                object-fit: contain !important;
+              `;
               applyFaviconOpticalAlignment(favicon);
               const replaceWithFallbackIcon = function() {
                 const fallbackDiv = createLinkIcon();
@@ -14594,14 +12010,39 @@ async function getSearchSuggestions(query) {
               );
               iconNode = favicon;
             } else {
-              const searchIcon = createSearchIcon('x-ov-inline-icon--subtext');
+              const searchIcon = createSearchIcon();
+              searchIcon.style.setProperty('color', 'var(--x-ov-subtext, #9CA3AF)', 'important');
               iconNode = searchIcon;
             }
           }
-          
+
           if (iconNode) {
             const isFaviconIcon = iconNode.tagName === 'IMG';
-            const iconSlot = createSuggestionIconSlot();
+            const iconSlot = document.createElement('span');
+            iconSlot.style.cssText = `
+              all: unset !important;
+              width: 24px !important;
+              height: 24px !important;
+              flex: 0 0 24px !important;
+              flex-shrink: 0 !important;
+              border-radius: 8px !important;
+              display: flex !important;
+              align-items: center !important;
+              justify-content: center !important;
+              box-sizing: border-box !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              line-height: 1 !important;
+              text-decoration: none !important;
+              list-style: none !important;
+              outline: none !important;
+              background: transparent !important;
+              transition: background-color 0.2s ease !important;
+              color: var(--x-ov-subtext, #9CA3AF) !important;
+              font-size: 100% !important;
+              font: inherit !important;
+              vertical-align: baseline !important;
+            `;
             iconSlot._xIsFavicon = isFaviconIcon;
             iconSlot.appendChild(iconNode);
             iconNode = iconSlot;
@@ -14611,11 +12052,33 @@ async function getSearchSuggestions(query) {
               iconWrapper = iconSlot;
             }
           }
-          
+
           // Create text wrapper for title and tag
-          const textWrapper = createSuggestionTextWrapper();
+          const textWrapper = document.createElement('div');
+          textWrapper.style.cssText = `
+            all: unset !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            flex: 1 !important;
+            min-width: 0 !important;
+            overflow: visible !important;
+            box-sizing: border-box !important;
+            margin: 0 !important;
+            padding: 0 8px 0 0 !important;
+            line-height: 1 !important;
+            text-decoration: none !important;
+            list-style: none !important;
+            outline: none !important;
+            background: transparent !important;
+            color: inherit !important;
+            font-size: 100% !important;
+            font: inherit !important;
+            vertical-align: baseline !important;
+          `;
+
           // Create title with highlighted query
-          const title = createSuggestionTitle();
+          const title = document.createElement('span');
           applyNoTranslate(title);
           let highlightedTitle;
           if (isPrimarySearchSuggest ||
@@ -14636,77 +12099,241 @@ async function getSearchSuggestions(query) {
             background: 'var(--x-ext-mark-bg, #CFE8FF)',
             color: 'var(--x-ext-mark-text, #1E3A8A)'
           });
+          title.style.cssText = `
+            all: unset !important;
+            color: var(--x-ov-text, #111827) !important;
+            font-size: 14px !important;
+            font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+            font-weight: 400 !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 1.5 !important;
+            text-decoration: none !important;
+            list-style: none !important;
+            outline: none !important;
+            background: transparent !important;
+            display: inline-block !important;
+            vertical-align: baseline !important;
+          `;
           suggestionItem._xTitle = title;
-          
+
           textWrapper.appendChild(title);
           const reasonText = Array.isArray(suggestion.reasons)
             ? suggestion.reasons.map((item) => String(item || '').trim()).filter(Boolean).join(' · ')
             : '';
           if (overlayTabScoreDebugEnabled && reasonText) {
-            const reasonLine = createSuggestionReasonLine();
+            const reasonLine = document.createElement('span');
             setProtectedPlainText(reasonLine, reasonText);
+            reasonLine.style.cssText = `
+              all: unset !important;
+              color: var(--x-ov-subtext, #6B7280) !important;
+              font-size: 11px !important;
+              font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+              line-height: 1.2 !important;
+              white-space: nowrap !important;
+              overflow: hidden !important;
+              text-overflow: ellipsis !important;
+              max-width: 100% !important;
+              display: inline-block !important;
+              vertical-align: middle !important;
+            `;
             textWrapper.appendChild(reasonLine);
           }
-          
+
           // Add history tag if type is history
           if (suggestion.type === 'history' && !suggestion.isTopSite) {
             const urlLine = buildUrlLine(suggestion.url || '');
             if (urlLine) {
               textWrapper.appendChild(urlLine);
             }
-            const historyTag = createOverlayMetaTag();
+            const historyTag = document.createElement('span');
             setProtectedPlainText(historyTag, t('search_tag_history', '历史'));
             historyTag._xDefaultBg = 'var(--x-ov-tag-bg, #F3F4F6)';
             historyTag._xDefaultText = 'var(--x-ov-tag-text, #6B7280)';
             historyTag._xDefaultBorder = 'transparent';
+            historyTag.style.cssText = `
+              all: unset !important;
+              background: var(--x-ov-tag-bg, #F3F4F6) !important;
+              color: var(--x-ov-tag-text, #6B7280) !important;
+              font-size: 10px !important;
+              font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+              padding: 4px 6px !important;
+              border-radius: 8px !important;
+              box-sizing: border-box !important;
+              line-height: 1.2 !important;
+              text-decoration: none !important;
+              list-style: none !important;
+              outline: none !important;
+              border: 1px solid transparent !important;
+              display: inline-flex !important;
+              align-items: center !important;
+              vertical-align: middle !important;
+              flex-shrink: 0 !important;
+            `;
             textWrapper.appendChild(historyTag);
             suggestionItem._xHistoryTag = historyTag;
           }
-          
+
           // Add topSite tag if type is topSite
           if (suggestion.type === 'topSite' || suggestion.isTopSite) {
             const urlLine = buildUrlLine(suggestion.url || '');
             if (urlLine) {
               textWrapper.appendChild(urlLine);
             }
-            const topSiteTag = createOverlayMetaTag();
+            const topSiteTag = document.createElement('span');
             setProtectedPlainText(topSiteTag, t('search_tag_top_site', '常用'));
             topSiteTag._xDefaultBg = 'var(--x-ov-tag-bg, #F3F4F6)';
             topSiteTag._xDefaultText = 'var(--x-ov-tag-text, #6B7280)';
             topSiteTag._xDefaultBorder = 'transparent';
+            topSiteTag.style.cssText = `
+              all: unset !important;
+              background: var(--x-ov-tag-bg, #F3F4F6) !important;
+              color: var(--x-ov-tag-text, #6B7280) !important;
+              font-size: 10px !important;
+              font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+              padding: 4px 6px !important;
+              border-radius: 8px !important;
+              box-sizing: border-box !important;
+              line-height: 1.2 !important;
+              text-decoration: none !important;
+              list-style: none !important;
+              outline: none !important;
+              border: 1px solid transparent !important;
+              display: inline-flex !important;
+              align-items: center !important;
+              vertical-align: middle !important;
+              flex-shrink: 0 !important;
+            `;
             textWrapper.appendChild(topSiteTag);
             suggestionItem._xTopSiteTag = topSiteTag;
           }
-          
+
           // Add bookmark tag if type is bookmark
           if (suggestion.type === 'bookmark') {
             if (suggestion.path) {
               const bookmarkPath = document.createElement('span');
               setProtectedPlainText(bookmarkPath, suggestion.path);
-              bookmarkPath.className = 'x-ov-bookmark-path';
+              bookmarkPath.style.cssText = `
+                all: unset !important;
+                color: var(--x-ov-link, #2563EB) !important;
+                font-size: 12px !important;
+                font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+                text-decoration: none !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                line-height: 1.2 !important;
+                display: inline-block !important;
+                vertical-align: middle !important;
+              `;
               textWrapper.appendChild(bookmarkPath);
             }
-          const bookmarkTag = createOverlayMetaTag({ bookmark: true });
+          const bookmarkTag = document.createElement('span');
           setProtectedPlainText(bookmarkTag, t('search_tag_bookmark', '书签'));
           bookmarkTag._xDefaultBg = 'var(--x-ov-bookmark-tag-bg, #FEF3C7)';
           bookmarkTag._xDefaultText = 'var(--x-ov-bookmark-tag-text, #D97706)';
           bookmarkTag._xDefaultBorder = 'transparent';
+          bookmarkTag.style.cssText = `
+            all: unset !important;
+            background: var(--x-ov-bookmark-tag-bg, #FEF3C7) !important;
+            color: var(--x-ov-bookmark-tag-text, #D97706) !important;
+            font-size: 10px !important;
+              font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+              padding: 4px 6px !important;
+              border-radius: 8px !important;
+              box-sizing: border-box !important;
+              line-height: 1.2 !important;
+              text-decoration: none !important;
+              list-style: none !important;
+              outline: none !important;
+              border: 1px solid transparent !important;
+              display: inline-flex !important;
+              align-items: center !important;
+              vertical-align: middle !important;
+              flex-shrink: 0 !important;
+            `;
             textWrapper.appendChild(bookmarkTag);
             suggestionItem._xBookmarkTag = bookmarkTag;
           }
           if (shouldSwitchMatchedTab) {
-            const openTabTag = createOverlayMetaTag();
+            const openTabTag = document.createElement('span');
             setProtectedPlainText(openTabTag, t('search_tag_open_tab', '已打开'));
             openTabTag._xDefaultBg = 'var(--x-ov-tag-bg, #F3F4F6)';
             openTabTag._xDefaultText = 'var(--x-ov-tag-text, #6B7280)';
             openTabTag._xDefaultBorder = 'transparent';
+            openTabTag.style.cssText = `
+              all: unset !important;
+              background: var(--x-ov-tag-bg, #F3F4F6) !important;
+              color: var(--x-ov-tag-text, #6B7280) !important;
+              font-size: 10px !important;
+              font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+              padding: 4px 6px !important;
+              border-radius: 8px !important;
+              box-sizing: border-box !important;
+              line-height: 1.2 !important;
+              text-decoration: none !important;
+              list-style: none !important;
+              outline: none !important;
+              border: 1px solid transparent !important;
+              display: inline-flex !important;
+              align-items: center !important;
+              vertical-align: middle !important;
+              flex-shrink: 0 !important;
+            `;
             textWrapper.appendChild(openTabTag);
             suggestionItem._xOpenTabTag = openTabTag;
           }
-          
-          const rightSide = createOverlayRightSide();
 
-          const actionTags = createOverlayActionTags();
+          const rightSide = document.createElement('div');
+          rightSide.style.cssText = `
+            all: unset !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            flex-shrink: 0 !important;
+            box-sizing: border-box !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 1 !important;
+            text-decoration: none !important;
+            list-style: none !important;
+            outline: none !important;
+            background: transparent !important;
+            color: inherit !important;
+            font-size: 100% !important;
+            font: inherit !important;
+            vertical-align: baseline !important;
+          `;
+
+          const actionTags = document.createElement('div');
+          actionTags.style.cssText = `
+            all: unset !important;
+            display: none !important;
+            align-items: center !important;
+            gap: 6px !important;
+            box-sizing: border-box !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 1 !important;
+            text-decoration: none !important;
+            list-style: none !important;
+            outline: none !important;
+            background: transparent !important;
+            color: inherit !important;
+            font-size: 100% !important;
+            font: inherit !important;
+            vertical-align: baseline !important;
+            flex-shrink: 0 !important;
+          `;
 
           const isTopSiteMatch = Boolean(topSiteMatch && suggestion === topSiteMatch);
           const isDirectHighlight = isPrimaryHighlight &&
@@ -14737,12 +12364,37 @@ async function getSearchSuggestions(query) {
           }
 
           // Create visit button
-          const visitButton = createOverlayVisitButton();
+          const visitButton = document.createElement('button');
+          applyNoTranslate(visitButton);
+          visitButton.style.cssText = `
+            all: unset !important;
+            background: transparent !important;
+            color: var(--x-ov-subtext, #9CA3AF) !important;
+            border: 1px solid transparent !important;
+            border-radius: 16px !important;
+            font-size: 12px !important;
+            font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+            cursor: pointer !important;
+            transition: background-color 0.2s ease !important;
+            padding: 6px 12px !important;
+            box-sizing: border-box !important;
+            margin: 0 !important;
+            line-height: 1 !important;
+            text-decoration: none !important;
+            list-style: none !important;
+            outline: none !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 4px !important;
+            vertical-align: baseline !important;
+            transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 160ms ease !important;
+          `;
+          applyNoTranslate(visitButton);
           suggestionItem._xAlwaysHideVisitButton = suggestion.type === 'modeSwitch';
           if (suggestionItem._xAlwaysHideVisitButton) {
-            visitButton.style.display = 'none';
+            visitButton.style.setProperty('display', 'none', 'important');
           }
-          
+
           if (suggestion.type === 'newtab') {
             setInlineLabelWithIcon(visitButton, getSearchActionLabel(), getRiSvg('ri-arrow-right-line', 'ri-size-12'));
           } else if (suggestion.type === 'commandNewTab') {
@@ -14772,40 +12424,117 @@ async function getSearchSuggestions(query) {
           let historyDeleteButton = null;
           let historyDeleteSlot = null;
           if (suggestion.type === 'history' && !suggestion.isTopSite) {
-            historyDeleteSlot = createOverlayHistoryDeleteSlot();
-            historyDeleteButton = createOverlayHistoryDeleteButton();
+            historyDeleteSlot = document.createElement('div');
+            applyNoTranslate(historyDeleteSlot);
+            historyDeleteSlot.style.cssText = `
+              all: unset !important;
+              width: 0 !important;
+              height: 28px !important;
+              flex: 0 0 auto !important;
+              display: inline-flex !important;
+              align-items: center !important;
+              justify-content: center !important;
+              box-sizing: border-box !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              overflow: visible !important;
+              line-height: 1 !important;
+              text-decoration: none !important;
+              list-style: none !important;
+              outline: none !important;
+              background: transparent !important;
+              vertical-align: baseline !important;
+              opacity: 0 !important;
+              transition: width 180ms ease, margin-left 180ms ease, opacity 160ms ease !important;
+            `;
+            historyDeleteButton = document.createElement('button');
+            applyNoTranslate(historyDeleteButton);
             historyDeleteButton.type = 'button';
             const removeHistoryTooltipText = t('search_remove_history_tooltip', '移除该历史');
             historyDeleteButton.innerHTML = getRiSvg('ri-delete-bin-6-line', 'ri-size-14');
             historyDeleteButton.setAttribute('aria-label', removeHistoryTooltipText);
             historyDeleteButton.setAttribute('title', removeHistoryTooltipText);
+            historyDeleteButton.style.cssText = `
+              all: unset !important;
+              width: 24px !important;
+              height: 24px !important;
+              flex: 0 0 24px !important;
+              border-radius: 8px !important;
+              box-sizing: border-box !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              line-height: 1 !important;
+              text-decoration: none !important;
+              list-style: none !important;
+              outline: none !important;
+              background: transparent !important;
+              color: var(--x-ext-input-icon, #9CA3AF) !important;
+              display: inline-flex !important;
+              visibility: hidden !important;
+              pointer-events: none !important;
+              opacity: 0 !important;
+              align-items: center !important;
+              justify-content: center !important;
+              font-size: 0 !important;
+              cursor: pointer !important;
+              transform: translateX(4px) !important;
+              transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 160ms ease, opacity 160ms ease, visibility 160ms ease !important;
+            `;
+            const historyDeleteIcon = historyDeleteButton.querySelector('.ri-icon');
+            if (historyDeleteIcon) {
+              historyDeleteIcon.style.setProperty('display', 'inline-flex', 'important');
+              historyDeleteIcon.style.setProperty('align-items', 'center', 'important');
+              historyDeleteIcon.style.setProperty('justify-content', 'center', 'important');
+              historyDeleteIcon.style.setProperty('line-height', '1', 'important');
+              historyDeleteIcon.style.setProperty('transform', 'none', 'important');
+              historyDeleteIcon.style.setProperty('pointer-events', 'none', 'important');
+              historyDeleteIcon.style.setProperty('cursor', 'pointer', 'important');
+            }
             historyDeleteButton.addEventListener('mouseenter', () => {
+              const itemIndex = suggestionItems.indexOf(suggestionItem);
+              const isSelected = itemIndex === selectedIndex;
+              const shouldAutoHighlight = selectedIndex === -1 && suggestionItem._xIsAutocompleteTop;
+              const shouldUseThemeHover = Boolean(isSelected || shouldAutoHighlight);
               const buttonThemeSource = suggestionItem._xTheme || defaultTheme;
               const resolvedTheme = getThemeForMode(buttonThemeSource);
-              const hoverColors = getHoverColors(buttonThemeSource);
+              const hoverColors = shouldUseThemeHover
+                ? getHoverColors(buttonThemeSource)
+                : getNeutralHoverActionColors();
               showTopActionTooltip(historyDeleteButton, removeHistoryTooltipText);
-              historyDeleteButton.style.background = hoverColors.bg;
-              historyDeleteButton.style.border = `1px solid ${hoverColors.border}`;
-              historyDeleteButton.style.color = resolvedTheme.buttonText;
-              historyDeleteButton.style.transform = 'scale(1.06)';
+              historyDeleteButton.style.setProperty(
+                'background',
+                hoverColors.bg,
+                'important'
+              );
+              historyDeleteButton.style.setProperty(
+                'border',
+                `1px solid ${hoverColors.border}`,
+                'important'
+              );
+              historyDeleteButton.style.setProperty(
+                'color',
+                shouldUseThemeHover ? resolvedTheme.buttonText : hoverColors.text,
+                'important'
+              );
+              historyDeleteButton.style.setProperty('transform', 'scale(1.06)', 'important');
             });
             historyDeleteButton.addEventListener('mouseleave', () => {
               hideTopActionTooltip();
-              historyDeleteButton.style.background = 'transparent';
-              historyDeleteButton.style.border = '1px solid transparent';
-              historyDeleteButton.style.transform = 'none';
+              historyDeleteButton.style.setProperty('background', 'transparent', 'important');
+              historyDeleteButton.style.setProperty('border', '1px solid transparent', 'important');
+              historyDeleteButton.style.setProperty('transform', 'none', 'important');
             });
             historyDeleteButton.addEventListener('blur', () => {
               hideTopActionTooltip();
-              historyDeleteButton.style.background = 'transparent';
-              historyDeleteButton.style.border = '1px solid transparent';
-              historyDeleteButton.style.transform = 'none';
+              historyDeleteButton.style.setProperty('background', 'transparent', 'important');
+              historyDeleteButton.style.setProperty('border', '1px solid transparent', 'important');
+              historyDeleteButton.style.setProperty('transform', 'none', 'important');
             });
             historyDeleteButton.addEventListener('pointerup', () => {
-              historyDeleteButton.style.transform = 'none';
+              historyDeleteButton.style.setProperty('transform', 'none', 'important');
             });
             historyDeleteButton.addEventListener('pointercancel', () => {
-              historyDeleteButton.style.transform = 'none';
+              historyDeleteButton.style.setProperty('transform', 'none', 'important');
             });
             historyDeleteButton.addEventListener('click', function(e) {
               e.preventDefault();
@@ -14839,7 +12568,7 @@ async function getSearchSuggestions(query) {
             });
             historyDeleteSlot.appendChild(historyDeleteButton);
           }
-          
+
           // Add hover effects
           suggestionItem.addEventListener('mouseenter', function() {
             this._xIsHovering = true;
@@ -14849,14 +12578,16 @@ async function getSearchSuggestions(query) {
               if (selectedIndex === -1 && this._xIsAutocompleteTop) {
                 return;
               }
+              this.style.setProperty('background', 'var(--x-ov-hover-bg)', 'important');
+              this.style.setProperty('border', '1px solid transparent', 'important');
             }
           });
-          
+
           suggestionItem.addEventListener('mouseleave', function() {
             this._xIsHovering = false;
             updateSelection();
           });
-          
+
           // Add click handler to visit URL
           visitButton.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -14892,15 +12623,6 @@ async function getSearchSuggestions(query) {
               document.removeEventListener('keydown', captureTabHandler, true);
               return;
             }
-            if (suggestion.provider && suggestion.searchQuery) {
-              if (openSiteSearchProviderQuery(suggestion.provider, suggestion.searchQuery)) {
-                removeOverlay(overlay);
-                document.removeEventListener('click', clickOutsideHandler);
-                document.removeEventListener('keydown', keydownHandler);
-                document.removeEventListener('keydown', captureTabHandler, true);
-              }
-              return;
-            }
             if (suggestion.forceSearch && suggestion.searchQuery) {
               chrome.runtime.sendMessage({
                 action: 'searchOrNavigate',
@@ -14919,7 +12641,7 @@ async function getSearchSuggestions(query) {
             document.removeEventListener('keydown', keydownHandler);
             document.removeEventListener('keydown', captureTabHandler, true);
           });
-          
+
           // Add click handler to select item
           suggestionItem.addEventListener('click', function() {
             if (suggestion.type === 'commandNewTab') {
@@ -14946,15 +12668,6 @@ async function getSearchSuggestions(query) {
             if (suggestion.type === 'modeSwitch') {
               applyThemeModeChange(suggestion.nextMode);
               searchInput.focus();
-              return;
-            }
-            if (suggestion.provider && suggestion.searchQuery) {
-              if (openSiteSearchProviderQuery(suggestion.provider, suggestion.searchQuery)) {
-                removeOverlay(overlay);
-                document.removeEventListener('click', clickOutsideHandler);
-                document.removeEventListener('keydown', keydownHandler);
-                document.removeEventListener('keydown', captureTabHandler, true);
-              }
               return;
             }
             if (shouldSwitchMatchedTabSuggestion(suggestion, index)) {
@@ -14986,7 +12699,7 @@ async function getSearchSuggestions(query) {
             document.removeEventListener('keydown', keydownHandler);
             document.removeEventListener('keydown', captureTabHandler, true);
           });
-          
+
           leftSide.appendChild(iconNode);
           leftSide.appendChild(textWrapper);
           suggestionItem.appendChild(leftSide);
@@ -15027,65 +12740,57 @@ async function getSearchSuggestions(query) {
         if (shouldAnimateGrowth) {
           animateSuggestionsGrowth(suggestionsContainer, previousHeight);
         }
-      
+
       // Update keyboard navigation
       if (!canAppend) {
         selectedIndex = -1;
       }
-      syncHoveredSuggestionFromPointer();
-      updateSelection();
       });
     }
-    
+
     function clearSearchSuggestions() {
       inlineSearchState = null;
       siteSearchTriggerState = null;
       lastSuggestionResponse = [];
       requestTabsAndRender();
     }
-    
+
     // Focus the input when created
     setTimeout(() => searchInput.focus(), 100);
-    
 
-    
+
+
     // Create suggestions container
     const suggestionsContainer = document.createElement('div');
     applyNoTranslate(suggestionsContainer);
     suggestionsContainer.id = '_x_extension_suggestions_container_2024_unique_';
-    suggestionsContainer.className = 'x-ov-suggestions-container';
-    suggestionsContainer.addEventListener('mousemove', updateSuggestionPointerFromEvent, { passive: true });
-    suggestionsContainer.addEventListener('mouseenter', updateSuggestionPointerFromEvent, { passive: true });
-    suggestionsContainer.addEventListener('mouseleave', clearHoveredSuggestionFromPointer);
-    const handleOverlayWheel = (event) => {
-      if (!overlay || !overlay.isConnected) {
-        return;
-      }
-      pauseOverlayAntiTranslateObserverForScroll();
-      event.stopPropagation();
-      const maxScrollTop = Math.max(
-        0,
-        suggestionsContainer.scrollHeight - suggestionsContainer.clientHeight
-      );
-      if (maxScrollTop <= 0) {
-        event.preventDefault();
-        return;
-      }
-      const nextScrollTop = Math.max(
-        0,
-        Math.min(maxScrollTop, suggestionsContainer.scrollTop + event.deltaY)
-      );
-      if (nextScrollTop !== suggestionsContainer.scrollTop) {
-        suggestionsContainer.scrollTop = nextScrollTop;
-      }
-      event.preventDefault();
-    };
-    overlayPanel.addEventListener('wheel', handleOverlayWheel, { passive: false });
+    suggestionsContainer.style.cssText = `
+      all: unset !important;
+      width: 100% !important;
+      flex: 1 1 auto !important;
+      min-height: 0 !important;
+      max-height: 50vh !important;
+      overflow-y: auto !important;
+      scrollbar-width: none !important;
+      -ms-overflow-style: none !important;
+      background: transparent !important;
+      border-radius: 0 0 28px 28px !important;
+      padding: 12px !important;
+      box-sizing: border-box !important;
+      display: block !important;
+      line-height: 1 !important;
+      text-decoration: none !important;
+      list-style: none !important;
+      outline: none !important;
+      color: inherit !important;
+      font-size: 100% !important;
+      font: inherit !important;
+      vertical-align: baseline !important;
+    `;
 
-    overlayPanel.appendChild(inputContainer);
-    overlayPanel.appendChild(suggestionsContainer);
-    overlayShadowRoot.appendChild(overlayPanel);
-    applyNoTranslateDeep(overlayPanel);
+    overlay.appendChild(inputContainer);
+    overlay.appendChild(suggestionsContainer);
+    applyNoTranslateDeep(overlay);
     document.body.appendChild(overlay);
     startOverlayViewportSizeSync(overlay);
     startOverlayAntiTranslateObserver(overlay);
@@ -15098,17 +12803,10 @@ async function getSearchSuggestions(query) {
       clearOverlayEnterAnimationFrames();
       // Flush initial style state before starting transition to avoid skipped enter animations.
       void overlay.offsetHeight;
-      overlayEnterAnimationRafA = requestAnimationFrame(() => {
-        overlayEnterAnimationRafA = null;
-        overlayEnterAnimationRafB = requestAnimationFrame(() => {
-          overlayEnterAnimationRafB = null;
-          if (!overlay.isConnected) {
-            return;
-          }
-          overlay.style.setProperty('opacity', '1', 'important');
-          overlay.style.setProperty('transform', 'translateX(-50%) translateY(0) scale(1)', 'important');
-          overlay.style.setProperty('filter', 'blur(0)', 'important');
-        });
+      overlayFrameTracker.runEnterAnimation(overlay, () => {
+        overlay.style.setProperty('opacity', '1', 'important');
+        overlay.style.setProperty('transform', 'translateX(-50%) translateY(0) scale(1)', 'important');
+        overlay.style.setProperty('filter', 'blur(0)', 'important');
       });
     }
     // Let the container paint first so the enter transition is visible on busy pages.
