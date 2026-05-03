@@ -6,6 +6,12 @@ try {
 }
 
 try {
+  importScripts(chrome.runtime.getURL('src/shared/url-guards.js'));
+} catch (error) {
+  console.warn('Lumno: failed to load URL guards.', error);
+}
+
+try {
   importScripts(chrome.runtime.getURL('src/shared/settings.js'));
 } catch (error) {
   console.warn('Lumno: failed to load settings utils.', error);
@@ -24,6 +30,10 @@ try {
 }
 
 function isBrowserExtensionProtocol(protocol) {
+  const guards = globalThis.LumnoUrlGuards || {};
+  if (typeof guards.isBrowserExtensionProtocol === 'function') {
+    return guards.isBrowserExtensionProtocol(protocol);
+  }
   const normalized = String(protocol || '').toLowerCase();
   return normalized === 'chrome-extension:' ||
     normalized === 'moz-extension:' ||
@@ -31,6 +41,10 @@ function isBrowserExtensionProtocol(protocol) {
 }
 
 function isRestrictedUrl(url) {
+  const guards = globalThis.LumnoUrlGuards || {};
+  if (typeof guards.isRestrictedUrl === 'function') {
+    return guards.isRestrictedUrl(url);
+  }
   if (!url) {
     return true;
   }
@@ -67,6 +81,10 @@ function isRestrictedUrl(url) {
 }
 
 function canOpenOverlayOnUrl(url) {
+  const guards = globalThis.LumnoUrlGuards || {};
+  if (typeof guards.canOpenOverlayOnUrl === 'function') {
+    return guards.canOpenOverlayOnUrl(url);
+  }
   if (!url) {
     return false;
   }
@@ -103,6 +121,14 @@ function canOpenOverlayOnUrl(url) {
     return false;
   }
   return true;
+}
+
+function canFetchPageForFavicon(url) {
+  const guards = globalThis.LumnoUrlGuards || {};
+  if (typeof guards.canFetchPageForFavicon === 'function') {
+    return guards.canFetchPageForFavicon(url);
+  }
+  return !isRestrictedUrl(url);
 }
 
 function isLocalFileLikeTargetUrl(url) {
@@ -4002,6 +4028,12 @@ function resolveFaviconCandidates(targetUrl, hostOverride, fallbackUrl, preferre
   if (faviconResolvePending.has(cacheKey)) {
     return faviconResolvePending.get(cacheKey);
   }
+  if (!canFetchPageForFavicon(inputUrl)) {
+    const fallbackCandidates = buildFaviconFallbackCandidates(inputUrl, hostOverride, fallbackUrl, normalizedTheme, { includeChromeFallback: includeChromeFallback });
+    const resolved = dedupeAndSortFaviconCandidates(fallbackCandidates);
+    faviconResolveCache.set(cacheKey, resolved.slice(0, 8));
+    return Promise.resolve(resolved);
+  }
   const promise = fetch(inputUrl, { cache: 'force-cache' })
     .then((response) => {
       if (!response || !response.ok) {
@@ -5413,6 +5445,8 @@ async function getSearchSuggestions(query) {
   let overlayKeyCaptureHandler = null;
   let clickOutsideHandler = null;
   let overlayScrollPauseHandler = null;
+  const OVERLAY_HOST_ID = '_x_extension_overlay_host_2026_unique_';
+  const OVERLAY_PANEL_ID = '_x_extension_overlay_2024_unique_';
   const SETTINGS = window.LumnoSettings || {};
   const overlayLifecycle = window.LumnoOverlayLifecycle;
   if (!overlayLifecycle ||
@@ -6194,7 +6228,8 @@ async function getSearchSuggestions(query) {
     stopOverlayViewportSizeSync();
     stopOverlayAntiTranslateObserver();
     if (overlayElement) {
-      overlayElement.remove();
+      const mountHost = overlayElement._lumnoOverlayHost || overlayElement;
+      mountHost.remove();
     }
     // Also remove the scrollbar style
     const scrollbarStyle = document.getElementById('_x_extension_scrollbar_style_2024_unique_');
@@ -6271,25 +6306,43 @@ async function getSearchSuggestions(query) {
     window.removeEventListener('resize', updateSiteSearchPrefixLayout);
   }
 
+  const overlayShell = window.LumnoOverlayShell;
+
   // Check if the overlay already exists
-  let overlay = document.getElementById('_x_extension_overlay_2024_unique_');
+  let overlay = overlayShell && typeof overlayShell.findOverlayPanel === 'function'
+    ? overlayShell.findOverlayPanel(document, {
+      hostId: OVERLAY_HOST_ID,
+      id: OVERLAY_PANEL_ID
+    })
+    : document.getElementById(OVERLAY_PANEL_ID);
 
   if (overlay) {
     // If it exists, remove it (toggle off)
     removeOverlay(overlay);
   } else {
     // If it doesn't exist, create it (toggle on)
-    const overlayShell = window.LumnoOverlayShell;
-    if (!overlayShell || typeof overlayShell.createOverlayElement !== 'function') {
+    if (!overlayShell ||
+        typeof overlayShell.createOverlayMount !== 'function' ||
+        typeof overlayShell.appendOverlayStyleNodes !== 'function') {
       console.warn('Lumno: overlay shell helper not available.');
       return;
     }
     const initialOverlaySizePreset = getOverlaySizePreset(overlaySizeMode);
-    overlay = overlayShell.createOverlayElement(document, {
-      id: '_x_extension_overlay_2024_unique_',
+    const overlayMount = overlayShell.createOverlayMount(document, {
+      hostId: OVERLAY_HOST_ID,
+      id: OVERLAY_PANEL_ID,
       width: initialOverlaySizePreset.width,
-      maxHeightVh: initialOverlaySizePreset.maxHeightVh
+      maxHeightVh: initialOverlaySizePreset.maxHeightVh,
+      openSansCssUrl: OPEN_SANS_CSS_URL,
+      remixIconCssUrl: RI_CSS_URL
     });
+    overlay = overlayMount && overlayMount.panel ? overlayMount.panel : null;
+    const overlayHost = overlayMount && overlayMount.host ? overlayMount.host : overlay;
+    const overlayStyleRoot = overlayMount && overlayMount.root ? overlayMount.root : null;
+    if (!overlay || !overlayHost) {
+      console.warn('Lumno: overlay mount could not be created.');
+      return;
+    }
     applyNoTranslate(overlay);
 
 
@@ -6332,7 +6385,11 @@ async function getSearchSuggestions(query) {
 
     // 使用系统字体，避免外链字体依赖。
 
-    overlayShell.appendOverlayStyleNodes(document);
+    overlayShell.appendOverlayStyleNodes(document, {
+      root: overlayStyleRoot,
+      openSansCssUrl: OPEN_SANS_CSS_URL,
+      remixIconCssUrl: RI_CSS_URL
+    });
 
 
     if (typeof window._x_extension_createSearchInput_2024_unique_ !== 'function') {
@@ -9912,7 +9969,11 @@ async function getSearchSuggestions(query) {
 
     // Add click outside to close functionality
     clickOutsideHandler = function(e) {
-      if (!overlay.contains(e.target)) {
+      const eventPath = e && typeof e.composedPath === 'function' ? e.composedPath() : [];
+      const clickedInsideOverlay = overlay.contains(e.target) ||
+        eventPath.includes(overlay) ||
+        eventPath.includes(overlay._lumnoOverlayHost);
+      if (!clickedInsideOverlay) {
         removeOverlay(overlay);
         document.removeEventListener('click', clickOutsideHandler);
       }
@@ -9988,7 +10049,11 @@ async function getSearchSuggestions(query) {
       if (e.key !== 'Tab') {
         return;
       }
-      if (document.activeElement !== searchInput) {
+      const searchRoot = searchInput && typeof searchInput.getRootNode === 'function'
+        ? searchInput.getRootNode()
+        : null;
+      const activeInRoot = searchRoot && searchRoot.activeElement ? searchRoot.activeElement : null;
+      if (document.activeElement !== searchInput && activeInRoot !== searchInput) {
         return;
       }
       handleTabKey(e);
@@ -10276,7 +10341,11 @@ async function getSearchSuggestions(query) {
       if (!overlay || !overlay.isConnected) {
         return;
       }
-      if (document.activeElement !== searchInput) {
+      const searchRoot = searchInput && typeof searchInput.getRootNode === 'function'
+        ? searchInput.getRootNode()
+        : null;
+      const activeInRoot = searchRoot && searchRoot.activeElement ? searchRoot.activeElement : null;
+      if (document.activeElement !== searchInput && activeInRoot !== searchInput) {
         return;
       }
       if (isImeCompositionEvent(e)) {
@@ -12791,7 +12860,7 @@ async function getSearchSuggestions(query) {
     overlay.appendChild(inputContainer);
     overlay.appendChild(suggestionsContainer);
     applyNoTranslateDeep(overlay);
-    document.body.appendChild(overlay);
+    document.body.appendChild(overlayHost);
     startOverlayViewportSizeSync(overlay);
     startOverlayAntiTranslateObserver(overlay);
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;

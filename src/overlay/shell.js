@@ -30,6 +30,7 @@
       display: flex !important;
       flex-direction: column !important;
       align-items: center !important;
+      pointer-events: auto !important;
       contain: layout style !important;
       box-sizing: border-box !important;
       margin: 0 !important;
@@ -51,9 +52,42 @@
     return overlay;
   }
 
-  function appendOverlayStyleNodes(doc) {
-    const head = doc && doc.head ? doc.head : null;
-    if (!head) {
+  function findById(rootNode, id) {
+    if (!rootNode || !id) {
+      return null;
+    }
+    if (typeof rootNode.getElementById === 'function') {
+      return rootNode.getElementById(id);
+    }
+    if (typeof rootNode.querySelector === 'function') {
+      return rootNode.querySelector(`#${id}`);
+    }
+    return null;
+  }
+
+  function appendStylesheet(doc, rootNode, id, href) {
+    if (!doc || !rootNode || !id || !href || findById(rootNode, id)) {
+      return;
+    }
+    const link = doc.createElement('link');
+    link.id = id;
+    link.rel = 'stylesheet';
+    link.href = href;
+    rootNode.appendChild(link);
+  }
+
+  function appendOverlayStyleNodes(doc, options) {
+    const settings = options && typeof options === 'object' ? options : {};
+    const styleRoot = settings.root || (doc && doc.head ? doc.head : null);
+    if (!styleRoot) {
+      return;
+    }
+
+    appendStylesheet(doc, styleRoot, '_x_extension_open_sans_shadow_css_2026_unique_', settings.openSansCssUrl);
+    appendStylesheet(doc, styleRoot, '_x_extension_remixicon_shadow_css_2026_unique_', settings.remixIconCssUrl);
+
+    if (findById(styleRoot, '_x_extension_scrollbar_style_2024_unique_') ||
+        findById(styleRoot, '_x_extension_overlay_theme_style_2024_unique_')) {
       return;
     }
 
@@ -68,7 +102,7 @@
         scrollbar-width: none !important;
       }
     `;
-    head.appendChild(scrollbarStyle);
+    styleRoot.appendChild(scrollbarStyle);
 
     const overlayThemeStyle = doc.createElement('style');
     overlayThemeStyle.id = '_x_extension_overlay_theme_style_2024_unique_';
@@ -82,20 +116,20 @@
         line-height: 1;
         font-size: var(--ri-size, 16px);
         flex-shrink: 0;
-        font-style: normal !important;
-        font-variant: normal !important;
-        text-transform: none !important;
+        font-style: normal;
+        font-variant: normal;
+        text-transform: none;
       }
       #_x_extension_overlay_2024_unique_ button .ri-icon,
       #_x_extension_overlay_2024_unique_ [role="button"] .ri-icon,
       #_x_extension_overlay_2024_unique_ a .ri-icon {
-        cursor: inherit !important;
-        pointer-events: none !important;
+        cursor: inherit;
+        pointer-events: none;
       }
       #_x_extension_overlay_2024_unique_ .ri-icon::before {
-        font-style: normal !important;
-        font-variant: normal !important;
-        text-transform: none !important;
+        font-style: normal;
+        font-variant: normal;
+        text-transform: none;
       }
       #_x_extension_overlay_2024_unique_ .ri-size-8 { --ri-size: 8px; }
       #_x_extension_overlay_2024_unique_ .ri-size-12 { --ri-size: 12px; }
@@ -103,27 +137,111 @@
       #_x_extension_overlay_2024_unique_ .ri-size-20 { --ri-size: 20px; }
       #_x_extension_overlay_2024_unique_ .ri-size-24 { --ri-size: 24px; }
       #_x_extension_search_input_2024_unique_ {
-        text-align: left !important;
+        text-align: left;
       }
       #_x_extension_search_input_2024_unique_::placeholder {
-        color: var(--x-ov-placeholder, #9CA3AF) !important;
-        opacity: 0.68 !important;
-        text-align: left !important;
+        color: var(--x-ov-placeholder, #9CA3AF);
+        opacity: 0.68;
+        text-align: left;
       }
       #_x_extension_search_input_2024_unique_::-webkit-input-placeholder {
-        color: var(--x-ov-placeholder, #9CA3AF) !important;
-        opacity: 0.68 !important;
+        color: var(--x-ov-placeholder, #9CA3AF);
+        opacity: 0.68;
       }
       #_x_extension_search_input_2024_unique_::selection {
-        background: #CFE8FF !important;
-        color: #1E3A8A !important;
+        background: #CFE8FF;
+        color: #1E3A8A;
       }
     `;
-    head.appendChild(overlayThemeStyle);
+    styleRoot.appendChild(overlayThemeStyle);
+  }
+
+  function createOverlayHost(doc, options) {
+    const settings = options && typeof options === 'object' ? options : {};
+    const host = doc.createElement('div');
+    host.id = settings.hostId || '_x_extension_overlay_host_2026_unique_';
+    host.setAttribute('data-lumno-overlay-host', 'true');
+    host.style.cssText = `
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      overflow: visible !important;
+      transform: none !important;
+      filter: none !important;
+      clip: auto !important;
+      clip-path: none !important;
+      mask: none !important;
+      -webkit-mask: none !important;
+      content-visibility: visible !important;
+      isolation: isolate !important;
+      z-index: 2147483647 !important;
+      pointer-events: none !important;
+      contain: layout style paint !important;
+      background: transparent !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      box-sizing: border-box !important;
+    `;
+    return host;
+  }
+
+  function createOverlayMount(doc, options) {
+    const settings = options && typeof options === 'object' ? options : {};
+    if (!doc || typeof doc.createElement !== 'function') {
+      return null;
+    }
+    const host = createOverlayHost(doc, settings);
+    if (typeof host.attachShadow !== 'function') {
+      const panel = createOverlayElement(doc, settings);
+      return {
+        host: panel,
+        panel,
+        root: null
+      };
+    }
+    const shadowRoot = host.attachShadow({ mode: 'open' });
+    appendOverlayStyleNodes(doc, {
+      root: shadowRoot,
+      openSansCssUrl: settings.openSansCssUrl,
+      remixIconCssUrl: settings.remixIconCssUrl
+    });
+    const panel = createOverlayElement(doc, settings);
+    panel.setAttribute('data-lumno-overlay-panel', 'true');
+    panel._lumnoOverlayHost = host;
+    panel._lumnoOverlayRoot = shadowRoot;
+    host._lumnoOverlayPanel = panel;
+    shadowRoot.appendChild(panel);
+    return {
+      host,
+      panel,
+      root: shadowRoot
+    };
+  }
+
+  function findOverlayPanel(doc, options) {
+    const settings = options && typeof options === 'object' ? options : {};
+    const panelId = settings.id || '_x_extension_overlay_2024_unique_';
+    const hostId = settings.hostId || '_x_extension_overlay_host_2026_unique_';
+    const host = doc && typeof doc.getElementById === 'function'
+      ? doc.getElementById(hostId)
+      : null;
+    if (host && host.shadowRoot) {
+      return findById(host.shadowRoot, panelId) || host._lumnoOverlayPanel || host;
+    }
+    return doc && typeof doc.getElementById === 'function'
+      ? doc.getElementById(panelId)
+      : null;
   }
 
   return Object.freeze({
     appendOverlayStyleNodes,
-    createOverlayElement
+    createOverlayElement,
+    createOverlayMount,
+    findOverlayPanel
   });
 });

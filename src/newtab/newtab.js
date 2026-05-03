@@ -5621,6 +5621,10 @@
   }
 
   function isBrowserExtensionProtocol(protocol) {
+    const guards = window.LumnoUrlGuards || {};
+    if (typeof guards.isBrowserExtensionProtocol === 'function') {
+      return guards.isBrowserExtensionProtocol(protocol);
+    }
     const normalized = String(protocol || '').toLowerCase();
     return normalized === 'chrome-extension:' ||
       normalized === 'moz-extension:' ||
@@ -5678,6 +5682,10 @@
   }
 
   function isRestrictedUrl(url) {
+    const guards = window.LumnoUrlGuards || {};
+    if (typeof guards.isRestrictedUrl === 'function') {
+      return guards.isRestrictedUrl(url);
+    }
     if (!url) {
       return true;
     }
