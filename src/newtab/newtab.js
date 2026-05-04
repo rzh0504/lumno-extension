@@ -6172,13 +6172,6 @@
     );
   }
 
-  function shouldRestrictInteractiveSiteSearchSuggestions(provider, query) {
-    return Boolean(
-      isInteractiveSiteSearchProvider(provider) &&
-      String(query || '').trim()
-    );
-  }
-
   function runSiteSearchProviderQuery(provider, query, disposition) {
     const trimmedQuery = String(query || '').trim();
     if (!provider || !trimmedQuery) {
@@ -6580,7 +6573,7 @@
     latestRawQuery = '';
     latestQuery = '';
     clearAutocomplete();
-    setSiteSearchPrefix(provider, defaultTheme);
+    setSiteSearchPrefix(provider, defaultTheme, { animate: true });
     getThemeForProvider(provider).then((theme) => {
       if (siteSearchState === provider) {
         setSiteSearchPrefix(provider, theme);
@@ -7314,7 +7307,8 @@
         return;
       }
       const rawTagInput = (latestRawQuery || inputParts.input.value || '').trim();
-      const modeCommandActive = isModeCommand(rawTagInput);
+      const siteSearchQueryModeActive = Boolean(siteSearchState && String(query || '').trim());
+      const modeCommandActive = !siteSearchQueryModeActive && isModeCommand(rawTagInput);
       if (modeCommandActive) {
         if (storageArea) {
           storageArea.get([THEME_STORAGE_KEY], (result) => {
@@ -7326,12 +7320,14 @@
           });
         }
       }
-      const commandMatch = !modeCommandActive ? getCommandMatch(rawTagInput) : null;
+      const commandMatch = (!modeCommandActive && !siteSearchQueryModeActive)
+        ? getCommandMatch(rawTagInput)
+        : null;
       const hasCommand = Boolean(commandMatch);
       const preSuggestions = [];
       if (modeCommandActive) {
         preSuggestions.push(buildModeSuggestion());
-      } else {
+      } else if (!siteSearchQueryModeActive) {
         if (hasCommand) {
           preSuggestions.push(buildCommandSuggestion(commandMatch.command));
         }
@@ -7357,7 +7353,7 @@
           renderSuggestions(suggestions, query);
         });
       }
-      const inlineCandidate = (!siteSearchState && !modeCommandActive && !hasCommand)
+      const inlineCandidate = (!siteSearchQueryModeActive && !modeCommandActive && !hasCommand)
         ? getInlineSiteSearchCandidate(rawTagInput, providersForTags)
         : null;
       let inlineSuggestion = null;
@@ -7377,7 +7373,7 @@
         }
       }
 
-      const newTabSuggestion = modeCommandActive
+      const newTabSuggestion = (modeCommandActive || siteSearchQueryModeActive)
         ? null
         : {
           type: 'newtab',
@@ -7389,26 +7385,29 @@
           searchQuery: query,
           forceSearch: true
         };
+      const siteSearchSuggestion = siteSearchQueryModeActive
+        ? (() => {
+            const siteUrl = buildSearchUrl(siteSearchState.template, query);
+            if (!siteUrl) {
+              return null;
+            }
+            return {
+              type: 'siteSearch',
+              title: formatMessage('search_in_site_query', '在 {site} 中搜索 "{query}"', {
+                site: getSiteSearchDisplayName(siteSearchState),
+                query: query
+              }),
+              url: siteUrl,
+              favicon: getProviderIcon(siteSearchState),
+              provider: siteSearchState,
+              searchQuery: query
+            };
+          })()
+        : null;
 
-      let allSuggestions = modeCommandActive
-        ? [...preSuggestions]
-        : [...preSuggestions, newTabSuggestion, ...suggestions];
-      if (!modeCommandActive && siteSearchState && query) {
-        const siteUrl = buildSearchUrl(siteSearchState.template, query);
-        if (siteUrl) {
-          allSuggestions.unshift({
-            type: 'siteSearch',
-            title: formatMessage('search_in_site_query', '在 {site} 中搜索 "{query}"', {
-              site: getSiteSearchDisplayName(siteSearchState),
-              query: query
-            }),
-            url: siteUrl,
-            favicon: getProviderIcon(siteSearchState),
-            provider: siteSearchState,
-            searchQuery: query
-          });
-        }
-      }
+      let allSuggestions = siteSearchQueryModeActive
+        ? (siteSearchSuggestion ? [siteSearchSuggestion] : [])
+        : (modeCommandActive ? [...preSuggestions] : [...preSuggestions, newTabSuggestion, ...suggestions]);
       allSuggestions = filterBlacklistedSuggestions(allSuggestions, query);
 
       const onlyKeywordSuggestions = allSuggestions.length > 0 &&
@@ -7498,20 +7497,6 @@
         if (primaryHighlightIndex >= 0) {
           primarySuggestion = allSuggestions[primaryHighlightIndex] || null;
           mergedProvider = findProviderForSuggestionMatch(primarySuggestion, providersForTags);
-        }
-        if (shouldRestrictInteractiveSiteSearchSuggestions(siteSearchState, query)) {
-          const primaryInteractiveSuggestion = allSuggestions.find((item) =>
-            item &&
-            item.provider === siteSearchState &&
-            item.searchQuery === query
-          );
-          if (primaryInteractiveSuggestion) {
-            allSuggestions = [primaryInteractiveSuggestion];
-            primaryHighlightIndex = 0;
-            primaryHighlightReason = 'inline';
-            primarySuggestion = primaryInteractiveSuggestion;
-            mergedProvider = null;
-          }
         }
         applyAutocomplete(allSuggestions, primarySuggestion, primaryHighlightReason);
         const inlineAutoHighlight = Boolean(inlineSuggestion && primaryHighlightIndex === 0);
@@ -8455,7 +8440,8 @@
       'min-height': '44px',
       'height': '44px',
       'position': 'relative',
-      'z-index': '2'
+      'z-index': '2',
+      'overflow': 'visible'
     },
     inputStyleOverrides: {
       'border-bottom': 'none',
@@ -9144,7 +9130,7 @@
     min-height: 45px;
     display: block;
     box-sizing: border-box;
-    overflow: hidden;
+    overflow: visible;
     border-radius: 24px;
     background: var(--x-nt-input-bg, rgba(255, 255, 255, 0.9));
     border: 1px solid var(--x-nt-input-border, rgba(0, 0, 0, 0.06));
@@ -9179,7 +9165,9 @@
   const defaultPlaceholder = searchInput.placeholder;
   const defaultCaretColor = searchInput.style.caretColor || '#7DB7FF';
   let baseInputPaddingLeft = null;
-  const prefixGap = 6;
+  const prefixGap = 8;
+  const inputModePrefixTransition = 'opacity 220ms cubic-bezier(0.22, 1, 0.36, 1), transform 300ms cubic-bezier(0.22, 1, 0.36, 1), filter 260ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms ease, box-shadow 180ms ease';
+  let inputModePrefixAnimationFrame = null;
 
   const siteSearchPrefix = document.createElement('span');
   siteSearchPrefix.id = '_x_extension_newtab_site_search_prefix_2024_unique_';
@@ -9190,15 +9178,92 @@
     transform: translateY(-50%);
     left: 50px;
     display: none;
+    align-items: center;
+    justify-content: center;
+    max-width: min(160px, 42%);
+    min-width: 0;
+    height: 26px;
+    padding: 0 10px;
     white-space: nowrap;
-    font-size: 16px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-sizing: border-box;
+    font-size: 13px;
     font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
     line-height: 1;
-    color: var(--x-nt-subtext, #6B7280);
+    letter-spacing: 0;
+    color: #F8FAFC;
+    background: #3B82F6;
+    border-radius: 9px;
+    box-shadow: 0 7px 16px rgba(59, 130, 246, 0.24);
+    opacity: 1;
+    filter: blur(0px);
+    transition: ${inputModePrefixTransition};
+    will-change: transform, opacity, filter;
     pointer-events: none;
     z-index: 1;
+    user-select: none;
   `;
   inputContainer.appendChild(siteSearchPrefix);
+
+  function shouldReduceInputModeMotion() {
+    return Boolean(
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    );
+  }
+
+  function getInputModePrefixVisual(theme) {
+    const resolvedTheme = theme ? getThemeForMode(theme) : defaultTheme;
+    const accentRgb = (resolvedTheme && (resolvedTheme.accentRgb || parseCssColor(resolvedTheme.accent))) ||
+      defaultAccentColor;
+    return {
+      background: rgbToCss(accentRgb),
+      shadow: `0 7px 16px rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, ${isNewtabDarkMode() ? 0.34 : 0.24})`,
+      caretColor: resolvedTheme && resolvedTheme.placeholderText
+        ? resolvedTheme.placeholderText
+        : rgbToCss(accentRgb)
+    };
+  }
+
+  function applyInputModePrefixVisual(theme) {
+    const visual = getInputModePrefixVisual(theme);
+    siteSearchPrefix.style.setProperty('background', visual.background);
+    siteSearchPrefix.style.setProperty('box-shadow', visual.shadow);
+    siteSearchPrefix.style.setProperty('color', '#F8FAFC');
+    return visual;
+  }
+
+  function setInputModePrefixRestState() {
+    siteSearchPrefix.style.setProperty('opacity', '1');
+    siteSearchPrefix.style.setProperty('filter', 'blur(0px)');
+    siteSearchPrefix.style.setProperty('transform', 'translateY(-50%)');
+    siteSearchPrefix.style.setProperty('transition', inputModePrefixTransition);
+  }
+
+  function playInputModePrefixEnterAnimation() {
+    if (inputModePrefixAnimationFrame !== null) {
+      cancelAnimationFrame(inputModePrefixAnimationFrame);
+      inputModePrefixAnimationFrame = null;
+    }
+    if (shouldReduceInputModeMotion()) {
+      setInputModePrefixRestState();
+      return;
+    }
+    siteSearchPrefix.style.setProperty('transition', 'none');
+    siteSearchPrefix.style.setProperty('opacity', '0');
+    siteSearchPrefix.style.setProperty('filter', 'blur(4px)');
+    siteSearchPrefix.style.setProperty('transform', 'translateY(-50%) translateX(-14px) scale(0.78)');
+    void siteSearchPrefix.offsetWidth;
+    inputModePrefixAnimationFrame = requestAnimationFrame(() => {
+      inputModePrefixAnimationFrame = null;
+      siteSearchPrefix.style.setProperty('transition', inputModePrefixTransition);
+      siteSearchPrefix.style.setProperty('opacity', '1');
+      siteSearchPrefix.style.setProperty('filter', 'blur(0px)');
+      siteSearchPrefix.style.setProperty('transform', 'translateY(-50%) translateX(0) scale(1)');
+    });
+  }
 
   function getBaseInputPaddingLeft() {
     if (baseInputPaddingLeft === null) {
@@ -9215,30 +9280,33 @@
       searchInput.style.setProperty('padding-left', `${basePadding}px`);
       return;
     }
-    const prefixWidth = siteSearchPrefix.getBoundingClientRect().width;
+    const prefixWidth = Math.ceil(siteSearchPrefix.offsetWidth || siteSearchPrefix.getBoundingClientRect().width || 0);
     const paddedLeft = Math.max(basePadding + prefixWidth + prefixGap, basePadding);
     searchInput.style.setProperty('padding-left', `${paddedLeft}px`);
   }
 
-  function setSiteSearchPrefix(provider, theme) {
-    const prefixText = formatMessage('search_in_site_ellipsis', '在 {site} 中搜索...', {
-      site: getSiteSearchDisplayName(provider)
+  function setSiteSearchPrefix(provider, theme, options) {
+    const prefixText = getSiteSearchDisplayName(provider) || formatMessage('search_in_site', '在 {site} 中搜索', {
+      site: provider && provider.name ? provider.name : ''
     });
+    const shouldAnimate = Boolean(options && options.animate);
     siteSearchPrefix.textContent = prefixText;
+    const visual = applyInputModePrefixVisual(theme);
     siteSearchPrefix.style.setProperty('display', 'inline-flex');
-    const resolvedTheme = theme ? getThemeForMode(theme) : null;
-    if (resolvedTheme && resolvedTheme.placeholderText) {
-      siteSearchPrefix.style.setProperty('color', resolvedTheme.placeholderText);
+    if (!shouldAnimate) {
+      setInputModePrefixRestState();
     }
     searchInput.placeholder = '';
-    if (resolvedTheme && resolvedTheme.placeholderText) {
-      searchInput.style.setProperty('caret-color', resolvedTheme.placeholderText);
-    }
+    searchInput.style.setProperty('caret-color', visual.caretColor);
     updateSiteSearchPrefixLayout();
+    if (shouldAnimate) {
+      playInputModePrefixEnterAnimation();
+    }
   }
 
   function clearSiteSearchPrefix() {
     siteSearchPrefix.textContent = '';
+    setInputModePrefixRestState();
     siteSearchPrefix.style.setProperty('display', 'none');
     searchInput.placeholder = defaultPlaceholder;
     searchInput.style.setProperty('caret-color', defaultCaretColor);

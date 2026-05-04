@@ -7038,7 +7038,13 @@ function toggleBlackRectangle(tabs, overlayContext) {
         updateModeBadge(searchInput ? searchInput.value : '');
       }
       if (siteSearchState) {
-        setSiteSearchPrefix(siteSearchState);
+        const activeSiteSearchProvider = siteSearchState;
+        setSiteSearchPrefix(activeSiteSearchProvider, defaultTheme);
+        getThemeForProvider(activeSiteSearchProvider).then((theme) => {
+          if (siteSearchState === activeSiteSearchProvider) {
+            setSiteSearchPrefix(activeSiteSearchProvider, theme);
+          }
+        });
         updateSiteSearchPrefixLayout();
       }
       if (latestOverlayQuery) {
@@ -7363,7 +7369,9 @@ function toggleBlackRectangle(tabs, overlayContext) {
     const warmIconCache = overlayFaviconRuntime.warmIconCache;
     const defaultCaretColor = searchInput.style.caretColor || 'var(--x-ext-input-caret, #7DB7FF)';
     let baseInputPaddingLeft = null;
-    const prefixGap = 6;
+    const prefixGap = 8;
+    const inputModePrefixTransition = 'opacity 220ms cubic-bezier(0.22, 1, 0.36, 1), transform 300ms cubic-bezier(0.22, 1, 0.36, 1), filter 260ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms ease, box-shadow 180ms ease';
+    let inputModePrefixAnimationFrame = null;
 
     function mixColor(color, target, amount) {
       return [
@@ -8609,15 +8617,92 @@ function toggleBlackRectangle(tabs, overlayContext) {
       transform: translateY(-50%) !important;
       left: 50px !important;
       display: none !important;
+      align-items: center !important;
+      justify-content: center !important;
+      max-width: min(160px, 42%) !important;
+      min-width: 0 !important;
+      height: 26px !important;
+      padding: 0 10px !important;
       white-space: nowrap !important;
-      font-size: 16px !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      box-sizing: border-box !important;
+      font-size: 13px !important;
       font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+      font-weight: 700 !important;
       line-height: 1 !important;
-      color: var(--x-ov-subtext, #6B7280) !important;
+      letter-spacing: 0 !important;
+      color: #F8FAFC !important;
+      background: #3B82F6 !important;
+      border-radius: 9px !important;
+      box-shadow: 0 7px 16px rgba(59, 130, 246, 0.24) !important;
+      opacity: 1 !important;
+      filter: blur(0px) !important;
+      transition: ${inputModePrefixTransition} !important;
+      will-change: transform, opacity, filter !important;
       pointer-events: none !important;
       z-index: 1 !important;
+      user-select: none !important;
     `;
     inputContainer.appendChild(siteSearchPrefix);
+
+    function shouldReduceInputModeMotion() {
+      return Boolean(
+        window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      );
+    }
+
+    function getInputModePrefixVisual(theme) {
+      const resolvedTheme = theme ? getThemeForMode(theme) : defaultTheme;
+      const accentRgb = (resolvedTheme && (resolvedTheme.accentRgb || parseCssColor(resolvedTheme.accent))) ||
+        defaultAccentColor;
+      return {
+        background: rgbToCss(accentRgb),
+        shadow: `0 7px 16px rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, ${isOverlayDarkMode() ? 0.34 : 0.24})`,
+        caretColor: resolvedTheme && resolvedTheme.placeholderText
+          ? resolvedTheme.placeholderText
+          : rgbToCss(accentRgb)
+      };
+    }
+
+    function applyInputModePrefixVisual(theme) {
+      const visual = getInputModePrefixVisual(theme);
+      siteSearchPrefix.style.setProperty('background', visual.background, 'important');
+      siteSearchPrefix.style.setProperty('box-shadow', visual.shadow, 'important');
+      siteSearchPrefix.style.setProperty('color', '#F8FAFC', 'important');
+      return visual;
+    }
+
+    function setInputModePrefixRestState() {
+      siteSearchPrefix.style.setProperty('opacity', '1', 'important');
+      siteSearchPrefix.style.setProperty('filter', 'blur(0px)', 'important');
+      siteSearchPrefix.style.setProperty('transform', 'translateY(-50%)', 'important');
+      siteSearchPrefix.style.setProperty('transition', inputModePrefixTransition, 'important');
+    }
+
+    function playInputModePrefixEnterAnimation() {
+      if (inputModePrefixAnimationFrame !== null) {
+        cancelAnimationFrame(inputModePrefixAnimationFrame);
+        inputModePrefixAnimationFrame = null;
+      }
+      if (shouldReduceInputModeMotion()) {
+        setInputModePrefixRestState();
+        return;
+      }
+      siteSearchPrefix.style.setProperty('transition', 'none', 'important');
+      siteSearchPrefix.style.setProperty('opacity', '0', 'important');
+      siteSearchPrefix.style.setProperty('filter', 'blur(4px)', 'important');
+      siteSearchPrefix.style.setProperty('transform', 'translateY(-50%) translateX(-14px) scale(0.78)', 'important');
+      void siteSearchPrefix.offsetWidth;
+      inputModePrefixAnimationFrame = requestAnimationFrame(() => {
+        inputModePrefixAnimationFrame = null;
+        siteSearchPrefix.style.setProperty('transition', inputModePrefixTransition, 'important');
+        siteSearchPrefix.style.setProperty('opacity', '1', 'important');
+        siteSearchPrefix.style.setProperty('filter', 'blur(0px)', 'important');
+        siteSearchPrefix.style.setProperty('transform', 'translateY(-50%) translateX(0) scale(1)', 'important');
+      });
+    }
 
     function getBaseInputPaddingLeft() {
       if (baseInputPaddingLeft === null) {
@@ -8634,44 +8719,48 @@ function toggleBlackRectangle(tabs, overlayContext) {
         setInputScopedStyle(searchInput, 'padding-left', `${basePadding}px`);
         return;
       }
-      const prefixWidth = siteSearchPrefix.getBoundingClientRect().width;
+      const prefixWidth = Math.ceil(siteSearchPrefix.offsetWidth || siteSearchPrefix.getBoundingClientRect().width || 0);
       const paddedLeft = Math.max(basePadding + prefixWidth + prefixGap, basePadding);
       setInputScopedStyle(searchInput, 'padding-left', `${paddedLeft}px`);
     }
 
-    function setInputModePrefix(prefixText, theme) {
+    function setInputModePrefix(prefixText, theme, options) {
+      const shouldAnimate = Boolean(options && options.animate);
       siteSearchPrefix.textContent = prefixText;
+      const visual = applyInputModePrefixVisual(theme);
       siteSearchPrefix.style.setProperty('display', 'inline-flex', 'important');
-      const resolvedTheme = theme ? getThemeForMode(theme) : null;
-      if (resolvedTheme && resolvedTheme.placeholderText) {
-        siteSearchPrefix.style.setProperty('color', resolvedTheme.placeholderText, 'important');
+      if (!shouldAnimate) {
+        setInputModePrefixRestState();
       }
       searchInput.placeholder = '';
-      if (resolvedTheme && resolvedTheme.placeholderText) {
-        setInputScopedStyle(searchInput, 'caret-color', resolvedTheme.placeholderText);
-      }
+      setInputScopedStyle(searchInput, 'caret-color', visual.caretColor);
       updateSiteSearchPrefixLayout();
+      if (shouldAnimate) {
+        playInputModePrefixEnterAnimation();
+      }
     }
 
     function clearInputModePrefix() {
       siteSearchPrefix.textContent = '';
+      setInputModePrefixRestState();
       siteSearchPrefix.style.setProperty('display', 'none', 'important');
       searchInput.placeholder = defaultPlaceholderText || defaultPlaceholder;
       setInputScopedStyle(searchInput, 'caret-color', defaultCaretColor);
       updateSiteSearchPrefixLayout();
     }
 
-    function setSiteSearchPrefix(provider, theme) {
-      const prefixText = formatMessage('search_in_site_prefix', '在 {site} 中搜索｜', {
-        site: getSiteSearchDisplayName(provider)
+    function setSiteSearchPrefix(provider, theme, options) {
+      const prefixText = getSiteSearchDisplayName(provider) || formatMessage('search_in_site', '在 {site} 中搜索', {
+        site: provider && provider.name ? provider.name : ''
       });
-      setInputModePrefix(prefixText, theme);
+      setInputModePrefix(prefixText, theme, options);
     }
 
     function setOpenTabsSearchPrefix(theme) {
       setInputModePrefix(
-        t('search_open_tabs_only_prefix', '仅搜索已打开标签页｜'),
-        theme
+        t('search_open_tabs_only_entry', '搜索已打开标签页'),
+        theme,
+        { animate: true }
       );
     }
 
@@ -9121,13 +9210,6 @@ function toggleBlackRectangle(tabs, overlayContext) {
       return Boolean(
         hasOpenAndSubmitSiteSearchAction(provider) &&
         String(provider.submitStrategy || '').trim() === 'geminiPrompt'
-      );
-    }
-
-    function shouldRestrictInteractiveSiteSearchSuggestions(provider, query) {
-      return Boolean(
-        isInteractiveSiteSearchProvider(provider) &&
-        String(query || '').trim()
       );
     }
 
@@ -9583,7 +9665,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
       latestRawInputValue = '';
       latestOverlayQuery = '';
       clearAutocomplete();
-      setSiteSearchPrefix(provider, defaultTheme);
+      setSiteSearchPrefix(provider, defaultTheme, { animate: true });
       const providerIcon = getProviderIcon(provider);
       getThemeForProvider(provider).then((theme) => {
         if (siteSearchState === provider) {
@@ -11322,7 +11404,8 @@ function toggleBlackRectangle(tabs, overlayContext) {
       }
       lastSuggestionResponse = Array.isArray(suggestions) ? suggestions : [];
       const rawTagInput = (latestRawInputValue || query || '').trim();
-      const modeCommandActive = isModeCommand(rawTagInput);
+      const siteSearchQueryModeActive = Boolean(siteSearchState && String(query || '').trim());
+      const modeCommandActive = !siteSearchQueryModeActive && isModeCommand(rawTagInput);
       if (modeCommandActive) {
         if (storageArea) {
           storageArea.get([THEME_STORAGE_KEY], (result) => {
@@ -11336,7 +11419,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
       }
 
       // Add New Tab suggestion as first item
-      const newTabSuggestion = modeCommandActive
+      const newTabSuggestion = (modeCommandActive || siteSearchQueryModeActive)
         ? null
         : {
           type: 'newtab',
@@ -11394,12 +11477,14 @@ function toggleBlackRectangle(tabs, overlayContext) {
         if (query !== latestOverlayQuery) {
           return;
         }
-        const commandMatch = !modeCommandActive ? getCommandMatch(rawTagInput) : null;
+        const commandMatch = (!modeCommandActive && !siteSearchQueryModeActive)
+          ? getCommandMatch(rawTagInput)
+          : null;
         const hasCommand = Boolean(commandMatch);
         const preSuggestions = [];
         if (modeCommandActive) {
           preSuggestions.push(buildModeSuggestion());
-        } else {
+        } else if (!siteSearchQueryModeActive) {
           if (hasCommand) {
             preSuggestions.push(buildCommandSuggestion(commandMatch.command));
           }
@@ -11426,7 +11511,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
           });
         }
         const rawTagInputForInline = (latestRawInputValue || searchInput.value || '').trim();
-        const inlineCandidate = (!siteSearchState && !modeCommandActive && !hasCommand)
+        const inlineCandidate = (!siteSearchQueryModeActive && !modeCommandActive && !hasCommand)
           ? getInlineSiteSearchCandidate(rawTagInputForInline, providersForTags)
           : null;
         let inlineSuggestion = null;
@@ -11446,10 +11531,30 @@ function toggleBlackRectangle(tabs, overlayContext) {
           }
         }
 
+        const siteSearchSuggestion = siteSearchQueryModeActive
+          ? (() => {
+              const siteUrl = buildSearchUrl(siteSearchState.template, query);
+              if (!siteUrl) {
+                return null;
+              }
+              return {
+                type: 'siteSearch',
+                title: formatMessage('search_in_site_query', '在 {site} 中搜索 "{query}"', {
+                  site: getSiteSearchDisplayName(siteSearchState),
+                  query: query
+                }),
+                url: siteUrl,
+                favicon: getProviderIcon(siteSearchState),
+                provider: siteSearchState,
+                searchQuery: query
+              };
+            })()
+          : null;
+
         // Add New Tab, ChatGPT and Perplexity suggestions to the beginning
-        let allSuggestions = modeCommandActive
-          ? [...preSuggestions]
-          : [...preSuggestions, newTabSuggestion, /*chatGptSuggestion, perplexitySuggestion,*/ ...suggestions];
+        let allSuggestions = siteSearchQueryModeActive
+          ? (siteSearchSuggestion ? [siteSearchSuggestion] : [])
+          : (modeCommandActive ? [...preSuggestions] : [...preSuggestions, newTabSuggestion, /*chatGptSuggestion, perplexitySuggestion,*/ ...suggestions]);
         allSuggestions.forEach((item) => {
           if (!item || !item.url) {
             return;
@@ -11463,22 +11568,6 @@ function toggleBlackRectangle(tabs, overlayContext) {
             delete item._xMatchedTabId;
           }
         });
-        if (!modeCommandActive && siteSearchState && query) {
-          const siteUrl = buildSearchUrl(siteSearchState.template, query);
-          if (siteUrl) {
-            allSuggestions.unshift({
-              type: 'siteSearch',
-              title: formatMessage('search_in_site_query', '在 {site} 中搜索 "{query}"', {
-                site: getSiteSearchDisplayName(siteSearchState),
-                query: query
-              }),
-              url: siteUrl,
-              favicon: getProviderIcon(siteSearchState),
-              provider: siteSearchState,
-              searchQuery: query
-            });
-          }
-        }
         allSuggestions = filterOverlayBlacklistedSuggestions(allSuggestions, query);
         const onlyKeywordSuggestions = allSuggestions.length > 0 &&
           allSuggestions.every((item) => item && (item.type === 'googleSuggest' || item.type === 'newtab'));
@@ -11599,20 +11688,6 @@ function toggleBlackRectangle(tabs, overlayContext) {
           if (primaryHighlightIndex >= 0) {
             primarySuggestion = allSuggestions[primaryHighlightIndex] || null;
             mergedProvider = findProviderForSuggestionMatch(primarySuggestion, providersForTags);
-          }
-          if (shouldRestrictInteractiveSiteSearchSuggestions(siteSearchState, query)) {
-            const primaryInteractiveSuggestion = allSuggestions.find((item) =>
-              item &&
-              item.provider === siteSearchState &&
-              item.searchQuery === query
-            );
-            if (primaryInteractiveSuggestion) {
-              allSuggestions = [primaryInteractiveSuggestion];
-              primaryHighlightIndex = 0;
-              primaryHighlightReason = 'inline';
-              primarySuggestion = primaryInteractiveSuggestion;
-              mergedProvider = null;
-            }
           }
           applyAutocomplete(allSuggestions, primarySuggestion, primaryHighlightReason);
           const inlineAutoHighlight = Boolean(inlineSuggestion && primaryHighlightIndex === 0);
