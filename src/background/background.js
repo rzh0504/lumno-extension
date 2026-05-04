@@ -10316,41 +10316,51 @@ function toggleBlackRectangle(tabs, overlayContext) {
         if (suggestionItems.length === 0) {
           return;
         }
+        let didWrap = false;
         if (selectedIndex === -1) {
           // Move from auto highlight (or input) to next suggestion
           const autoIndex = getAutoHighlightIndex();
           selectedIndex = autoIndex >= 0
             ? (autoIndex + 1) % suggestionItems.length
             : 0;
+          didWrap = autoIndex >= 0 && selectedIndex === 0;
         } else {
           // Move to next suggestion
+          const previousIndex = selectedIndex;
           selectedIndex = (selectedIndex + 1) % suggestionItems.length;
+          didWrap = previousIndex === suggestionItems.length - 1 && selectedIndex === 0;
         }
         updateSelection();
+        scrollSelectedSuggestionIntoView('down', didWrap);
         searchInput.focus();
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         if (suggestionItems.length === 0) {
           return;
         }
+        let didWrap = false;
         if (selectedIndex === 0) {
           // Wrap from first suggestion to the last suggestion
           selectedIndex = suggestionItems.length - 1;
+          didWrap = true;
         } else if (selectedIndex === -1) {
           const autoIndex = getAutoHighlightIndex();
           if (autoIndex > 0) {
             selectedIndex = autoIndex - 1;
           } else if (autoIndex === 0) {
             selectedIndex = suggestionItems.length - 1;
+            didWrap = true;
           } else {
             // Move from input to last suggestion
             selectedIndex = suggestionItems.length - 1;
+            didWrap = true;
           }
         } else {
           // Move to previous suggestion
           selectedIndex = selectedIndex - 1;
         }
         updateSelection();
+        scrollSelectedSuggestionIntoView('up', didWrap);
         searchInput.focus();
       } else if (e.key === 'Enter') {
         e.preventDefault();
@@ -10742,6 +10752,30 @@ function toggleBlackRectangle(tabs, overlayContext) {
           item._xTitle.style.setProperty('font-weight', isHighlighted ? '600' : '400', 'important');
         }
       });
+    }
+
+    function scrollSelectedSuggestionIntoView(direction, didWrap) {
+      if (!suggestionsContainer || selectedIndex < 0) {
+        return;
+      }
+      const item = suggestionItems[selectedIndex];
+      if (!item || !item.isConnected) {
+        return;
+      }
+      if (didWrap) {
+        suggestionsContainer.scrollTop = direction === 'down'
+          ? 0
+          : suggestionsContainer.scrollHeight;
+        return;
+      }
+      const containerRect = suggestionsContainer.getBoundingClientRect();
+      const itemRect = item.getBoundingClientRect();
+      const inset = 8;
+      if (itemRect.top < containerRect.top + inset) {
+        suggestionsContainer.scrollTop -= (containerRect.top + inset) - itemRect.top;
+      } else if (itemRect.bottom > containerRect.bottom - inset) {
+        suggestionsContainer.scrollTop += itemRect.bottom - (containerRect.bottom - inset);
+      }
     }
 
     function animateSuggestionsGrowth(container, fromHeight) {

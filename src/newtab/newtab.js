@@ -8605,6 +8605,30 @@
     });
   }
 
+  function scrollSelectedSuggestionIntoView(direction, didWrap) {
+    if (!suggestionsContainer || selectedIndex < 0) {
+      return;
+    }
+    const item = suggestionItems[selectedIndex];
+    if (!item || !item.isConnected) {
+      return;
+    }
+    if (didWrap) {
+      suggestionsContainer.scrollTop = direction === 'down'
+        ? 0
+        : suggestionsContainer.scrollHeight;
+      return;
+    }
+    const containerRect = suggestionsContainer.getBoundingClientRect();
+    const itemRect = item.getBoundingClientRect();
+    const inset = 8;
+    if (itemRect.top < containerRect.top + inset) {
+      suggestionsContainer.scrollTop -= (containerRect.top + inset) - itemRect.top;
+    } else if (itemRect.bottom > containerRect.bottom - inset) {
+      suggestionsContainer.scrollTop += itemRect.bottom - (containerRect.bottom - inset);
+    }
+  }
+
   function animateSuggestionsGrowth(container, fromHeight) {
     if (!container || !fromHeight) {
       return;
@@ -10198,32 +10222,40 @@
           return;
         }
         event.preventDefault();
+        let didWrap = false;
         if (event.key === 'ArrowDown') {
           if (selectedIndex === -1) {
             const autoIndex = getAutoHighlightIndex();
             selectedIndex = autoIndex >= 0
               ? (autoIndex + 1) % suggestionItems.length
               : 0;
+            didWrap = autoIndex >= 0 && selectedIndex === 0;
           } else {
+            const previousIndex = selectedIndex;
             selectedIndex = (selectedIndex + 1) % suggestionItems.length;
+            didWrap = previousIndex === suggestionItems.length - 1 && selectedIndex === 0;
           }
         } else {
           if (selectedIndex === 0) {
             selectedIndex = suggestionItems.length - 1;
+            didWrap = true;
           } else if (selectedIndex === -1) {
             const autoIndex = getAutoHighlightIndex();
             if (autoIndex > 0) {
               selectedIndex = autoIndex - 1;
             } else if (autoIndex === 0) {
               selectedIndex = suggestionItems.length - 1;
+              didWrap = true;
             } else {
               selectedIndex = suggestionItems.length - 1;
+              didWrap = true;
             }
           } else {
             selectedIndex = selectedIndex - 1;
           }
         }
         updateSelection();
+        scrollSelectedSuggestionIntoView(event.key === 'ArrowDown' ? 'down' : 'up', didWrap);
         return;
       }
       if (event.key === 'Tab' && handleTabKey) {
