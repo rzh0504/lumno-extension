@@ -20,6 +20,7 @@
     const getSiteFaviconUrl = typeof config.getSiteFaviconUrl === 'function' ? config.getSiteFaviconUrl : (() => '');
     const normalizeFaviconHost = typeof config.normalizeFaviconHost === 'function' ? config.normalizeFaviconHost : ((value) => String(value || ''));
     const shouldBlockFaviconForHost = typeof config.shouldBlockFaviconForHost === 'function' ? config.shouldBlockFaviconForHost : (() => false);
+    const isFaviconProxyUrl = typeof config.isFaviconProxyUrl === 'function' ? config.isFaviconProxyUrl : (() => false);
     const shouldSkipThemeUpgradeCandidate = typeof config.shouldSkipThemeUpgradeCandidate === 'function'
       ? config.shouldSkipThemeUpgradeCandidate
       : (() => false);
@@ -342,10 +343,16 @@
       const cacheKey = `${String(normalizedHostKey || '')}::${String(pageUrl || '')}::${String(fallbackUrl || '')}::${preferredTheme}`;
       const shouldBypassCachedUrl = normalizeFaviconHost(normalizedHostKey || '') === 'lumno.kubai.design';
       const cachedUrl = resolvedFaviconUrlCache.get(cacheKey) || '';
-      const safeCachedUrl = (shouldBypassCachedUrl || isBlockedLocalFaviconUrl(cachedUrl) || isChromeMonogramFaviconUrl(cachedUrl))
+      const safeCachedUrl = (
+        shouldBypassCachedUrl ||
+        isBlockedLocalFaviconUrl(cachedUrl) ||
+        isChromeMonogramFaviconUrl(cachedUrl) ||
+        isFaviconProxyUrl(cachedUrl)
+      )
         ? ''
         : cachedUrl;
       const safeFallbackUrl = isBlockedLocalFaviconUrl(fallbackUrl) ? '' : String(fallbackUrl || '');
+      const fallbackIsProxy = isFaviconProxyUrl(safeFallbackUrl);
 
       return {
         pageUrl: String(pageUrl || ''),
@@ -356,6 +363,8 @@
         previousWorkingSrc: getLastWorkingFaviconSrc(img),
         cacheKey,
         safeCachedUrl,
+        primaryFallbackUrl: fallbackIsProxy ? '' : safeFallbackUrl,
+        proxyFallbackUrl: fallbackIsProxy ? safeFallbackUrl : '',
         googleFavicon: normalizedHostKey ? getGoogleFaviconUrl(normalizedHostKey) : '',
         faviconIsFavicon: normalizedHostKey ? getFaviconIsUrl(normalizedHostKey) : '',
         handleFailed: typeof onFailed === 'function' ? onFailed : function() {},
@@ -381,19 +390,48 @@
       const siteSvgFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon.svg` : '';
       const siteDarkSvgFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon-dark.svg` : '';
       const siteLightSvgFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon-light.svg` : '';
+      const sitePngFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon.png` : '';
+      const site32PngFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon-32x32.png` : '';
+      const site16PngFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon-16x16.png` : '';
       const siteIcoFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon.ico` : '';
+      const siteAppleTouchIcon = state.faviconHostKey ? `https://${state.faviconHostKey}/apple-touch-icon.png` : '';
+      const siteAppleTouchIconPrecomposed = state.faviconHostKey ? `https://${state.faviconHostKey}/apple-touch-icon-precomposed.png` : '';
+      const siteIconPng = state.faviconHostKey ? `https://${state.faviconHostKey}/icon.png` : '';
       const themedCandidates = state.preferredTheme === 'dark'
-        ? [siteDarkSvgFavicon, siteSvgFavicon, siteIcoFavicon, siteLightSvgFavicon]
-        : [siteLightSvgFavicon, siteSvgFavicon, siteIcoFavicon, siteDarkSvgFavicon];
+        ? [
+          siteDarkSvgFavicon,
+          siteSvgFavicon,
+          sitePngFavicon,
+          siteIcoFavicon,
+          site32PngFavicon,
+          site16PngFavicon,
+          siteAppleTouchIcon,
+          siteAppleTouchIconPrecomposed,
+          siteIconPng,
+          siteLightSvgFavicon
+        ]
+        : [
+          siteLightSvgFavicon,
+          siteSvgFavicon,
+          sitePngFavicon,
+          siteIcoFavicon,
+          site32PngFavicon,
+          site16PngFavicon,
+          siteAppleTouchIcon,
+          siteAppleTouchIconPrecomposed,
+          siteIconPng,
+          siteDarkSvgFavicon
+        ];
       const knownThemedCandidates = getKnownOverlayThemedFaviconCandidates(state.faviconHostKey, state.preferredTheme);
 
       return {
         localCandidates: dedupeOverlayFaviconCandidateUrls([
           state.safeCachedUrl,
-          state.fallbackUrl,
+          state.primaryFallbackUrl,
           ...knownThemedCandidates,
           ...themedCandidates,
           state.googleFavicon,
+          state.proxyFallbackUrl,
           state.faviconIsFavicon
         ]).filter((candidate) => !isBlockedLocalFaviconUrl(candidate))
       };
@@ -414,7 +452,9 @@
       }
       img.style.setProperty('visibility', 'visible', 'important');
       if (!isChromeMonogramFaviconUrl(nextUrl) && state.cacheKey) {
-        resolvedFaviconUrlCache.set(state.cacheKey, nextUrl);
+        if (!isFaviconProxyUrl(nextUrl)) {
+          resolvedFaviconUrlCache.set(state.cacheKey, nextUrl);
+        }
       }
       return true;
     }
@@ -478,7 +518,7 @@
           }
           setFaviconSrcWithAnimation(img, candidate);
           img.style.setProperty('visibility', 'visible', 'important');
-          if (state.cacheKey) {
+          if (state.cacheKey && !isFaviconProxyUrl(candidate)) {
             resolvedFaviconUrlCache.set(state.cacheKey, candidate);
           }
         };

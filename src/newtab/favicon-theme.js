@@ -353,7 +353,9 @@
     if (!url) {
       return false;
     }
-    return /google\.com\/s2\/favicons/i.test(url) || /gstatic\.com\/favicon/i.test(url);
+    return /google\.com\/s2\/favicons/i.test(url) ||
+      /gstatic\.com\/favicon/i.test(url) ||
+      /favicon\.is\//i.test(url);
   }
 
   function extractAverageColor(image) {

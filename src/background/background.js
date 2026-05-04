@@ -578,6 +578,7 @@ const DOCUMENT_PIP_ENABLED_STORAGE_KEY = '_x_extension_document_pip_enabled_2026
 const PINNED_TAB_RECOVERY_ENABLED_STORAGE_KEY = '_x_extension_pinned_tab_recovery_enabled_2026_unique_';
 const FALLBACK_SHORTCUT_STORAGE_KEY = '_x_extension_fallback_hotkey_2024_unique_';
 const SEARCH_RESULT_PRIORITY_STORAGE_KEY = '_x_extension_search_result_priority_2026_unique_';
+const SEARCH_SELECTION_STATS_STORAGE_KEY = '_x_extension_search_selection_stats_2026_unique_';
 const FAVICON_VISIT_DIRTY_STORAGE_KEY = '_x_extension_favicon_visit_dirty_2026_unique_';
 const FAVICON_VISIT_DIRTY_TTL_MS = 1000 * 60 * 60 * 24;
 const FAVICON_VISIT_DIRTY_MAX_ENTRIES = 600;
@@ -3027,6 +3028,18 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       sendResponse({ suggestions: [] });
     });
     return true; // Keep the message channel open for async response
+  } else if (request.action === 'recordSearchSuggestionSelection') {
+    recordSearchSuggestionSelection(request)
+      .then((result) => {
+        sendResponse(result);
+      })
+      .catch((error) => {
+        sendResponse({
+          ok: false,
+          reason: error && error.message ? error.message : 'record-selection-failed'
+        });
+      });
+    return true;
   } else if (request.action === 'deleteHistoryUrl') {
     const targetUrl = typeof request.url === 'string' ? request.url : '';
     if (!targetUrl) {
@@ -3263,6 +3276,8 @@ let siteSearchCache = null;
 let siteSearchPromise = null;
 let searchBlacklistCache = null;
 let searchBlacklistPromise = null;
+let searchSelectionStatsCache = null;
+let searchSelectionStatsPromise = null;
 const SEARCH_ENGINE_SUGGEST_TIMEOUT_MS = 180;
 const LOCAL_SUGGEST_SOURCE_TIMEOUT_MS = 800;
 const HISTORY_FALLBACK_CACHE_TTL_MS = 45 * 1000;
@@ -3432,6 +3447,12 @@ function getFaviconIsUrl(hostname) {
     return '';
   }
   return `https://favicon.is/${encodeURIComponent(normalized)}`;
+}
+
+function isFaviconProxyUrl(url) {
+  return /google\.com\/s2\/favicons/i.test(String(url || '')) ||
+    /gstatic\.com\/favicon/i.test(String(url || '')) ||
+    /favicon\.is\//i.test(String(url || ''));
 }
 
 function normalizeHost(hostname) {
@@ -4115,6 +4136,41 @@ function getKnownThemedFaviconCandidates(hostname, preferredTheme) {
   return [];
 }
 
+function buildRootFaviconCandidates(hostname, preferredTheme) {
+  const host = normalizeFaviconHost(hostname);
+  const mode = normalizeThemePreference(preferredTheme);
+  if (!host) {
+    return [];
+  }
+  const themed = mode === 'dark'
+    ? [
+      { url: `https://${host}/favicon-dark.svg`, score: 34 },
+      { url: `https://${host}/favicon.svg`, score: 28 },
+      { url: `https://${host}/favicon-light.svg`, score: 16 }
+    ]
+    : mode === 'light'
+      ? [
+        { url: `https://${host}/favicon-light.svg`, score: 32 },
+        { url: `https://${host}/favicon.svg`, score: 29 },
+        { url: `https://${host}/favicon-dark.svg`, score: 15 }
+      ]
+      : [
+        { url: `https://${host}/favicon.svg`, score: 28 },
+        { url: `https://${host}/favicon-dark.svg`, score: 20 },
+        { url: `https://${host}/favicon-light.svg`, score: 20 }
+      ];
+  return [
+    ...themed,
+    { url: `https://${host}/favicon.png`, score: 27 },
+    { url: `https://${host}/favicon-32x32.png`, score: 23 },
+    { url: `https://${host}/favicon-16x16.png`, score: 21 },
+    { url: `https://${host}/favicon.ico`, score: 24 },
+    { url: `https://${host}/apple-touch-icon.png`, score: 18 },
+    { url: `https://${host}/apple-touch-icon-precomposed.png`, score: 17 },
+    { url: `https://${host}/icon.png`, score: 14 }
+  ];
+}
+
 function getThemeHintScore(url, mediaValue, preferredTheme) {
   const normalizedTheme = normalizeThemePreference(preferredTheme);
   if (!normalizedTheme) {
@@ -4263,22 +4319,8 @@ function buildFaviconFallbackCandidates(pageUrl, hostOverride, fallbackUrl, pref
   }
   if (host) {
     candidates.push(...getKnownThemedFaviconCandidates(host, normalizedTheme));
-    if (normalizedTheme === 'dark') {
-      candidates.push({ url: `https://${host}/favicon-dark.svg`, score: 34 });
-      candidates.push({ url: `https://${host}/favicon.svg`, score: 28 });
-      candidates.push({ url: `https://${host}/favicon-light.svg`, score: 16 });
-    } else if (normalizedTheme === 'light') {
-      candidates.push({ url: `https://${host}/favicon-light.svg`, score: 32 });
-      candidates.push({ url: `https://${host}/favicon.svg`, score: 29 });
-      candidates.push({ url: `https://${host}/favicon-dark.svg`, score: 15 });
-    } else {
-      candidates.push({ url: `https://${host}/favicon.svg`, score: 28 });
-      candidates.push({ url: `https://${host}/favicon-dark.svg`, score: 20 });
-      candidates.push({ url: `https://${host}/favicon-light.svg`, score: 20 });
-    }
-    candidates.push({ url: `https://${host}/favicon.ico`, score: 24 });
-    candidates.push({ url: `https://${host}/apple-touch-icon.png`, score: 16 });
-    candidates.push({ url: getGoogleFaviconUrl(host), score: 8 });
+    candidates.push(...buildRootFaviconCandidates(host, normalizedTheme));
+    candidates.push({ url: getGoogleFaviconUrl(host), score: 4 });
     candidates.push({ url: getFaviconIsUrl(host), score: 1 });
   }
   if (inputUrl && includeChromeFallback) {
@@ -4587,6 +4629,108 @@ function loadSearchBlacklistItems() {
   return searchBlacklistPromise;
 }
 
+function normalizeSearchSelectionStats(rawStats) {
+  if (typeof SEARCH_UTILS.normalizeSearchSelectionStats === 'function') {
+    return SEARCH_UTILS.normalizeSearchSelectionStats(rawStats);
+  }
+  return { version: 1, updatedAt: 0, queries: {} };
+}
+
+function loadSearchSelectionStats() {
+  if (searchSelectionStatsCache) {
+    return Promise.resolve(searchSelectionStatsCache);
+  }
+  if (searchSelectionStatsPromise) {
+    return searchSelectionStatsPromise;
+  }
+  searchSelectionStatsPromise = new Promise((resolve) => {
+    if (!localStorageArea) {
+      const emptyStats = normalizeSearchSelectionStats(null);
+      searchSelectionStatsCache = emptyStats;
+      resolve(emptyStats);
+      return;
+    }
+    localStorageArea.get([SEARCH_SELECTION_STATS_STORAGE_KEY], (result) => {
+      const stats = normalizeSearchSelectionStats(result && result[SEARCH_SELECTION_STATS_STORAGE_KEY]);
+      searchSelectionStatsCache = stats;
+      resolve(stats);
+    });
+  }).finally(() => {
+    searchSelectionStatsPromise = null;
+  });
+  return searchSelectionStatsPromise;
+}
+
+function saveSearchSelectionStats(stats) {
+  const normalizedStats = normalizeSearchSelectionStats(stats);
+  searchSelectionStatsCache = normalizedStats;
+  return new Promise((resolve) => {
+    if (!localStorageArea) {
+      resolve(false);
+      return;
+    }
+    localStorageArea.set({ [SEARCH_SELECTION_STATS_STORAGE_KEY]: normalizedStats }, () => {
+      resolve(!(chrome.runtime && chrome.runtime.lastError));
+    });
+  });
+}
+
+function shouldRecordSearchSuggestionSelectionPayload(selection) {
+  if (!selection || typeof selection !== 'object') {
+    return false;
+  }
+  const query = String(selection.query || '').trim();
+  const url = String(selection.url || '').trim();
+  if (!query || !url) {
+    return false;
+  }
+  const type = String(selection.type || '').trim();
+  if (type === 'newtab' ||
+      type === 'googleSuggest' ||
+      type === 'siteSearch' ||
+      type === 'inlineSiteSearch' ||
+      type === 'siteSearchPrompt' ||
+      type === 'modeSwitch' ||
+      type === 'commandNewTab' ||
+      type === 'commandSettings') {
+    return false;
+  }
+  return true;
+}
+
+function recordSearchSuggestionSelection(selection) {
+  if (!shouldRecordSearchSuggestionSelectionPayload(selection) ||
+      typeof SEARCH_UTILS.recordSearchSelectionInStats !== 'function') {
+    return Promise.resolve({ ok: false, reason: 'invalid-selection' });
+  }
+  return loadSearchSelectionStats()
+    .then((stats) => {
+      const updatedStats = SEARCH_UTILS.recordSearchSelectionInStats(stats, selection);
+      return saveSearchSelectionStats(updatedStats);
+    })
+    .then((ok) => ({ ok: ok === true }));
+}
+
+function recordSearchSuggestionSelectionFromSuggestion(suggestion, query, source) {
+  if (!suggestion || suggestion.forceSearch || suggestion.provider || !suggestion.url) {
+    return;
+  }
+  recordSearchSuggestionSelection({
+    query,
+    url: suggestion.url,
+    title: suggestion.title || '',
+    type: suggestion.type || 'history',
+    source: source || 'overlay'
+  }).catch(() => {});
+}
+
+function getSearchSelectionBoost(item, context, stats, options) {
+  if (typeof SEARCH_UTILS.getSearchSelectionBoost !== 'function') {
+    return 0;
+  }
+  return SEARCH_UTILS.getSearchSelectionBoost(item, context, stats, options);
+}
+
 function isUrlBlockedBySearchBlacklist(url, items) {
   if (BLACKLIST_UTILS.isUrlBlocked) {
     return BLACKLIST_UTILS.isUrlBlocked(url, items);
@@ -4826,6 +4970,16 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     searchBlacklistCache = null;
     searchBlacklistPromise = null;
   }
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== 'local' || !changes[SEARCH_SELECTION_STATS_STORAGE_KEY]) {
+    return;
+  }
+  searchSelectionStatsCache = normalizeSearchSelectionStats(
+    changes[SEARCH_SELECTION_STATS_STORAGE_KEY].newValue
+  );
+  searchSelectionStatsPromise = null;
 });
 
 function getBrowserInternalScheme() {
@@ -5265,7 +5419,8 @@ async function getSearchSuggestions(query) {
       bookmarksRaw,
       fallbackHistoryItems,
       allBookmarks,
-      searchBlacklistItems
+      searchBlacklistItems,
+      searchSelectionStats
     ] = await Promise.all([
       withTimeout(
         fetchSearchSuggestionsForEngine(query)
@@ -5288,7 +5443,8 @@ async function getSearchSuggestions(query) {
       }, [], LOCAL_SUGGEST_SOURCE_TIMEOUT_MS),
       getFallbackHistoryItemsCached(),
       getAllBookmarksCached(),
-      loadSearchBlacklistItems()
+      loadSearchBlacklistItems(),
+      loadSearchSelectionStats()
     ]);
     const collectSearchMatches = (items) => {
       if (typeof searchUtils.collectSearchMatches === 'function') {
@@ -5443,7 +5599,11 @@ async function getSearchSuggestions(query) {
       const normalizedExtras = extras && typeof extras === 'object' ? { ...extras } : {};
       const scoreAdjustment = Number(normalizedExtras.scoreAdjustment) || 0;
       delete normalizedExtras.scoreAdjustment;
-      const suggestion = createSearchSuggestion(item, sourceType, baseScore + scoreAdjustment, {
+      const selectionBoost = getSearchSelectionBoost(item, context, searchSelectionStats, searchScoreOptions);
+      if (selectionBoost > 0) {
+        normalizedExtras.selectionBoost = selectionBoost;
+      }
+      const suggestion = createSearchSuggestion(item, sourceType, baseScore + scoreAdjustment + selectionBoost, {
         favicon: buildSearchSuggestionFavicon(item.url),
         reasons: buildSuggestionReasons(item, sourceType),
         ...normalizedExtras
@@ -7182,6 +7342,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
       getSiteFaviconUrl,
       normalizeFaviconHost,
       shouldBlockFaviconForHost,
+      isFaviconProxyUrl,
       shouldSkipThemeUpgradeCandidate: shouldSkipOverlayThemeUpgradeCandidate,
       isOverlayDarkMode,
       preloadThemeFromFavicon,
@@ -8014,7 +8175,9 @@ function toggleBlackRectangle(tabs, overlayContext) {
       if (!url) {
         return false;
       }
-      return /google\.com\/s2\/favicons/i.test(url) || /gstatic\.com\/favicon/i.test(url);
+      return /google\.com\/s2\/favicons/i.test(url) ||
+        /gstatic\.com\/favicon/i.test(url) ||
+        /favicon\.is\//i.test(url);
     }
 
     function getThemeFromUrl(url, hostOverride) {
@@ -9308,6 +9471,12 @@ function toggleBlackRectangle(tabs, overlayContext) {
         return null;
       }
       const matchIndex = list.indexOf(match);
+      const firstResultIndex = Array.isArray(list)
+        ? list.findIndex((item) => item && item.type !== 'newtab')
+        : -1;
+      if (matchIndex !== firstResultIndex) {
+        return null;
+      }
       if (matchIndex > 0) {
         const [picked] = list.splice(matchIndex, 1);
         list.unshift(picked);
@@ -9881,6 +10050,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
             } else {
               // Navigate to the suggested URL
               console.log('Opening URL from keyboard:', selectedSuggestion.url);
+              recordSearchSuggestionSelectionFromSuggestion(selectedSuggestion, query, 'overlay');
               chrome.runtime.sendMessage({
                 action: 'createTab',
                 url: selectedSuggestion.url
@@ -9937,6 +10107,11 @@ function toggleBlackRectangle(tabs, overlayContext) {
             return;
           }
           if (autocompleteState && autocompleteState.url) {
+            recordSearchSuggestionSelectionFromSuggestion({
+              url: autocompleteState.url,
+              title: autocompleteState.title || '',
+              type: 'autocomplete'
+            }, query, 'overlay');
             chrome.runtime.sendMessage({
               action: 'createTab',
               url: autocompleteState.url
@@ -11710,11 +11885,13 @@ function toggleBlackRectangle(tabs, overlayContext) {
               if (index < 4) {
                 favicon.fetchPriority = 'high';
               }
-              attachFaviconData(
-                favicon,
-                suggestion.favicon || '',
-                suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : ''
-              );
+              if (!isFaviconProxyUrl(suggestion.favicon)) {
+                attachFaviconData(
+                  favicon,
+                  suggestion.favicon || '',
+                  suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : ''
+                );
+              }
               favicon.style.cssText = `
                 all: unset !important;
                 width: 16px !important;
@@ -12380,6 +12557,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
               });
             } else {
               console.log('Opening URL:', suggestion.url);
+              recordSearchSuggestionSelectionFromSuggestion(suggestion, query, 'overlay');
               chrome.runtime.sendMessage({
                 action: 'createTab',
                 url: suggestion.url

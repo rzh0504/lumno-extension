@@ -2859,6 +2859,29 @@
     }
   }
 
+  function recordSearchSuggestionSelection(suggestion, rawQuery) {
+    if (!suggestion || suggestion.forceSearch || suggestion.provider || !suggestion.url ||
+        !chrome || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') {
+      return;
+    }
+    const query = String(rawQuery || latestRawQuery || (inputParts && inputParts.input ? inputParts.input.value : '') || '').trim();
+    if (!query) {
+      return;
+    }
+    chrome.runtime.sendMessage({
+      action: 'recordSearchSuggestionSelection',
+      query,
+      url: suggestion.url,
+      title: suggestion.title || '',
+      type: suggestion.type || 'history',
+      source: 'newtab'
+    }, () => {
+      if (chrome.runtime && chrome.runtime.lastError) {
+        // Best-effort ranking signal.
+      }
+    });
+  }
+
   function openBookmarkFolder(nodeId) {
     const id = String(nodeId || '').trim();
     if (!id) {
@@ -6446,6 +6469,12 @@
       return null;
     }
     const matchIndex = list.indexOf(match);
+    const firstResultIndex = Array.isArray(list)
+      ? list.findIndex((item) => item && item.type !== 'newtab')
+      : -1;
+    if (matchIndex !== firstResultIndex) {
+      return null;
+    }
     if (matchIndex > 0) {
       const [picked] = list.splice(matchIndex, 1);
       list.unshift(picked);
@@ -8180,6 +8209,7 @@
             navigateToQuery(suggestion.searchQuery, true);
             return;
           }
+          recordSearchSuggestionSelection(suggestion, query);
           navigateToUrl(suggestion.url);
         });
 
@@ -8614,6 +8644,7 @@
           return true;
         }
         if (selectedSuggestion.url) {
+          recordSearchSuggestionSelection(selectedSuggestion, query);
           navigateToUrl(selectedSuggestion.url);
           return true;
         }
@@ -8649,6 +8680,11 @@
         }
       }
       if (autocompleteState && autocompleteState.url) {
+        recordSearchSuggestionSelection({
+          url: autocompleteState.url,
+          title: autocompleteState.title || '',
+          type: 'autocomplete'
+        }, query);
         navigateToUrl(autocompleteState.url);
         return;
       }

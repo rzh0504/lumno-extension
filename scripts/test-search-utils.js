@@ -37,6 +37,69 @@ const rootScore = score({ title: 'Lumno', url: 'https://lumno.kubai.design/' }, 
 const releaseScore = score({ title: 'Release | Lumno', url: 'https://lumno.kubai.design/release/' }, 'lumno release', 'history');
 assert.ok(releaseScore > rootScore, 'specific release page should outrank root for path-intent queries');
 
+const selectionNow = 1_800_000_000_000;
+let selectionStats = search.normalizeSearchSelectionStats(null, { now: selectionNow });
+for (let i = 0; i < 12; i += 1) {
+  selectionStats = search.recordSearchSelectionInStats(selectionStats, {
+    query: 'ProjectX',
+    title: 'ProjectX | Selected Project',
+    url: 'https://selected.example.com/',
+    type: 'history'
+  }, { now: selectionNow + i });
+}
+const selectionContext = search.buildSearchQueryContext('ProjectX');
+const selectedCandidate = {
+  title: 'ProjectX | Selected Project',
+  url: 'https://selected.example.com/',
+  visitCount: 5,
+  lastVisitTime: selectionNow
+};
+const topSiteCandidate = {
+  title: 'ProjectX',
+  url: 'https://projectx.example.com/',
+  visitCount: 40,
+  lastVisitTime: selectionNow
+};
+const selectionOptions = {
+  now: selectionNow + 12,
+  getTitlePinyinMatchScore: () => ({ score: 0, reason: '' }),
+  isLocalNetworkHost: () => false,
+  isOwnExtensionUrl: () => false
+};
+const selectedScore = search.calculateSearchRelevanceScore(selectedCandidate, 'history', selectionContext, selectionOptions) +
+  search.getSearchSelectionBoost(selectedCandidate, selectionContext, selectionStats, selectionOptions);
+const topSiteScore = search.calculateSearchRelevanceScore(topSiteCandidate, 'topSite', selectionContext, selectionOptions);
+assert.ok(
+  selectedScore > topSiteScore,
+  'query-specific selection history should be strong enough to outrank a generic top-site match'
+);
+const selectedSelectionBoost = search.getSearchSelectionBoost(
+  selectedCandidate,
+  selectionContext,
+  selectionStats,
+  selectionOptions
+);
+const learnedNavigationList = [
+  {
+    type: 'topSite',
+    title: topSiteCandidate.title,
+    url: topSiteCandidate.url,
+    isTopSite: true
+  },
+  {
+    type: 'history',
+    title: selectedCandidate.title,
+    url: selectedCandidate.url,
+    selectionBoost: selectedSelectionBoost
+  }
+];
+const learnedNavigationMatch = search.promoteStrongNavigationMatch(learnedNavigationList, 'ProjectX');
+assert.strictEqual(
+  learnedNavigationMatch.url,
+  selectedCandidate.url,
+  'strong navigation promotion should respect query-specific selection boost'
+);
+
 const navList = [
   { type: 'history', title: 'Example Blog Detail', url: 'https://example.com/blog/detail' },
   { type: 'history', title: 'Example Home', url: 'https://example.com/' }
