@@ -17,8 +17,10 @@ const injectedScriptFiles = [
   'src/shared/settings.js',
   'src/shared/search-utils.js',
   'src/shared/site-search-store.js',
+  'src/shared/suggestion-navigation.js',
   'src/shared/url-guards.js',
   'src/overlay/runtime.js',
+  'src/overlay/favicon-view.js',
   'src/overlay/input-ui.js',
   'src/overlay/shell.js',
   'src/overlay/lifecycle.js',
@@ -90,6 +92,25 @@ function listJsFiles(dir) {
   return files;
 }
 
+function listHtmlFiles(dir) {
+  if (!fs.existsSync(dir)) {
+    return [];
+  }
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const files = [];
+  entries.forEach((entry) => {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...listHtmlFiles(fullPath));
+      return;
+    }
+    if (entry.isFile() && fullPath.endsWith('.html')) {
+      files.push(fullPath);
+    }
+  });
+  return files;
+}
+
 function checkRuntimeGetUrlReferences() {
   const files = listJsFiles('src');
   const staticGetUrlPattern = /chrome\.runtime\.getURL\(\s*(['"`])([^'"`]+)\1\s*\)/g;
@@ -102,6 +123,24 @@ function checkRuntimeGetUrlReferences() {
         continue;
       }
       checkManifestPath(value.split(/[?#]/)[0]);
+    }
+  });
+}
+
+function checkHtmlReferences() {
+  const files = listHtmlFiles('src');
+  const referencePattern = /\b(?:src|href)=["']([^"']+)["']/g;
+  files.forEach((file) => {
+    const source = fs.readFileSync(file, 'utf8');
+    let match = null;
+    while ((match = referencePattern.exec(source))) {
+      const value = match[1];
+      if (!value || /^(https?:|data:|mailto:|tel:|#|__MSG_)/.test(value)) {
+        continue;
+      }
+      const cleanValue = value.split(/[?#]/)[0];
+      const resolved = path.normalize(path.join(path.dirname(file), cleanValue));
+      checkManifestPath(resolved);
     }
   });
 }
@@ -119,6 +158,7 @@ Object.values(manifest.icons || {}).forEach(checkManifestPath);
 });
 injectedScriptFiles.forEach(checkManifestPath);
 checkRuntimeGetUrlReferences();
+checkHtmlReferences();
 if (missing.length > 0) {
   console.error('Manifest resources missing from package:');
   missing.forEach((entry) => console.error(`- ${entry}`));

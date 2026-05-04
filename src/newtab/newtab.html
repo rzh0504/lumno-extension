@@ -457,7 +457,7 @@
         display: block;
       }
       .x-nt-bookmark-icon--figma .x-nt-folder-shape--hover {
-        opacity: 0 !important;
+        opacity: 0;
         pointer-events: none;
       }
       .x-nt-bookmark-title {
@@ -832,6 +832,160 @@
         border: 1px solid rgba(255, 255, 255, 0.2);
         box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
       }
+      #_x_extension_newtab_notice_banner_2026_unique_ {
+        all: unset;
+        width: min(82vw, calc(var(--x-nt-search-max-width, 720px) - 84px));
+        margin: 12px auto 0;
+        padding: 7px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        box-sizing: border-box;
+        border-radius: 999px;
+        background: rgba(17, 24, 39, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 18px 36px rgba(0, 0, 0, 0.18);
+        color: #f9fafb;
+        font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        backdrop-filter: blur(12px);
+      }
+      .x-nt-page-notice-content {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .x-nt-page-notice-icon {
+        flex: 0 0 auto;
+        width: 20px;
+        height: 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #fbbf24;
+        opacity: 0.96;
+      }
+      .x-nt-page-notice-message {
+        min-width: 0;
+        font-size: 13px;
+        font-weight: 400;
+        line-height: 1.45;
+        color: rgba(249, 250, 251, 0.96);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .x-nt-page-notice-primary {
+        all: unset;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .x-nt-page-notice-close {
+        all: unset;
+        flex: 0 0 auto;
+        width: 24px;
+        height: 24px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        color: rgba(249, 250, 251, 0.72);
+        cursor: pointer;
+      }
+      #_x_extension_newtab_suggestions_container_2024_unique_ {
+        all: unset;
+        width: 100%;
+        margin-top: 0;
+        position: relative;
+        left: auto;
+        right: auto;
+        top: auto;
+        z-index: 1;
+        background: transparent;
+        border: none;
+        border-top: none;
+        border-radius: 0;
+        box-shadow: none;
+        padding: 8px;
+        box-sizing: border-box;
+        display: none;
+        max-height: calc(100vh - 220px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transform: translateY(-4px);
+        transition: opacity 0.12s ease, transform 0.12s ease;
+        line-height: 1;
+        text-decoration: none;
+        list-style: none;
+        outline: none;
+        color: inherit;
+        font-size: 100%;
+        font: inherit;
+        vertical-align: baseline;
+      }
+      #_x_extension_newtab_suggestions_container_2024_unique_[data-visible="true"] {
+        display: block;
+        margin-top: 10px;
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transform: translateY(0);
+      }
+      #_x_extension_newtab_top_action_tooltip_2026_unique_ {
+        all: unset;
+        position: fixed;
+        left: 8px;
+        top: 8px;
+        display: block;
+        visibility: hidden;
+        width: max-content;
+        max-width: 420px;
+        padding: 8px 12px;
+        border-radius: 10px;
+        background: #0f172a;
+        color: #f8fafc;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        font-size: 12px;
+        font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        font-weight: 500;
+        line-height: 1.35;
+        white-space: normal;
+        overflow-wrap: break-word;
+        text-align: left;
+        box-sizing: border-box;
+        pointer-events: none;
+        z-index: 4;
+        box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+        opacity: 0;
+        transform: translateY(4px);
+        transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+      }
+      body[data-theme="dark"] #_x_extension_newtab_top_action_tooltip_2026_unique_ {
+        background: #020617;
+        border-color: rgba(255, 255, 255, 0.2);
+        box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
+      }
+      #_x_extension_newtab_top_action_tooltip_2026_unique_[data-visible="true"] {
+        visibility: visible;
+        opacity: 1;
+        transform: translateY(0);
+      }
       .ri-icon {
         width: var(--ri-size, 16px);
         height: var(--ri-size, 16px);
@@ -847,6 +1001,26 @@
       .ri-size-16 { --ri-size: 16px; }
       .ri-size-20 { --ri-size: 20px; }
       .ri-size-24 { --ri-size: 24px; }
+      .x-nt-suggestion-inline-icon {
+        all: unset;
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        line-height: 1;
+        text-decoration: none;
+        list-style: none;
+        outline: none;
+        background: transparent;
+        color: inherit;
+        font-size: 100%;
+        font: inherit;
+        vertical-align: baseline;
+      }
       .x-nt-recent-card:hover .x-nt-recent-action {
         max-width: 64px;
         padding-left: 6px;
@@ -880,6 +1054,27 @@
         box-sizing: border-box;
         user-select: none;
       }
+      #_x_extension_newtab_root_2024_unique_ {
+        color: var(--x-nt-text, #111827);
+      }
+      #_x_extension_newtab_root_2024_unique_ button,
+      #_x_extension_newtab_root_2024_unique_ a,
+      #_x_extension_newtab_root_2024_unique_ [role="button"] {
+        cursor: pointer;
+      }
+      #_x_extension_newtab_root_2024_unique_ button .ri-icon,
+      #_x_extension_newtab_root_2024_unique_ a .ri-icon,
+      #_x_extension_newtab_root_2024_unique_ [role="button"] .ri-icon {
+        cursor: inherit;
+        pointer-events: none;
+      }
+      #_x_extension_newtab_search_input_2024_unique_::placeholder {
+        color: var(--x-nt-placeholder, #9ca3af);
+      }
+      #_x_extension_newtab_search_input_2024_unique_::selection {
+        background: #cfe8ff;
+        color: #1e3a8a;
+      }
       @media (max-width: 860px) {
         #_x_extension_newtab_bookmarks_grid_2024_unique_ {
           grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -909,6 +1104,10 @@
     <script src="../shared/settings.js"></script>
     <script src="../shared/search-utils.js"></script>
     <script src="../shared/site-search-store.js"></script>
+    <script src="../shared/suggestion-navigation.js"></script>
+    <script src="favicon-cache.js"></script>
+    <script src="favicon-theme.js"></script>
+    <script src="favicon-view.js"></script>
     <script src="newtab.js"></script>
   </body>
 </html>
