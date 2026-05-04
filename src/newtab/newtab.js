@@ -32,6 +32,7 @@
   const SEARCH_BLACKLIST_STORAGE_KEY = '_x_extension_search_blacklist_2026_unique_';
   const BLACKLIST_UTILS = globalThis.LumnoBlacklistUtils || {};
   const SETTINGS = globalThis.LumnoSettings || {};
+  const SEARCH_UTILS = globalThis.LumnoSearchUtils || {};
   const TAB_RANK_SCORE_DEBUG_STORAGE_KEY = '_x_extension_tab_rank_score_debug_2026_unique_';
   const NEWTAB_OPEN_TAB_SUGGESTION_LIMIT = 8;
   const FAVICON_PERSIST_STORAGE_KEY = '_x_extension_favicon_url_cache_2024_unique_';
@@ -212,7 +213,7 @@
     if (!wordmarkContainer) {
       return;
     }
-    wordmarkContainer.style.setProperty('display', newtabWordmarkVisible ? 'flex' : 'none', 'important');
+    wordmarkContainer.style.setProperty('display', newtabWordmarkVisible ? 'flex' : 'none');
     updateSearchEntryLayout();
   }
 
@@ -227,13 +228,13 @@
       if (wordmarkImageEl.getAttribute('src') !== darkSrc) {
         wordmarkImageEl.setAttribute('src', darkSrc);
       }
-      wordmarkImageEl.style.setProperty('opacity', '0.9', 'important');
+      wordmarkImageEl.style.setProperty('opacity', '0.9');
       return;
     }
     if (wordmarkImageEl.getAttribute('src') !== lightSrc) {
       wordmarkImageEl.setAttribute('src', lightSrc);
     }
-    wordmarkImageEl.style.setProperty('opacity', '0.82', 'important');
+    wordmarkImageEl.style.setProperty('opacity', '0.82');
   }
 
   function formatTabRankDebugText(tab) {
@@ -2161,13 +2162,13 @@
     }
     const shouldShow = isModeCommand(rawValue || '');
     if (!shouldShow) {
-      modeBadge.style.setProperty('display', 'none', 'important');
+      modeBadge.style.setProperty('display', 'none');
       return;
     }
     modeBadge.textContent = formatMessage('mode_badge', '模式：{mode}', {
       mode: getThemeModeLabel(currentThemeMode)
     });
-    modeBadge.style.setProperty('display', 'inline-flex', 'important');
+    modeBadge.style.setProperty('display', 'inline-flex');
   }
 
   function getNextThemeMode(mode) {
@@ -2301,6 +2302,7 @@
     { key: 'yt', aliases: ['youtube'], name: 'YouTube', template: 'https://www.youtube.com/results?search_query={query}' },
     { key: 'bb', aliases: ['bilibili', 'bili'], name: 'Bilibili', template: 'https://search.bilibili.com/all?keyword={query}' },
     { key: 'gh', aliases: ['github'], name: 'GitHub', template: 'https://github.com/search?q={query}' },
+    { key: 'gm', aliases: ['gemini'], name: 'Gemini', template: 'https://gemini.google.com/app', action: 'openAndSubmit', submitStrategy: 'geminiPrompt' },
     { key: 'so', aliases: ['baidu', 'bd'], name: '百度', template: 'https://www.baidu.com/s?wd={query}' },
     { key: 'bi', aliases: ['bing'], name: 'Bing', template: 'https://www.bing.com/search?q={query}' },
     { key: 'gg', aliases: ['google'], name: 'Google', template: 'https://www.google.com/search?q={query}' },
@@ -7785,6 +7787,55 @@
     return template.replace(/\{query\}/g, encodeURIComponent(query));
   }
 
+  function hasOpenAndSubmitSiteSearchAction(provider) {
+    if (typeof SEARCH_UTILS.hasOpenAndSubmitSiteSearchAction === 'function') {
+      return SEARCH_UTILS.hasOpenAndSubmitSiteSearchAction(provider);
+    }
+    return Boolean(
+      provider &&
+      String(provider.action || '').trim() === 'openAndSubmit'
+    );
+  }
+
+  function isInteractiveSiteSearchProvider(provider) {
+    if (typeof SEARCH_UTILS.isInteractiveSiteSearchProvider === 'function') {
+      return SEARCH_UTILS.isInteractiveSiteSearchProvider(provider);
+    }
+    return Boolean(
+      hasOpenAndSubmitSiteSearchAction(provider) &&
+      String(provider.submitStrategy || '').trim() === 'geminiPrompt'
+    );
+  }
+
+  function shouldRestrictInteractiveSiteSearchSuggestions(provider, query) {
+    return Boolean(
+      isInteractiveSiteSearchProvider(provider) &&
+      String(query || '').trim()
+    );
+  }
+
+  function runSiteSearchProviderQuery(provider, query, disposition) {
+    const trimmedQuery = String(query || '').trim();
+    if (!provider || !trimmedQuery) {
+      return false;
+    }
+    if (isInteractiveSiteSearchProvider(provider)) {
+      chrome.runtime.sendMessage({
+        action: 'runSiteSearchProviderQuery',
+        provider: provider,
+        query: trimmedQuery,
+        disposition: disposition || 'currentTab'
+      });
+      return true;
+    }
+    const siteUrl = buildSearchUrl(provider.template, trimmedQuery);
+    if (!siteUrl) {
+      return false;
+    }
+    navigateToUrl(siteUrl);
+    return true;
+  }
+
   function getProviderIcon(provider) {
     if (provider && provider.icon) {
       return provider.icon;
@@ -7800,15 +7851,23 @@
   }
 
   function mergeCustomProvidersLocal(baseItems, customItems) {
+    if (typeof SEARCH_UTILS.mergeCustomProviders === 'function') {
+      return SEARCH_UTILS.mergeCustomProviders(baseItems, customItems);
+    }
     const merged = [];
     const seen = new Set();
+    const baseMap = new Map((baseItems || []).map((item) => [String(item && item.key ? item.key : '').toLowerCase(), item]));
     (customItems || []).forEach((item) => {
       const key = String(item && item.key ? item.key : '').toLowerCase();
       if (!key || seen.has(key)) {
         return;
       }
       seen.add(key);
-      merged.push(item);
+      merged.push({
+        ...item,
+        action: String(item.action || (baseMap.get(key) && baseMap.get(key).action) || '').trim(),
+        submitStrategy: String(item.submitStrategy || (baseMap.get(key) && baseMap.get(key).submitStrategy) || '').trim()
+      });
     });
     (baseItems || []).forEach((item) => {
       const key = String(item && item.key ? item.key : '').toLowerCase();
@@ -8045,6 +8104,16 @@
       return null;
     }
     return { provider: provider, query: remainder };
+  }
+
+  function promoteStrongNavigationMatch(list, rawQuery) {
+    if (typeof SEARCH_UTILS.promoteStrongNavigationMatch !== 'function') {
+      return null;
+    }
+    return SEARCH_UTILS.promoteStrongNavigationMatch(list, rawQuery, {
+      getDirectNavigationUrl,
+      getUrlDisplay
+    });
   }
 
   function matchesTopSitePrefix(suggestion, input) {
@@ -9005,7 +9074,8 @@
             }),
             url: inlineUrl,
             favicon: getProviderIcon(inlineCandidate.provider),
-            provider: inlineCandidate.provider
+            provider: inlineCandidate.provider,
+            searchQuery: inlineCandidate.query
           };
         }
       }
@@ -9037,7 +9107,8 @@
             }),
             url: siteUrl,
             favicon: getProviderIcon(siteSearchState),
-            provider: siteSearchState
+            provider: siteSearchState,
+            searchQuery: query
           });
         }
       }
@@ -9049,6 +9120,7 @@
       let autocompleteCandidate = null;
       let primaryHighlightIndex = -1;
       let primaryHighlightReason = 'none';
+      let strongNavigationMatch = null;
       let topSiteMatch = null;
       let siteSearchPrompt = null;
       let mergedProvider = null;
@@ -9058,12 +9130,17 @@
       const preferAutocompleteFirst = searchResultPriorityMode !== 'search';
       if (!modeCommandActive && !hasCommand) {
         if (!siteSearchState && !inlineEnabled && preferAutocompleteFirst) {
+          strongNavigationMatch = promoteStrongNavigationMatch(allSuggestions, latestRawQuery.trim());
+          if (strongNavigationMatch) {
+            primaryHighlightIndex = 0;
+            primaryHighlightReason = 'navigation';
+          }
           topSiteMatch = promoteTopSiteMatch(allSuggestions, latestRawQuery.trim());
         }
         siteSearchTrigger = (!siteSearchState && !inlineEnabled)
           ? getSiteSearchTriggerCandidate(rawTagInput, providersForTags, topSiteMatch)
           : null;
-        if (siteSearchTrigger && !topSiteMatch) {
+        if (siteSearchTrigger && !topSiteMatch && !strongNavigationMatch) {
           siteSearchPrompt = {
             type: 'siteSearchPrompt',
             title: formatMessage('search_in_site', '在 {site} 中搜索', {
@@ -9081,7 +9158,7 @@
             siteSearchPrompt = null;
           }
         }
-        if (!siteSearchState && !inlineEnabled && !siteSearchPrompt && preferAutocompleteFirst) {
+        if (!siteSearchState && !inlineEnabled && !siteSearchPrompt && !strongNavigationMatch && preferAutocompleteFirst) {
           autocompleteCandidate = getAutocompleteCandidate(allSuggestions, latestRawQuery);
           if (autocompleteCandidate) {
             const candidateIndex = allSuggestions.findIndex((suggestion) => {
@@ -9113,7 +9190,7 @@
           allSuggestions = filterBlacklistedSuggestions(allSuggestions, query);
           primaryHighlightIndex = 0;
           primaryHighlightReason = 'inline';
-        } else if (!siteSearchPrompt && topSiteMatch && preferAutocompleteFirst) {
+        } else if (!siteSearchPrompt && !strongNavigationMatch && topSiteMatch && preferAutocompleteFirst) {
           primaryHighlightIndex = 0;
           primaryHighlightReason = 'topSite';
         }
@@ -9125,10 +9202,30 @@
           primarySuggestion = allSuggestions[primaryHighlightIndex] || null;
           mergedProvider = findProviderForSuggestionMatch(primarySuggestion, providersForTags);
         }
+        if (shouldRestrictInteractiveSiteSearchSuggestions(siteSearchState, query)) {
+          const primaryInteractiveSuggestion = allSuggestions.find((item) =>
+            item &&
+            item.provider === siteSearchState &&
+            item.searchQuery === query
+          );
+          if (primaryInteractiveSuggestion) {
+            allSuggestions = [primaryInteractiveSuggestion];
+            primaryHighlightIndex = 0;
+            primaryHighlightReason = 'inline';
+            primarySuggestion = primaryInteractiveSuggestion;
+            mergedProvider = null;
+          }
+        }
         applyAutocomplete(allSuggestions, primarySuggestion, primaryHighlightReason);
         const inlineAutoHighlight = Boolean(inlineSuggestion && primaryHighlightIndex === 0);
         inlineSearchState = inlineSuggestion
-          ? { url: inlineSuggestion.url, rawInput: rawTagInput, isAuto: inlineAutoHighlight }
+          ? {
+              url: inlineSuggestion.url,
+              provider: inlineSuggestion.provider,
+              query: inlineSuggestion.searchQuery || '',
+              rawInput: rawTagInput,
+              isAuto: inlineAutoHighlight
+            }
           : null;
         const resolvedProvider = mergedProvider || siteSearchTrigger;
         siteSearchTriggerState = resolvedProvider
@@ -9811,6 +9908,10 @@
             inputParts.input.focus();
             return;
           }
+          if (suggestion.provider && suggestion.searchQuery) {
+            runSiteSearchProviderQuery(suggestion.provider, suggestion.searchQuery, 'currentTab');
+            return;
+          }
           if (suggestion.forceSearch && suggestion.searchQuery) {
             navigateToQuery(suggestion.searchQuery, true);
             return;
@@ -10235,6 +10336,9 @@
           inputParts.input.focus();
           return true;
         }
+        if (selectedSuggestion.provider && selectedSuggestion.searchQuery) {
+          return runSiteSearchProviderQuery(selectedSuggestion.provider, selectedSuggestion.searchQuery, 'currentTab');
+        }
         if (selectedSuggestion.forceSearch && selectedSuggestion.searchQuery) {
           navigateToQuery(selectedSuggestion.searchQuery, true);
           return true;
@@ -10258,17 +10362,21 @@
         }
       }
       if (siteSearchState) {
-        const siteUrl = buildSearchUrl(siteSearchState.template, query);
-        if (siteUrl) {
-          navigateToUrl(siteUrl);
+        if (runSiteSearchProviderQuery(siteSearchState, query, 'currentTab')) {
           return;
         }
       }
       const currentRawInput = (latestRawQuery || inputParts.input.value || '').trim();
       if (inlineSearchState && inlineSearchState.isAuto &&
-          inlineSearchState.url && inlineSearchState.rawInput === currentRawInput) {
-        navigateToUrl(inlineSearchState.url);
-        return;
+          inlineSearchState.rawInput === currentRawInput) {
+        if (inlineSearchState.provider && inlineSearchState.query) {
+          if (runSiteSearchProviderQuery(inlineSearchState.provider, inlineSearchState.query, 'currentTab')) {
+            return;
+          }
+        } else if (inlineSearchState.url) {
+          navigateToUrl(inlineSearchState.url);
+          return;
+        }
       }
       if (autocompleteState && autocompleteState.url) {
         navigateToUrl(autocompleteState.url);
@@ -10639,30 +10747,30 @@
   modeBadge = document.createElement('div');
   modeBadge.id = '_x_extension_newtab_mode_badge_2024_unique_';
   modeBadge.style.cssText = `
-    all: unset !important;
-    position: absolute !important;
-    right: 52px !important;
-    top: 50% !important;
-    transform: translateY(-50%) !important;
-    display: none !important;
-    align-items: center !important;
-    gap: 6px !important;
-    background: var(--x-nt-tag-bg, #F3F4F6) !important;
-    color: var(--x-nt-tag-text, #6B7280) !important;
-    border: 1px solid var(--x-nt-panel-border, rgba(0, 0, 0, 0.08)) !important;
-    border-radius: 999px !important;
-    padding: 4px 8px !important;
-    font-size: 11px !important;
-    font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-    font-weight: 500 !important;
-    line-height: 1 !important;
-    white-space: nowrap !important;
-    max-width: 180px !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    box-sizing: border-box !important;
-    pointer-events: none !important;
-    z-index: 1 !important;
+    all: unset;
+    position: absolute;
+    right: 52px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;
+    align-items: center;
+    gap: 6px;
+    background: var(--x-nt-tag-bg, #F3F4F6);
+    color: var(--x-nt-tag-text, #6B7280);
+    border: 1px solid var(--x-nt-panel-border, rgba(0, 0, 0, 0.08));
+    border-radius: 999px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 1;
   `;
   inputParts.container.appendChild(modeBadge);
   const searchInput = inputParts.input;
@@ -10673,28 +10781,28 @@
   wordmarkContainer.id = '_x_extension_newtab_wordmark_2026_unique_';
   wordmarkContainer.setAttribute('aria-hidden', 'true');
   wordmarkContainer.style.cssText = `
-    all: unset !important;
-    width: 90vw !important;
-    max-width: var(--x-nt-search-max-width, 720px) !important;
-    min-height: 0 !important;
-    margin: 0 0 28px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    box-sizing: border-box !important;
-    pointer-events: auto !important;
-    user-select: none !important;
+    all: unset;
+    width: 90vw;
+    max-width: var(--x-nt-search-max-width, 720px);
+    min-height: 0;
+    margin: 0 0 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    pointer-events: auto;
+    user-select: none;
   `;
   const wordmarkButton = document.createElement('button');
   wordmarkButton.type = 'button';
   wordmarkButton.setAttribute('aria-label', t('settings_tab_appearance', '外观'));
   wordmarkButton.style.cssText = `
-    all: unset !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    cursor: pointer !important;
-    pointer-events: auto !important;
+    all: unset;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    pointer-events: auto;
   `;
   wordmarkButton.addEventListener('click', (event) => {
     event.preventDefault();
@@ -10703,18 +10811,18 @@
     window.open(optionsUrl, '_blank');
   });
   wordmarkImageEl = document.createElement('img');
-wordmarkImageEl.src = '../../assets/images/lumno-wordmark.svg';
+  wordmarkImageEl.src = '../../assets/images/lumno-wordmark.svg';
   wordmarkImageEl.alt = '';
   wordmarkImageEl.draggable = false;
   wordmarkImageEl.style.cssText = `
-    width: 180px !important;
-    max-width: 52% !important;
-    height: auto !important;
-    display: block !important;
-    object-fit: contain !important;
-    opacity: 0.82 !important;
-    filter: none !important;
-    transform: translateY(0) !important;
+    width: 180px;
+    max-width: 52%;
+    height: auto;
+    display: block;
+    object-fit: contain;
+    opacity: 0.82;
+    filter: none;
+    transform: translateY(0);
   `;
   wordmarkButton.appendChild(wordmarkImageEl);
   wordmarkContainer.appendChild(wordmarkButton);

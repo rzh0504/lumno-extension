@@ -40,8 +40,14 @@
       list-style: none !important;
       outline: none !important;
       color: var(--x-ov-text, #111827) !important;
-      font-size: 100% !important;
-      font: inherit !important;
+      font-size: 16px !important;
+      font-style: normal !important;
+      font-variant: normal !important;
+      font-weight: 400 !important;
+      letter-spacing: normal !important;
+      word-spacing: normal !important;
+      text-transform: none !important;
+      text-shadow: none !important;
       vertical-align: baseline !important;
       opacity: 0 !important;
       filter: blur(6px) !important;
@@ -162,6 +168,7 @@
     host.id = settings.hostId || '_x_extension_overlay_host_2026_unique_';
     host.setAttribute('data-lumno-overlay-host', 'true');
     host.style.cssText = `
+      all: initial !important;
       position: fixed !important;
       inset: 0 !important;
       width: 100vw !important;
@@ -186,6 +193,19 @@
       padding: 0 !important;
       border: 0 !important;
       box-sizing: border-box !important;
+      color: initial !important;
+      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+      font-size: 16px !important;
+      font-style: normal !important;
+      font-variant: normal !important;
+      font-weight: 400 !important;
+      letter-spacing: normal !important;
+      line-height: 1 !important;
+      text-align: initial !important;
+      text-decoration: none !important;
+      text-shadow: none !important;
+      text-transform: none !important;
+      word-spacing: normal !important;
     `;
     return host;
   }

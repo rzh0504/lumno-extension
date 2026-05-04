@@ -18,6 +18,12 @@ try {
 }
 
 try {
+  importScripts(chrome.runtime.getURL('src/shared/search-utils.js'));
+} catch (error) {
+  console.warn('Lumno: failed to load search utils.', error);
+}
+
+try {
   importScripts(chrome.runtime.getURL('src/background/pip-ownership.js'));
 } catch (error) {
   console.warn('Lumno: failed to load PiP ownership utils.', error);
@@ -1909,6 +1915,288 @@ if (chrome && chrome.tabs && chrome.tabs.onMoved) {
   });
 }
 
+function waitForTabComplete(tabId, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let timeoutId = null;
+    const finish = (tab, error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      chrome.tabs.onUpdated.removeListener(handleUpdated);
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(tab || null);
+    };
+    const handleUpdated = (updatedTabId, changeInfo, tab) => {
+      if (updatedTabId !== tabId) {
+        return;
+      }
+      if (changeInfo && changeInfo.status === 'complete') {
+        finish(tab || null);
+      }
+    };
+    chrome.tabs.onUpdated.addListener(handleUpdated);
+    chrome.tabs.get(tabId, (tab) => {
+      if (chrome.runtime && chrome.runtime.lastError) {
+        finish(null, new Error(chrome.runtime.lastError.message || 'tab-unavailable'));
+        return;
+      }
+      if (tab && tab.status === 'complete') {
+        finish(tab);
+      }
+    });
+    timeoutId = setTimeout(() => {
+      chrome.tabs.get(tabId, (tab) => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          finish(null, new Error(chrome.runtime.lastError.message || 'tab-unavailable'));
+          return;
+        }
+        finish(tab || null);
+      });
+    }, Math.max(1000, Number(timeoutMs) || 15000));
+  });
+}
+
+function submitGeminiPromptInTab(tabId, prompt) {
+  return new Promise((resolve) => {
+    chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: async (rawPrompt) => {
+        const promptText = String(rawPrompt || '').trim();
+        if (!promptText) {
+          return { ok: false, reason: 'empty-prompt' };
+        }
+        const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+        const isVisible = (element) => {
+          if (!element) {
+            return false;
+          }
+          const style = window.getComputedStyle(element);
+          if (style.display === 'none' || style.visibility === 'hidden') {
+            return false;
+          }
+          const rect = element.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        };
+        const isActionableButton = (element) => {
+          if (!isVisible(element) || element.disabled) {
+            return false;
+          }
+          const style = window.getComputedStyle(element);
+          const ariaDisabled = String(element.getAttribute('aria-disabled') || '').toLowerCase();
+          return (
+            ariaDisabled !== 'true' &&
+            style.pointerEvents !== 'none' &&
+            style.visibility !== 'hidden' &&
+            style.display !== 'none' &&
+            style.opacity !== '0'
+          );
+        };
+        const editorSelectors = [
+          '.ql-editor[contenteditable="true"][role="textbox"]',
+          '[contenteditable="true"][role="textbox"][aria-label*="Gemini"]',
+          '[contenteditable="true"][role="textbox"][aria-label*="gemini"]',
+          '[contenteditable="true"][data-placeholder*="Gemini"]',
+          '[contenteditable="true"][data-placeholder*="gemini"]',
+          'rich-textarea .ql-editor[contenteditable="true"]',
+          'textarea[aria-label*="Gemini"]',
+          'textarea[aria-label*="gemini"]',
+          'div[role="textbox"][contenteditable="true"]',
+          'textarea'
+        ];
+        const sendButtonSelectors = [
+          'button[aria-label="发送"]',
+          'button[aria-label="Send"]',
+          'button[aria-label*="发送"]',
+          'button[aria-label*="提交"]',
+          'button[aria-label*="Send"]',
+          'button[aria-label*="send" i]',
+          'button[aria-label*="submit" i]'
+        ];
+        const escapeHtml = (value) => value
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        const dispatchInput = (element) => {
+          element.dispatchEvent(new InputEvent('input', {
+            bubbles: true,
+            cancelable: true,
+            data: promptText,
+            inputType: 'insertText'
+          }));
+          element.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+        const findEditor = () => {
+          for (const selector of editorSelectors) {
+            const editor = Array.from(document.querySelectorAll(selector)).find(isVisible);
+            if (editor) {
+              return editor;
+            }
+          }
+          return null;
+        };
+        const findSendButton = () => {
+          for (const selector of sendButtonSelectors) {
+            const button = Array.from(document.querySelectorAll(selector)).find((item) => isVisible(item));
+            if (button) {
+              return button;
+            }
+          }
+          return null;
+        };
+        const setPrompt = (editor) => {
+          editor.focus();
+          if (editor instanceof HTMLTextAreaElement || editor instanceof HTMLInputElement) {
+            editor.value = promptText;
+            dispatchInput(editor);
+            return editor.value === promptText;
+          }
+          const selection = window.getSelection();
+          if (selection) {
+            const range = document.createRange();
+            range.selectNodeContents(editor);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+          if (typeof document.execCommand === 'function') {
+            document.execCommand('insertText', false, promptText);
+          }
+          const currentText = String(editor.innerText || editor.textContent || '').trim();
+          if (currentText !== promptText) {
+            editor.innerHTML = `<p>${escapeHtml(promptText)}</p>`;
+          }
+          dispatchInput(editor);
+          return String(editor.innerText || editor.textContent || '').trim() === promptText;
+        };
+        const pressEnter = (editor) => {
+          ['keydown', 'keypress', 'keyup'].forEach((type) => {
+            editor.dispatchEvent(new KeyboardEvent(type, {
+              key: 'Enter',
+              code: 'Enter',
+              bubbles: true,
+              cancelable: true
+            }));
+          });
+        };
+        for (let attempt = 0; attempt < 12; attempt += 1) {
+          const editor = findEditor();
+          if (!editor) {
+            await sleep(400);
+            continue;
+          }
+          const populated = setPrompt(editor);
+          if (!populated) {
+            await sleep(250);
+            continue;
+          }
+          for (let sendAttempt = 0; sendAttempt < 24; sendAttempt += 1) {
+            const sendButton = findSendButton();
+            if (sendButton && isActionableButton(sendButton)) {
+              sendButton.click();
+              return { ok: true, method: 'button' };
+            }
+            await sleep(sendAttempt < 4 ? 150 : 250);
+          }
+          pressEnter(editor);
+          return { ok: true, method: 'enter' };
+        }
+        return { ok: false, reason: 'editor-not-found' };
+      },
+      args: [prompt]
+    }, (results) => {
+      if (chrome.runtime && chrome.runtime.lastError) {
+        resolve({ ok: false, reason: chrome.runtime.lastError.message || 'execute-script-failed' });
+        return;
+      }
+      const result = Array.isArray(results) && results[0] ? results[0].result : null;
+      resolve(result && typeof result === 'object' ? result : { ok: false, reason: 'empty-script-result' });
+    });
+  });
+}
+
+function runInteractiveSiteSearchProvider(provider, query, sender, disposition) {
+  const prompt = String(query || '').trim();
+  const entryUrl = getSiteSearchProviderEntryUrl(provider);
+  const targetDisposition = disposition === 'currentTab' ? 'currentTab' : 'newTab';
+  return new Promise((resolve) => {
+    if (!entryUrl || !prompt || !isInteractiveSiteSearchProvider(provider)) {
+      resolve({ ok: false, reason: 'invalid-provider-request' });
+      return;
+    }
+    const finish = (result) => {
+      resolve(result && typeof result === 'object' ? result : { ok: false, reason: 'unknown' });
+    };
+    const handleReadyTab = (tab) => {
+      if (!tab || typeof tab.id !== 'number') {
+        finish({ ok: false, reason: 'tab-unavailable' });
+        return;
+      }
+      waitForTabComplete(tab.id, 15000)
+        .catch(() => tab)
+        .then(() => submitGeminiPromptInTab(tab.id, prompt))
+        .then((result) => {
+          finish({
+            ok: Boolean(result && result.ok),
+            tabId: tab.id,
+            url: entryUrl,
+            method: result && result.method ? result.method : '',
+            reason: result && result.reason ? result.reason : ''
+          });
+        })
+        .catch((error) => {
+          finish({
+            ok: false,
+            tabId: tab.id,
+            url: entryUrl,
+            reason: error && error.message ? error.message : 'interactive-site-search-failed'
+          });
+        });
+    };
+    const updateTab = (tabId) => {
+      chrome.tabs.update(tabId, { url: entryUrl, active: true }, (tab) => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          finish({ ok: false, reason: chrome.runtime.lastError.message || 'tab-update-failed' });
+          return;
+        }
+        handleReadyTab(tab);
+      });
+    };
+    if (targetDisposition === 'currentTab') {
+      if (sender && sender.tab && typeof sender.tab.id === 'number') {
+        updateTab(sender.tab.id);
+        return;
+      }
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          finish({ ok: false, reason: chrome.runtime.lastError.message || 'active-tab-unavailable' });
+          return;
+        }
+        const activeTab = Array.isArray(tabs) && tabs.length > 0 ? tabs[0] : null;
+        if (activeTab && typeof activeTab.id === 'number') {
+          updateTab(activeTab.id);
+          return;
+        }
+        finish({ ok: false, reason: 'active-tab-unavailable' });
+      });
+      return;
+    }
+    chrome.tabs.create({ url: entryUrl, active: true }, (tab) => {
+      if (chrome.runtime && chrome.runtime.lastError) {
+        finish({ ok: false, reason: chrome.runtime.lastError.message || 'tab-create-failed' });
+        return;
+      }
+      handleReadyTab(tab);
+    });
+  });
+}
+
 // Listen for messages from content script to switch tabs
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   if (request.action === 'switchToTab') {
@@ -2787,6 +3075,21 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       sendResponse({ items: items });
     });
     return true;
+  } else if (request.action === 'runSiteSearchProviderQuery') {
+    runInteractiveSiteSearchProvider(
+      request.provider,
+      request.query,
+      sender,
+      request.disposition
+    ).then((result) => {
+      sendResponse(result);
+    }).catch((error) => {
+      sendResponse({
+        ok: false,
+        reason: error && error.message ? error.message : 'interactive-site-search-failed'
+      });
+    });
+    return true;
   } else if (request.action === 'getShortcutRules') {
     loadShortcutRules().then((items) => {
       sendResponse({ items: items });
@@ -2982,6 +3285,7 @@ const SITE_SEARCH_STORAGE_KEY = '_x_extension_site_search_custom_2024_unique_';
 const SITE_SEARCH_DISABLED_STORAGE_KEY = '_x_extension_site_search_disabled_2024_unique_';
 const SEARCH_BLACKLIST_STORAGE_KEY = '_x_extension_search_blacklist_2026_unique_';
 const BLACKLIST_UTILS = globalThis.LumnoBlacklistUtils || {};
+const SEARCH_UTILS = globalThis.LumnoSearchUtils || {};
 const DEFAULT_SEARCH_ENGINE_STORAGE_KEY = '_x_extension_default_search_engine_2024_unique_';
 migrateStorageIfNeeded([
   DOCUMENT_PIP_ENABLED_STORAGE_KEY,
@@ -4160,28 +4464,56 @@ function fetchFaviconData(url) {
 }
 
 function normalizeSiteSearchTemplate(template) {
-  if (!template) {
-    return '';
+  if (typeof SEARCH_UTILS.normalizeSiteSearchTemplate === 'function') {
+    return SEARCH_UTILS.normalizeSiteSearchTemplate(template);
   }
-  return template
+  return String(template || '')
+    .trim()
     .replace(/\{\{\{s\}\}\}/g, '{query}')
     .replace(/\{s\}/g, '{query}')
     .replace(/\{searchTerms\}/g, '{query}');
 }
 
-function sanitizeSiteSearchProviders(items) {
-  if (!Array.isArray(items)) {
-    return [];
+function isAiSiteSearchProvider(provider) {
+  if (typeof SEARCH_UTILS.isAiSiteSearchProvider === 'function') {
+    return SEARCH_UTILS.isAiSiteSearchProvider(provider);
   }
-  return items
+  const template = normalizeSiteSearchTemplate(provider && provider.template);
+  return Boolean(provider && (
+    String(provider.action || '').trim() === 'openAndSubmit' ||
+    (template && !template.includes('{query}'))
+  ));
+}
+
+function isInteractiveSiteSearchProvider(provider) {
+  if (typeof SEARCH_UTILS.isInteractiveSiteSearchProvider === 'function') {
+    return SEARCH_UTILS.isInteractiveSiteSearchProvider(provider);
+  }
+  return Boolean(
+    isAiSiteSearchProvider(provider) &&
+    String((provider && provider.action) || '').trim() === 'openAndSubmit' &&
+    String((provider && provider.submitStrategy) || '').trim() === 'geminiPrompt'
+  );
+}
+
+function sanitizeSiteSearchProviders(items) {
+  if (typeof SEARCH_UTILS.sanitizeSiteSearchProviders === 'function') {
+    return SEARCH_UTILS.sanitizeSiteSearchProviders(items);
+  }
+  return (Array.isArray(items) ? items : [])
     .filter((item) => item && item.key && item.template)
-    .map((item) => ({
-      key: String(item.key).trim(),
-      aliases: Array.isArray(item.aliases) ? item.aliases.filter(Boolean) : [],
-      name: item.name || item.key,
-      template: normalizeSiteSearchTemplate(item.template)
-    }))
-    .filter((item) => item.key && item.template && item.template.includes('{query}'));
+    .map((item) => {
+      const template = normalizeSiteSearchTemplate(item.template);
+      return {
+        key: String(item.key).trim(),
+        aliases: Array.isArray(item.aliases) ? item.aliases.filter(Boolean) : [],
+        name: item.name || item.key,
+        template,
+        action: String(item.action || '').trim(),
+        submitStrategy: String(item.submitStrategy || '').trim()
+      };
+    })
+    .filter((item) => item.key && item.template && (item.template.includes('{query}') || isAiSiteSearchProvider(item)));
 }
 
 function loadCustomSiteSearchProviders() {
@@ -4257,9 +4589,15 @@ function isUrlBlockedBySearchBlacklist(url, items) {
 }
 
 function buildBlacklistProbeUrlFromTemplate(template, query) {
+  if (typeof SEARCH_UTILS.buildBlacklistProbeUrlFromTemplate === 'function') {
+    return SEARCH_UTILS.buildBlacklistProbeUrlFromTemplate(template, query);
+  }
   const rawTemplate = String(template || '');
-  if (!rawTemplate || !rawTemplate.includes('{query}')) {
+  if (!rawTemplate) {
     return '';
+  }
+  if (!rawTemplate.includes('{query}')) {
+    return rawTemplate;
   }
   return rawTemplate.replace(/\{query\}/g, encodeURIComponent(String(query || '')));
 }
@@ -4290,8 +4628,12 @@ function filterBlacklistedSuggestions(list, items, queryForProvider) {
 }
 
 function mergeCustomProviders(baseItems, customItems) {
+  if (typeof SEARCH_UTILS.mergeCustomProviders === 'function') {
+    return SEARCH_UTILS.mergeCustomProviders(baseItems, customItems);
+  }
   const merged = [];
   const seen = new Set();
+  const baseMap = new Map((baseItems || []).map((item) => [String(item && item.key ? item.key : '').toLowerCase(), item]));
   customItems.forEach((item) => {
     if (item && item.disabled) {
       return;
@@ -4301,7 +4643,11 @@ function mergeCustomProviders(baseItems, customItems) {
       return;
     }
     seen.add(key);
-    merged.push(item);
+    merged.push({
+      ...item,
+      action: String(item.action || (baseMap.get(key) && baseMap.get(key).action) || '').trim(),
+      submitStrategy: String(item.submitStrategy || (baseMap.get(key) && baseMap.get(key).submitStrategy) || '').trim()
+    });
   });
   baseItems.forEach((item) => {
     const key = String(item.key || '').toLowerCase();
@@ -4312,6 +4658,16 @@ function mergeCustomProviders(baseItems, customItems) {
     merged.push(item);
   });
   return merged;
+}
+
+function getSiteSearchProviderEntryUrl(provider) {
+  if (!provider || !provider.template) {
+    return '';
+  }
+  if (typeof SEARCH_UTILS.buildSearchUrlFromTemplate === 'function') {
+    return SEARCH_UTILS.buildSearchUrlFromTemplate(provider.template, '');
+  }
+  return normalizeSiteSearchTemplate(provider.template).replace(/\{query\}/g, '');
 }
 
 function getTemplateDomain(template) {
@@ -4855,15 +5211,45 @@ function mergeItemsByUrl(itemGroups) {
 // Function to get search suggestions from history and top sites
 async function getSearchSuggestions(query) {
   const suggestions = [];
-  const lookupQuery = String(query || '');
-  const queryLower = String(lookupQuery || '').trim().toLowerCase();
-  const normalizedPinyinQuery = shouldUseTitlePinyinMatch(lookupQuery)
-    ? normalizeAsciiQueryForPinyin(lookupQuery)
-    : '';
-  const useTitlePinyinMatch = Boolean(normalizedPinyinQuery);
-  const lookupStartTime = Date.now() - (30 * 24 * 60 * 60 * 1000);
+  const searchUtils = SEARCH_UTILS;
+  const searchPolicy = searchUtils.SEARCH_POLICY || {
+    lookupWindowDays: 180,
+    lookupMaxResults: 120,
+    maxEngineSuggestions: 5,
+    candidatePoolLimit: 20,
+    finalSuggestionLimit: 12,
+    fallbackTopSiteLimit: 5
+  };
+  const context = typeof searchUtils.buildSearchQueryContext === 'function'
+    ? searchUtils.buildSearchQueryContext(query, {
+      normalizedPinyinQuery: shouldUseTitlePinyinMatch(query)
+        ? normalizeAsciiQueryForPinyin(query)
+        : ''
+    })
+    : {
+      lookupQuery: String(query || ''),
+      queryLower: String(query || '').trim().toLowerCase(),
+      normalizedPinyinQuery: shouldUseTitlePinyinMatch(query)
+        ? normalizeAsciiQueryForPinyin(query)
+        : '',
+      useTitlePinyinMatch: shouldUseTitlePinyinMatch(query),
+      queryTerms: String(query || '').trim().toLowerCase().split(/\s+/).filter(Boolean),
+      coreQueryTerms: String(query || '').trim().toLowerCase().split(/\s+/).filter(Boolean),
+      intentType: 'object',
+      hasSettingsIntent: false,
+      hasInformationalIntent: false
+    };
+  if (!context.queryLower) {
+    return [];
+  }
+  const lookupStartTime = Date.now() - (searchPolicy.lookupWindowDays * 24 * 60 * 60 * 1000);
   const lookupEndTime = Date.now();
-  const lookupMaxResults = 50;
+  const lookupMaxResults = searchPolicy.lookupMaxResults || 120;
+  const searchScoreOptions = {
+    getTitlePinyinMatchScore,
+    isLocalNetworkHost: shouldBlockFaviconForHost,
+    isOwnExtensionUrl
+  };
 
   try {
     const [
@@ -4877,14 +5263,14 @@ async function getSearchSuggestions(query) {
     ] = await Promise.all([
       withTimeout(
         fetchSearchSuggestionsForEngine(query)
-        .then((items) => (Array.isArray(items) ? items.slice(0, 5) : []))
+        .then((items) => (Array.isArray(items) ? items.slice(0, searchPolicy.maxEngineSuggestions || 5) : []))
         .catch(() => []),
         SEARCH_ENGINE_SUGGEST_TIMEOUT_MS,
         []
       ),
       callChromeApiWithTimeout((done) => {
         chrome.history.search({
-          text: lookupQuery,
+          text: context.lookupQuery,
           maxResults: lookupMaxResults,
           startTime: lookupStartTime,
           endTime: lookupEndTime
@@ -4892,71 +5278,49 @@ async function getSearchSuggestions(query) {
       }, [], LOCAL_SUGGEST_SOURCE_TIMEOUT_MS),
       getTopSitesCached(),
       callChromeApiWithTimeout((done) => {
-        chrome.bookmarks.search({ query: lookupQuery }, done);
+        chrome.bookmarks.search({ query: context.lookupQuery }, done);
       }, [], LOCAL_SUGGEST_SOURCE_TIMEOUT_MS),
       getFallbackHistoryItemsCached(),
       getAllBookmarksCached(),
       loadSearchBlacklistItems()
     ]);
-    const matchesLookupText = (item) => {
-      if (!item || !item.url) {
-        return false;
+    const collectSearchMatches = (items) => {
+      if (typeof searchUtils.collectSearchMatches === 'function') {
+        return searchUtils.collectSearchMatches(items, context, searchBlacklistItems, {
+          getTitlePinyinMatchScore,
+          isUrlBlockedBySearchBlacklist
+        });
       }
-      const titleLower = item.title ? item.title.toLowerCase() : '';
-      const urlLower = item.url.toLowerCase();
-      return Boolean(queryLower) && (titleLower.includes(queryLower) || urlLower.includes(queryLower));
-    };
-    const matchesTitlePinyin = (item) => {
-      if (!useTitlePinyinMatch || !item || !item.title) {
-        return false;
-      }
-      return getTitlePinyinMatchScore(item.title, normalizedPinyinQuery).score > 0;
-    };
-
-    let historyItems = mergeItemsByUrl([
-      Array.isArray(historyItemsRaw) ? historyItemsRaw : [],
-      useTitlePinyinMatch
-        ? (Array.isArray(fallbackHistoryItems) ? fallbackHistoryItems.filter((item) => matchesTitlePinyin(item)) : [])
-        : []
-    ]).filter((item) => !isUrlBlockedBySearchBlacklist(item && item.url, searchBlacklistItems));
-    if (historyItems.length === 0 && lookupQuery && lookupQuery.trim().length > 0) {
-      historyItems = Array.isArray(fallbackHistoryItems)
-        ? fallbackHistoryItems.filter((item) => (
-          (matchesLookupText(item) || matchesTitlePinyin(item)) &&
-          !isUrlBlockedBySearchBlacklist(item && item.url, searchBlacklistItems)
-        ))
-        : [];
-    }
-    const bookmarks = mergeItemsByUrl([
-      Array.isArray(bookmarksRaw) ? bookmarksRaw : [],
-      useTitlePinyinMatch
-        ? (Array.isArray(allBookmarks) ? allBookmarks.filter((item) => matchesTitlePinyin(item)) : [])
-        : []
-    ]).filter((item) => !isUrlBlockedBySearchBlacklist(item && item.url, searchBlacklistItems));
-
-    engineSuggestions.forEach((suggestion) => {
-      if (suggestion && suggestion !== lookupQuery) {
-        const suggestionItem = {
-          type: 'googleSuggest',
-          title: suggestion,
-          url: buildDefaultSearchUrl(suggestion),
-          favicon: getDefaultSearchEngineFaviconUrl(),
-          score: 200,
-          searchQuery: suggestion,
-          forceSearch: true,
-          reasons: ['来源：搜索建议']
-        };
-        if (!isSuggestionBlockedBySearchBlacklist(suggestionItem, searchBlacklistItems, suggestion)) {
-          suggestions.push(suggestionItem);
+      return (Array.isArray(items) ? items : []).filter((item) => {
+        if (!item || !item.url || isUrlBlockedBySearchBlacklist(item.url, searchBlacklistItems)) {
+          return false;
         }
-      }
-    });
+        const titleLower = item.title ? item.title.toLowerCase() : '';
+        const urlLower = item.url.toLowerCase();
+        const pinyinMatch = context.useTitlePinyinMatch && item.title
+          ? getTitlePinyinMatchScore(item.title, context.normalizedPinyinQuery).score > 0
+          : false;
+        return pinyinMatch || titleLower.includes(context.queryLower) || urlLower.includes(context.queryLower);
+      });
+    };
+    const mergeSearchItems = typeof searchUtils.mergeItemsByUrl === 'function'
+      ? searchUtils.mergeItemsByUrl
+      : mergeItemsByUrl;
+    const fallbackHistoryMatches = collectSearchMatches(fallbackHistoryItems);
+    const historyItems = collectSearchMatches(mergeSearchItems([
+      Array.isArray(historyItemsRaw) ? historyItemsRaw : [],
+      fallbackHistoryMatches
+    ]));
+    const bookmarkTextMatches = collectSearchMatches(allBookmarks);
+    const bookmarks = collectSearchMatches(mergeSearchItems([
+      Array.isArray(bookmarksRaw) ? bookmarksRaw : [],
+      bookmarkTextMatches
+    ]));
 
     const bookmarkNodeMap = (Array.isArray(bookmarks) && bookmarks.length > 0)
       ? await getBookmarkNodeMapCached()
       : new Map();
 
-    const queryWords = queryLower.split(/\s+/).filter((word) => word.length > 0);
     const rootFolderTitles = new Set([
       'Bookmarks bar',
       'Other bookmarks',
@@ -4965,123 +5329,6 @@ async function getSearchSuggestions(query) {
       '其他书签',
       '移动设备书签'
     ]);
-
-    // Helper function to calculate relevance score
-    function calculateRelevanceScore(item) {
-      const titleLower = item.title ? item.title.toLowerCase() : '';
-      const urlLower = item.url.toLowerCase();
-      let hostname = '';
-      let textScore = 0;
-      let pinyinTitleScore = 0;
-      let behaviorScore = 0;
-
-      // Exact title match (highest priority)
-      if (titleLower === queryLower) textScore += 100;
-
-      // Title starts with query
-      if (titleLower.startsWith(queryLower)) textScore += 50;
-
-      // Query words in title
-      queryWords.forEach(word => {
-        if (titleLower.includes(word)) textScore += 20;
-      });
-
-      // Partial title match
-      if (titleLower.includes(queryLower)) textScore += 15;
-
-      // URL domain match
-      try {
-        hostname = normalizeHost(new URL(item.url).hostname);
-        if (hostname.includes(queryLower)) textScore += 10;
-        if (hostname.startsWith(queryLower)) textScore += 20;
-      } catch (e) {
-        // Invalid URL, skip domain scoring
-      }
-
-      // URL path match: boost token-level hits so "/release/"-like keywords rank higher.
-      if (urlLower.includes(queryLower)) textScore += 8;
-      try {
-        const parsedUrl = new URL(item.url);
-        const pathnameLower = String(parsedUrl.pathname || '').toLowerCase();
-        const decodedPathnameLower = decodeURIComponent(pathnameLower);
-        const pathSegments = decodedPathnameLower.split('/').filter(Boolean);
-        const pathTokens = [];
-        pathSegments.forEach((segment) => {
-          const segmentTokens = segment.split(/[^a-z0-9\u4e00-\u9fff]+/i).filter(Boolean);
-          if (segmentTokens.length > 0) {
-            pathTokens.push(...segmentTokens);
-          }
-        });
-        if (decodedPathnameLower && queryWords.length > 0) {
-          queryWords.forEach((word) => {
-            if (!word) {
-              return;
-            }
-            if (pathTokens.includes(word)) {
-              textScore += 30;
-              return;
-            }
-            const hasPrefixToken = pathTokens.some((token) => token.startsWith(word));
-            if (hasPrefixToken) {
-              textScore += 20;
-              return;
-            }
-            const hasPartialToken = pathTokens.some((token) => token.includes(word));
-            if (hasPartialToken) {
-              textScore += 12;
-              return;
-            }
-            if (decodedPathnameLower.includes(word)) {
-              textScore += 8;
-            }
-          });
-        }
-      } catch (e) {
-        // Ignore invalid URL parsing/decoding errors.
-      }
-
-      pinyinTitleScore = getTitlePinyinMatchScore(item.title, normalizedPinyinQuery).score;
-      textScore += pinyinTitleScore;
-
-      // Local-network/dev pages should surface earlier for quick workflows.
-      if (hostname && shouldBlockFaviconForHost(hostname)) {
-        if (titleLower === queryLower) textScore += 90;
-        else if (titleLower.startsWith(queryLower)) textScore += 70;
-        else if (titleLower.includes(queryLower)) textScore += 45;
-        else if (urlLower.includes(queryLower)) textScore += 20;
-      }
-
-      // Do not surface generic high-frequency sites for natural-language searches
-      // unless there is at least some textual match against title/url/hostname/path.
-      if (textScore <= 0) {
-        return 0;
-      }
-
-      // Recency bonus (for history items)
-      if (item.lastVisitTime) {
-        const daysSinceVisit = (Date.now() - item.lastVisitTime) / (1000 * 60 * 60 * 24);
-        if (daysSinceVisit < 1) behaviorScore += 10;
-        else if (daysSinceVisit < 7) behaviorScore += 5;
-        else if (daysSinceVisit < 30) behaviorScore += 2;
-      }
-
-      // Visit-frequency and strong recency boosts for history ranking.
-      const visitCount = Number(item.visitCount) > 0 ? Number(item.visitCount) : 0;
-      const typedCount = Number(item.typedCount) > 0 ? Number(item.typedCount) : 0;
-      if (visitCount > 0) {
-        behaviorScore += Math.min(24, Math.log2(visitCount + 1) * 6);
-      }
-      if (typedCount > 0) {
-        behaviorScore += Math.min(12, typedCount * 2);
-      }
-      if (item.lastVisitTime) {
-        const hoursSinceVisit = (Date.now() - item.lastVisitTime) / (1000 * 60 * 60);
-        if (hoursSinceVisit < 2) behaviorScore += 28;
-        else if (hoursSinceVisit < 24) behaviorScore += 18;
-        else if (hoursSinceVisit < 72) behaviorScore += 10;
-      }
-      return textScore + behaviorScore;
-    }
 
     function buildSuggestionReasons(item, sourceType) {
       const reasons = [];
@@ -5092,7 +5339,7 @@ async function getSearchSuggestions(query) {
       } else if (sourceType === 'history') {
         reasons.push('来源：浏览历史');
       }
-      const pinyinMatch = getTitlePinyinMatchScore(item && item.title, normalizedPinyinQuery);
+      const pinyinMatch = getTitlePinyinMatchScore(item && item.title, context.normalizedPinyinQuery);
       if (pinyinMatch.reason === 'initials-exact' || pinyinMatch.reason === 'initials-prefix') {
         reasons.push('标题首字母匹配');
       } else if (pinyinMatch.score > 0) {
@@ -5113,310 +5360,223 @@ async function getSearchSuggestions(query) {
       return reasons.slice(0, 3);
     }
 
-    // Process history items with scoring
-    const processedUrls = new Set();
-    const suggestionByUrl = new Map();
-    const suggestionIndexByUrl = new Map();
-    historyItems.forEach(item => {
-      if (isSearchEngineResultUrl(item.url)) {
+    function buildSearchSuggestionFavicon(url) {
+      if (isOwnExtensionUrl(url)) {
+        return getOwnExtensionFaviconUrl();
+      }
+      try {
+        const urlObj = new URL(url);
+        const host = normalizeHost(urlObj.hostname);
+        return shouldBlockFaviconForHost(host) ? '' : getGoogleFaviconUrl(host);
+      } catch (e) {
+        const fallbackHost = extractHostFromInput(url);
+        return shouldBlockFaviconForHost(fallbackHost) ? '' : `${url}/favicon.ico`;
+      }
+    }
+
+    function createSearchSuggestion(item, sourceType, score, extras) {
+      if (typeof searchUtils.createSearchSuggestion === 'function') {
+        return searchUtils.createSearchSuggestion(item, sourceType, score, extras);
+      }
+      return {
+        type: sourceType,
+        title: item.title || item.url,
+        url: item.url,
+        favicon: extras && extras.favicon ? extras.favicon : '',
+        score,
+        lastVisitTime: Number(item.lastVisitTime) || 0,
+        visitCount: Number(item.visitCount) || 0,
+        typedCount: Number(item.typedCount) || 0,
+        reasons: extras && Array.isArray(extras.reasons) ? extras.reasons : [],
+        ...(extras || {})
+      };
+    }
+
+    function calculateSearchRelevanceScore(item, sourceType) {
+      if (typeof searchUtils.calculateSearchRelevanceScore === 'function') {
+        return searchUtils.calculateSearchRelevanceScore(item, sourceType, context, searchScoreOptions);
+      }
+      return 0;
+    }
+
+    function buildBookmarkPath(bookmark) {
+      const pathParts = [];
+      let parentId = bookmark && bookmark.parentId ? bookmark.parentId : bookmark && bookmark.id;
+      while (parentId) {
+        const node = bookmarkNodeMap.get(parentId);
+        if (!node) {
+          break;
+        }
+        const isRootFolder = !node.parentId && rootFolderTitles.has(node.title);
+        if (!node.hasUrl && node.title && !isRootFolder) {
+          pathParts.unshift(node.title);
+        }
+        parentId = node.parentId;
+      }
+      return pathParts.join('/');
+    }
+
+    const suggestionIndexByKey = new Map();
+    const fallbackTopSites = [];
+
+    function getSuggestionKey(item) {
+      return typeof searchUtils.buildSearchDedupEntryKey === 'function'
+        ? searchUtils.buildSearchDedupEntryKey(item)
+        : (item && item.url ? item.url : '');
+    }
+
+    function upsertSuggestion(item, sourceType, extras) {
+      if (!item || !item.url) {
+        return null;
+      }
+      const itemKey = getSuggestionKey(item);
+      const baseScore = calculateSearchRelevanceScore(item, sourceType);
+      if (baseScore <= 0) {
+        return null;
+      }
+      const normalizedExtras = extras && typeof extras === 'object' ? { ...extras } : {};
+      const scoreAdjustment = Number(normalizedExtras.scoreAdjustment) || 0;
+      delete normalizedExtras.scoreAdjustment;
+      const suggestion = createSearchSuggestion(item, sourceType, baseScore + scoreAdjustment, {
+        favicon: buildSearchSuggestionFavicon(item.url),
+        reasons: buildSuggestionReasons(item, sourceType),
+        ...normalizedExtras
+      });
+      const existingIndex = suggestionIndexByKey.get(itemKey);
+      if (typeof existingIndex === 'number') {
+        suggestions[existingIndex] = suggestion;
+      } else {
+        suggestionIndexByKey.set(itemKey, suggestions.length);
+        suggestions.push(suggestion);
+      }
+      return suggestion;
+    }
+
+    historyItems.forEach((item) => {
+      if (!item || !item.title || isSearchEngineResultUrl(item.url)) {
         return;
       }
-      if (item.title && !processedUrls.has(item.url)) {
-        const score = calculateRelevanceScore(item);
-        if (score > 0) {
-          // Get favicon URL using Google's favicon service (more reliable)
-        let faviconUrl = '';
-        if (isOwnExtensionUrl(item.url)) {
-          faviconUrl = getOwnExtensionFaviconUrl();
-        } else {
-          try {
-            const urlObj = new URL(item.url);
-            const host = normalizeHost(urlObj.hostname);
-            faviconUrl = shouldBlockFaviconForHost(host) ? '' : getGoogleFaviconUrl(host);
-          } catch (e) {
-            // Fallback to direct favicon URL (skip local network)
-            const fallbackHost = extractHostFromInput(item.url);
-            faviconUrl = shouldBlockFaviconForHost(fallbackHost) ? '' : item.url + '/favicon.ico';
-          }
-        }
-
-          const suggestion = {
-            type: 'history',
-            title: item.title,
-            url: item.url,
-            favicon: faviconUrl,
-            score: score,
-            lastVisitTime: item.lastVisitTime || 0,
-            visitCount: Number(item.visitCount) || 0,
-            typedCount: Number(item.typedCount) || 0,
-            reasons: buildSuggestionReasons(item, 'history')
-          };
-          suggestions.push(suggestion);
-          processedUrls.add(item.url);
-          suggestionByUrl.set(item.url, suggestion);
-          suggestionIndexByUrl.set(item.url, suggestions.length - 1);
-        }
-      }
+      upsertSuggestion(item, 'history');
     });
 
-    // Process top sites with scoring
-    const fallbackTopSites = [];
-    topSites.forEach(site => {
-      if (isUrlBlockedBySearchBlacklist(site && site.url, searchBlacklistItems)) {
+    (Array.isArray(topSites) ? topSites : []).forEach((site) => {
+      if (!site || !site.url || isUrlBlockedBySearchBlacklist(site.url, searchBlacklistItems)) {
         return;
       }
-      if (!site || !site.url || processedUrls.has(site.url)) {
-        if (site && site.url) {
-          const existing = suggestionByUrl.get(site.url);
-          if (existing) {
-            existing.isTopSite = true;
-            existing.score = (existing.score || 0) + 10;
-          }
-        }
-        return;
-      }
-      const score = calculateRelevanceScore(site);
-      let adjustedScore = score;
-      if (score > 0) {
-        adjustedScore += 20; // Boost top sites so they surface earlier
-        const titleLower = site.title ? site.title.toLowerCase() : '';
-        try {
-          const hostname = normalizeHost(new URL(site.url).hostname);
-          if (hostname.startsWith(queryLower)) {
-            adjustedScore += 15;
-          }
-        } catch (e) {
-          // Ignore invalid URLs
-        }
-        if (titleLower.startsWith(queryLower)) {
-          adjustedScore += 10;
-        }
-      }
-      if (score > 0) {
-        let faviconUrl = '';
-        if (isOwnExtensionUrl(site.url)) {
-          faviconUrl = getOwnExtensionFaviconUrl();
-        } else {
-          try {
-            const urlObj = new URL(site.url);
-            const host = normalizeHost(urlObj.hostname);
-            faviconUrl = shouldBlockFaviconForHost(host) ? '' : getGoogleFaviconUrl(host);
-          } catch (e) {
-            const fallbackHost = extractHostFromInput(site.url);
-            faviconUrl = shouldBlockFaviconForHost(fallbackHost) ? '' : site.url + '/favicon.ico';
-          }
-        }
-
-        const suggestion = {
-          type: 'topSite',
-          title: site.title || site.url,
-          url: site.url,
-          favicon: faviconUrl,
-          score: adjustedScore,
-          reasons: buildSuggestionReasons(site, 'topSite')
+      const itemKey = getSuggestionKey(site);
+      const existingIndex = suggestionIndexByKey.get(itemKey);
+      if (typeof existingIndex === 'number') {
+        const existing = suggestions[existingIndex];
+        suggestions[existingIndex] = {
+          ...existing,
+          isTopSite: true,
+          score: (existing.score || 0) + 6
         };
-        suggestions.push(suggestion);
-        processedUrls.add(site.url);
-        suggestionByUrl.set(site.url, suggestion);
-        suggestionIndexByUrl.set(site.url, suggestions.length - 1);
-      } else {
+        return;
+      }
+
+      const titleLower = site.title ? site.title.toLowerCase() : '';
+      let scoreAdjustment = 4;
+      try {
+        const hostname = normalizeHost(new URL(site.url).hostname);
+        if (hostname.startsWith(context.queryLower)) {
+          scoreAdjustment += 8;
+        }
+      } catch (e) {
+        // Ignore invalid URLs.
+      }
+      if (titleLower.startsWith(context.queryLower)) {
+        scoreAdjustment += 6;
+      }
+      const suggestion = upsertSuggestion(site, 'topSite', { isTopSite: true, scoreAdjustment });
+      if (!suggestion) {
         fallbackTopSites.push(site);
       }
     });
 
-    // Process bookmarks with scoring
-    bookmarks.forEach(bookmark => {
-      if (!bookmark.url) {
+    bookmarks.forEach((bookmark) => {
+      if (!bookmark || !bookmark.url) {
         return;
       }
-      const existingSuggestion = suggestionByUrl.get(bookmark.url);
-      const shouldReplaceExisting = existingSuggestion && existingSuggestion.type !== 'bookmark';
-      if (!processedUrls.has(bookmark.url) || shouldReplaceExisting) {
-        const score = calculateRelevanceScore(bookmark);
-        // Boost bookmark score slightly to prioritize them
-        if (score > 0) {
-          const adjustedScore = score + 5; // Bonus for bookmarks
+      upsertSuggestion(bookmark, 'bookmark', {
+        path: buildBookmarkPath(bookmark),
+        scoreAdjustment: 4
+      });
+    });
 
-          // Get favicon URL using Google's favicon service
-          let faviconUrl = '';
-          if (isOwnExtensionUrl(bookmark.url)) {
-            faviconUrl = getOwnExtensionFaviconUrl();
-          } else {
-            try {
-              const urlObj = new URL(bookmark.url);
-              const host = normalizeHost(urlObj.hostname);
-              faviconUrl = shouldBlockFaviconForHost(host) ? '' : getGoogleFaviconUrl(host);
-            } catch (e) {
-              // Fallback to direct favicon URL (skip local network)
-              const fallbackHost = extractHostFromInput(bookmark.url);
-              faviconUrl = shouldBlockFaviconForHost(fallbackHost) ? '' : bookmark.url + '/favicon.ico';
-            }
-          }
+    if (typeof searchUtils.buildSearchBrandDirectSuggestion === 'function') {
+      const brandDirectSuggestion = searchUtils.buildSearchBrandDirectSuggestion(suggestions, context, {
+        ...searchScoreOptions,
+        buildFavicon: buildSearchSuggestionFavicon,
+        buildReasons: buildSuggestionReasons
+      });
+      if (brandDirectSuggestion) {
+        const directKey = getSuggestionKey(brandDirectSuggestion);
+        const existingIndex = suggestionIndexByKey.get(directKey);
+        if (typeof existingIndex === 'number') {
+          suggestions[existingIndex] = brandDirectSuggestion;
+        } else {
+          suggestionIndexByKey.set(directKey, suggestions.length);
+          suggestions.push(brandDirectSuggestion);
+        }
+      }
+    }
 
-          const pathParts = [];
-          let parentId = bookmark.id;
-          if (bookmark.parentId) {
-            parentId = bookmark.parentId;
-          }
-          while (parentId) {
-            const node = bookmarkNodeMap.get(parentId);
-            if (!node) {
-              break;
-            }
-            const isRootFolder = !node.parentId && rootFolderTitles.has(node.title);
-            if (!node.hasUrl && node.title && !isRootFolder) {
-              pathParts.unshift(node.title);
-            }
-            parentId = node.parentId;
-          }
-          const bookmarkPath = pathParts.join('/');
-
-          const suggestion = {
-            type: 'bookmark',
-            title: bookmark.title || bookmark.url,
-            url: bookmark.url,
-            favicon: faviconUrl,
-            path: bookmarkPath,
-            score: adjustedScore,
-            reasons: buildSuggestionReasons(bookmark, 'bookmark')
-          };
-          const existingIndex = suggestionIndexByUrl.get(bookmark.url);
-          if (shouldReplaceExisting && typeof existingIndex === 'number') {
-            suggestions[existingIndex] = suggestion;
-            suggestionIndexByUrl.set(bookmark.url, existingIndex);
-          } else {
-            suggestions.push(suggestion);
-            suggestionIndexByUrl.set(bookmark.url, suggestions.length - 1);
-          }
-          processedUrls.add(bookmark.url);
-          suggestionByUrl.set(bookmark.url, suggestion);
+    const engineSuggestionScore = typeof searchUtils.getSearchEngineSuggestionScore === 'function'
+      ? searchUtils.getSearchEngineSuggestionScore(context, suggestions)
+      : 160;
+    engineSuggestions.forEach((suggestion) => {
+      if (suggestion && suggestion !== context.lookupQuery) {
+        const suggestionItem = {
+          type: 'googleSuggest',
+          title: suggestion,
+          url: buildDefaultSearchUrl(suggestion),
+          favicon: getDefaultSearchEngineFaviconUrl(),
+          score: engineSuggestionScore,
+          searchQuery: suggestion,
+          forceSearch: true,
+          reasons: ['来源：搜索建议']
+        };
+        if (!isSuggestionBlockedBySearchBlacklist(suggestionItem, searchBlacklistItems, suggestion)) {
+          suggestions.push(suggestionItem);
         }
       }
     });
 
-    function getRecentPopularityBoost(suggestion) {
-      if (!suggestion) {
-        return 0;
-      }
-      let boost = 0;
-      const visitCount = Number(suggestion.visitCount) > 0 ? Number(suggestion.visitCount) : 0;
-      const typedCount = Number(suggestion.typedCount) > 0 ? Number(suggestion.typedCount) : 0;
-      if (visitCount > 0) {
-        boost += Math.min(16, Math.log2(visitCount + 1) * 4);
-      }
-      if (typedCount > 0) {
-        boost += Math.min(8, typedCount * 1.5);
-      }
-      const lastVisitTime = Number(suggestion.lastVisitTime) || 0;
-      if (lastVisitTime > 0) {
-        const hoursSinceVisit = (Date.now() - lastVisitTime) / (1000 * 60 * 60);
-        if (hoursSinceVisit < 2) boost += 16;
-        else if (hoursSinceVisit < 24) boost += 10;
-        else if (hoursSinceVisit < 72) boost += 6;
-      }
-      return boost;
-    }
-
-    // Sort by top site, then relevance + recent-popularity boost, then recency.
     suggestions.sort((a, b) => {
-      const aTop = a.isTopSite || a.type === 'topSite';
-      const bTop = b.isTopSite || b.type === 'topSite';
-      if (aTop !== bTop) {
-        return aTop ? -1 : 1;
+      if (typeof searchUtils.compareSearchSuggestions === 'function') {
+        return searchUtils.compareSearchSuggestions(a, b);
       }
-      const scoreDiff = ((b.score || 0) + getRecentPopularityBoost(b)) -
-        ((a.score || 0) + getRecentPopularityBoost(a));
-      if (scoreDiff !== 0) {
-        return scoreDiff;
-      }
-      const visitDiff = (Number(b.visitCount) || 0) - (Number(a.visitCount) || 0);
-      if (visitDiff !== 0) {
-        return visitDiff;
-      }
-      const aVisit = a.lastVisitTime || 0;
-      const bVisit = b.lastVisitTime || 0;
-      return bVisit - aVisit;
+      return (b.score || 0) - (a.score || 0);
     });
 
-    // Remove duplicates and limit results
     const uniqueSuggestions = [];
-    const seenSuggestionUrls = new Set();
-    for (let i = 0; i < suggestions.length && uniqueSuggestions.length < 12; i += 1) {
+    const seenSuggestionKeys = new Set();
+    for (let i = 0; i < suggestions.length && uniqueSuggestions.length < (searchPolicy.candidatePoolLimit || 20); i += 1) {
       const suggestion = suggestions[i];
-      const suggestionUrl = suggestion && suggestion.url ? suggestion.url : '';
-      if (!suggestionUrl || seenSuggestionUrls.has(suggestionUrl)) {
+      const suggestionKey = getSuggestionKey(suggestion);
+      if (!suggestionKey || seenSuggestionKeys.has(suggestionKey)) {
         continue;
       }
-      seenSuggestionUrls.add(suggestionUrl);
+      seenSuggestionKeys.add(suggestionKey);
       uniqueSuggestions.push(suggestion);
     }
 
-    // Also remove duplicates by title to avoid similar entries
-    const dedupedByTitle = [];
-    const titleIndexMap = new Map();
-    uniqueSuggestions.forEach((suggestion) => {
-      const titleKey = (suggestion.title || '').toLowerCase();
-      if (!titleKey) {
-        dedupedByTitle.push(suggestion);
-        return;
-      }
-      if (!titleIndexMap.has(titleKey)) {
-        titleIndexMap.set(titleKey, dedupedByTitle.length);
-        dedupedByTitle.push(suggestion);
-        return;
-      }
-      const existingIndex = titleIndexMap.get(titleKey);
-      const existing = dedupedByTitle[existingIndex];
-      if (suggestion.type === 'bookmark' && existing.type !== 'bookmark') {
-        dedupedByTitle[existingIndex] = suggestion;
-      }
-    });
-    let finalSuggestions = filterBlacklistedSuggestions(dedupedByTitle, searchBlacklistItems, lookupQuery);
-
-    const hostCounts = new Map();
-    finalSuggestions = finalSuggestions.filter((suggestion) => {
-      if (!suggestion.url) {
-        return true;
-      }
-      let hostname = '';
-      try {
-        hostname = normalizeHost(new URL(suggestion.url).hostname);
-      } catch (e) {
-        return true;
-      }
-      const current = hostCounts.get(hostname) || 0;
-      if (current >= 2) {
-        return false;
-      }
-      hostCounts.set(hostname, current + 1);
-      return true;
-    }).slice(0, 8);
+    let finalSuggestions = filterBlacklistedSuggestions(uniqueSuggestions, searchBlacklistItems, context.lookupQuery);
+    if (typeof searchUtils.applySearchSuggestionHostDiversity === 'function') {
+      finalSuggestions = searchUtils.applySearchSuggestionHostDiversity(finalSuggestions);
+    } else {
+      finalSuggestions = finalSuggestions.slice(0, searchPolicy.finalSuggestionLimit || 12);
+    }
 
     if (finalSuggestions.length === 0 && fallbackTopSites.length > 0) {
-      const fallbackResults = fallbackTopSites.slice(0, 3).map((site, index) => {
-        let faviconUrl = '';
-        if (isOwnExtensionUrl(site.url)) {
-          faviconUrl = getOwnExtensionFaviconUrl();
-        } else {
-          try {
-            const urlObj = new URL(site.url);
-            const host = normalizeHost(urlObj.hostname);
-            faviconUrl = shouldBlockFaviconForHost(host) ? '' : getGoogleFaviconUrl(host);
-          } catch (e) {
-            const fallbackHost = extractHostFromInput(site.url);
-            faviconUrl = shouldBlockFaviconForHost(fallbackHost) ? '' : site.url + '/favicon.ico';
-          }
-        }
-        return {
-          type: 'topSite',
-          title: site.title || site.url,
-          url: site.url,
-          favicon: faviconUrl,
-          score: 1 - index,
+      const fallbackResults = fallbackTopSites
+        .slice(0, searchPolicy.fallbackTopSiteLimit || 5)
+        .map((site, index) => createSearchSuggestion(site, 'topSite', 1 - index, {
+          favicon: buildSearchSuggestionFavicon(site.url),
           reasons: ['来源：常用站点']
-        };
-      });
-      finalSuggestions = filterBlacklistedSuggestions(fallbackResults, searchBlacklistItems, lookupQuery);
+        }));
+      finalSuggestions = filterBlacklistedSuggestions(fallbackResults, searchBlacklistItems, context.lookupQuery);
     }
 
     return finalSuggestions;
@@ -6400,42 +6560,48 @@ async function getSearchSuggestions(query) {
 
     await bootstrapOverlayLanguageForInitialRender();
 
+    const inputUsesIsolatedStyles = Boolean(overlayStyleRoot);
     const inputParts = window._x_extension_createSearchInput_2024_unique_({
+      styleRoot: overlayStyleRoot,
+      useIsolatedStyles: inputUsesIsolatedStyles,
       placeholder: t('overlay_search_placeholder', t('search_placeholder', defaultPlaceholderText)),
       inputId: '_x_extension_search_input_2024_unique_',
       iconId: '_x_extension_search_icon_2024_unique_',
       containerId: '_x_extension_input_container_2024_unique_',
       rightIconUrl: chrome.runtime.getURL('assets/images/lumno-input-light.png'),
+      containerStyleOverrides: {
+        height: '56px',
+        'min-height': '56px',
+        'max-height': '56px',
+        overflow: 'visible'
+      },
+      inputStyleOverrides: {
+        height: '56px',
+        'min-height': '56px',
+        'max-height': '56px',
+        'line-height': '1.3',
+        'padding-top': '0',
+        'padding-bottom': '0',
+        'padding-right': '92px'
+      },
       rightIconStyleOverrides: {
-        cursor: 'pointer'
+        cursor: 'pointer',
+        right: '50px'
       },
       showUnderlineWhenEmpty: true
     });
     const searchInput = inputParts.input;
     const inputContainer = inputParts.container;
     const rightIcon = inputParts.rightIcon;
-    const overlayInputHeight = 56;
+    const setInputScopedStyle = (element, property, value) => {
+      if (!element) {
+        return;
+      }
+      element.style.setProperty(property, value, inputUsesIsolatedStyles ? '' : 'important');
+    };
     applyNoTranslate(searchInput);
     applyNoTranslate(inputContainer);
     applyNoTranslate(rightIcon);
-    if (inputContainer) {
-      inputContainer.style.setProperty('height', `${overlayInputHeight}px`, 'important');
-      inputContainer.style.setProperty('min-height', `${overlayInputHeight}px`, 'important');
-      inputContainer.style.setProperty('max-height', `${overlayInputHeight}px`, 'important');
-      inputContainer.style.setProperty('overflow', 'visible', 'important');
-    }
-    if (searchInput) {
-      searchInput.style.setProperty('height', `${overlayInputHeight}px`, 'important');
-      searchInput.style.setProperty('min-height', `${overlayInputHeight}px`, 'important');
-      searchInput.style.setProperty('max-height', `${overlayInputHeight}px`, 'important');
-      searchInput.style.setProperty('line-height', '1.3', 'important');
-      searchInput.style.setProperty('padding-top', '0', 'important');
-      searchInput.style.setProperty('padding-bottom', '0', 'important');
-      searchInput.style.setProperty('padding-right', '92px', 'important');
-    }
-    if (rightIcon) {
-      rightIcon.style.setProperty('right', '50px', 'important');
-    }
     const topActionTooltip = document.createElement('div');
     applyNoTranslate(topActionTooltip);
     topActionTooltip.id = '_x_extension_top_action_tooltip_2026_unique_';
@@ -6630,12 +6796,12 @@ async function getSearchSuggestions(query) {
       const baseRightReserve = 92;
       const badgeVisible = Boolean(modeBadge && modeBadge.style.getPropertyValue('display') !== 'none');
       if (!badgeVisible) {
-        searchInput.style.setProperty('padding-right', `${baseRightReserve}px`, 'important');
+        setInputScopedStyle(searchInput, 'padding-right', `${baseRightReserve}px`);
         return;
       }
       const badgeWidth = Math.ceil(modeBadge.getBoundingClientRect().width || 0);
       const totalReserve = Math.max(baseRightReserve, 86 + badgeWidth + 12);
-      searchInput.style.setProperty('padding-right', `${totalReserve}px`, 'important');
+      setInputScopedStyle(searchInput, 'padding-right', `${totalReserve}px`);
     }
 
 
@@ -6939,6 +7105,7 @@ async function getSearchSuggestions(query) {
       { key: 'yt', aliases: ['youtube'], name: 'YouTube', template: 'https://www.youtube.com/results?search_query={query}' },
       { key: 'bb', aliases: ['bilibili', 'bili'], name: 'Bilibili', template: 'https://search.bilibili.com/all?keyword={query}' },
       { key: 'gh', aliases: ['github'], name: 'GitHub', template: 'https://github.com/search?q={query}' },
+      { key: 'gm', aliases: ['gemini'], name: 'Gemini', template: 'https://gemini.google.com/app', action: 'openAndSubmit', submitStrategy: 'geminiPrompt' },
       { key: 'so', aliases: ['baidu', 'bd'], name: 'Baidu', template: 'https://www.baidu.com/s?wd={query}' },
       { key: 'bi', aliases: ['bing'], name: 'Bing', template: 'https://www.bing.com/search?q={query}' },
       { key: 'gg', aliases: ['google'], name: 'Google', template: 'https://www.google.com/search?q={query}' },
@@ -6958,7 +7125,7 @@ async function getSearchSuggestions(query) {
     window._x_extension_theme_color_cache_2024_unique_ = themeColorCache;
     const themeHostCache = window._x_extension_theme_host_cache_2024_unique_ || new Map();
     window._x_extension_theme_host_cache_2024_unique_ = themeHostCache;
-    const defaultCaretColor = searchInput.style.caretColor || '#7DB7FF';
+    const defaultCaretColor = searchInput.style.caretColor || 'var(--x-ext-input-caret, #7DB7FF)';
     let baseInputPaddingLeft = null;
     const prefixGap = 6;
 
@@ -8848,12 +9015,12 @@ async function getSearchSuggestions(query) {
       const basePadding = getBaseInputPaddingLeft();
       siteSearchPrefix.style.setProperty('left', `${basePadding}px`, 'important');
       if (siteSearchPrefix.style.display === 'none') {
-        searchInput.style.setProperty('padding-left', `${basePadding}px`, 'important');
+        setInputScopedStyle(searchInput, 'padding-left', `${basePadding}px`);
         return;
       }
       const prefixWidth = siteSearchPrefix.getBoundingClientRect().width;
       const paddedLeft = Math.max(basePadding + prefixWidth + prefixGap, basePadding);
-      searchInput.style.setProperty('padding-left', `${paddedLeft}px`, 'important');
+      setInputScopedStyle(searchInput, 'padding-left', `${paddedLeft}px`);
     }
 
     function setInputModePrefix(prefixText, theme) {
@@ -8865,7 +9032,7 @@ async function getSearchSuggestions(query) {
       }
       searchInput.placeholder = '';
       if (resolvedTheme && resolvedTheme.placeholderText) {
-        searchInput.style.setProperty('caret-color', resolvedTheme.placeholderText, 'important');
+        setInputScopedStyle(searchInput, 'caret-color', resolvedTheme.placeholderText);
       }
       updateSiteSearchPrefixLayout();
     }
@@ -8874,7 +9041,7 @@ async function getSearchSuggestions(query) {
       siteSearchPrefix.textContent = '';
       siteSearchPrefix.style.setProperty('display', 'none', 'important');
       searchInput.placeholder = defaultPlaceholderText || defaultPlaceholder;
-      searchInput.style.setProperty('caret-color', defaultCaretColor, 'important');
+      setInputScopedStyle(searchInput, 'caret-color', defaultCaretColor);
       updateSiteSearchPrefixLayout();
     }
 
@@ -9327,6 +9494,52 @@ async function getSearchSuggestions(query) {
       return template.replace(/\{query\}/g, encodeURIComponent(query));
     }
 
+    function hasOpenAndSubmitSiteSearchAction(provider) {
+      return Boolean(
+        provider &&
+        String(provider.action || '').trim() === 'openAndSubmit'
+      );
+    }
+
+    function isInteractiveSiteSearchProvider(provider) {
+      return Boolean(
+        hasOpenAndSubmitSiteSearchAction(provider) &&
+        String(provider.submitStrategy || '').trim() === 'geminiPrompt'
+      );
+    }
+
+    function shouldRestrictInteractiveSiteSearchSuggestions(provider, query) {
+      return Boolean(
+        isInteractiveSiteSearchProvider(provider) &&
+        String(query || '').trim()
+      );
+    }
+
+    function openSiteSearchProviderQuery(provider, query) {
+      const trimmedQuery = String(query || '').trim();
+      if (!provider || !trimmedQuery) {
+        return false;
+      }
+      if (isInteractiveSiteSearchProvider(provider)) {
+        chrome.runtime.sendMessage({
+          action: 'runSiteSearchProviderQuery',
+          provider: provider,
+          query: trimmedQuery,
+          disposition: 'newTab'
+        });
+        return true;
+      }
+      const siteUrl = buildSearchUrl(provider.template, trimmedQuery);
+      if (!siteUrl) {
+        return false;
+      }
+      chrome.runtime.sendMessage({
+        action: 'createTab',
+        url: siteUrl
+      });
+      return true;
+    }
+
     function getProviderIcon(provider) {
       if (provider && provider.icon) {
         return provider.icon;
@@ -9342,8 +9555,12 @@ async function getSearchSuggestions(query) {
     }
 
     function mergeCustomProvidersLocal(baseItems, customItems) {
+      if (typeof SEARCH_UTILS.mergeCustomProviders === 'function') {
+        return SEARCH_UTILS.mergeCustomProviders(baseItems, customItems);
+      }
       const merged = [];
       const seen = new Set();
+      const baseMap = new Map((baseItems || []).map((item) => [String(item && item.key ? item.key : '').toLowerCase(), item]));
       (customItems || []).forEach((item) => {
         if (item && item.disabled) {
           return;
@@ -9353,7 +9570,11 @@ async function getSearchSuggestions(query) {
           return;
         }
         seen.add(key);
-        merged.push(item);
+        merged.push({
+          ...item,
+          action: String(item.action || (baseMap.get(key) && baseMap.get(key).action) || '').trim(),
+          submitStrategy: String(item.submitStrategy || (baseMap.get(key) && baseMap.get(key).submitStrategy) || '').trim()
+        });
       });
       (baseItems || []).forEach((item) => {
         const key = String(item && item.key ? item.key : '').toLowerCase();
@@ -9639,6 +9860,16 @@ async function getSearchSuggestions(query) {
         return null;
       }
       return { provider: provider, query: remainder };
+    }
+
+    function promoteStrongNavigationMatch(list, rawQuery) {
+      if (typeof SEARCH_UTILS.promoteStrongNavigationMatch !== 'function') {
+        return null;
+      }
+      return SEARCH_UTILS.promoteStrongNavigationMatch(list, rawQuery, {
+        getDirectNavigationUrl,
+        getUrlDisplay
+      });
     }
 
     function matchesTopSitePrefix(suggestion, input) {
@@ -10238,6 +10469,15 @@ async function getSearchSuggestions(query) {
               searchInput.focus();
               return;
             }
+            if (selectedSuggestion.provider && selectedSuggestion.searchQuery) {
+              if (openSiteSearchProviderQuery(selectedSuggestion.provider, selectedSuggestion.searchQuery)) {
+                removeOverlay(overlay);
+                document.removeEventListener('click', clickOutsideHandler);
+                document.removeEventListener('keydown', keydownHandler);
+                document.removeEventListener('keydown', captureTabHandler, true);
+              }
+              return;
+            }
             if (shouldSwitchMatchedTabSuggestion(selectedSuggestion, activeSuggestionIndex)) {
               chrome.runtime.sendMessage({
                 action: 'switchToTab',
@@ -10278,12 +10518,7 @@ async function getSearchSuggestions(query) {
           document.removeEventListener('keydown', captureTabHandler, true);
         } else if (query) {
           if (siteSearchState) {
-            const siteUrl = buildSearchUrl(siteSearchState.template, query);
-            if (siteUrl) {
-              chrome.runtime.sendMessage({
-                action: 'createTab',
-                url: siteUrl
-              });
+            if (openSiteSearchProviderQuery(siteSearchState, query)) {
               removeOverlay(overlay);
               document.removeEventListener('click', clickOutsideHandler);
               document.removeEventListener('keydown', keydownHandler);
@@ -10293,11 +10528,19 @@ async function getSearchSuggestions(query) {
           }
           const currentRawInput = (latestRawInputValue || searchInput.value || '').trim();
           if (inlineSearchState && inlineSearchState.isAuto &&
-              inlineSearchState.url && inlineSearchState.rawInput === currentRawInput) {
-            chrome.runtime.sendMessage({
-              action: 'createTab',
-              url: inlineSearchState.url
-            });
+              inlineSearchState.rawInput === currentRawInput) {
+            if (inlineSearchState.provider && inlineSearchState.query) {
+              if (!openSiteSearchProviderQuery(inlineSearchState.provider, inlineSearchState.query)) {
+                return;
+              }
+            } else if (inlineSearchState.url) {
+              chrome.runtime.sendMessage({
+                action: 'createTab',
+                url: inlineSearchState.url
+              });
+            } else {
+              return;
+            }
             removeOverlay(overlay);
             document.removeEventListener('click', clickOutsideHandler);
             document.removeEventListener('keydown', keydownHandler);
@@ -11621,7 +11864,8 @@ async function getSearchSuggestions(query) {
               }),
               url: inlineUrl,
               favicon: getProviderIcon(inlineCandidate.provider),
-              provider: inlineCandidate.provider
+              provider: inlineCandidate.provider,
+              searchQuery: inlineCandidate.query
             };
           }
         }
@@ -11654,7 +11898,8 @@ async function getSearchSuggestions(query) {
               }),
               url: siteUrl,
               favicon: getProviderIcon(siteSearchState),
-              provider: siteSearchState
+              provider: siteSearchState,
+              searchQuery: query
             });
           }
         }
@@ -11665,6 +11910,7 @@ async function getSearchSuggestions(query) {
         let autocompleteCandidate = null;
         let primaryHighlightIndex = -1;
         let primaryHighlightReason = 'none';
+        let strongNavigationMatch = null;
         let topSiteMatch = null;
         let siteSearchPrompt = null;
         const inlineEnabled = Boolean(inlineSuggestion);
@@ -11674,12 +11920,17 @@ async function getSearchSuggestions(query) {
         const preferAutocompleteFirst = overlaySearchResultPriorityMode !== 'search';
         if (!modeCommandActive && !hasCommand) {
           if (!siteSearchState && !inlineEnabled && preferAutocompleteFirst) {
+            strongNavigationMatch = promoteStrongNavigationMatch(allSuggestions, latestRawInputValue.trim());
+            if (strongNavigationMatch) {
+              primaryHighlightIndex = 0;
+              primaryHighlightReason = 'navigation';
+            }
             topSiteMatch = promoteTopSiteMatch(allSuggestions, latestRawInputValue.trim());
           }
           siteSearchTrigger = (!siteSearchState && !inlineEnabled)
             ? getSiteSearchTriggerCandidate(rawTagInput, providersForTags, topSiteMatch)
             : null;
-          if (siteSearchTrigger && !topSiteMatch) {
+          if (siteSearchTrigger && !topSiteMatch && !strongNavigationMatch) {
             siteSearchPrompt = {
               type: 'siteSearchPrompt',
               title: formatMessage('search_in_site', '在 {site} 中搜索', {
@@ -11697,7 +11948,7 @@ async function getSearchSuggestions(query) {
               siteSearchPrompt = null;
             }
           }
-          if (!siteSearchState && !inlineEnabled && !siteSearchPrompt && preferAutocompleteFirst) {
+          if (!siteSearchState && !inlineEnabled && !siteSearchPrompt && !strongNavigationMatch && preferAutocompleteFirst) {
             autocompleteCandidate = getAutocompleteCandidate(allSuggestions, latestRawInputValue);
             if (autocompleteCandidate) {
               const candidateIndex = allSuggestions.findIndex((suggestion) => {
@@ -11729,7 +11980,7 @@ async function getSearchSuggestions(query) {
             allSuggestions = filterOverlayBlacklistedSuggestions(allSuggestions, query);
             primaryHighlightIndex = 0;
             primaryHighlightReason = 'inline';
-          } else if (!siteSearchPrompt && topSiteMatch && preferAutocompleteFirst) {
+          } else if (!siteSearchPrompt && !strongNavigationMatch && topSiteMatch && preferAutocompleteFirst) {
             primaryHighlightIndex = 0;
             primaryHighlightReason = 'topSite';
           }
@@ -11773,10 +12024,30 @@ async function getSearchSuggestions(query) {
             primarySuggestion = allSuggestions[primaryHighlightIndex] || null;
             mergedProvider = findProviderForSuggestionMatch(primarySuggestion, providersForTags);
           }
+          if (shouldRestrictInteractiveSiteSearchSuggestions(siteSearchState, query)) {
+            const primaryInteractiveSuggestion = allSuggestions.find((item) =>
+              item &&
+              item.provider === siteSearchState &&
+              item.searchQuery === query
+            );
+            if (primaryInteractiveSuggestion) {
+              allSuggestions = [primaryInteractiveSuggestion];
+              primaryHighlightIndex = 0;
+              primaryHighlightReason = 'inline';
+              primarySuggestion = primaryInteractiveSuggestion;
+              mergedProvider = null;
+            }
+          }
           applyAutocomplete(allSuggestions, primarySuggestion, primaryHighlightReason);
           const inlineAutoHighlight = Boolean(inlineSuggestion && primaryHighlightIndex === 0);
           inlineSearchState = inlineSuggestion
-            ? { url: inlineSuggestion.url, rawInput: rawTagInputForInline, isAuto: inlineAutoHighlight }
+            ? {
+                url: inlineSuggestion.url,
+                provider: inlineSuggestion.provider,
+                query: inlineSuggestion.searchQuery || '',
+                rawInput: rawTagInputForInline,
+                isAuto: inlineAutoHighlight
+              }
             : null;
           const resolvedProvider = mergedProvider || siteSearchTrigger;
           siteSearchTriggerState = resolvedProvider
@@ -12692,6 +12963,14 @@ async function getSearchSuggestions(query) {
               document.removeEventListener('keydown', captureTabHandler, true);
               return;
             }
+            if (suggestion.provider && suggestion.searchQuery) {
+              openSiteSearchProviderQuery(suggestion.provider, suggestion.searchQuery);
+              removeOverlay(overlay);
+              document.removeEventListener('click', clickOutsideHandler);
+              document.removeEventListener('keydown', keydownHandler);
+              document.removeEventListener('keydown', captureTabHandler, true);
+              return;
+            }
             if (suggestion.forceSearch && suggestion.searchQuery) {
               chrome.runtime.sendMessage({
                 action: 'searchOrNavigate',
@@ -12744,6 +13023,14 @@ async function getSearchSuggestions(query) {
                 action: 'switchToTab',
                 tabId: suggestion._xMatchedTabId
               });
+              removeOverlay(overlay);
+              document.removeEventListener('click', clickOutsideHandler);
+              document.removeEventListener('keydown', keydownHandler);
+              document.removeEventListener('keydown', captureTabHandler, true);
+              return;
+            }
+            if (suggestion.provider && suggestion.searchQuery) {
+              openSiteSearchProviderQuery(suggestion.provider, suggestion.searchQuery);
               removeOverlay(overlay);
               document.removeEventListener('click', clickOutsideHandler);
               document.removeEventListener('keydown', keydownHandler);

@@ -714,8 +714,13 @@
         pointer-events: auto;
       }
       ._x_extension_shortcuts_hotkey_action_2024_unique_[data-side="left"][data-can-reset="false"] {
-        opacity: 0 !important;
-        pointer-events: none !important;
+        opacity: 0;
+        pointer-events: none;
+      }
+      ._x_extension_shortcuts_hotkey_wrap_2024_unique_:not([data-capturing="true"]):hover
+        ._x_extension_shortcuts_hotkey_action_2024_unique_[data-side="left"][data-can-reset="false"] {
+        opacity: 0;
+        pointer-events: none;
       }
       ._x_extension_shortcuts_hotkey_action_2024_unique_[data-side="left"] {
         left: 8px;
@@ -1153,7 +1158,7 @@
         z-index: 3;
       }
       ._x_extension_tooltip_host_2024_unique_[data-tooltip]::after {
-        content: none !important;
+        content: none;
       }
       ._x_extension_tooltip_host_2024_unique_[data-tooltip] {
         cursor: pointer;
@@ -2688,6 +2693,12 @@
               </div>
               <div id="_x_extension_site_search_builtin_list_2024_unique_" class="_x_extension_shortcut_list_2024_unique_"></div>
             </div>
+            <div class="_x_extension_shortcut_group_2024_unique_">
+              <div class="_x_extension_shortcut_group_header_2024_unique_">
+                <div class="_x_extension_shortcut_group_title_2024_unique_ _x_extension_section_title_2024_unique_" data-i18n="shortcuts_group_ai">AI</div>
+              </div>
+              <div id="_x_extension_site_search_ai_builtin_list_2026_unique_" class="_x_extension_shortcut_list_2024_unique_"></div>
+            </div>
           </div>
         </div>
         <div class="_x_extension_settings_content_2024_unique_" data-content="blacklist" data-active="false">
@@ -2823,6 +2834,7 @@
     -->
     <script src="../shared/blacklist-utils.js"></script>
     <script src="../shared/settings.js"></script>
+    <script src="../shared/search-utils.js"></script>
     <script src="options.js"></script>
   </body>
 </html>
