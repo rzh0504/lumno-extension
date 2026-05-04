@@ -513,7 +513,6 @@
     const config = getNewtabWidthModeConfig();
     const searchMax = Math.max(720, Number(config.searchMaxWidth || 720));
     const contentMax = Math.max(1040, Number(config.contentMaxWidth || 1040));
-    root.style.setProperty('max-width', `${searchMax}px`, 'important');
     if (document && document.documentElement) {
       document.documentElement.style.setProperty('--x-nt-search-max-width', `${searchMax}px`);
       document.documentElement.style.setProperty('--x-nt-content-max-width', `${contentMax}px`);
@@ -10150,6 +10149,7 @@
   }
 
   const inputParts = createSearchInput({
+    useImportantStyles: false,
     containerId: '_x_extension_newtab_input_container_2024_unique_',
     inputId: '_x_extension_newtab_search_input_2024_unique_',
     iconId: '_x_extension_newtab_search_icon_2024_unique_',
@@ -10831,25 +10831,25 @@
   searchLayer = document.createElement('div');
   searchLayer.id = '_x_extension_newtab_search_layer_2024_unique_';
   searchLayer.style.cssText = `
-    all: unset !important;
-    position: relative !important;
-    width: 100% !important;
-    min-width: 100% !important;
-    min-height: 45px !important;
-    display: block !important;
-    box-sizing: border-box !important;
-    overflow: hidden !important;
-    border-radius: 24px !important;
-    background: var(--x-nt-input-bg, rgba(255, 255, 255, 0.9)) !important;
-    border: 1px solid var(--x-nt-input-border, rgba(0, 0, 0, 0.06)) !important;
-    box-shadow: var(--x-nt-input-shadow, 0 20px 60px rgba(0, 0, 0, 0.08)) !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    z-index: 12 !important;
+    all: unset;
+    position: relative;
+    width: 100%;
+    min-width: 100%;
+    min-height: 45px;
+    display: block;
+    box-sizing: border-box;
+    overflow: hidden;
+    border-radius: 24px;
+    background: var(--x-nt-input-bg, rgba(255, 255, 255, 0.9));
+    border: 1px solid var(--x-nt-input-border, rgba(0, 0, 0, 0.06));
+    box-shadow: var(--x-nt-input-shadow, 0 20px 60px rgba(0, 0, 0, 0.08));
+    margin: 0;
+    padding: 0;
+    z-index: 12;
   `;
 
   if (rightIcon) {
-    rightIcon.style.setProperty('right', '14px', 'important');
+    rightIcon.style.setProperty('right', '14px');
     rightIcon.addEventListener('click', function(event) {
       event.preventDefault();
       event.stopPropagation();
@@ -10878,19 +10878,19 @@
   const siteSearchPrefix = document.createElement('span');
   siteSearchPrefix.id = '_x_extension_newtab_site_search_prefix_2024_unique_';
   siteSearchPrefix.style.cssText = `
-    all: unset !important;
-    position: absolute !important;
-    top: 50% !important;
-    transform: translateY(-50%) !important;
-    left: 50px !important;
-    display: none !important;
-    white-space: nowrap !important;
-    font-size: 16px !important;
-    font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-    line-height: 1 !important;
-    color: var(--x-nt-subtext, #6B7280) !important;
-    pointer-events: none !important;
-    z-index: 1 !important;
+    all: unset;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    left: 50px;
+    display: none;
+    white-space: nowrap;
+    font-size: 16px;
+    font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1;
+    color: var(--x-nt-subtext, #6B7280);
+    pointer-events: none;
+    z-index: 1;
   `;
   inputContainer.appendChild(siteSearchPrefix);
 
@@ -10904,14 +10904,14 @@
 
   function updateSiteSearchPrefixLayout() {
     const basePadding = getBaseInputPaddingLeft();
-    siteSearchPrefix.style.setProperty('left', `${basePadding}px`, 'important');
+    siteSearchPrefix.style.setProperty('left', `${basePadding}px`);
     if (siteSearchPrefix.style.display === 'none') {
-      searchInput.style.setProperty('padding-left', `${basePadding}px`, 'important');
+      searchInput.style.setProperty('padding-left', `${basePadding}px`);
       return;
     }
     const prefixWidth = siteSearchPrefix.getBoundingClientRect().width;
     const paddedLeft = Math.max(basePadding + prefixWidth + prefixGap, basePadding);
-    searchInput.style.setProperty('padding-left', `${paddedLeft}px`, 'important');
+    searchInput.style.setProperty('padding-left', `${paddedLeft}px`);
   }
 
   function setSiteSearchPrefix(provider, theme) {
@@ -10919,23 +10919,23 @@
       site: getSiteSearchDisplayName(provider)
     });
     siteSearchPrefix.textContent = prefixText;
-    siteSearchPrefix.style.setProperty('display', 'inline-flex', 'important');
+    siteSearchPrefix.style.setProperty('display', 'inline-flex');
     const resolvedTheme = theme ? getThemeForMode(theme) : null;
     if (resolvedTheme && resolvedTheme.placeholderText) {
-      siteSearchPrefix.style.setProperty('color', resolvedTheme.placeholderText, 'important');
+      siteSearchPrefix.style.setProperty('color', resolvedTheme.placeholderText);
     }
     searchInput.placeholder = '';
     if (resolvedTheme && resolvedTheme.placeholderText) {
-      searchInput.style.setProperty('caret-color', resolvedTheme.placeholderText, 'important');
+      searchInput.style.setProperty('caret-color', resolvedTheme.placeholderText);
     }
     updateSiteSearchPrefixLayout();
   }
 
   function clearSiteSearchPrefix() {
     siteSearchPrefix.textContent = '';
-    siteSearchPrefix.style.setProperty('display', 'none', 'important');
+    siteSearchPrefix.style.setProperty('display', 'none');
     searchInput.placeholder = defaultPlaceholder;
-    searchInput.style.setProperty('caret-color', defaultCaretColor, 'important');
+    searchInput.style.setProperty('caret-color', defaultCaretColor);
     updateSiteSearchPrefixLayout();
   }
 
