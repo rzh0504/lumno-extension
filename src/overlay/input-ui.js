@@ -349,7 +349,7 @@
     applyNoTranslate(rightIcon);
     rightIcon.id = config.rightIconId || '_x_extension_search_right_icon_2024_unique_';
     rightIcon.type = 'button';
-    rightIcon.innerHTML = config.rightIconHtml || '<i class="_x_extension_svg_2024_unique_ ri-icon ri-size-16 ri-settings-6-line" aria-hidden="true"></i>';
+    rightIcon.innerHTML = config.rightIconHtml || '<i class="_x_extension_svg_2024_unique_ ri-icon ri-size-16 ri-settings-line" aria-hidden="true"></i>';
     rightIcon.setAttribute('aria-label', config.rightIconAlt || getMessage('settings_button_aria', 'Settings'));
     applyBaseStyles(rightIcon, COMPONENT_CLASSES.rightIcon, COMPONENT_STYLES.rightIcon, useInlineBaseStyles, useImportantStyles);
     applyStyleOverrides(rightIcon, config.rightIconStyleOverrides, useImportantStyles);

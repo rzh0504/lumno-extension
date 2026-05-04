@@ -904,31 +904,78 @@
         color: rgba(249, 250, 251, 0.72);
         cursor: pointer;
       }
+      #_x_extension_newtab_suggestions_surface_2026_unique_ {
+        all: unset;
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 0;
+        height: 0;
+        display: block;
+        z-index: 19;
+        background: var(--x-nt-suggestions-bg, rgba(255, 255, 255, 0.96));
+        border: 1px solid var(--x-nt-panel-border, rgba(0, 0, 0, 0.08));
+        border-radius: 28px;
+        box-shadow: var(--x-nt-panel-shadow-focus, var(--x-nt-panel-shadow, 0 18px 44px rgba(0, 0, 0, 0.1)));
+        backdrop-filter: blur(var(--x-nt-panel-blur, 24px)) saturate(var(--x-nt-panel-saturate, 165%));
+        -webkit-backdrop-filter: blur(var(--x-nt-panel-blur, 24px)) saturate(var(--x-nt-panel-saturate, 165%));
+        box-sizing: border-box;
+        pointer-events: none;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.12s ease;
+      }
+      #_x_extension_newtab_suggestions_outline_2026_unique_ {
+        all: unset;
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 0;
+        height: 0;
+        display: block;
+        z-index: 24;
+        background: transparent;
+        border: 1px solid var(--x-nt-panel-border, rgba(0, 0, 0, 0.08));
+        border-radius: 28px;
+        box-sizing: border-box;
+        pointer-events: none;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.12s ease;
+      }
+      #_x_extension_newtab_suggestions_surface_2026_unique_[data-visible="true"] {
+        opacity: 1;
+        visibility: visible;
+      }
+      #_x_extension_newtab_suggestions_outline_2026_unique_[data-visible="true"] {
+        opacity: 1;
+        visibility: visible;
+      }
       #_x_extension_newtab_suggestions_container_2024_unique_ {
         all: unset;
-        width: 100%;
+        width: min(90vw, var(--x-nt-search-max-width, 720px));
         margin-top: 0;
-        position: relative;
-        left: auto;
+        position: fixed;
+        left: 0;
         right: auto;
-        top: auto;
-        z-index: 1;
+        top: 0;
+        z-index: 23;
         background: transparent;
         border: none;
         border-top: none;
-        border-radius: 0;
+        border-radius: 0 0 24px 24px;
         box-shadow: none;
         padding: 8px;
         box-sizing: border-box;
-        display: none;
+        display: block;
         max-height: calc(100vh - 220px);
         overflow-y: auto;
         overscroll-behavior: contain;
+        overflow-anchor: none;
         opacity: 0;
         visibility: hidden;
         pointer-events: none;
-        transform: translateY(-4px);
-        transition: opacity 0.12s ease, transform 0.12s ease;
+        transition: opacity 0.12s ease;
         line-height: 1;
         text-decoration: none;
         list-style: none;
@@ -939,12 +986,10 @@
         vertical-align: baseline;
       }
       #_x_extension_newtab_suggestions_container_2024_unique_[data-visible="true"] {
-        display: block;
-        margin-top: 10px;
+        margin-top: 0;
         opacity: 1;
         visibility: visible;
         pointer-events: auto;
-        transform: translateY(0);
       }
       #_x_extension_newtab_top_action_tooltip_2026_unique_ {
         all: unset;
