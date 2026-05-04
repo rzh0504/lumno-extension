@@ -24,6 +24,12 @@ try {
 }
 
 try {
+  importScripts(chrome.runtime.getURL('src/shared/site-search-store.js'));
+} catch (error) {
+  console.warn('Lumno: failed to load site search store.', error);
+}
+
+try {
   importScripts(chrome.runtime.getURL('src/background/pip-ownership.js'));
 } catch (error) {
   console.warn('Lumno: failed to load PiP ownership utils.', error);
@@ -1444,14 +1450,14 @@ function openOverlayOnTab(activeTab, tabs, source) {
     openNewtabFallbackForUrl(activeUrl);
     return;
   }
-  logHotkeyDebug('inject-start', { tabId: activeTab.id, file: 'src/shared/settings.js,src/overlay/input-ui.js,src/overlay/shell.js,src/overlay/lifecycle.js', source: source || '' });
+  logHotkeyDebug('inject-start', { tabId: activeTab.id, file: 'src/shared/settings.js,src/shared/search-utils.js,src/shared/site-search-store.js,src/overlay/runtime.js,src/overlay/input-ui.js,src/overlay/shell.js,src/overlay/lifecycle.js', source: source || '' });
   chrome.scripting.executeScript({
     target: {tabId: activeTab.id},
-    files: ['src/shared/settings.js', 'src/overlay/input-ui.js', 'src/overlay/shell.js', 'src/overlay/lifecycle.js']
+    files: ['src/shared/settings.js', 'src/shared/search-utils.js', 'src/shared/site-search-store.js', 'src/overlay/runtime.js', 'src/overlay/input-ui.js', 'src/overlay/shell.js', 'src/overlay/lifecycle.js']
   }, function() {
     if (chrome.runtime.lastError) {
       logHotkeyDebug('inject-failed', {
-        step: 'src/shared/settings.js,src/overlay/input-ui.js,src/overlay/shell.js,src/overlay/lifecycle.js',
+        step: 'src/shared/settings.js,src/shared/search-utils.js,src/shared/site-search-store.js,src/overlay/runtime.js,src/overlay/input-ui.js,src/overlay/shell.js,src/overlay/lifecycle.js',
         tabId: activeTab.id,
         error: chrome.runtime.lastError.message || 'unknown',
         source: source || ''
@@ -5587,7 +5593,7 @@ async function getSearchSuggestions(query) {
   }
 }
 
-  async function toggleBlackRectangle(tabs, overlayContext) {
+function toggleBlackRectangle(tabs, overlayContext) {
   let captureTabHandler = null;
   let overlayThemeStorageListener = null;
   let overlayLanguageStorageListener = null;
@@ -5608,7 +5614,24 @@ async function getSearchSuggestions(query) {
   const OVERLAY_HOST_ID = '_x_extension_overlay_host_2026_unique_';
   const OVERLAY_PANEL_ID = '_x_extension_overlay_2024_unique_';
   const SETTINGS = window.LumnoSettings || {};
+  const SEARCH_UTILS = window.LumnoSearchUtils || {};
+  const SITE_SEARCH_STORE = window.LumnoSiteSearchStore || {};
+  const overlayRuntime = window.LumnoOverlayRuntime;
   const overlayLifecycle = window.LumnoOverlayLifecycle;
+  if (!overlayRuntime ||
+      !overlayRuntime.STORAGE_KEYS ||
+      typeof overlayRuntime.getRuntimeUrl !== 'function' ||
+      typeof overlayRuntime.getStorageArea !== 'function' ||
+      typeof overlayRuntime.getStorageValues !== 'function' ||
+      typeof overlayRuntime.loadLocaleMessages !== 'function') {
+    console.warn('Lumno: overlay runtime helper not available.');
+    return;
+  }
+  if (typeof SITE_SEARCH_STORE.loadSiteSearchProviders !== 'function' ||
+      typeof SITE_SEARCH_STORE.mergeStoredProviders !== 'function') {
+    console.warn('Lumno: site search store helper not available.');
+    return;
+  }
   if (!overlayLifecycle ||
       typeof overlayLifecycle.createFrameTracker !== 'function' ||
       typeof overlayLifecycle.createViewportSizeSync !== 'function' ||
@@ -5685,27 +5708,23 @@ async function getSearchSuggestions(query) {
     restoreProtectedNode,
     restoreProtectedAncestors
   });
-  const THEME_STORAGE_KEY = '_x_extension_theme_mode_2024_unique_';
-  const LANGUAGE_STORAGE_KEY = '_x_extension_language_2024_unique_';
-  const LANGUAGE_MESSAGES_STORAGE_KEY = '_x_extension_language_messages_2024_unique_';
-  const DEFAULT_SEARCH_ENGINE_STORAGE_KEY = '_x_extension_default_search_engine_2024_unique_';
-  const SEARCH_RESULT_PRIORITY_STORAGE_KEY = '_x_extension_search_result_priority_2026_unique_';
-  const SEARCH_BLACKLIST_STORAGE_KEY = '_x_extension_search_blacklist_2026_unique_';
-  const OVERLAY_SIZE_MODE_STORAGE_KEY = '_x_extension_overlay_size_mode_2026_unique_';
-  const OVERLAY_TAB_PRIORITY_STORAGE_KEY = '_x_extension_overlay_tab_priority_2024_unique_';
-  const TAB_RANK_SCORE_DEBUG_STORAGE_KEY = '_x_extension_tab_rank_score_debug_2026_unique_';
-  const storageArea = (chrome && chrome.storage && chrome.storage.sync)
-    ? chrome.storage.sync
-    : (chrome && chrome.storage ? chrome.storage.local : null);
-  const storageAreaName = storageArea
-    ? (storageArea === (chrome && chrome.storage ? chrome.storage.sync : null) ? 'sync' : 'local')
-    : null;
-  const RI_CSS_URL = (chrome && chrome.runtime && chrome.runtime.getURL)
-    ? chrome.runtime.getURL('assets/remixicon/fonts/remixicon.css')
-    : 'assets/remixicon/fonts/remixicon.css';
-  const OPEN_SANS_CSS_URL = (chrome && chrome.runtime && chrome.runtime.getURL)
-    ? chrome.runtime.getURL('assets/fonts/open-sans/open-sans.css')
-    : 'assets/fonts/open-sans/open-sans.css';
+  const overlayStorageKeys = overlayRuntime.STORAGE_KEYS;
+  const THEME_STORAGE_KEY = overlayStorageKeys.themeMode;
+  const LANGUAGE_STORAGE_KEY = overlayStorageKeys.language;
+  const LANGUAGE_MESSAGES_STORAGE_KEY = overlayStorageKeys.languageMessages;
+  const DEFAULT_SEARCH_ENGINE_STORAGE_KEY = overlayStorageKeys.defaultSearchEngine;
+  const SITE_SEARCH_STORAGE_KEY = overlayStorageKeys.siteSearchCustom;
+  const SITE_SEARCH_DISABLED_STORAGE_KEY = overlayStorageKeys.siteSearchDisabled;
+  const SEARCH_RESULT_PRIORITY_STORAGE_KEY = overlayStorageKeys.searchResultPriority;
+  const SEARCH_BLACKLIST_STORAGE_KEY = overlayStorageKeys.searchBlacklist;
+  const OVERLAY_SIZE_MODE_STORAGE_KEY = overlayStorageKeys.overlaySizeMode;
+  const OVERLAY_TAB_PRIORITY_STORAGE_KEY = overlayStorageKeys.overlayTabPriority;
+  const TAB_RANK_SCORE_DEBUG_STORAGE_KEY = overlayStorageKeys.tabRankScoreDebug;
+  const storageRuntime = overlayRuntime.getStorageArea(chrome);
+  const storageArea = storageRuntime.area;
+  const storageAreaName = storageRuntime.name;
+  const RI_CSS_URL = overlayRuntime.getRuntimeUrl(chrome, 'assets/remixicon/fonts/remixicon.css');
+  const OPEN_SANS_CSS_URL = overlayRuntime.getRuntimeUrl(chrome, 'assets/fonts/open-sans/open-sans.css');
   const overlayMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
   let overlayThemeMode = 'system';
   let overlaySearchResultPriorityMode = 'autocomplete';
@@ -5757,7 +5776,7 @@ async function getSearchSuggestions(query) {
     return list.filter((suggestion) => !isOverlaySuggestionBlockedBySearchBlacklist(suggestion, queryForProvider));
   }
 
-  function loadOverlaySearchBlacklistItems() {
+  function loadOverlaySearchBlacklistItems(onReload) {
     if (!storageArea) {
       overlaySearchBlacklistItems = [];
       return;
@@ -5766,8 +5785,8 @@ async function getSearchSuggestions(query) {
       overlaySearchBlacklistItems = normalizeOverlaySearchBlacklistItems(
         result ? result[SEARCH_BLACKLIST_STORAGE_KEY] : null
       );
-      if (latestOverlayQuery) {
-        updateSearchSuggestions(lastSuggestionResponse, latestOverlayQuery);
+      if (typeof onReload === 'function') {
+        onReload();
       }
     });
   }
@@ -5776,13 +5795,6 @@ async function getSearchSuggestions(query) {
     return typeof SETTINGS.normalizeSearchResultPriority === 'function'
       ? SETTINGS.normalizeSearchResultPriority(value)
       : (value === 'search' ? 'search' : 'autocomplete');
-  }
-
-  function isInjectedBrowserExtensionProtocol(protocol) {
-    const normalized = String(protocol || '').toLowerCase();
-    return normalized === 'chrome-extension:' ||
-      normalized === 'moz-extension:' ||
-      normalized === 'ms-browser-extension:';
   }
 
   function stopOverlayPageThemeObserver() {
@@ -5979,7 +5991,7 @@ async function getSearchSuggestions(query) {
     searchTemplate: ''
   };
 
-  async function ensureRemixIconStyles() {
+  function ensureRemixIconStyles() {
     if (document.getElementById('_x_extension_remixicon_css_2024_unique_')) {
       return;
     }
@@ -5994,7 +6006,7 @@ async function getSearchSuggestions(query) {
     host.appendChild(link);
   }
 
-  async function ensureOpenSansStyles() {
+  function ensureOpenSansStyles() {
     if (document.getElementById('_x_extension_open_sans_css_2024_unique_')) {
       return;
     }
@@ -6009,8 +6021,8 @@ async function getSearchSuggestions(query) {
     host.appendChild(link);
   }
 
-  await ensureOpenSansStyles();
-  await ensureRemixIconStyles();
+  ensureOpenSansStyles();
+  ensureRemixIconStyles();
 
   function normalizeLocale(locale) {
     return typeof SETTINGS.normalizeLocale === 'function'
@@ -6026,45 +6038,11 @@ async function getSearchSuggestions(query) {
   }
 
   function loadLocaleMessages(locale) {
-    const normalized = normalizeLocale(locale);
-    if (!chrome || !chrome.runtime || typeof chrome.runtime.getURL !== 'function') {
-      return Promise.resolve({});
-    }
-    const localePath = chrome.runtime.getURL(`_locales/${normalized}/messages.json`);
-    const isInvalidExtensionUrl = (() => {
-      if (!localePath) {
-        return true;
-      }
-      try {
-        const parsed = new URL(localePath);
-        return isInjectedBrowserExtensionProtocol(parsed.protocol) &&
-          String(parsed.hostname || '').toLowerCase() === 'invalid';
-      } catch (e) {
-        return false;
-      }
-    })();
-    if (isInvalidExtensionUrl) {
-      return new Promise((resolve) => {
-        if (!chrome.runtime.sendMessage) {
-          resolve({});
-          return;
-        }
-        chrome.runtime.sendMessage({ action: 'getLocaleMessages', locale: normalized }, (response) => {
-          resolve((response && response.messages) || {});
-        });
-      });
-    }
-    return fetch(localePath)
-      .then((response) => response.json())
-      .catch(() => new Promise((resolve) => {
-        if (!chrome.runtime.sendMessage) {
-          resolve({});
-          return;
-        }
-        chrome.runtime.sendMessage({ action: 'getLocaleMessages', locale: normalized }, (response) => {
-          resolve((response && response.messages) || {});
-        });
-      }));
+    return overlayRuntime.loadLocaleMessages({
+      chromeApi: chrome,
+      locale,
+      normalizeLocale
+    });
   }
 
   function t(key, fallback) {
@@ -6081,15 +6059,7 @@ async function getSearchSuggestions(query) {
   }
 
   function getStorageValuesAsync(keys) {
-    return new Promise((resolve) => {
-      if (!storageArea || !storageArea.get) {
-        resolve({});
-        return;
-      }
-      storageArea.get(keys, (result) => {
-        resolve(result || {});
-      });
-    });
+    return overlayRuntime.getStorageValues(storageArea, keys);
   }
 
   async function bootstrapOverlayLanguageForInitialRender() {
@@ -6229,7 +6199,7 @@ async function getSearchSuggestions(query) {
     return t('action_search', '搜索');
   }
 
-  function loadOverlaySearchEngineState() {
+  function loadOverlaySearchEngineState(onReload) {
     if (!storageArea) {
       return;
     }
@@ -6237,8 +6207,8 @@ async function getSearchSuggestions(query) {
       const stored = result ? result[DEFAULT_SEARCH_ENGINE_STORAGE_KEY] : null;
       if (stored && stored.id) {
         overlaySearchEngineState = stored;
-        if (latestOverlayQuery) {
-          updateSearchSuggestions(lastSuggestionResponse, latestOverlayQuery);
+        if (typeof onReload === 'function') {
+          onReload();
         }
       }
     });
@@ -6505,6 +6475,27 @@ async function getSearchSuggestions(query) {
     }
     applyNoTranslate(overlay);
 
+    let tabs = [];
+    let currentOverlayTabId = null;
+    if (initialOverlayTabs.length > 0) {
+      tabs = initialOverlayTabs;
+    }
+    if (typeof initialContextTabId === 'number') {
+      currentOverlayTabId = initialContextTabId;
+    }
+    let latestOverlayQuery = '';
+    let latestRawInputValue = '';
+    let lastDeletionAt = 0;
+    let autocompleteState = null;
+    let inlineSearchState = null;
+    let siteSearchTriggerState = null;
+    let siteSearchState = null;
+    let openTabsSearchModeActive = false;
+    let isComposing = false;
+    let selectedIndex = -1; // -1 means input is focused, 0+ means suggestion is selected
+    const suggestionItems = [];
+    let currentSuggestions = []; // Store current suggestions for keyboard navigation
+    let lastRenderedQuery = '';
 
     const applyOverlayTheme = (mode) => {
       overlayThemeMode = mode;
@@ -6558,7 +6549,7 @@ async function getSearchSuggestions(query) {
       return;
     }
 
-    await bootstrapOverlayLanguageForInitialRender();
+    const initialLanguageReady = bootstrapOverlayLanguageForInitialRender().catch(() => {});
 
     const inputUsesIsolatedStyles = Boolean(overlayStyleRoot);
     const inputParts = window._x_extension_createSearchInput_2024_unique_({
@@ -6789,6 +6780,33 @@ async function getSearchSuggestions(query) {
     `;
     inputContainer.appendChild(modeBadge);
 
+    const suggestionsContainer = document.createElement('div');
+    applyNoTranslate(suggestionsContainer);
+    suggestionsContainer.id = '_x_extension_suggestions_container_2024_unique_';
+    suggestionsContainer.style.cssText = `
+      all: unset !important;
+      width: 100% !important;
+      flex: 1 1 auto !important;
+      min-height: 0 !important;
+      max-height: 50vh !important;
+      overflow-y: auto !important;
+      scrollbar-width: none !important;
+      -ms-overflow-style: none !important;
+      background: transparent !important;
+      border-radius: 0 0 28px 28px !important;
+      padding: 12px !important;
+      box-sizing: border-box !important;
+      display: block !important;
+      line-height: 1 !important;
+      text-decoration: none !important;
+      list-style: none !important;
+      outline: none !important;
+      color: inherit !important;
+      font-size: 100% !important;
+      font: inherit !important;
+      vertical-align: baseline !important;
+    `;
+
     function updateInputRightPadding() {
       if (!searchInput) {
         return;
@@ -6859,6 +6877,12 @@ async function getSearchSuggestions(query) {
         applyLanguageStrings();
       });
     }
+
+    initialLanguageReady.then(() => {
+      if (overlay && overlay.isConnected) {
+        applyLanguageStrings();
+      }
+    });
 
     function getThemeModeLabel(mode) {
       if (mode === 'dark') {
@@ -7069,21 +7093,6 @@ async function getSearchSuggestions(query) {
       // Don't change selectedIndex here to allow keyboard navigation
     });
 
-    let tabs = [];
-    let currentOverlayTabId = null;
-    if (initialOverlayTabs.length > 0) {
-      tabs = initialOverlayTabs;
-    }
-    if (typeof initialContextTabId === 'number') {
-      currentOverlayTabId = initialContextTabId;
-    }
-    let latestOverlayQuery = '';
-    let latestRawInputValue = '';
-    let lastDeletionAt = 0;
-    let autocompleteState = null;
-    let inlineSearchState = null;
-    let siteSearchTriggerState = null;
-    let isComposing = false;
     function isImeCompositionEvent(event) {
       if (!event) {
         return isComposing;
@@ -7096,8 +7105,6 @@ async function getSearchSuggestions(query) {
         event.key === 'Process'
       );
     }
-    let siteSearchState = null;
-    let openTabsSearchModeActive = false;
     const defaultPlaceholder = searchInput.placeholder;
     let siteSearchProvidersCache = null;
     let pendingProviderReload = false;
@@ -7547,6 +7554,12 @@ async function getSearchSuggestions(query) {
       target.style.setProperty('--x-ext-input-divider-opacity', tokens.dividerOpacity, 'important');
     }
 
+    function refreshOverlaySuggestionsFromLastResponse() {
+      if (latestOverlayQuery) {
+        updateSearchSuggestions(lastSuggestionResponse, latestOverlayQuery);
+      }
+    }
+
     if (storageArea) {
       storageArea.get([THEME_STORAGE_KEY], (result) => {
         applyOverlayTheme(result[THEME_STORAGE_KEY] || 'system');
@@ -7585,7 +7598,7 @@ async function getSearchSuggestions(query) {
     };
     chrome.storage.onChanged.addListener(overlayLanguageStorageListener);
 
-    loadOverlaySearchEngineState();
+    loadOverlaySearchEngineState(refreshOverlaySuggestionsFromLastResponse);
     overlaySearchEngineStorageListener = (changes, areaName) => {
       if (!storageAreaName || areaName !== storageAreaName || !changes[DEFAULT_SEARCH_ENGINE_STORAGE_KEY]) {
         return;
@@ -7604,7 +7617,7 @@ async function getSearchSuggestions(query) {
         overlaySearchResultPriorityMode = normalizeSearchResultPriority(result[SEARCH_RESULT_PRIORITY_STORAGE_KEY]);
       });
     }
-    loadOverlaySearchBlacklistItems();
+    loadOverlaySearchBlacklistItems(refreshOverlaySuggestionsFromLastResponse);
     overlaySearchResultPriorityStorageListener = (changes, areaName) => {
       if (!storageAreaName || areaName !== storageAreaName || !changes[SEARCH_RESULT_PRIORITY_STORAGE_KEY]) {
         return;
@@ -9554,93 +9567,23 @@ async function getSearchSuggestions(query) {
       }
     }
 
-    function mergeCustomProvidersLocal(baseItems, customItems) {
-      if (typeof SEARCH_UTILS.mergeCustomProviders === 'function') {
-        return SEARCH_UTILS.mergeCustomProviders(baseItems, customItems);
-      }
-      const merged = [];
-      const seen = new Set();
-      const baseMap = new Map((baseItems || []).map((item) => [String(item && item.key ? item.key : '').toLowerCase(), item]));
-      (customItems || []).forEach((item) => {
-        if (item && item.disabled) {
-          return;
-        }
-        const key = String(item && item.key ? item.key : '').toLowerCase();
-        if (!key || seen.has(key)) {
-          return;
-        }
-        seen.add(key);
-        merged.push({
-          ...item,
-          action: String(item.action || (baseMap.get(key) && baseMap.get(key).action) || '').trim(),
-          submitStrategy: String(item.submitStrategy || (baseMap.get(key) && baseMap.get(key).submitStrategy) || '').trim()
-        });
-      });
-      (baseItems || []).forEach((item) => {
-        const key = String(item && item.key ? item.key : '').toLowerCase();
-        if (!key || seen.has(key)) {
-          return;
-        }
-        seen.add(key);
-        merged.push(item);
-      });
-      return merged;
-    }
-
     function getSiteSearchProviders() {
       if (siteSearchProvidersCache) {
         return Promise.resolve(siteSearchProvidersCache);
       }
-      const localUrl = chrome.runtime.getURL('assets/data/site-search.json');
-      const localFallback = fetch(localUrl)
-        .then((response) => response.json())
-        .then((data) => {
-          const items = data && Array.isArray(data.items) ? data.items : [];
-          return items;
-        })
-        .catch(() => []);
-      const customFallback = new Promise((resolve) => {
-        if (!storageArea) {
-          resolve([]);
-          return;
-        }
-        storageArea.get([SITE_SEARCH_STORAGE_KEY], (result) => {
-          const items = Array.isArray(result[SITE_SEARCH_STORAGE_KEY]) ? result[SITE_SEARCH_STORAGE_KEY] : [];
-          resolve(items);
-        });
-      });
-      const disabledFallback = new Promise((resolve) => {
-        if (!storageArea) {
-          resolve([]);
-          return;
-        }
-        storageArea.get([SITE_SEARCH_DISABLED_STORAGE_KEY], (result) => {
-          const items = Array.isArray(result[SITE_SEARCH_DISABLED_STORAGE_KEY])
-            ? result[SITE_SEARCH_DISABLED_STORAGE_KEY]
-            : [];
-          resolve(items.map((item) => String(item).toLowerCase()).filter(Boolean));
-        });
-      });
-      return new Promise((resolve) => {
-        chrome.runtime.sendMessage({ action: 'getSiteSearchProviders' }, (response) => {
-          const items = response && Array.isArray(response.items) ? response.items : [];
-          if (items.length > 0) {
-            siteSearchProvidersCache = items;
-            resolve(items);
-            return;
-          }
-          Promise.all([localFallback, customFallback, disabledFallback])
-            .then(([localItems, customItems, disabledKeys]) => {
-            const baseItems = localItems.length > 0 ? localItems : defaultSiteSearchProviders;
-            const filteredBase = baseItems.filter((item) => {
-              const key = String(item && item.key ? item.key : '').toLowerCase();
-              return key && !disabledKeys.includes(key);
-            });
-            const merged = mergeCustomProvidersLocal(filteredBase, customItems);
-            siteSearchProvidersCache = merged;
-            resolve(merged);
-          });
-        });
+      return SITE_SEARCH_STORE.loadSiteSearchProviders({
+        chromeApi: chrome,
+        storageArea,
+        storageKeys: {
+          custom: SITE_SEARCH_STORAGE_KEY,
+          disabled: SITE_SEARCH_DISABLED_STORAGE_KEY
+        },
+        defaultProviders: defaultSiteSearchProviders,
+        mergeCustomProviders: SEARCH_UTILS.mergeCustomProviders,
+        getStorageValues: getStorageValuesAsync
+      }).then((items) => {
+        siteSearchProvidersCache = items;
+        return items;
       });
     }
 
@@ -9657,13 +9600,14 @@ async function getSearchSuggestions(query) {
       storageArea.get([SITE_SEARCH_STORAGE_KEY, SITE_SEARCH_DISABLED_STORAGE_KEY], (result) => {
         const customItems = Array.isArray(result[SITE_SEARCH_STORAGE_KEY]) ? result[SITE_SEARCH_STORAGE_KEY] : [];
         const disabledKeys = Array.isArray(result[SITE_SEARCH_DISABLED_STORAGE_KEY])
-          ? result[SITE_SEARCH_DISABLED_STORAGE_KEY].map((item) => String(item).toLowerCase()).filter(Boolean)
+          ? result[SITE_SEARCH_DISABLED_STORAGE_KEY]
           : [];
-        const baseItems = defaultSiteSearchProviders.filter((item) => {
-          const key = String(item && item.key ? item.key : '').toLowerCase();
-          return key && !disabledKeys.includes(key);
-        });
-        siteSearchProvidersCache = mergeCustomProvidersLocal(baseItems, customItems);
+        siteSearchProvidersCache = SITE_SEARCH_STORE.mergeStoredProviders(
+          defaultSiteSearchProviders,
+          customItems,
+          disabledKeys,
+          SEARCH_UTILS.mergeCustomProviders
+        );
         if (latestOverlayQuery) {
           chrome.runtime.sendMessage({
             action: 'getSearchSuggestions',
@@ -10339,11 +10283,6 @@ async function getSearchSuggestions(query) {
     });
 
     // Add keyboard navigation
-    let selectedIndex = -1; // -1 means input is focused, 0+ means suggestion is selected
-    const suggestionItems = [];
-    let currentSuggestions = []; // Store current suggestions for keyboard navigation
-    let lastRenderedQuery = '';
-
     function getAutoHighlightIndex() {
       return suggestionItems.findIndex((item) => Boolean(item && item._xIsAutocompleteTop));
     }
@@ -13113,37 +13052,6 @@ async function getSearchSuggestions(query) {
 
     // Focus the input when created
     setTimeout(() => searchInput.focus(), 100);
-
-
-
-    // Create suggestions container
-    const suggestionsContainer = document.createElement('div');
-    applyNoTranslate(suggestionsContainer);
-    suggestionsContainer.id = '_x_extension_suggestions_container_2024_unique_';
-    suggestionsContainer.style.cssText = `
-      all: unset !important;
-      width: 100% !important;
-      flex: 1 1 auto !important;
-      min-height: 0 !important;
-      max-height: 50vh !important;
-      overflow-y: auto !important;
-      scrollbar-width: none !important;
-      -ms-overflow-style: none !important;
-      background: transparent !important;
-      border-radius: 0 0 28px 28px !important;
-      padding: 12px !important;
-      box-sizing: border-box !important;
-      display: block !important;
-      line-height: 1 !important;
-      text-decoration: none !important;
-      list-style: none !important;
-      outline: none !important;
-      color: inherit !important;
-      font-size: 100% !important;
-      font: inherit !important;
-      vertical-align: baseline !important;
-    `;
-
     overlay.appendChild(inputContainer);
     overlay.appendChild(suggestionsContainer);
     applyNoTranslateDeep(overlay);

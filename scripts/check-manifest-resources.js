@@ -6,7 +6,10 @@ const missing = [];
 const injectedScriptFiles = [
   'src/background/pip-ownership.js',
   'src/shared/settings.js',
+  'src/shared/search-utils.js',
+  'src/shared/site-search-store.js',
   'src/shared/url-guards.js',
+  'src/overlay/runtime.js',
   'src/overlay/input-ui.js',
   'src/overlay/shell.js',
   'src/overlay/lifecycle.js',

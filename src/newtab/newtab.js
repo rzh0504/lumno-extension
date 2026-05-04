@@ -33,6 +33,7 @@
   const BLACKLIST_UTILS = globalThis.LumnoBlacklistUtils || {};
   const SETTINGS = globalThis.LumnoSettings || {};
   const SEARCH_UTILS = globalThis.LumnoSearchUtils || {};
+  const SITE_SEARCH_STORE = globalThis.LumnoSiteSearchStore || {};
   const TAB_RANK_SCORE_DEBUG_STORAGE_KEY = '_x_extension_tab_rank_score_debug_2026_unique_';
   const NEWTAB_OPEN_TAB_SUGGESTION_LIMIT = 8;
   const FAVICON_PERSIST_STORAGE_KEY = '_x_extension_favicon_url_cache_2024_unique_';
@@ -7849,90 +7850,26 @@
     }
   }
 
-  function mergeCustomProvidersLocal(baseItems, customItems) {
-    if (typeof SEARCH_UTILS.mergeCustomProviders === 'function') {
-      return SEARCH_UTILS.mergeCustomProviders(baseItems, customItems);
-    }
-    const merged = [];
-    const seen = new Set();
-    const baseMap = new Map((baseItems || []).map((item) => [String(item && item.key ? item.key : '').toLowerCase(), item]));
-    (customItems || []).forEach((item) => {
-      const key = String(item && item.key ? item.key : '').toLowerCase();
-      if (!key || seen.has(key)) {
-        return;
-      }
-      seen.add(key);
-      merged.push({
-        ...item,
-        action: String(item.action || (baseMap.get(key) && baseMap.get(key).action) || '').trim(),
-        submitStrategy: String(item.submitStrategy || (baseMap.get(key) && baseMap.get(key).submitStrategy) || '').trim()
-      });
-    });
-    (baseItems || []).forEach((item) => {
-      const key = String(item && item.key ? item.key : '').toLowerCase();
-      if (!key || seen.has(key)) {
-        return;
-      }
-      seen.add(key);
-      merged.push(item);
-    });
-    return merged;
-  }
-
   function getSiteSearchProviders() {
     if (siteSearchProvidersCache) {
       return Promise.resolve(siteSearchProvidersCache);
     }
-    const localUrl = chrome.runtime.getURL('assets/data/site-search.json');
-    const localFallback = fetch(localUrl)
-      .then((response) => response.json())
-      .then((data) => {
-        const items = data && Array.isArray(data.items) ? data.items : [];
-        return items;
-      })
-      .catch(() => []);
-    const customFallback = new Promise((resolve) => {
-      if (!storageArea) {
-        resolve([]);
-        return;
-      }
-      storageArea.get([SITE_SEARCH_STORAGE_KEY], (result) => {
-        const items = Array.isArray(result[SITE_SEARCH_STORAGE_KEY]) ? result[SITE_SEARCH_STORAGE_KEY] : [];
-        resolve(items);
-      });
-    });
-    const disabledFallback = new Promise((resolve) => {
-      if (!storageArea) {
-        resolve([]);
-        return;
-      }
-      storageArea.get([SITE_SEARCH_DISABLED_STORAGE_KEY], (result) => {
-        const items = Array.isArray(result[SITE_SEARCH_DISABLED_STORAGE_KEY])
-          ? result[SITE_SEARCH_DISABLED_STORAGE_KEY]
-          : [];
-        resolve(items.map((item) => String(item).toLowerCase()).filter(Boolean));
-      });
-    });
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ action: 'getSiteSearchProviders' }, (response) => {
-        const items = response && Array.isArray(response.items) ? response.items : [];
-        if (items.length > 0) {
-          siteSearchProvidersCache = items;
-          resolve(items);
-          return;
-        }
-        Promise.all([localFallback, customFallback, disabledFallback])
-          .then(([localItems, customItems, disabledKeys]) => {
-          const baseItems = localItems.length > 0 ? localItems : defaultSiteSearchProviders;
-          const filteredBase = baseItems.filter((item) => {
-            const key = String(item && item.key ? item.key : '').toLowerCase();
-            return key && !disabledKeys.includes(key);
-          });
-          const merged = mergeCustomProvidersLocal(filteredBase, customItems);
-          siteSearchProvidersCache = merged;
-          resolve(merged);
-        });
-      });
+    if (typeof SITE_SEARCH_STORE.loadSiteSearchProviders !== 'function') {
+      siteSearchProvidersCache = defaultSiteSearchProviders.slice();
+      return Promise.resolve(siteSearchProvidersCache);
+    }
+    return SITE_SEARCH_STORE.loadSiteSearchProviders({
+      chromeApi: chrome,
+      storageArea,
+      storageKeys: {
+        custom: SITE_SEARCH_STORAGE_KEY,
+        disabled: SITE_SEARCH_DISABLED_STORAGE_KEY
+      },
+      defaultProviders: defaultSiteSearchProviders,
+      mergeCustomProviders: SEARCH_UTILS.mergeCustomProviders
+    }).then((items) => {
+      siteSearchProvidersCache = items;
+      return items;
     });
   }
 
@@ -11039,13 +10976,16 @@
     storageArea.get([SITE_SEARCH_STORAGE_KEY, SITE_SEARCH_DISABLED_STORAGE_KEY], (result) => {
       const customItems = Array.isArray(result[SITE_SEARCH_STORAGE_KEY]) ? result[SITE_SEARCH_STORAGE_KEY] : [];
       const disabledKeys = Array.isArray(result[SITE_SEARCH_DISABLED_STORAGE_KEY])
-        ? result[SITE_SEARCH_DISABLED_STORAGE_KEY].map((item) => String(item).toLowerCase()).filter(Boolean)
+        ? result[SITE_SEARCH_DISABLED_STORAGE_KEY]
         : [];
-      const baseItems = defaultSiteSearchProviders.filter((item) => {
-        const key = String(item && item.key ? item.key : '').toLowerCase();
-        return key && !disabledKeys.includes(key);
-      });
-      siteSearchProvidersCache = mergeCustomProvidersLocal(baseItems, customItems);
+      siteSearchProvidersCache = typeof SITE_SEARCH_STORE.mergeStoredProviders === 'function'
+        ? SITE_SEARCH_STORE.mergeStoredProviders(
+          defaultSiteSearchProviders,
+          customItems,
+          disabledKeys,
+          SEARCH_UTILS.mergeCustomProviders
+        )
+        : defaultSiteSearchProviders.slice();
       if (latestQuery) {
         requestSuggestions(latestQuery, { immediate: true });
       }

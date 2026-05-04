@@ -101,11 +101,11 @@
     scrollbarStyle.id = '_x_extension_scrollbar_style_2024_unique_';
     scrollbarStyle.textContent = `
       #_x_extension_overlay_2024_unique_ *::-webkit-scrollbar {
-        display: none !important;
+        display: none;
       }
       #_x_extension_overlay_2024_unique_ * {
-        -ms-overflow-style: none !important;
-        scrollbar-width: none !important;
+        -ms-overflow-style: none;
+        scrollbar-width: none;
       }
     `;
     styleRoot.appendChild(scrollbarStyle);
