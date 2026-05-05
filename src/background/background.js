@@ -48,6 +48,12 @@ try {
 }
 
 try {
+  importScripts(chrome.runtime.getURL('src/background/shortcut-rules.js'));
+} catch (error) {
+  console.warn('Lumno: failed to load shortcut rules helpers.', error);
+}
+
+try {
   importScripts(chrome.runtime.getURL('src/background/pip-ownership.js'));
 } catch (error) {
   console.warn('Lumno: failed to load PiP ownership utils.', error);
@@ -77,6 +83,20 @@ const isLocalFileLikeTargetUrl = BACKGROUND_NEWTAB_FALLBACK.isLocalFileLikeTarge
 const checkFileSchemeAccess = BACKGROUND_NEWTAB_FALLBACK.checkFileSchemeAccess;
 const openNewtabFallback = BACKGROUND_NEWTAB_FALLBACK.openNewtabFallback;
 const openNewtabFallbackForUrl = BACKGROUND_NEWTAB_FALLBACK.openNewtabFallbackForUrl;
+const BACKGROUND_SHORTCUT_RULES = globalThis.LumnoShortcutRules || {};
+const shortcutRules = BACKGROUND_SHORTCUT_RULES && typeof BACKGROUND_SHORTCUT_RULES.create === 'function'
+  ? BACKGROUND_SHORTCUT_RULES.create({
+    chromeApi: chrome,
+    fetchImpl: fetch,
+    navigatorLike: navigator
+  })
+  : null;
+const loadShortcutRules = shortcutRules && typeof shortcutRules.loadShortcutRules === 'function'
+  ? shortcutRules.loadShortcutRules
+  : () => Promise.resolve([]);
+const getShortcutUrl = shortcutRules && typeof shortcutRules.getShortcutUrl === 'function'
+  ? shortcutRules.getShortcutUrl
+  : () => null;
 
 function isBrowserExtensionProtocol(protocol) {
   const guards = globalThis.LumnoUrlGuards || {};
@@ -2455,8 +2475,6 @@ function handleFaviconMessage(request, sender, sendResponse) {
   }
 }
 
-let shortcutRulesCache = null;
-let shortcutRulesPromise = null;
 let siteSearchCache = null;
 let siteSearchPromise = null;
 let searchBlacklistCache = null;
@@ -4093,25 +4111,6 @@ function loadSiteSearchProviders() {
   return siteSearchPromise;
 }
 
-function loadShortcutRules() {
-  if (shortcutRulesCache) {
-    return Promise.resolve(shortcutRulesCache);
-  }
-  if (shortcutRulesPromise) {
-    return shortcutRulesPromise;
-  }
-  const rulesUrl = chrome.runtime.getURL('assets/data/shortcut-rules.json');
-  shortcutRulesPromise = fetch(rulesUrl)
-    .then((response) => response.json())
-    .then((data) => {
-      const items = data && Array.isArray(data.items) ? data.items : [];
-      shortcutRulesCache = items;
-      return items;
-    })
-    .catch(() => []);
-  return shortcutRulesPromise;
-}
-
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (!storageAreaName || areaName !== storageAreaName) {
     return;
@@ -4161,48 +4160,6 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   );
   searchSelectionStatsPromise = null;
 });
-
-function getBrowserInternalScheme() {
-  const ua = navigator.userAgent || '';
-  if (ua.includes('Edg/')) {
-    return 'edge://';
-  }
-  if (ua.includes('Brave')) {
-    return 'brave://';
-  }
-  if (ua.includes('Vivaldi')) {
-    return 'vivaldi://';
-  }
-  if (ua.includes('OPR/') || ua.includes('Opera')) {
-    return 'opera://';
-  }
-  return 'chrome://';
-}
-
-function getShortcutUrl(query, rules) {
-  if (!query || !Array.isArray(rules)) {
-    return null;
-  }
-  const queryLower = query.toLowerCase();
-  const scheme = getBrowserInternalScheme();
-  for (let i = 0; i < rules.length; i += 1) {
-    const rule = rules[i];
-    if (!rule || !Array.isArray(rule.keys)) {
-      continue;
-    }
-    const isMatch = rule.keys.some((key) => queryLower.startsWith(key));
-    if (!isMatch) {
-      continue;
-    }
-    if (rule.type === 'browserPage' && rule.path) {
-      return `${scheme}${rule.path}`;
-    }
-    if (rule.type === 'url' && rule.url) {
-      return rule.url;
-    }
-  }
-  return null;
-}
 
 function withTimeout(promise, timeoutMs, fallbackValue) {
   const safePromise = promise

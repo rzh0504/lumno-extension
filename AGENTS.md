@@ -9,6 +9,7 @@
 - `src/background/ai-provider-submit.js`
 - `src/background/extension-pages.js`
 - `src/background/newtab-fallback.js`
+- `src/background/shortcut-rules.js`
 - `src/background/pip-ownership.js`
 - `src/background/pip-main-world.js`
 - `src/newtab/newtab.html`
