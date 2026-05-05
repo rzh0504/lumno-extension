@@ -6155,20 +6155,20 @@
     const urlLine = document.createElement('span');
     urlLine.textContent = url;
     urlLine.style.cssText = `
-      all: unset !important;
-      color: var(--x-nt-link, #2563EB) !important;
-      font-size: 12px !important;
-      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-      text-decoration: none !important;
-      display: inline-block !important;
-      max-width: 60% !important;
-      line-height: 1.4 !important;
-      white-space: nowrap !important;
-      overflow: hidden !important;
-      text-overflow: ellipsis !important;
-      box-sizing: border-box !important;
-      margin: 0 !important;
-      padding: 0 !important;
+      all: unset;
+      color: var(--x-nt-link, #2563EB);
+      font-size: 12px;
+      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      text-decoration: none;
+      display: inline-block;
+      max-width: 60%;
+      line-height: 1.4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     `;
     return urlLine;
   }
