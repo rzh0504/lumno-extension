@@ -6,6 +6,7 @@
 ### 1) 仅打包运行必需文件
 - `manifest.json`
 - `src/background/background.js`
+- `src/background/ai-provider-submit.js`
 - `src/background/pip-ownership.js`
 - `src/newtab/newtab.html`
 - `src/newtab/newtab.js`

@@ -1775,6 +1775,91 @@
       .replace(/\{searchTerms\}/g, '{query}');
   }
 
+  const INTERACTIVE_SITE_SEARCH_SUBMIT_STRATEGIES = Object.freeze([
+    'geminiPrompt',
+    'chatgptPrompt',
+    'doubaoPrompt',
+    'qianwenQuery',
+    'yuanbaoPrompt',
+    'minimaxPrompt',
+    'deepseekPrompt',
+    'kimiPrompt'
+  ]);
+
+  const DEFAULT_SITE_SEARCH_PROVIDERS = Object.freeze([
+    { key: 'yt', aliases: ['youtube'], name: 'YouTube', template: 'https://www.youtube.com/results?search_query={query}' },
+    { key: 'bb', aliases: ['bilibili', 'bili'], name: 'Bilibili', template: 'https://search.bilibili.com/all?keyword={query}' },
+    { key: 'gh', aliases: ['github'], name: 'GitHub', template: 'https://github.com/search?q={query}' },
+    { key: 'gpt', aliases: ['chatgpt', 'openai'], name: 'ChatGPT', template: 'https://chatgpt.com/?hints=search&ref=ext&q={query}', action: 'openAndSubmit', submitStrategy: 'chatgptPrompt', iconUrl: 'https://www.google.com/s2/favicons?domain=chatgpt.com&sz=64' },
+    { key: 'gm', aliases: ['gemini'], name: 'Gemini', template: 'https://gemini.google.com/app', action: 'openAndSubmit', submitStrategy: 'geminiPrompt', iconUrl: 'https://www.google.com/s2/favicons?domain=gemini.google.com&sz=64' },
+    { key: 'dbai', aliases: ['doubao', '豆包'], name: '豆包', template: 'https://www.doubao.com/chat/', action: 'openAndSubmit', submitStrategy: 'doubaoPrompt', iconUrl: 'https://www.google.com/s2/favicons?domain=www.doubao.com&sz=64' },
+    { key: 'qw', aliases: ['qianwen', 'qwen', '千问'], name: '千问', template: 'https://www.qianwen.com/?q={query}', action: 'openAndSubmit', submitStrategy: 'qianwenQuery', iconUrl: 'https://www.google.com/s2/favicons?domain=www.qianwen.com&sz=64' },
+    { key: 'yb', aliases: ['yuanbao', 'tencent', '腾讯元宝', '元宝'], name: '元宝', template: 'https://yuanbao.tencent.com/chat/', action: 'openAndSubmit', submitStrategy: 'yuanbaoPrompt', iconUrl: 'https://www.google.com/s2/favicons?domain=yuanbao.tencent.com&sz=64' },
+    { key: 'mx', aliases: ['minimax', 'mini max'], name: 'MiniMax', template: 'https://chat.minimax.io/', action: 'openAndSubmit', submitStrategy: 'minimaxPrompt', iconUrl: 'https://www.google.com/s2/favicons?domain=chat.minimax.io&sz=64' },
+    { key: 'ds', aliases: ['deepseek', 'deep seek', '深度求索'], name: 'DeepSeek', template: 'https://chat.deepseek.com/', action: 'openAndSubmit', submitStrategy: 'deepseekPrompt', iconUrl: 'https://www.google.com/s2/favicons?domain=chat.deepseek.com&sz=64' },
+    { key: 'kimi', aliases: ['moonshot', '月之暗面'], name: 'Kimi', template: 'https://www.kimi.com/', action: 'openAndSubmit', submitStrategy: 'kimiPrompt', iconUrl: 'https://www.google.com/s2/favicons?domain=www.kimi.com&sz=64' },
+    { key: 'so', aliases: ['baidu', 'bd'], name: 'Baidu', template: 'https://www.baidu.com/s?wd={query}' },
+    { key: 'bi', aliases: ['bing'], name: 'Bing', template: 'https://www.bing.com/search?q={query}' },
+    { key: 'gg', aliases: ['google'], name: 'Google', template: 'https://www.google.com/search?q={query}' },
+    { key: 'zh', aliases: ['zhihu'], name: 'Zhihu', template: 'https://www.zhihu.com/search?q={query}' },
+    { key: 'db', aliases: ['douban'], name: 'Douban', template: 'https://www.douban.com/search?q={query}' },
+    { key: 'jj', aliases: ['juejin'], name: 'Juejin', template: 'https://juejin.cn/search?query={query}' },
+    { key: 'tb', aliases: ['taobao'], name: 'Taobao', template: 'https://s.taobao.com/search?q={query}' },
+    { key: 'tm', aliases: ['tmall'], name: 'Tmall', template: 'https://list.tmall.com/search_product.htm?q={query}' },
+    { key: 'wx', aliases: ['weixin', 'wechat'], name: 'WeChat', template: 'https://weixin.sogou.com/weixin?query={query}' },
+    { key: 'tw', aliases: ['twitter', 'x'], name: 'X', template: 'https://x.com/search?q={query}' },
+    { key: 'rd', aliases: ['reddit'], name: 'Reddit', template: 'https://www.reddit.com/search/?q={query}' },
+    { key: 'wk', aliases: ['wiki', 'wikipedia'], name: 'Wikipedia', template: 'https://en.wikipedia.org/wiki/Special:Search?search={query}' },
+    { key: 'zw', aliases: ['zhwiki'], name: 'Wikipedia', template: 'https://zh.wikipedia.org/wiki/Special:Search?search={query}' }
+  ]);
+
+  const SITE_SEARCH_PROVIDER_DISPLAY_NAME_MESSAGES = Object.freeze({
+    gpt: ['site_search_name_chatgpt', 'ChatGPT'],
+    gm: ['site_search_name_gemini', 'Gemini'],
+    dbai: ['site_search_name_doubao', 'Doubao'],
+    qw: ['site_search_name_qianwen', 'Qianwen'],
+    yb: ['site_search_name_yuanbao', 'Yuanbao'],
+    mx: ['site_search_name_minimax', 'MiniMax'],
+    ds: ['site_search_name_deepseek', 'DeepSeek'],
+    kimi: ['site_search_name_kimi', 'Kimi'],
+    so: ['site_search_name_baidu', 'Baidu'],
+    zh: ['site_search_name_zhihu', 'Zhihu'],
+    db: ['site_search_name_douban', 'Douban'],
+    jd: ['site_search_name_juejin', 'Juejin'],
+    jj: ['site_search_name_juejin', 'Juejin'],
+    tb: ['site_search_name_taobao', 'Taobao'],
+    tm: ['site_search_name_tmall', 'Tmall'],
+    wx: ['site_search_name_wechat', 'WeChat'],
+    zw: ['site_search_name_wikipedia', 'Wikipedia']
+  });
+
+  function cloneSiteSearchProvider(provider) {
+    return {
+      ...(provider || {}),
+      aliases: Array.isArray(provider && provider.aliases) ? provider.aliases.slice() : []
+    };
+  }
+
+  function getSiteSearchProviderDisplayNameMessage(provider) {
+    const key = String(provider && provider.key ? provider.key : '').toLowerCase();
+    const mapping = SITE_SEARCH_PROVIDER_DISPLAY_NAME_MESSAGES[key];
+    if (!mapping) {
+      return null;
+    }
+    return {
+      messageKey: mapping[0],
+      fallback: mapping[1]
+    };
+  }
+
+  function getDefaultSiteSearchProviders() {
+    return DEFAULT_SITE_SEARCH_PROVIDERS.map(cloneSiteSearchProvider);
+  }
+
+  function isInteractiveSiteSearchSubmitStrategy(strategy) {
+    return INTERACTIVE_SITE_SEARCH_SUBMIT_STRATEGIES.includes(String(strategy || '').trim());
+  }
+
   function hasOpenAndSubmitSiteSearchAction(provider) {
     return Boolean(
       provider &&
@@ -1796,7 +1881,7 @@
   function isInteractiveSiteSearchProvider(provider) {
     return Boolean(
       hasOpenAndSubmitSiteSearchAction(provider) &&
-      String(provider.submitStrategy || '').trim() === 'geminiPrompt'
+      isInteractiveSiteSearchSubmitStrategy(provider.submitStrategy)
     );
   }
 
@@ -1926,10 +2011,13 @@
     getSearchSelectionBoost,
     getSearchTermCoverageStats,
     getStrongNavigationMatchScore,
+    getDefaultSiteSearchProviders,
+    getSiteSearchProviderDisplayNameMessage,
     hasOpenAndSubmitSiteSearchAction,
     inheritSiteSearchProviderBehavior,
     isAiSiteSearchProvider,
     isInteractiveSiteSearchProvider,
+    isInteractiveSiteSearchSubmitStrategy,
     isSearchLikelyBrandProductQuery,
     isSearchLikelyDirectNavigationQuery,
     isShortAsciiSearchTerm,

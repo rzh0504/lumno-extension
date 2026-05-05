@@ -135,6 +135,22 @@ const merged = search.mergeCustomProviders([geminiBase], [customizedGemini]);
 assert.strictEqual(merged.length, 1, 'custom provider should replace same-key built-in provider');
 assert.strictEqual(merged[0].action, 'openAndSubmit');
 
+assert.deepStrictEqual(
+  search.getSiteSearchProviderDisplayNameMessage({ key: 'dbai' }),
+  { messageKey: 'site_search_name_doubao', fallback: 'Doubao' },
+  'AI provider display names should resolve from shared mapping'
+);
+assert.deepStrictEqual(
+  search.getSiteSearchProviderDisplayNameMessage({ key: 'jd' }),
+  { messageKey: 'site_search_name_juejin', fallback: 'Juejin' },
+  'legacy juejin key should resolve from shared mapping'
+);
+assert.strictEqual(
+  search.getSiteSearchProviderDisplayNameMessage({ key: 'unknown' }),
+  null,
+  'unknown provider display names should fall back to caller-owned name'
+);
+
 assert.strictEqual(
   search.buildSearchUrlFromTemplate('https://example.com/search?q={searchTerms}', 'hello world'),
   'https://example.com/search?q=hello%20world',

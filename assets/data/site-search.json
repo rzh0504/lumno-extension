@@ -20,12 +20,76 @@
       "template": "https://github.com/search?q={query}"
     },
     {
+      "key": "gpt",
+      "aliases": ["chatgpt", "openai"],
+      "name": "ChatGPT",
+      "template": "https://chatgpt.com/?hints=search&ref=ext&q={query}",
+      "iconUrl": "https://www.google.com/s2/favicons?domain=chatgpt.com&sz=64",
+      "action": "openAndSubmit",
+      "submitStrategy": "chatgptPrompt"
+    },
+    {
       "key": "gm",
       "aliases": ["gemini"],
       "name": "Gemini",
       "template": "https://gemini.google.com/app",
+      "iconUrl": "https://www.google.com/s2/favicons?domain=gemini.google.com&sz=64",
       "action": "openAndSubmit",
       "submitStrategy": "geminiPrompt"
+    },
+    {
+      "key": "dbai",
+      "aliases": ["doubao", "豆包"],
+      "name": "豆包",
+      "template": "https://www.doubao.com/chat/",
+      "iconUrl": "https://www.google.com/s2/favicons?domain=www.doubao.com&sz=64",
+      "action": "openAndSubmit",
+      "submitStrategy": "doubaoPrompt"
+    },
+    {
+      "key": "qw",
+      "aliases": ["qianwen", "qwen", "千问"],
+      "name": "千问",
+      "template": "https://www.qianwen.com/?q={query}",
+      "iconUrl": "https://www.google.com/s2/favicons?domain=www.qianwen.com&sz=64",
+      "action": "openAndSubmit",
+      "submitStrategy": "qianwenQuery"
+    },
+    {
+      "key": "yb",
+      "aliases": ["yuanbao", "tencent", "腾讯元宝", "元宝"],
+      "name": "元宝",
+      "template": "https://yuanbao.tencent.com/chat/",
+      "iconUrl": "https://www.google.com/s2/favicons?domain=yuanbao.tencent.com&sz=64",
+      "action": "openAndSubmit",
+      "submitStrategy": "yuanbaoPrompt"
+    },
+    {
+      "key": "mx",
+      "aliases": ["minimax", "mini max"],
+      "name": "MiniMax",
+      "template": "https://chat.minimax.io/",
+      "iconUrl": "https://www.google.com/s2/favicons?domain=chat.minimax.io&sz=64",
+      "action": "openAndSubmit",
+      "submitStrategy": "minimaxPrompt"
+    },
+    {
+      "key": "ds",
+      "aliases": ["deepseek", "deep seek", "深度求索"],
+      "name": "DeepSeek",
+      "template": "https://chat.deepseek.com/",
+      "iconUrl": "https://www.google.com/s2/favicons?domain=chat.deepseek.com&sz=64",
+      "action": "openAndSubmit",
+      "submitStrategy": "deepseekPrompt"
+    },
+    {
+      "key": "kimi",
+      "aliases": ["moonshot", "月之暗面"],
+      "name": "Kimi",
+      "template": "https://www.kimi.com/",
+      "iconUrl": "https://www.google.com/s2/favicons?domain=www.kimi.com&sz=64",
+      "action": "openAndSubmit",
+      "submitStrategy": "kimiPrompt"
     },
     {
       "key": "so",

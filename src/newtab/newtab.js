@@ -2232,25 +2232,9 @@
     SEARCH_BLACKLIST_STORAGE_KEY
   ]);
   let handleTabKey = null;
-  const defaultSiteSearchProviders = [
-    { key: 'yt', aliases: ['youtube'], name: 'YouTube', template: 'https://www.youtube.com/results?search_query={query}' },
-    { key: 'bb', aliases: ['bilibili', 'bili'], name: 'Bilibili', template: 'https://search.bilibili.com/all?keyword={query}' },
-    { key: 'gh', aliases: ['github'], name: 'GitHub', template: 'https://github.com/search?q={query}' },
-    { key: 'gm', aliases: ['gemini'], name: 'Gemini', template: 'https://gemini.google.com/app', action: 'openAndSubmit', submitStrategy: 'geminiPrompt' },
-    { key: 'so', aliases: ['baidu', 'bd'], name: '百度', template: 'https://www.baidu.com/s?wd={query}' },
-    { key: 'bi', aliases: ['bing'], name: 'Bing', template: 'https://www.bing.com/search?q={query}' },
-    { key: 'gg', aliases: ['google'], name: 'Google', template: 'https://www.google.com/search?q={query}' },
-    { key: 'zh', aliases: ['zhihu'], name: '知乎', template: 'https://www.zhihu.com/search?q={query}' },
-    { key: 'db', aliases: ['douban'], name: '豆瓣', template: 'https://www.douban.com/search?q={query}' },
-    { key: 'jd', aliases: ['juejin'], name: '掘金', template: 'https://juejin.cn/search?query={query}' },
-    { key: 'tb', aliases: ['taobao'], name: '淘宝', template: 'https://s.taobao.com/search?q={query}' },
-    { key: 'tm', aliases: ['tmall'], name: '天猫', template: 'https://list.tmall.com/search_product.htm?q={query}' },
-    { key: 'wx', aliases: ['weixin', 'wechat'], name: '微信', template: 'https://weixin.sogou.com/weixin?query={query}' },
-    { key: 'tw', aliases: ['twitter', 'x'], name: 'X', template: 'https://x.com/search?q={query}' },
-    { key: 'rd', aliases: ['reddit'], name: 'Reddit', template: 'https://www.reddit.com/search/?q={query}' },
-    { key: 'wk', aliases: ['wiki', 'wikipedia'], name: 'Wikipedia', template: 'https://en.wikipedia.org/wiki/Special:Search?search={query}' },
-    { key: 'zw', aliases: ['zhwiki'], name: '维基百科', template: 'https://zh.wikipedia.org/wiki/Special:Search?search={query}' }
-  ];
+  const defaultSiteSearchProviders = typeof SEARCH_UTILS.getDefaultSiteSearchProviders === 'function'
+    ? SEARCH_UTILS.getDefaultSiteSearchProviders()
+    : [];
   const defaultAccentColor = NEWTAB_FAVICON_THEME.defaultAccentColor;
   const mixColor = NEWTAB_FAVICON_THEME.mixColor;
   const stableHashCode = NEWTAB_FAVICON_THEME.stableHashCode;
@@ -2259,6 +2243,7 @@
   const rgbToCssParts = NEWTAB_FAVICON_THEME.rgbToCssParts;
   const parseCssColor = NEWTAB_FAVICON_THEME.parseCssColor;
   const buildTheme = NEWTAB_FAVICON_THEME.buildTheme;
+  const getBrandAccentForHost = NEWTAB_FAVICON_THEME.getBrandAccentForHost;
   const getBrandAccentForUrl = NEWTAB_FAVICON_THEME.getBrandAccentForUrl;
   const buildFallbackThemeForHost = NEWTAB_FAVICON_THEME.buildFallbackThemeForHost;
   const normalizeHost = NEWTAB_FAVICON_THEME.normalizeHost;
@@ -2407,16 +2392,42 @@
     });
   }
 
-  function getThemeForProvider(provider) {
-    if (provider && provider.template) {
-      const brandAccent = getBrandAccentForUrl(provider.template);
-      if (brandAccent) {
-        const brandTheme = buildTheme(brandAccent);
-        brandTheme._xIsBrand = true;
-        return Promise.resolve(brandTheme);
-      }
+  function getProviderThemeHost(provider) {
+    return normalizeHost(getProviderHost(provider));
+  }
+
+  function buildAndCacheBrandThemeForHost(hostKey, iconUrl) {
+    const normalizedHost = normalizeHost(hostKey);
+    if (!normalizedHost) {
+      return null;
     }
-    return getThemeFromUrl(getProviderIcon(provider));
+    const brandAccent = getBrandAccentForHost(normalizedHost);
+    if (!brandAccent) {
+      return null;
+    }
+    const brandTheme = buildTheme(brandAccent);
+    brandTheme._xIsBrand = true;
+    themeHostCache.set(normalizedHost, brandTheme);
+    if (iconUrl) {
+      themeColorCache.set(iconUrl, brandTheme);
+    }
+    return brandTheme;
+  }
+
+  function getThemeForProvider(provider) {
+    const hostKey = getProviderThemeHost(provider);
+    const iconUrl = getProviderIcon(provider);
+    if (hostKey && themeHostCache.has(hostKey)) {
+      return Promise.resolve(themeHostCache.get(hostKey));
+    }
+    if (iconUrl && themeColorCache.has(iconUrl)) {
+      return Promise.resolve(themeColorCache.get(iconUrl));
+    }
+    const brandTheme = buildAndCacheBrandThemeForHost(hostKey, iconUrl);
+    if (brandTheme) {
+      return Promise.resolve(brandTheme);
+    }
+    return getThemeFromUrl(iconUrl, hostKey);
   }
 
   function shouldUseBrandTheme(suggestion) {
@@ -2460,11 +2471,21 @@
       return defaultTheme;
     }
     if (suggestion && suggestion.provider) {
-      const brandAccent = getBrandAccentForUrl(suggestion.provider.template);
-      if (brandAccent) {
-        const brandTheme = buildTheme(brandAccent);
-        brandTheme._xIsBrand = true;
+      const hostKey = getProviderThemeHost(suggestion.provider);
+      const iconUrl = getProviderIcon(suggestion.provider);
+      if (hostKey && themeHostCache.has(hostKey)) {
+        return themeHostCache.get(hostKey);
+      }
+      if (iconUrl && themeColorCache.has(iconUrl)) {
+        return themeColorCache.get(iconUrl);
+      }
+      const brandTheme = buildAndCacheBrandThemeForHost(hostKey, iconUrl);
+      if (brandTheme) {
         return brandTheme;
+      }
+      const fallbackTheme = buildFallbackThemeForHost(hostKey);
+      if (fallbackTheme) {
+        return fallbackTheme;
       }
     }
     if (suggestion && suggestion.url) {
@@ -2764,6 +2785,13 @@
   const FAVICON_GOOGLE_SIZE = 128;
 
   function getThemeSourceForSuggestion(suggestion) {
+    if (suggestion && suggestion.provider) {
+      const hostKey = getProviderThemeHost(suggestion.provider);
+      if (hostKey && shouldBlockFaviconForHost(hostKey)) {
+        return '';
+      }
+      return getProviderIcon(suggestion.provider) || (hostKey ? getGoogleFaviconUrl(hostKey) : '');
+    }
     if (suggestion && suggestion.url) {
       try {
         const hostname = normalizeHost(new URL(suggestion.url).hostname);
@@ -6162,13 +6190,27 @@
     );
   }
 
+  function isAiSiteSearchProvider(provider) {
+    if (typeof SEARCH_UTILS.isAiSiteSearchProvider === 'function') {
+      return SEARCH_UTILS.isAiSiteSearchProvider(provider);
+    }
+    const template = normalizeSiteSearchTemplate(String((provider && provider.template) || '').trim());
+    return Boolean(
+      provider &&
+      (
+        hasOpenAndSubmitSiteSearchAction(provider) ||
+        (template && !template.includes('{query}'))
+      )
+    );
+  }
+
   function isInteractiveSiteSearchProvider(provider) {
     if (typeof SEARCH_UTILS.isInteractiveSiteSearchProvider === 'function') {
       return SEARCH_UTILS.isInteractiveSiteSearchProvider(provider);
     }
     return Boolean(
       hasOpenAndSubmitSiteSearchAction(provider) &&
-      String(provider.submitStrategy || '').trim() === 'geminiPrompt'
+      ['geminiPrompt', 'chatgptPrompt', 'doubaoPrompt', 'qianwenQuery', 'yuanbaoPrompt', 'minimaxPrompt', 'deepseekPrompt', 'kimiPrompt'].includes(String(provider.submitStrategy || '').trim())
     );
   }
 
@@ -6197,6 +6239,9 @@
   function getProviderIcon(provider) {
     if (provider && provider.icon) {
       return provider.icon;
+    }
+    if (provider && provider.iconUrl) {
+      return provider.iconUrl;
     }
     const template = provider && provider.template ? provider.template : '';
     try {
@@ -6250,23 +6295,35 @@
     if (!provider) {
       return t('site_search_default', '站内');
     }
-    const key = String(provider.key || '').toLowerCase();
-    const keyToMessage = {
-      so: ['site_search_name_baidu', 'Baidu'],
-      zh: ['site_search_name_zhihu', 'Zhihu'],
-      db: ['site_search_name_douban', 'Douban'],
-      jd: ['site_search_name_juejin', 'Juejin'],
-      jj: ['site_search_name_juejin', 'Juejin'],
-      tb: ['site_search_name_taobao', 'Taobao'],
-      tm: ['site_search_name_tmall', 'Tmall'],
-      wx: ['site_search_name_wechat', 'WeChat'],
-      zw: ['site_search_name_wikipedia', 'Wikipedia']
-    };
-    const mapping = keyToMessage[key];
+    const mapping = typeof SEARCH_UTILS.getSiteSearchProviderDisplayNameMessage === 'function'
+      ? SEARCH_UTILS.getSiteSearchProviderDisplayNameMessage(provider)
+      : null;
     if (mapping) {
-      return t(mapping[0], mapping[1]);
+      return t(mapping.messageKey, mapping.fallback);
     }
     return provider.name || provider.key || t('site_search_default', '站内');
+  }
+
+  function getSiteSearchActionTitle(provider, query) {
+    const site = getSiteSearchDisplayName(provider);
+    const queryText = String(query || '').trim();
+    if (isAiSiteSearchProvider(provider)) {
+      return queryText
+        ? formatMessage('ask_ai_provider_query', '向 {site} 提问 "{query}"', { site, query: queryText })
+        : formatMessage('ask_ai_provider', '向 {site} 提问', { site });
+    }
+    return queryText
+      ? formatMessage('search_in_site_query', '在 {site} 中搜索 "{query}"', { site, query: queryText })
+      : formatMessage('search_in_site', '在 {site} 中搜索', { site });
+  }
+
+  function getSiteSearchPrefixText(provider) {
+    if (isAiSiteSearchProvider(provider)) {
+      return getSiteSearchDisplayName(provider);
+    }
+    return getSiteSearchDisplayName(provider) || formatMessage('search_in_site', '在 {site} 中搜索', {
+      site: provider && provider.name ? provider.name : ''
+    });
   }
 
   function suggestionMatchesProvider(suggestion, provider) {
@@ -7362,9 +7419,7 @@
         if (inlineUrl) {
           inlineSuggestion = {
             type: 'inlineSiteSearch',
-            title: formatMessage('search_in_site', '在 {site} 中搜索', {
-              site: getSiteSearchDisplayName(inlineCandidate.provider)
-            }),
+            title: getSiteSearchActionTitle(inlineCandidate.provider),
             url: inlineUrl,
             favicon: getProviderIcon(inlineCandidate.provider),
             provider: inlineCandidate.provider,
@@ -7393,10 +7448,7 @@
             }
             return {
               type: 'siteSearch',
-              title: formatMessage('search_in_site_query', '在 {site} 中搜索 "{query}"', {
-                site: getSiteSearchDisplayName(siteSearchState),
-                query: query
-              }),
+              title: getSiteSearchActionTitle(siteSearchState, query),
               url: siteUrl,
               favicon: getProviderIcon(siteSearchState),
               provider: siteSearchState,
@@ -7425,7 +7477,10 @@
       let siteSearchTrigger = null;
       const preferAutocompleteFirst = searchResultPriorityMode !== 'search';
       if (!modeCommandActive && !hasCommand) {
-        if (!siteSearchState && !inlineEnabled && preferAutocompleteFirst) {
+        const exactSiteSearchTrigger = (!siteSearchState && !inlineEnabled)
+          ? getSiteSearchTriggerCandidate(rawTagInput, providersForTags, null)
+          : null;
+        if (!siteSearchState && !inlineEnabled && !exactSiteSearchTrigger && preferAutocompleteFirst) {
           strongNavigationMatch = promoteStrongNavigationMatch(allSuggestions, latestRawQuery.trim());
           if (strongNavigationMatch) {
             primaryHighlightIndex = 0;
@@ -7434,14 +7489,12 @@
           topSiteMatch = promoteTopSiteMatch(allSuggestions, latestRawQuery.trim());
         }
         siteSearchTrigger = (!siteSearchState && !inlineEnabled)
-          ? getSiteSearchTriggerCandidate(rawTagInput, providersForTags, topSiteMatch)
+          ? (exactSiteSearchTrigger || getSiteSearchTriggerCandidate(rawTagInput, providersForTags, topSiteMatch))
           : null;
-        if (siteSearchTrigger && !topSiteMatch && !strongNavigationMatch) {
+        if (siteSearchTrigger && (exactSiteSearchTrigger || (!topSiteMatch && !strongNavigationMatch))) {
           siteSearchPrompt = {
             type: 'siteSearchPrompt',
-            title: formatMessage('search_in_site', '在 {site} 中搜索', {
-              site: getSiteSearchDisplayName(siteSearchTrigger)
-            }),
+            title: getSiteSearchActionTitle(siteSearchTrigger),
             url: '',
             favicon: getProviderIcon(siteSearchTrigger),
             provider: siteSearchTrigger
@@ -9180,7 +9233,8 @@
     display: none;
     align-items: center;
     justify-content: center;
-    max-width: min(160px, 42%);
+    gap: 6px;
+    max-width: min(220px, 48%);
     min-width: 0;
     height: 26px;
     padding: 0 10px;
@@ -9195,6 +9249,7 @@
     letter-spacing: 0;
     color: #F8FAFC;
     background: #3B82F6;
+    border: 1px solid transparent;
     border-radius: 9px;
     box-shadow: 0 7px 16px rgba(59, 130, 246, 0.24);
     opacity: 1;
@@ -9214,25 +9269,83 @@
     );
   }
 
-  function getInputModePrefixVisual(theme) {
+  function getInputModePrefixVisual(theme, options) {
     const resolvedTheme = theme ? getThemeForMode(theme) : defaultTheme;
     const accentRgb = (resolvedTheme && (resolvedTheme.accentRgb || parseCssColor(resolvedTheme.accent))) ||
       defaultAccentColor;
+    const isAi = Boolean(options && options.isAi);
+    if (isAi) {
+      const alpha = isNewtabDarkMode() ? 0.18 : 0.1;
+      return {
+        background: `rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, ${alpha})`,
+        border: `1px solid rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, ${isNewtabDarkMode() ? 0.3 : 0.2})`,
+        shadow: `0 6px 14px rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, ${isNewtabDarkMode() ? 0.2 : 0.1})`,
+        color: isNewtabDarkMode() ? '#F8FAFC' : '#334155',
+        caretColor: resolvedTheme && resolvedTheme.placeholderText
+          ? resolvedTheme.placeholderText
+          : rgbToCss(accentRgb)
+      };
+    }
     return {
       background: rgbToCss(accentRgb),
+      border: '1px solid transparent',
       shadow: `0 7px 16px rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, ${isNewtabDarkMode() ? 0.34 : 0.24})`,
+      color: '#F8FAFC',
       caretColor: resolvedTheme && resolvedTheme.placeholderText
         ? resolvedTheme.placeholderText
         : rgbToCss(accentRgb)
     };
   }
 
-  function applyInputModePrefixVisual(theme) {
-    const visual = getInputModePrefixVisual(theme);
+  function applyInputModePrefixVisual(theme, options) {
+    const visual = getInputModePrefixVisual(theme, options);
     siteSearchPrefix.style.setProperty('background', visual.background);
+    siteSearchPrefix.style.setProperty('border', visual.border);
     siteSearchPrefix.style.setProperty('box-shadow', visual.shadow);
-    siteSearchPrefix.style.setProperty('color', '#F8FAFC');
+    siteSearchPrefix.style.setProperty('color', visual.color);
     return visual;
+  }
+
+  function setInputModePrefixContent(prefixText, options) {
+    siteSearchPrefix.textContent = '';
+    const iconUrl = options && options.iconUrl ? String(options.iconUrl || '').trim() : '';
+    if (iconUrl) {
+      const icon = document.createElement('img');
+      icon.alt = '';
+      icon.decoding = 'async';
+      icon.referrerPolicy = 'no-referrer';
+      icon.style.cssText = `
+        all: unset;
+        width: 15px;
+        height: 15px;
+        border-radius: 4px;
+        object-fit: contain;
+        flex: 0 0 auto;
+        display: block;
+      `;
+      icon.addEventListener('error', () => {
+        icon.remove();
+        updateSiteSearchPrefixLayout();
+      }, { once: true });
+      const iconHost = options && options.iconHost ? String(options.iconHost || '').trim() : '';
+      if (typeof attachFaviconData === 'function') {
+        icon.src = iconUrl;
+        attachFaviconData(icon, iconUrl, iconHost);
+      } else {
+        icon.src = iconUrl;
+      }
+      siteSearchPrefix.appendChild(icon);
+    }
+    const text = document.createElement('span');
+    text.textContent = prefixText;
+    text.style.cssText = `
+      all: unset;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    `;
+    siteSearchPrefix.appendChild(text);
   }
 
   function setInputModePrefixRestState() {
@@ -9286,12 +9399,17 @@
   }
 
   function setSiteSearchPrefix(provider, theme, options) {
-    const prefixText = getSiteSearchDisplayName(provider) || formatMessage('search_in_site', '在 {site} 中搜索', {
-      site: provider && provider.name ? provider.name : ''
-    });
+    const prefixText = getSiteSearchPrefixText(provider);
     const shouldAnimate = Boolean(options && options.animate);
-    siteSearchPrefix.textContent = prefixText;
-    const visual = applyInputModePrefixVisual(theme);
+    const isAi = isAiSiteSearchProvider(provider);
+    const prefixOptions = {
+      ...(options || {}),
+      iconUrl: isAi ? getProviderIcon(provider) : '',
+      iconHost: isAi ? getProviderThemeHost(provider) : '',
+      isAi
+    };
+    setInputModePrefixContent(prefixText, prefixOptions);
+    const visual = applyInputModePrefixVisual(theme, prefixOptions);
     siteSearchPrefix.style.setProperty('display', 'inline-flex');
     if (!shouldAnimate) {
       setInputModePrefixRestState();

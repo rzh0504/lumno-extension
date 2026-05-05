@@ -30,6 +30,12 @@ try {
 }
 
 try {
+  importScripts(chrome.runtime.getURL('src/background/ai-provider-submit.js'));
+} catch (error) {
+  console.warn('Lumno: failed to load AI provider submit runtime.', error);
+}
+
+try {
   importScripts(chrome.runtime.getURL('src/background/pip-ownership.js'));
 } catch (error) {
   console.warn('Lumno: failed to load PiP ownership utils.', error);
@@ -1469,34 +1475,40 @@ function openOverlayOnTab(activeTab, tabs, source) {
     const runOverlayScript = (tabZoomFactor) => {
       const prefillQuery = getOverlayPrefillQueryForSource(activeTab, source);
       const prioritizeCurrentPageMatch = source === 'page-hotkey-prefill';
-      chrome.scripting.executeScript({
-        target: {tabId: activeTab.id},
-        function: toggleBlackRectangle,
-        args: [tabs, {
-          tabZoomFactor: tabZoomFactor,
-          prefillQuery: prefillQuery,
-          prioritizeCurrentPageMatch: prioritizeCurrentPageMatch,
-          currentTabId: typeof activeTab.id === 'number' ? activeTab.id : null,
-          currentTabUrl: getResolvedTabUrl(activeTab)
-        }]
-      }, function() {
-        if (chrome.runtime.lastError) {
-          logHotkeyDebug('inject-failed', {
-            step: 'toggleBlackRectangle',
-            tabId: activeTab.id,
-            error: chrome.runtime.lastError.message || 'unknown',
-            source: source || ''
+      loadSiteSearchProviders()
+        .catch(() => [])
+        .then((siteSearchProviders) => {
+          chrome.scripting.executeScript({
+            target: {tabId: activeTab.id},
+            function: toggleBlackRectangle,
+            args: [tabs, {
+              tabZoomFactor: tabZoomFactor,
+              prefillQuery: prefillQuery,
+              prioritizeCurrentPageMatch: prioritizeCurrentPageMatch,
+              currentTabId: typeof activeTab.id === 'number' ? activeTab.id : null,
+              currentTabUrl: getResolvedTabUrl(activeTab),
+              siteSearchProviders: Array.isArray(siteSearchProviders) ? siteSearchProviders : []
+            }]
+          }, function() {
+            if (chrome.runtime.lastError) {
+              logHotkeyDebug('inject-failed', {
+                step: 'toggleBlackRectangle',
+                tabId: activeTab.id,
+                error: chrome.runtime.lastError.message || 'unknown',
+                source: source || ''
+              });
+              openNewtabFallback();
+              return;
+            }
+            logHotkeyDebug('overlay-opened', {
+              tabId: activeTab.id,
+              tabCount: Array.isArray(tabs) ? tabs.length : 0,
+              source: source || '',
+              tabZoomFactor: tabZoomFactor,
+              siteSearchProviderCount: Array.isArray(siteSearchProviders) ? siteSearchProviders.length : 0
+            });
           });
-          openNewtabFallback();
-          return;
-        }
-        logHotkeyDebug('overlay-opened', {
-          tabId: activeTab.id,
-          tabCount: Array.isArray(tabs) ? tabs.length : 0,
-          source: source || '',
-          tabZoomFactor: tabZoomFactor
         });
-      });
     };
     if (chrome.tabs && typeof chrome.tabs.getZoom === 'function') {
       chrome.tabs.getZoom(activeTab.id, (zoomFactor) => {
@@ -1971,170 +1983,18 @@ function waitForTabComplete(tabId, timeoutMs) {
   });
 }
 
-function submitGeminiPromptInTab(tabId, prompt) {
-  return new Promise((resolve) => {
-    chrome.scripting.executeScript({
-      target: { tabId: tabId },
-      func: async (rawPrompt) => {
-        const promptText = String(rawPrompt || '').trim();
-        if (!promptText) {
-          return { ok: false, reason: 'empty-prompt' };
-        }
-        const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
-        const isVisible = (element) => {
-          if (!element) {
-            return false;
-          }
-          const style = window.getComputedStyle(element);
-          if (style.display === 'none' || style.visibility === 'hidden') {
-            return false;
-          }
-          const rect = element.getBoundingClientRect();
-          return rect.width > 0 && rect.height > 0;
-        };
-        const isActionableButton = (element) => {
-          if (!isVisible(element) || element.disabled) {
-            return false;
-          }
-          const style = window.getComputedStyle(element);
-          const ariaDisabled = String(element.getAttribute('aria-disabled') || '').toLowerCase();
-          return (
-            ariaDisabled !== 'true' &&
-            style.pointerEvents !== 'none' &&
-            style.visibility !== 'hidden' &&
-            style.display !== 'none' &&
-            style.opacity !== '0'
-          );
-        };
-        const editorSelectors = [
-          '.ql-editor[contenteditable="true"][role="textbox"]',
-          '[contenteditable="true"][role="textbox"][aria-label*="Gemini"]',
-          '[contenteditable="true"][role="textbox"][aria-label*="gemini"]',
-          '[contenteditable="true"][data-placeholder*="Gemini"]',
-          '[contenteditable="true"][data-placeholder*="gemini"]',
-          'rich-textarea .ql-editor[contenteditable="true"]',
-          'textarea[aria-label*="Gemini"]',
-          'textarea[aria-label*="gemini"]',
-          'div[role="textbox"][contenteditable="true"]',
-          'textarea'
-        ];
-        const sendButtonSelectors = [
-          'button[aria-label="发送"]',
-          'button[aria-label="Send"]',
-          'button[aria-label*="发送"]',
-          'button[aria-label*="提交"]',
-          'button[aria-label*="Send"]',
-          'button[aria-label*="send" i]',
-          'button[aria-label*="submit" i]'
-        ];
-        const escapeHtml = (value) => value
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;');
-        const dispatchInput = (element) => {
-          element.dispatchEvent(new InputEvent('input', {
-            bubbles: true,
-            cancelable: true,
-            data: promptText,
-            inputType: 'insertText'
-          }));
-          element.dispatchEvent(new Event('change', { bubbles: true }));
-        };
-        const findEditor = () => {
-          for (const selector of editorSelectors) {
-            const editor = Array.from(document.querySelectorAll(selector)).find(isVisible);
-            if (editor) {
-              return editor;
-            }
-          }
-          return null;
-        };
-        const findSendButton = () => {
-          for (const selector of sendButtonSelectors) {
-            const button = Array.from(document.querySelectorAll(selector)).find((item) => isVisible(item));
-            if (button) {
-              return button;
-            }
-          }
-          return null;
-        };
-        const setPrompt = (editor) => {
-          editor.focus();
-          if (editor instanceof HTMLTextAreaElement || editor instanceof HTMLInputElement) {
-            editor.value = promptText;
-            dispatchInput(editor);
-            return editor.value === promptText;
-          }
-          const selection = window.getSelection();
-          if (selection) {
-            const range = document.createRange();
-            range.selectNodeContents(editor);
-            selection.removeAllRanges();
-            selection.addRange(range);
-          }
-          if (typeof document.execCommand === 'function') {
-            document.execCommand('insertText', false, promptText);
-          }
-          const currentText = String(editor.innerText || editor.textContent || '').trim();
-          if (currentText !== promptText) {
-            editor.innerHTML = `<p>${escapeHtml(promptText)}</p>`;
-          }
-          dispatchInput(editor);
-          return String(editor.innerText || editor.textContent || '').trim() === promptText;
-        };
-        const pressEnter = (editor) => {
-          ['keydown', 'keypress', 'keyup'].forEach((type) => {
-            editor.dispatchEvent(new KeyboardEvent(type, {
-              key: 'Enter',
-              code: 'Enter',
-              bubbles: true,
-              cancelable: true
-            }));
-          });
-        };
-        for (let attempt = 0; attempt < 12; attempt += 1) {
-          const editor = findEditor();
-          if (!editor) {
-            await sleep(400);
-            continue;
-          }
-          const populated = setPrompt(editor);
-          if (!populated) {
-            await sleep(250);
-            continue;
-          }
-          for (let sendAttempt = 0; sendAttempt < 24; sendAttempt += 1) {
-            const sendButton = findSendButton();
-            if (sendButton && isActionableButton(sendButton)) {
-              sendButton.click();
-              return { ok: true, method: 'button' };
-            }
-            await sleep(sendAttempt < 4 ? 150 : 250);
-          }
-          pressEnter(editor);
-          return { ok: true, method: 'enter' };
-        }
-        return { ok: false, reason: 'editor-not-found' };
-      },
-      args: [prompt]
-    }, (results) => {
-      if (chrome.runtime && chrome.runtime.lastError) {
-        resolve({ ok: false, reason: chrome.runtime.lastError.message || 'execute-script-failed' });
-        return;
-      }
-      const result = Array.isArray(results) && results[0] ? results[0].result : null;
-      resolve(result && typeof result === 'object' ? result : { ok: false, reason: 'empty-script-result' });
-    });
-  });
-}
-
 function runInteractiveSiteSearchProvider(provider, query, sender, disposition) {
   const prompt = String(query || '').trim();
-  const entryUrl = getSiteSearchProviderEntryUrl(provider);
+  const entryUrl = getSiteSearchProviderEntryUrl(provider, prompt);
+  const submitStrategy = String((provider && provider.submitStrategy) || '').trim();
   const targetDisposition = disposition === 'currentTab' ? 'currentTab' : 'newTab';
   return new Promise((resolve) => {
     if (!entryUrl || !prompt || !isInteractiveSiteSearchProvider(provider)) {
       resolve({ ok: false, reason: 'invalid-provider-request' });
+      return;
+    }
+    if (typeof AI_PROVIDER_SUBMIT.submitPromptInTab !== 'function') {
+      resolve({ ok: false, reason: 'submit-runtime-unavailable' });
       return;
     }
     const finish = (result) => {
@@ -2147,12 +2007,13 @@ function runInteractiveSiteSearchProvider(provider, query, sender, disposition) 
       }
       waitForTabComplete(tab.id, 15000)
         .catch(() => tab)
-        .then(() => submitGeminiPromptInTab(tab.id, prompt))
+        .then(() => AI_PROVIDER_SUBMIT.submitPromptInTab(chrome, tab.id, prompt, submitStrategy))
         .then((result) => {
           finish({
             ok: Boolean(result && result.ok),
             tabId: tab.id,
             url: entryUrl,
+            strategy: submitStrategy,
             method: result && result.method ? result.method : '',
             reason: result && result.reason ? result.reason : ''
           });
@@ -3307,6 +3168,7 @@ const SITE_SEARCH_DISABLED_STORAGE_KEY = '_x_extension_site_search_disabled_2024
 const SEARCH_BLACKLIST_STORAGE_KEY = '_x_extension_search_blacklist_2026_unique_';
 const BLACKLIST_UTILS = globalThis.LumnoBlacklistUtils || {};
 const SEARCH_UTILS = globalThis.LumnoSearchUtils || {};
+const AI_PROVIDER_SUBMIT = globalThis.LumnoAiProviderSubmit || {};
 const DEFAULT_SEARCH_ENGINE_STORAGE_KEY = '_x_extension_default_search_engine_2024_unique_';
 migrateStorageIfNeeded([
   DOCUMENT_PIP_ENABLED_STORAGE_KEY,
@@ -4540,7 +4402,11 @@ function isInteractiveSiteSearchProvider(provider) {
   return Boolean(
     isAiSiteSearchProvider(provider) &&
     String((provider && provider.action) || '').trim() === 'openAndSubmit' &&
-    String((provider && provider.submitStrategy) || '').trim() === 'geminiPrompt'
+    (
+      typeof SEARCH_UTILS.isInteractiveSiteSearchSubmitStrategy === 'function'
+        ? SEARCH_UTILS.isInteractiveSiteSearchSubmitStrategy(provider && provider.submitStrategy)
+        : ['geminiPrompt', 'chatgptPrompt', 'doubaoPrompt', 'qianwenQuery', 'yuanbaoPrompt', 'minimaxPrompt', 'deepseekPrompt', 'kimiPrompt'].includes(String((provider && provider.submitStrategy) || '').trim())
+    )
   );
 }
 
@@ -4738,34 +4604,20 @@ function isUrlBlockedBySearchBlacklist(url, items) {
   return false;
 }
 
-function buildBlacklistProbeUrlFromTemplate(template, query) {
-  if (typeof SEARCH_UTILS.buildBlacklistProbeUrlFromTemplate === 'function') {
-    return SEARCH_UTILS.buildBlacklistProbeUrlFromTemplate(template, query);
-  }
-  const rawTemplate = String(template || '');
-  if (!rawTemplate) {
-    return '';
-  }
-  if (!rawTemplate.includes('{query}')) {
-    return rawTemplate;
-  }
-  return rawTemplate.replace(/\{query\}/g, encodeURIComponent(String(query || '')));
-}
-
 function isSuggestionBlockedBySearchBlacklist(suggestion, items, queryForProvider) {
   if (!suggestion) {
     return false;
   }
-  if (suggestion.type === 'newtab') {
+  if (
+    suggestion.type === 'newtab' ||
+    suggestion.type === 'siteSearch' ||
+    suggestion.type === 'inlineSiteSearch' ||
+    suggestion.type === 'siteSearchPrompt'
+  ) {
     return false;
   }
   if (suggestion.url && isUrlBlockedBySearchBlacklist(suggestion.url, items)) {
     return true;
-  }
-  if (suggestion.type === 'siteSearchPrompt' && suggestion.provider) {
-    const probeQuery = String(queryForProvider || '').trim() || 'test';
-    const probeUrl = buildBlacklistProbeUrlFromTemplate(suggestion.provider.template, probeQuery);
-    return Boolean(probeUrl) && isUrlBlockedBySearchBlacklist(probeUrl, items);
   }
   return false;
 }
@@ -4810,14 +4662,14 @@ function mergeCustomProviders(baseItems, customItems) {
   return merged;
 }
 
-function getSiteSearchProviderEntryUrl(provider) {
+function getSiteSearchProviderEntryUrl(provider, query) {
   if (!provider || !provider.template) {
     return '';
   }
   if (typeof SEARCH_UTILS.buildSearchUrlFromTemplate === 'function') {
-    return SEARCH_UTILS.buildSearchUrlFromTemplate(provider.template, '');
+    return SEARCH_UTILS.buildSearchUrlFromTemplate(provider.template, query || '');
   }
-  return normalizeSiteSearchTemplate(provider.template).replace(/\{query\}/g, '');
+  return normalizeSiteSearchTemplate(provider.template).replace(/\{query\}/g, encodeURIComponent(String(query || '')));
 }
 
 function getTemplateDomain(template) {
@@ -4886,13 +4738,17 @@ function loadSiteSearchProviders() {
     return siteSearchPromise;
   }
   const localUrl = chrome.runtime.getURL('assets/data/site-search.json');
+  const fallbackDefaults = typeof SEARCH_UTILS.getDefaultSiteSearchProviders === 'function'
+    ? SEARCH_UTILS.getDefaultSiteSearchProviders()
+    : [];
   siteSearchPromise = fetch(localUrl)
     .then((response) => response.json())
     .then((data) => {
       const items = data && Array.isArray(data.items) ? data.items : [];
-      return sanitizeSiteSearchProviders(items);
+      const source = items.length > 0 ? items : fallbackDefaults;
+      return sanitizeSiteSearchProviders(source);
     })
-    .catch(() => []);
+    .catch(() => sanitizeSiteSearchProviders(fallbackDefaults));
   siteSearchPromise = siteSearchPromise.then((localItems) => {
     return localItems;
   }).then((items) => Promise.all([loadCustomSiteSearchProviders(), loadDisabledSiteSearchKeys()])
@@ -5910,14 +5766,6 @@ function toggleBlackRectangle(tabs, overlayContext) {
     return [];
   }
 
-  function buildOverlayBlacklistProbeUrlFromTemplate(template, query) {
-    const rawTemplate = String(template || '');
-    if (!rawTemplate || !rawTemplate.includes('{query}')) {
-      return '';
-    }
-    return rawTemplate.replace(/\{query\}/g, encodeURIComponent(String(query || '')));
-  }
-
   function isUrlBlockedByOverlaySearchBlacklist(url) {
     if (globalThis.LumnoBlacklistUtils && typeof globalThis.LumnoBlacklistUtils.isUrlBlocked === 'function') {
       return globalThis.LumnoBlacklistUtils.isUrlBlocked(url, overlaySearchBlacklistItems);
@@ -5926,16 +5774,19 @@ function toggleBlackRectangle(tabs, overlayContext) {
   }
 
   function isOverlaySuggestionBlockedBySearchBlacklist(suggestion, queryForProvider) {
-    if (!suggestion || suggestion.type === 'newtab') {
+    if (!suggestion) {
+      return false;
+    }
+    if (
+      suggestion.type === 'newtab' ||
+      suggestion.type === 'siteSearch' ||
+      suggestion.type === 'inlineSiteSearch' ||
+      suggestion.type === 'siteSearchPrompt'
+    ) {
       return false;
     }
     if (suggestion.url && isUrlBlockedByOverlaySearchBlacklist(suggestion.url)) {
       return true;
-    }
-    if (suggestion.type === 'siteSearchPrompt' && suggestion.provider) {
-      const probeQuery = String(queryForProvider || '').trim() || 'test';
-      const probeUrl = buildOverlayBlacklistProbeUrlFromTemplate(suggestion.provider.template, probeQuery);
-      return Boolean(probeUrl) && isUrlBlockedByOverlaySearchBlacklist(probeUrl);
     }
     return false;
   }
@@ -7308,27 +7159,16 @@ function toggleBlackRectangle(tabs, overlayContext) {
       );
     }
     const defaultPlaceholder = searchInput.placeholder;
-    let siteSearchProvidersCache = null;
+    const initialSiteSearchProviders = Array.isArray(overlayContext && overlayContext.siteSearchProviders)
+      ? overlayContext.siteSearchProviders
+      : [];
+    let siteSearchProvidersCache = initialSiteSearchProviders.length > 0
+      ? initialSiteSearchProviders
+      : null;
     let pendingProviderReload = false;
-    const defaultSiteSearchProviders = [
-      { key: 'yt', aliases: ['youtube'], name: 'YouTube', template: 'https://www.youtube.com/results?search_query={query}' },
-      { key: 'bb', aliases: ['bilibili', 'bili'], name: 'Bilibili', template: 'https://search.bilibili.com/all?keyword={query}' },
-      { key: 'gh', aliases: ['github'], name: 'GitHub', template: 'https://github.com/search?q={query}' },
-      { key: 'gm', aliases: ['gemini'], name: 'Gemini', template: 'https://gemini.google.com/app', action: 'openAndSubmit', submitStrategy: 'geminiPrompt' },
-      { key: 'so', aliases: ['baidu', 'bd'], name: 'Baidu', template: 'https://www.baidu.com/s?wd={query}' },
-      { key: 'bi', aliases: ['bing'], name: 'Bing', template: 'https://www.bing.com/search?q={query}' },
-      { key: 'gg', aliases: ['google'], name: 'Google', template: 'https://www.google.com/search?q={query}' },
-      { key: 'zh', aliases: ['zhihu'], name: 'Zhihu', template: 'https://www.zhihu.com/search?q={query}' },
-      { key: 'db', aliases: ['douban'], name: 'Douban', template: 'https://www.douban.com/search?q={query}' },
-      { key: 'jd', aliases: ['juejin'], name: 'Juejin', template: 'https://juejin.cn/search?query={query}' },
-      { key: 'tb', aliases: ['taobao'], name: 'Taobao', template: 'https://s.taobao.com/search?q={query}' },
-      { key: 'tm', aliases: ['tmall'], name: 'Tmall', template: 'https://list.tmall.com/search_product.htm?q={query}' },
-      { key: 'wx', aliases: ['weixin', 'wechat'], name: 'WeChat', template: 'https://weixin.sogou.com/weixin?query={query}' },
-      { key: 'tw', aliases: ['twitter', 'x'], name: 'X', template: 'https://x.com/search?q={query}' },
-      { key: 'rd', aliases: ['reddit'], name: 'Reddit', template: 'https://www.reddit.com/search/?q={query}' },
-      { key: 'wk', aliases: ['wiki', 'wikipedia'], name: 'Wikipedia', template: 'https://en.wikipedia.org/wiki/Special:Search?search={query}' },
-      { key: 'zw', aliases: ['zhwiki'], name: 'Wikipedia', template: 'https://zh.wikipedia.org/wiki/Special:Search?search={query}' }
-    ];
+    const defaultSiteSearchProviders = typeof SEARCH_UTILS.getDefaultSiteSearchProviders === 'function'
+      ? SEARCH_UTILS.getDefaultSiteSearchProviders()
+      : initialSiteSearchProviders;
     const defaultAccentColor = [59, 130, 246];
     const themeColorCache = window._x_extension_theme_color_cache_2024_unique_ || new Map();
     window._x_extension_theme_color_cache_2024_unique_ = themeColorCache;
@@ -7978,6 +7818,14 @@ function toggleBlackRectangle(tabs, overlayContext) {
       'youtube.com': [255, 0, 0],
       'youtu.be': [255, 0, 0],
       'google.com': [66, 133, 244],
+      'chatgpt.com': [16, 163, 127],
+      'gemini.google.com': [66, 133, 244],
+      'doubao.com': [79, 70, 229],
+      'qianwen.com': [37, 99, 235],
+      'yuanbao.tencent.com': [0, 82, 217],
+      'chat.minimax.io': [24, 119, 242],
+      'chat.deepseek.com': [74, 107, 255],
+      'kimi.com': [77, 92, 255],
       'bing.com': [0, 120, 215],
       'baidu.com': [41, 98, 255],
       'taobao.com': [255, 80, 0],
@@ -8298,16 +8146,42 @@ function toggleBlackRectangle(tabs, overlayContext) {
       });
     }
 
-    function getThemeForProvider(provider) {
-      if (provider && provider.template) {
-        const brandAccent = getBrandAccentForUrl(provider.template);
-        if (brandAccent) {
-          const brandTheme = buildTheme(brandAccent);
-          brandTheme._xIsBrand = true;
-          return Promise.resolve(brandTheme);
-        }
+    function getProviderThemeHost(provider) {
+      return normalizeHost(getProviderHost(provider));
+    }
+
+    function buildAndCacheBrandThemeForHost(hostKey, iconUrl) {
+      const normalizedHost = normalizeHost(hostKey);
+      if (!normalizedHost) {
+        return null;
       }
-      return getThemeFromUrl(getProviderIcon(provider));
+      const brandAccent = getBrandAccentForHost(normalizedHost);
+      if (!brandAccent) {
+        return null;
+      }
+      const brandTheme = buildTheme(brandAccent);
+      brandTheme._xIsBrand = true;
+      themeHostCache.set(normalizedHost, brandTheme);
+      if (iconUrl) {
+        themeColorCache.set(iconUrl, brandTheme);
+      }
+      return brandTheme;
+    }
+
+    function getThemeForProvider(provider) {
+      const hostKey = getProviderThemeHost(provider);
+      const iconUrl = getProviderIcon(provider);
+      if (hostKey && themeHostCache.has(hostKey)) {
+        return Promise.resolve(themeHostCache.get(hostKey));
+      }
+      if (iconUrl && themeColorCache.has(iconUrl)) {
+        return Promise.resolve(themeColorCache.get(iconUrl));
+      }
+      const brandTheme = buildAndCacheBrandThemeForHost(hostKey, iconUrl);
+      if (brandTheme) {
+        return Promise.resolve(brandTheme);
+      }
+      return getThemeFromUrl(iconUrl, hostKey);
     }
 
     function shouldUseBrandTheme(suggestion) {
@@ -8358,11 +8232,21 @@ function toggleBlackRectangle(tabs, overlayContext) {
         return defaultTheme;
       }
       if (suggestion && suggestion.provider) {
-        const brandAccent = getBrandAccentForUrl(suggestion.provider.template);
-        if (brandAccent) {
-          const brandTheme = buildTheme(brandAccent);
-          brandTheme._xIsBrand = true;
+        const hostKey = getProviderThemeHost(suggestion.provider);
+        const iconUrl = getProviderIcon(suggestion.provider);
+        if (hostKey && themeHostCache.has(hostKey)) {
+          return themeHostCache.get(hostKey);
+        }
+        if (iconUrl && themeColorCache.has(iconUrl)) {
+          return themeColorCache.get(iconUrl);
+        }
+        const brandTheme = buildAndCacheBrandThemeForHost(hostKey, iconUrl);
+        if (brandTheme) {
           return brandTheme;
+        }
+        const fallbackTheme = buildFallbackThemeForHost(hostKey);
+        if (fallbackTheme) {
+          return fallbackTheme;
         }
       }
       if (suggestion && suggestion.url) {
@@ -8585,6 +8469,13 @@ function toggleBlackRectangle(tabs, overlayContext) {
     }
 
     function getThemeSourceForSuggestion(suggestion) {
+      if (suggestion && suggestion.provider) {
+        const hostKey = getProviderThemeHost(suggestion.provider);
+        if (hostKey && shouldBlockFaviconForHost(hostKey)) {
+          return '';
+        }
+        return getProviderIcon(suggestion.provider) || (hostKey ? getGoogleFaviconUrl(hostKey) : '');
+      }
       if (suggestion && suggestion.url) {
         try {
           const hostname = normalizeHost(new URL(suggestion.url).hostname);
@@ -8619,7 +8510,8 @@ function toggleBlackRectangle(tabs, overlayContext) {
       display: none !important;
       align-items: center !important;
       justify-content: center !important;
-      max-width: min(160px, 42%) !important;
+      gap: 6px !important;
+      max-width: min(220px, 48%) !important;
       min-width: 0 !important;
       height: 26px !important;
       padding: 0 10px !important;
@@ -8634,6 +8526,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
       letter-spacing: 0 !important;
       color: #F8FAFC !important;
       background: #3B82F6 !important;
+      border: 1px solid transparent !important;
       border-radius: 9px !important;
       box-shadow: 0 7px 16px rgba(59, 130, 246, 0.24) !important;
       opacity: 1 !important;
@@ -8653,25 +8546,83 @@ function toggleBlackRectangle(tabs, overlayContext) {
       );
     }
 
-    function getInputModePrefixVisual(theme) {
+    function getInputModePrefixVisual(theme, options) {
       const resolvedTheme = theme ? getThemeForMode(theme) : defaultTheme;
       const accentRgb = (resolvedTheme && (resolvedTheme.accentRgb || parseCssColor(resolvedTheme.accent))) ||
         defaultAccentColor;
+      const isAi = Boolean(options && options.isAi);
+      if (isAi) {
+        const alpha = isOverlayDarkMode() ? 0.18 : 0.1;
+        return {
+          background: `rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, ${alpha})`,
+          border: `1px solid rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, ${isOverlayDarkMode() ? 0.3 : 0.2})`,
+          shadow: `0 6px 14px rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, ${isOverlayDarkMode() ? 0.2 : 0.1})`,
+          color: isOverlayDarkMode() ? '#F8FAFC' : '#334155',
+          caretColor: resolvedTheme && resolvedTheme.placeholderText
+            ? resolvedTheme.placeholderText
+            : rgbToCss(accentRgb)
+        };
+      }
       return {
         background: rgbToCss(accentRgb),
+        border: '1px solid transparent',
         shadow: `0 7px 16px rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, ${isOverlayDarkMode() ? 0.34 : 0.24})`,
+        color: '#F8FAFC',
         caretColor: resolvedTheme && resolvedTheme.placeholderText
           ? resolvedTheme.placeholderText
           : rgbToCss(accentRgb)
       };
     }
 
-    function applyInputModePrefixVisual(theme) {
-      const visual = getInputModePrefixVisual(theme);
+    function applyInputModePrefixVisual(theme, options) {
+      const visual = getInputModePrefixVisual(theme, options);
       siteSearchPrefix.style.setProperty('background', visual.background, 'important');
+      siteSearchPrefix.style.setProperty('border', visual.border, 'important');
       siteSearchPrefix.style.setProperty('box-shadow', visual.shadow, 'important');
-      siteSearchPrefix.style.setProperty('color', '#F8FAFC', 'important');
+      siteSearchPrefix.style.setProperty('color', visual.color, 'important');
       return visual;
+    }
+
+    function setInputModePrefixContent(prefixText, options) {
+      siteSearchPrefix.textContent = '';
+      const iconUrl = options && options.iconUrl ? String(options.iconUrl || '').trim() : '';
+      if (iconUrl) {
+        const icon = document.createElement('img');
+        icon.alt = '';
+        icon.decoding = 'async';
+        icon.referrerPolicy = 'no-referrer';
+        icon.style.cssText = `
+          all: unset !important;
+          width: 15px !important;
+          height: 15px !important;
+          border-radius: 4px !important;
+          object-fit: contain !important;
+          flex: 0 0 auto !important;
+          display: block !important;
+        `;
+        icon.addEventListener('error', () => {
+          icon.remove();
+          updateSiteSearchPrefixLayout();
+        }, { once: true });
+        const iconHost = options && options.iconHost ? String(options.iconHost || '').trim() : '';
+        if (typeof attachFaviconData === 'function') {
+          icon.src = iconUrl;
+          attachFaviconData(icon, iconUrl, iconHost);
+        } else {
+          icon.src = iconUrl;
+        }
+        siteSearchPrefix.appendChild(icon);
+      }
+      const text = document.createElement('span');
+      text.textContent = prefixText;
+      text.style.cssText = `
+        all: unset !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+      `;
+      siteSearchPrefix.appendChild(text);
     }
 
     function setInputModePrefixRestState() {
@@ -8726,8 +8677,8 @@ function toggleBlackRectangle(tabs, overlayContext) {
 
     function setInputModePrefix(prefixText, theme, options) {
       const shouldAnimate = Boolean(options && options.animate);
-      siteSearchPrefix.textContent = prefixText;
-      const visual = applyInputModePrefixVisual(theme);
+      setInputModePrefixContent(prefixText, options);
+      const visual = applyInputModePrefixVisual(theme, options);
       siteSearchPrefix.style.setProperty('display', 'inline-flex', 'important');
       if (!shouldAnimate) {
         setInputModePrefixRestState();
@@ -8750,10 +8701,14 @@ function toggleBlackRectangle(tabs, overlayContext) {
     }
 
     function setSiteSearchPrefix(provider, theme, options) {
-      const prefixText = getSiteSearchDisplayName(provider) || formatMessage('search_in_site', '在 {site} 中搜索', {
-        site: provider && provider.name ? provider.name : ''
+      const prefixText = getSiteSearchPrefixText(provider);
+      const isAi = isAiSiteSearchProvider(provider);
+      setInputModePrefix(prefixText, theme, {
+        ...(options || {}),
+        iconUrl: isAi ? getProviderIcon(provider) : '',
+        iconHost: isAi ? getProviderThemeHost(provider) : '',
+        isAi
       });
-      setInputModePrefix(prefixText, theme, options);
     }
 
     function setOpenTabsSearchPrefix(theme) {
@@ -9206,10 +9161,38 @@ function toggleBlackRectangle(tabs, overlayContext) {
       );
     }
 
+    function normalizeOverlaySiteSearchTemplate(template) {
+      if (typeof SEARCH_UTILS.normalizeSiteSearchTemplate === 'function') {
+        return SEARCH_UTILS.normalizeSiteSearchTemplate(template);
+      }
+      return String(template || '')
+        .trim()
+        .replace(/\{\{\{s\}\}\}/g, '{query}')
+        .replace(/\{s\}/g, '{query}')
+        .replace(/\{searchTerms\}/g, '{query}');
+    }
+
+    function isAiSiteSearchProvider(provider) {
+      if (typeof SEARCH_UTILS.isAiSiteSearchProvider === 'function') {
+        return SEARCH_UTILS.isAiSiteSearchProvider(provider);
+      }
+      const template = normalizeOverlaySiteSearchTemplate(provider && provider.template);
+      return Boolean(
+        provider &&
+        (
+          hasOpenAndSubmitSiteSearchAction(provider) ||
+          (template && !template.includes('{query}'))
+        )
+      );
+    }
+
     function isInteractiveSiteSearchProvider(provider) {
+      if (typeof SEARCH_UTILS.isInteractiveSiteSearchProvider === 'function') {
+        return SEARCH_UTILS.isInteractiveSiteSearchProvider(provider);
+      }
       return Boolean(
         hasOpenAndSubmitSiteSearchAction(provider) &&
-        String(provider.submitStrategy || '').trim() === 'geminiPrompt'
+        ['geminiPrompt', 'chatgptPrompt', 'doubaoPrompt', 'qianwenQuery', 'yuanbaoPrompt', 'minimaxPrompt', 'deepseekPrompt', 'kimiPrompt'].includes(String(provider.submitStrategy || '').trim())
       );
     }
 
@@ -9241,6 +9224,9 @@ function toggleBlackRectangle(tabs, overlayContext) {
     function getProviderIcon(provider) {
       if (provider && provider.icon) {
         return provider.icon;
+      }
+      if (provider && provider.iconUrl) {
+        return provider.iconUrl;
       }
       const template = provider && provider.template ? provider.template : '';
       try {
@@ -9314,23 +9300,35 @@ function toggleBlackRectangle(tabs, overlayContext) {
       if (!provider) {
         return t('site_search_default', '站内');
       }
-      const key = String(provider.key || '').toLowerCase();
-      const keyToMessage = {
-        so: ['site_search_name_baidu', 'Baidu'],
-        zh: ['site_search_name_zhihu', 'Zhihu'],
-        db: ['site_search_name_douban', 'Douban'],
-        jd: ['site_search_name_juejin', 'Juejin'],
-        jj: ['site_search_name_juejin', 'Juejin'],
-        tb: ['site_search_name_taobao', 'Taobao'],
-        tm: ['site_search_name_tmall', 'Tmall'],
-        wx: ['site_search_name_wechat', 'WeChat'],
-        zw: ['site_search_name_wikipedia', 'Wikipedia']
-      };
-      const mapping = keyToMessage[key];
+      const mapping = typeof SEARCH_UTILS.getSiteSearchProviderDisplayNameMessage === 'function'
+        ? SEARCH_UTILS.getSiteSearchProviderDisplayNameMessage(provider)
+        : null;
       if (mapping) {
-        return t(mapping[0], mapping[1]);
+        return t(mapping.messageKey, mapping.fallback);
       }
       return provider.name || provider.key || t('site_search_default', '站内');
+    }
+
+    function getSiteSearchActionTitle(provider, query) {
+      const site = getSiteSearchDisplayName(provider);
+      const queryText = String(query || '').trim();
+      if (isAiSiteSearchProvider(provider)) {
+        return queryText
+          ? formatMessage('ask_ai_provider_query', '向 {site} 提问 "{query}"', { site, query: queryText })
+          : formatMessage('ask_ai_provider', '向 {site} 提问', { site });
+      }
+      return queryText
+        ? formatMessage('search_in_site_query', '在 {site} 中搜索 "{query}"', { site, query: queryText })
+        : formatMessage('search_in_site', '在 {site} 中搜索', { site });
+    }
+
+    function getSiteSearchPrefixText(provider) {
+      if (isAiSiteSearchProvider(provider)) {
+        return getSiteSearchDisplayName(provider);
+      }
+      return getSiteSearchDisplayName(provider) || formatMessage('search_in_site', '在 {site} 中搜索', {
+        site: provider && provider.name ? provider.name : ''
+      });
     }
 
     function getProviderHost(provider) {
@@ -11520,9 +11518,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
           if (inlineUrl) {
             inlineSuggestion = {
               type: 'inlineSiteSearch',
-              title: formatMessage('search_in_site', '在 {site} 中搜索', {
-                site: getSiteSearchDisplayName(inlineCandidate.provider)
-              }),
+              title: getSiteSearchActionTitle(inlineCandidate.provider),
               url: inlineUrl,
               favicon: getProviderIcon(inlineCandidate.provider),
               provider: inlineCandidate.provider,
@@ -11539,10 +11535,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
               }
               return {
                 type: 'siteSearch',
-                title: formatMessage('search_in_site_query', '在 {site} 中搜索 "{query}"', {
-                  site: getSiteSearchDisplayName(siteSearchState),
-                  query: query
-                }),
+                title: getSiteSearchActionTitle(siteSearchState, query),
                 url: siteUrl,
                 favicon: getProviderIcon(siteSearchState),
                 provider: siteSearchState,
@@ -11584,7 +11577,10 @@ function toggleBlackRectangle(tabs, overlayContext) {
         let primarySuggestion = null;
         const preferAutocompleteFirst = overlaySearchResultPriorityMode !== 'search';
         if (!modeCommandActive && !hasCommand) {
-          if (!siteSearchState && !inlineEnabled && preferAutocompleteFirst) {
+          const exactSiteSearchTrigger = (!siteSearchState && !inlineEnabled)
+            ? getSiteSearchTriggerCandidate(rawTagInput, providersForTags, null)
+            : null;
+          if (!siteSearchState && !inlineEnabled && !exactSiteSearchTrigger && preferAutocompleteFirst) {
             strongNavigationMatch = promoteStrongNavigationMatch(allSuggestions, latestRawInputValue.trim());
             if (strongNavigationMatch) {
               primaryHighlightIndex = 0;
@@ -11593,14 +11589,12 @@ function toggleBlackRectangle(tabs, overlayContext) {
             topSiteMatch = promoteTopSiteMatch(allSuggestions, latestRawInputValue.trim());
           }
           siteSearchTrigger = (!siteSearchState && !inlineEnabled)
-            ? getSiteSearchTriggerCandidate(rawTagInput, providersForTags, topSiteMatch)
+            ? (exactSiteSearchTrigger || getSiteSearchTriggerCandidate(rawTagInput, providersForTags, topSiteMatch))
             : null;
-          if (siteSearchTrigger && !topSiteMatch && !strongNavigationMatch) {
+          if (siteSearchTrigger && (exactSiteSearchTrigger || (!topSiteMatch && !strongNavigationMatch))) {
             siteSearchPrompt = {
               type: 'siteSearchPrompt',
-              title: formatMessage('search_in_site', '在 {site} 中搜索', {
-                site: getSiteSearchDisplayName(siteSearchTrigger)
-              }),
+              title: getSiteSearchActionTitle(siteSearchTrigger),
               url: '',
               favicon: getProviderIcon(siteSearchTrigger),
               provider: siteSearchTrigger
@@ -11649,7 +11643,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
             primaryHighlightIndex = 0;
             primaryHighlightReason = 'topSite';
           }
-          if (!siteSearchState && query && (overlayTabQuickSwitchEnabled || prioritizeCurrentPageMatch)) {
+          if (!siteSearchState && !siteSearchPrompt && query && (overlayTabQuickSwitchEnabled || prioritizeCurrentPageMatch)) {
             const preferredCurrentTabMatchIndex = prioritizeCurrentPageMatch && typeof currentOverlayTabId === 'number'
               ? allSuggestions.findIndex((item) =>
                 item &&

@@ -722,6 +722,30 @@
   "site_search_name_baidu": {
     "message": "百度"
   },
+  "site_search_name_chatgpt": {
+    "message": "ChatGPT"
+  },
+  "site_search_name_gemini": {
+    "message": "Gemini"
+  },
+  "site_search_name_doubao": {
+    "message": "豆包"
+  },
+  "site_search_name_qianwen": {
+    "message": "千问"
+  },
+  "site_search_name_yuanbao": {
+    "message": "元宝"
+  },
+  "site_search_name_minimax": {
+    "message": "MiniMax"
+  },
+  "site_search_name_deepseek": {
+    "message": "DeepSeek"
+  },
+  "site_search_name_kimi": {
+    "message": "Kimi"
+  },
   "site_search_name_zhihu": {
     "message": "知乎"
   },
@@ -748,6 +772,12 @@
   },
   "search_in_site_query": {
     "message": "在 {site} 中搜索 \"{query}\""
+  },
+  "ask_ai_provider": {
+    "message": "向 {site} 提问"
+  },
+  "ask_ai_provider_query": {
+    "message": "向 {site} 提问 \"{query}\""
   },
   "search_query": {
     "message": "搜索 \"{query}\""

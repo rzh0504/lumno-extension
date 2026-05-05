@@ -199,25 +199,9 @@
   let isFallbackWidthReady = false;
   let searchBlacklistItems = [];
   let blacklistFormExpanded = false;
-  const fallbackSiteSearchProviders = [
-    { key: 'yt', aliases: ['youtube'], name: 'YouTube', template: 'https://www.youtube.com/results?search_query={query}' },
-    { key: 'bb', aliases: ['bilibili', 'bili'], name: 'Bilibili', template: 'https://search.bilibili.com/all?keyword={query}' },
-    { key: 'gh', aliases: ['github'], name: 'GitHub', template: 'https://github.com/search?q={query}' },
-    { key: 'gm', aliases: ['gemini'], name: 'Gemini', template: 'https://gemini.google.com/app', action: 'openAndSubmit', submitStrategy: 'geminiPrompt' },
-    { key: 'so', aliases: ['baidu', 'bd'], name: 'Baidu', template: 'https://www.baidu.com/s?wd={query}' },
-    { key: 'bi', aliases: ['bing'], name: 'Bing', template: 'https://www.bing.com/search?q={query}' },
-    { key: 'gg', aliases: ['google'], name: 'Google', template: 'https://www.google.com/search?q={query}' },
-    { key: 'zh', aliases: ['zhihu'], name: 'Zhihu', template: 'https://www.zhihu.com/search?q={query}' },
-    { key: 'db', aliases: ['douban'], name: 'Douban', template: 'https://www.douban.com/search?q={query}' },
-    { key: 'jj', aliases: ['juejin'], name: 'Juejin', template: 'https://juejin.cn/search?query={query}' },
-    { key: 'tb', aliases: ['taobao'], name: 'Taobao', template: 'https://s.taobao.com/search?q={query}' },
-    { key: 'tm', aliases: ['tmall'], name: 'Tmall', template: 'https://list.tmall.com/search_product.htm?q={query}' },
-    { key: 'wx', aliases: ['weixin', 'wechat'], name: 'WeChat', template: 'https://weixin.sogou.com/weixin?query={query}' },
-    { key: 'tw', aliases: ['twitter', 'x'], name: 'X', template: 'https://x.com/search?q={query}' },
-    { key: 'rd', aliases: ['reddit'], name: 'Reddit', template: 'https://www.reddit.com/search/?q={query}' },
-    { key: 'wk', aliases: ['wiki', 'wikipedia'], name: 'Wikipedia', template: 'https://en.wikipedia.org/wiki/Special:Search?search={query}' },
-    { key: 'zw', aliases: ['zhwiki'], name: 'Wikipedia', template: 'https://zh.wikipedia.org/wiki/Special:Search?search={query}' }
-  ];
+  const fallbackSiteSearchProviders = typeof SEARCH_UTILS.getDefaultSiteSearchProviders === 'function'
+    ? SEARCH_UTILS.getDefaultSiteSearchProviders()
+    : [];
 
   let currentMessages = null;
   let currentLanguageMode = 'system';
@@ -3476,23 +3460,32 @@
       if (!item || item._xIsCustom) {
         return item && (item.name || item.key) ? (item.name || item.key) : '';
       }
-      const key = String(item.key || '').toLowerCase();
-      const keyToMessage = {
-        so: ['site_search_name_baidu', 'Baidu'],
-        zh: ['site_search_name_zhihu', 'Zhihu'],
-        db: ['site_search_name_douban', 'Douban'],
-        jj: ['site_search_name_juejin', 'Juejin'],
-        jd: ['site_search_name_juejin', 'Juejin'],
-        tb: ['site_search_name_taobao', 'Taobao'],
-        tm: ['site_search_name_tmall', 'Tmall'],
-        wx: ['site_search_name_wechat', 'WeChat'],
-        zw: ['site_search_name_wikipedia', 'Wikipedia']
-      };
-      const mapping = keyToMessage[key];
+      const mapping = typeof SEARCH_UTILS.getSiteSearchProviderDisplayNameMessage === 'function'
+        ? SEARCH_UTILS.getSiteSearchProviderDisplayNameMessage(item)
+        : null;
       if (!mapping) {
         return item.name || item.key;
       }
-      return getMessage(mapping[0], mapping[1]);
+      return getMessage(mapping.messageKey, mapping.fallback);
+    }
+    function getSiteSearchItemIconUrl(item) {
+      if (!item) {
+        return '';
+      }
+      if (item.icon) {
+        return String(item.icon || '').trim();
+      }
+      if (item.iconUrl) {
+        return String(item.iconUrl || '').trim();
+      }
+      try {
+        const template = normalizeSiteSearchTemplate(String(item.template || '').trim());
+        const url = template.replace(/\{query\}/g, 'test');
+        const hostname = new URL(url).hostname;
+        return hostname ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=64` : '';
+      } catch (error) {
+        return '';
+      }
     }
     const renderItem = (item, list) => {
       const row = document.createElement('div');
@@ -3521,6 +3514,20 @@
       const titleText = document.createElement('span');
       titleText.textContent = getLocalizedBuiltinProviderName(item);
       title.appendChild(badge);
+      const iconUrl = getSiteSearchItemIconUrl(item);
+      if (iconUrl) {
+        const icon = document.createElement('img');
+        icon.className = '_x_extension_shortcut_item_icon_2024_unique_';
+        icon.decoding = 'async';
+        icon.loading = 'lazy';
+        icon.referrerPolicy = 'no-referrer';
+        icon.alt = '';
+        icon.src = iconUrl;
+        icon.addEventListener('error', () => {
+          icon.remove();
+        }, { once: true });
+        title.appendChild(icon);
+      }
       if (item._xIsCustom && normalizedTemplate && builtinTemplateSet.has(normalizedTemplate)) {
         const duplicateTag = document.createElement('button');
         duplicateTag.type = 'button';
