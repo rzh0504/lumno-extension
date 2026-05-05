@@ -2815,50 +2815,50 @@
   function createActionTag(labelText, keyLabel) {
     const tag = document.createElement('span');
     tag.style.cssText = `
-      all: unset !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      gap: 6px !important;
-      background: var(--x-ext-tag-bg, #EEF6FF) !important;
-      color: var(--x-ext-tag-text, #1E3A8A) !important;
-      border: 1px solid var(--x-ext-tag-border, #BFDBFE) !important;
-      padding: 4px 10px 4px 8px !important;
-      border-radius: 999px !important;
-      font-size: 11px !important;
-      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-      line-height: 1 !important;
-      text-decoration: none !important;
-      list-style: none !important;
-      outline: none !important;
-      box-sizing: border-box !important;
-      vertical-align: middle !important;
-      white-space: nowrap !important;
+      all: unset;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--x-ext-tag-bg, #EEF6FF);
+      color: var(--x-ext-tag-text, #1E3A8A);
+      border: 1px solid var(--x-ext-tag-border, #BFDBFE);
+      padding: 4px 10px 4px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1;
+      text-decoration: none;
+      list-style: none;
+      outline: none;
+      box-sizing: border-box;
+      vertical-align: middle;
+      white-space: nowrap;
     `;
 
     const label = document.createElement('span');
     label.textContent = labelText;
     label.style.cssText = `
-      all: unset !important;
-      font-weight: 500 !important;
-      line-height: 1 !important;
+      all: unset;
+      font-weight: 500;
+      line-height: 1;
     `;
 
     const keycap = document.createElement('span');
     keycap.textContent = keyLabel;
     keycap.style.cssText = `
-      all: unset !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      padding: 2px 7px !important;
-      border-radius: 6px !important;
-      background: var(--x-ext-key-bg, #FFFFFF) !important;
-      color: var(--x-ext-key-text, #1E3A8A) !important;
-      border: 1px solid var(--x-ext-key-border, #BFDBFE) !important;
-      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12) !important;
-      font-size: 10px !important;
-      font-weight: 500 !important;
-      line-height: 1 !important;
+      all: unset;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: var(--x-ext-key-bg, #FFFFFF);
+      color: var(--x-ext-key-text, #1E3A8A);
+      border: 1px solid var(--x-ext-key-border, #BFDBFE);
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+      font-size: 10px;
+      font-weight: 500;
+      line-height: 1;
     `;
 
     tag.appendChild(label);

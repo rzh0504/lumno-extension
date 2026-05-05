@@ -36,6 +36,12 @@ try {
 }
 
 try {
+  importScripts(chrome.runtime.getURL('src/background/extension-pages.js'));
+} catch (error) {
+  console.warn('Lumno: failed to load extension page helpers.', error);
+}
+
+try {
   importScripts(chrome.runtime.getURL('src/background/pip-ownership.js'));
 } catch (error) {
   console.warn('Lumno: failed to load PiP ownership utils.', error);
@@ -46,6 +52,14 @@ try {
 } catch (error) {
   console.warn('Lumno: failed to load pinyin support.', error);
 }
+
+const BACKGROUND_PAGES = globalThis.LumnoBackgroundPages || {};
+const getExtensionDetailsUrl = BACKGROUND_PAGES.getExtensionDetailsUrl;
+const openExtensionOptionsPage = BACKGROUND_PAGES.openExtensionOptionsPage;
+const openOnboardingPage = BACKGROUND_PAGES.openOnboardingPage;
+const openReleasePage = BACKGROUND_PAGES.openReleasePage;
+const openBookmarkManagerPage = BACKGROUND_PAGES.openBookmarkManagerPage;
+const openExtensionShortcutsPage = BACKGROUND_PAGES.openExtensionShortcutsPage;
 
 function isBrowserExtensionProtocol(protocol) {
   const guards = globalThis.LumnoUrlGuards || {};
@@ -212,13 +226,6 @@ function checkFileSchemeAccess(callback) {
   } catch (e) {
     done(null);
   }
-}
-
-function getExtensionDetailsUrl() {
-  if (!chrome || !chrome.runtime || !chrome.runtime.id) {
-    return 'chrome://extensions/';
-  }
-  return `chrome://extensions/?id=${encodeURIComponent(chrome.runtime.id)}`;
 }
 
 function buildNewtabFallbackUrl(options) {
@@ -441,122 +448,6 @@ function requestFocusVisibleNewtabInput(source, tabId) {
       error: e && e.message ? e.message : String(e || '')
     });
   }
-}
-
-function openExtensionOptionsPage(callback) {
-  const done = typeof callback === 'function' ? callback : () => {};
-  const fallbackOpen = () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('src/options/options.html') }, () => {
-      done(!(chrome.runtime && chrome.runtime.lastError));
-    });
-  };
-
-  if (!chrome.runtime || typeof chrome.runtime.openOptionsPage !== 'function') {
-    fallbackOpen();
-    return;
-  }
-
-  chrome.runtime.openOptionsPage(() => {
-    if (chrome.runtime && chrome.runtime.lastError) {
-      fallbackOpen();
-      return;
-    }
-    done(true);
-  });
-}
-
-const ONBOARDING_URL = 'https://lumno.kubai.design/onboarding/';
-const RELEASE_URL = 'https://lumno.kubai.design/release/';
-
-function openOnboardingPage(callback) {
-  const done = typeof callback === 'function' ? callback : () => {};
-  chrome.tabs.create({ url: ONBOARDING_URL }, () => {
-    done(!(chrome.runtime && chrome.runtime.lastError));
-  });
-}
-
-function getExtensionVersionTag() {
-  const version = chrome && chrome.runtime && chrome.runtime.getManifest
-    ? String((chrome.runtime.getManifest() || {}).version || '').trim()
-    : '';
-  if (!version) {
-    return '';
-  }
-  return /^v/i.test(version) ? version : `v${version}`;
-}
-
-function buildReleaseUrl(options) {
-  const params = new URLSearchParams();
-  params.set('entry', 'ext');
-  const reason = options && typeof options.reason === 'string' ? String(options.reason).trim().toLowerCase() : '';
-  if (reason) {
-    params.set('reason', reason);
-  }
-  const version = getExtensionVersionTag();
-  if (version) {
-    params.set('version', version);
-  }
-  return `${RELEASE_URL}?${params.toString()}`;
-}
-
-function openReleasePage(options, callback) {
-  const done = typeof callback === 'function' ? callback : () => {};
-  chrome.tabs.create({ url: buildReleaseUrl(options) }, () => {
-    done(!(chrome.runtime && chrome.runtime.lastError));
-  });
-}
-
-function getBookmarkManagerUrls() {
-  const ua = (typeof navigator !== 'undefined' && navigator.userAgent)
-    ? String(navigator.userAgent).toLowerCase()
-    : '';
-  const candidates = [];
-  const pushUnique = (url) => {
-    const value = String(url || '').trim();
-    if (!value || candidates.includes(value)) {
-      return;
-    }
-    candidates.push(value);
-  };
-
-  if (ua.includes('firefox/')) {
-    pushUnique('about:bookmarks');
-    pushUnique('chrome://bookmarks/');
-    return candidates;
-  }
-  if (ua.includes('edg/')) {
-    pushUnique('edge://favorites/');
-    pushUnique('edge://bookmarks/');
-  } else if (ua.includes('vivaldi/')) {
-    pushUnique('vivaldi://bookmarks/');
-  } else if (ua.includes('opr/') || ua.includes('opera')) {
-    pushUnique('opera://bookmarks/');
-  } else if (ua.includes('brave/')) {
-    pushUnique('brave://bookmarks/');
-  }
-  pushUnique('chrome://bookmarks/');
-  return candidates;
-}
-
-function openBookmarkManagerPage() {
-  const urls = getBookmarkManagerUrls();
-  return new Promise((resolve, reject) => {
-    const tryOpen = (index) => {
-      if (index >= urls.length) {
-        reject(new Error('no-bookmark-manager-url'));
-        return;
-      }
-      const targetUrl = urls[index];
-      chrome.tabs.create({ url: targetUrl }, () => {
-        if (chrome.runtime && chrome.runtime.lastError) {
-          tryOpen(index + 1);
-          return;
-        }
-        resolve(targetUrl);
-      });
-    };
-    tryOpen(0);
-  });
 }
 
 function logHotkeyDebug(stage, payload) {
@@ -1791,13 +1682,6 @@ function getConfiguredCopyUrlCommandShortcut(callback) {
       ? normalizeShortcutFromCommandsValue(command.shortcut)
       : '';
     callback(shortcut || '');
-  });
-}
-
-function openExtensionShortcutsPage(callback) {
-  const done = typeof callback === 'function' ? callback : () => {};
-  chrome.tabs.create({ url: 'chrome://extensions/shortcuts' }, () => {
-    done(!(chrome.runtime && chrome.runtime.lastError));
   });
 }
 

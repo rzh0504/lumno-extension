@@ -13,6 +13,7 @@ const packageRoots = [
   'assets'
 ];
 const injectedScriptFiles = [
+  'src/background/extension-pages.js',
   'src/background/pip-ownership.js',
   'src/shared/settings.js',
   'src/shared/search-utils.js',
