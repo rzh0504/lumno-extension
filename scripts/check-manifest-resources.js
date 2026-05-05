@@ -7,6 +7,7 @@ const injectedScriptFiles = [
   'src/background/extension-pages.js',
   'src/background/newtab-fallback.js',
   'src/background/pip-ownership.js',
+  'src/background/pip-main-world.js',
   'src/shared/settings.js',
   'src/shared/search-utils.js',
   'src/shared/site-search-store.js',

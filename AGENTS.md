@@ -10,6 +10,7 @@
 - `src/background/extension-pages.js`
 - `src/background/newtab-fallback.js`
 - `src/background/pip-ownership.js`
+- `src/background/pip-main-world.js`
 - `src/newtab/newtab.html`
 - `src/newtab/newtab.js`
 - `src/options/options.html`
