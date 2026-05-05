@@ -2065,529 +2065,516 @@ function runInteractiveSiteSearchProvider(provider, query, sender, disposition) 
   });
 }
 
-// Listen for messages from content script to switch tabs
-chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-  if (request.action === 'switchToTab') {
-    if (typeof request.tabId === 'number') {
-      recordTabSwitchEvent(request.tabId);
-    }
-    chrome.tabs.update(request.tabId, {active: true});
-    sendResponse({ ok: true });
-    return;
-  } else if (request.action === 'reportTabVisible') {
-    const senderTab = sender && sender.tab ? sender.tab : null;
-    if (senderTab && typeof senderTab.id === 'number') {
-      const at = Number(request && request.at);
-      recordTabSwitchEvent(senderTab.id, Number.isFinite(at) ? at : Date.now());
-    }
-    sendResponse({ ok: true });
-    return;
-  } else if (request.action === 'pipRequestOwnership') {
-    requestGlobalPipOwnership(sender, request && request.kind ? String(request.kind) : '')
-      .then((result) => {
-        sendResponse(result);
-      })
-      .catch((error) => {
-        sendResponse({
-          ok: false,
-          granted: false,
-          reason: error && error.message ? error.message : String(error || 'ownership-request-failed')
-        });
-      });
-    return true;
-  } else if (request.action === 'pipReleaseOwnership') {
-    releaseGlobalPipOwnership(sender, request && request.token ? String(request.token) : '')
-      .then((result) => {
-        sendResponse(result);
-      })
-      .catch((error) => {
-        sendResponse({
-          ok: false,
-          released: false,
-          reason: error && error.message ? error.message : String(error || 'ownership-release-failed')
-        });
-      });
-    return true;
-  } else if (request.action === 'getShowSearchShortcut') {
-    getConfiguredFallbackShortcut((shortcut) => {
-      sendResponse({ shortcut: shortcut || '' });
+// Route message actions by feature area before invoking the original handlers.
+const BACKGROUND_MESSAGE_ROUTE_GROUPS = Object.freeze({
+  tabs: Object.freeze([
+    'switchToTab',
+    'reportTabVisible',
+    'getTabsForOverlay',
+    'trackSearchTab',
+    'closeOtherTabsForOverlay'
+  ]),
+  shortcuts: Object.freeze([
+    'getShowSearchShortcut',
+    'getCopyCurrentUrlCommandShortcut',
+    'triggerShowSearchFromPageHotkey',
+    'getShortcutRules'
+  ]),
+  pip: Object.freeze([
+    'pipRequestOwnership',
+    'pipReleaseOwnership',
+    'siteTryEnterPiPInMainWorld',
+    'iqiyiTryEnterPiPInMainWorld',
+    'iqiyiSetupAutoPiPInMainWorld',
+    'forceExitPiPInMainWorld',
+    'ytForceExitPiPInMainWorld'
+  ]),
+  search: Object.freeze([
+    'searchOrNavigate',
+    'getSearchSuggestions',
+    'recordSearchSuggestionSelection',
+    'deleteHistoryUrl'
+  ]),
+  siteSearch: Object.freeze([
+    'getSiteSearchProviders',
+    'runSiteSearchProviderQuery'
+  ]),
+  localeAndPermissions: Object.freeze([
+    'getLocaleMessages',
+    'getFileSchemeAccessStatus'
+  ]),
+  extensionPages: Object.freeze([
+    'openOptionsPage',
+    'openExtensionShortcutsPage',
+    'openBookmarkManager',
+    'createTab',
+    'openNewTab',
+    'openExtensionDetailsPage'
+  ]),
+  favicon: Object.freeze([
+    'resolveFaviconCandidates',
+    'getFaviconData'
+  ])
+});
+
+const BACKGROUND_MESSAGE_ROUTES = Object.freeze(
+  Object.entries(BACKGROUND_MESSAGE_ROUTE_GROUPS).reduce((routes, [group, actions]) => {
+    actions.forEach((action) => {
+      routes[action] = group;
     });
-    return true;
-  } else if (request.action === 'getCopyCurrentUrlCommandShortcut') {
-    getConfiguredCopyUrlCommandShortcut((shortcut) => {
-      sendResponse({ shortcut: shortcut || '' });
-    });
-    return true;
-  } else if (request.action === 'triggerShowSearchFromPageHotkey') {
-    const senderTab = sender && sender.tab ? sender.tab : null;
-    if (!senderTab || typeof senderTab.id !== 'number') {
-      logHotkeyDebug('page-hotkey-invalid-sender', {
-        hasSender: Boolean(sender),
-        hasTab: Boolean(sender && sender.tab)
-      });
-      sendResponse({ ok: false });
-      return;
-    }
-    const shouldPrefillCurrentUrl = Boolean(request && request.prefillCurrentUrl);
-    const triggerSource = shouldPrefillCurrentUrl ? 'page-hotkey-prefill' : 'page-hotkey';
-    logHotkeyDebug('received', {
-      command: SHOW_SEARCH_COMMAND_NAME,
-      source: triggerSource,
-      tabId: senderTab.id,
-      url: senderTab.url || '',
-      pendingUrl: senderTab.pendingUrl || '',
-      prefillCurrentUrl: shouldPrefillCurrentUrl
-    });
-    rememberPageHotkeyContext(senderTab);
-    triggerShowSearchForTab(senderTab, triggerSource);
-    sendResponse({ ok: true });
-    return;
-  } else if (request.action === 'siteTryEnterPiPInMainWorld') {
-    const senderTab = sender && sender.tab ? sender.tab : null;
-    const tabId = senderTab && typeof senderTab.id === 'number' ? senderTab.id : null;
-    if (typeof tabId !== 'number') {
-      sendResponse({ ok: false, reason: 'no-tab' });
-      return;
-    }
-    const frameId = sender && typeof sender.frameId === 'number' ? sender.frameId : 0;
-    chrome.scripting.executeScript({
-      target: { tabId: tabId, frameIds: [frameId] },
-      world: 'MAIN',
-      func: async () => {
-        const result = {
-          ok: true,
-          before: Boolean(document.pictureInPictureElement),
-          after: Boolean(document.pictureInPictureElement),
-          attempted: false,
-          used: '',
-          error: ''
-        };
+    return routes;
+  }, {})
+);
 
-        const selectors = [
-          '.xgplayer video',
-          '.xgplayer-video-wrap video',
-          '.xg-video-container video',
-          '.iqp-player-videolayer video',
-          '.iqp-player video',
-          '.bpx-player-video-wrap video',
-          '#player video',
-          'video'
-        ];
+function sendUnknownBackgroundMessageResponse(sendResponse) {
+  sendResponse({ ok: false });
+  return;
+}
 
-        const host = String(location.hostname || '').toLowerCase();
-        const isDouyinHost = host.endsWith('.douyin.com') || host === 'douyin.com';
-        const isIqiyiHost = host.endsWith('.iqiyi.com') || host === 'iqiyi.com' || host.includes('.iqiyi.');
-        const candidateVideos = [];
-        const seen = new WeakSet();
-        const pushVideo = (video) => {
-          if (!(video instanceof HTMLVideoElement)) {
-            return;
-          }
-          if (!video.isConnected || seen.has(video)) {
-            return;
-          }
-          seen.add(video);
-          candidateVideos.push(video);
-        };
+function dispatchBackgroundMessage(request, sender, sendResponse) {
+  const action = request && request.action;
+  const group = BACKGROUND_MESSAGE_ROUTES[action];
 
-        for (const selector of selectors) {
-          const nodes = Array.from(document.querySelectorAll(selector));
-          for (const node of nodes) {
-            pushVideo(node);
-          }
-        }
-        Array.from(document.querySelectorAll('video')).forEach((node) => {
-          pushVideo(node);
-        });
+  switch (group) {
+    case 'tabs':
+      return handleTabMessage(request, sender, sendResponse);
+    case 'shortcuts':
+      return handleShortcutMessage(request, sender, sendResponse);
+    case 'pip':
+      return handlePipMessage(request, sender, sendResponse);
+    case 'search':
+      return handleSearchMessage(request, sender, sendResponse);
+    case 'siteSearch':
+      return handleSiteSearchMessage(request, sender, sendResponse);
+    case 'localeAndPermissions':
+      return handleLocaleAndPermissionMessage(request, sender, sendResponse);
+    case 'extensionPages':
+      return handleExtensionPageMessage(request, sender, sendResponse);
+    case 'favicon':
+      return handleFaviconMessage(request, sender, sendResponse);
+    default:
+      return sendUnknownBackgroundMessageResponse(sendResponse);
+  }
+}
 
-        const getArea = (video) => {
-          if (!video || typeof video.getBoundingClientRect !== 'function') {
-            return 0;
-          }
-          const rect = video.getBoundingClientRect();
-          const width = Math.max(0, Number(rect.width || 0));
-          const height = Math.max(0, Number(rect.height || 0));
-          return width * height;
-        };
+// Listen for extension runtime messages.
+chrome.runtime.onMessage.addListener(dispatchBackgroundMessage);
 
-        const hasBoost = (video) => {
-          if (!video || typeof video.closest !== 'function') {
-            return false;
-          }
-          if (host.endsWith('.douyin.com') || host === 'douyin.com') {
-            return Boolean(video.closest('.xgplayer, .xgplayer-video-wrap, .xg-video-container'));
-          }
-          if (host.endsWith('.iqiyi.com') || host === 'iqiyi.com' || host.includes('.iqiyi.')) {
-            return Boolean(video.closest('.iqp-player, .iqp-player-videolayer, #flashbox, #player'));
-          }
-          if (host.endsWith('.bilibili.com') || host === 'bilibili.com') {
-            return Boolean(video.closest('.bpx-player-video-wrap, .bilibili-player-video-wrap, #bilibili-player, #player'));
-          }
-          return false;
-        };
-
-        const scoreVideo = (video) => {
-          if (!(video instanceof HTMLVideoElement) || !video.isConnected) {
-            return -1;
-          }
-          const area = getArea(video);
-          const resolution = Math.max(
-            0,
-            Number(video.videoWidth || 0) * Number(video.videoHeight || 0)
-          );
-          const hasFrame = resolution > 0 || Number(video.readyState || 0) >= 1;
-          if (!hasFrame) {
-            return -1;
-          }
-          const playingBoost = (!video.paused && !video.ended && Number(video.readyState || 0) >= 2)
-            ? 1_000_000_000
-            : 0;
-          const profileBoost = hasBoost(video) ? 180_000_000 : 0;
-          const resolutionBoost = Math.min(80_000_000, Math.floor(resolution / 24));
-          return playingBoost + profileBoost + resolutionBoost + area;
-        };
-
-        candidateVideos.sort((a, b) => scoreVideo(b) - scoreVideo(a));
-
-        for (const video of candidateVideos) {
-          if (document.pictureInPictureElement) {
-            break;
-          }
-          if (scoreVideo(video) < 0) {
-            continue;
-          }
-          try {
-            video.autoPictureInPicture = true;
-          } catch (e) {}
-          try {
-            if (video.disablePictureInPicture) {
-              video.disablePictureInPicture = false;
-            }
-          } catch (e) {}
-          try {
-            if (video.hasAttribute('disablepictureinpicture')) {
-              video.removeAttribute('disablepictureinpicture');
-            }
-          } catch (e) {}
-          if (isIqiyiHost && video.paused && !video.ended) {
-            try {
-              await video.play();
-            } catch (e) {}
-          }
-          if (typeof video.requestPictureInPicture !== 'function') {
-            continue;
-          }
-          try {
-            result.attempted = true;
-            result.used = 'video.requestPictureInPicture';
-            await video.requestPictureInPicture();
-            if (document.pictureInPictureElement) {
-              break;
-            }
-          } catch (e) {
-            result.error = e && e.name ? String(e.name) : String(e);
-          }
-        }
-
-        result.after = Boolean(document.pictureInPictureElement);
-        return result;
+function handleTabMessage(request, sender, sendResponse) {
+  switch (request.action) {
+    case 'switchToTab': {
+      if (typeof request.tabId === 'number') {
+        recordTabSwitchEvent(request.tabId);
       }
-    }, (results) => {
-      if (chrome.runtime && chrome.runtime.lastError) {
-        sendResponse({
-          ok: false,
-          reason: chrome.runtime.lastError.message || 'executeScript-failed'
+      chrome.tabs.update(request.tabId, {active: true});
+      sendResponse({ ok: true });
+      return;
+    }
+    case 'reportTabVisible': {
+      const senderTab = sender && sender.tab ? sender.tab : null;
+      if (senderTab && typeof senderTab.id === 'number') {
+        const at = Number(request && request.at);
+        recordTabSwitchEvent(senderTab.id, Number.isFinite(at) ? at : Date.now());
+      }
+      sendResponse({ ok: true });
+      return;
+    }
+    case 'getTabsForOverlay': {
+      ensureTabSwitchStatsLoaded()
+        .catch(() => {})
+        .finally(() => {
+          const currentTabId = sender && sender.tab && typeof sender.tab.id === 'number'
+            ? sender.tab.id
+            : null;
+          chrome.tabs.query({}, (tabs) => {
+            const normalizedTabs = (Array.isArray(tabs) ? tabs : [])
+              .map((tab) => {
+                const resolvedUrl = getResolvedTabUrl(tab);
+                return {
+                  ...tab,
+                  url: resolvedUrl || ''
+                };
+              })
+              .filter((tab) => (
+                tab &&
+                tab.incognito !== true
+              ));
+            syncTabSwitchStatsFromTabList(normalizedTabs);
+            const sortedTabs = sortTabsForOverlay(normalizedTabs);
+            tabOverlayFetchSeq += 1;
+            const withSeq = sortedTabs.map((tab) => ({
+              ...tab,
+              _xTabFetchSeq: tabOverlayFetchSeq
+            }));
+            sendResponse({ tabs: withSeq, currentTabId: currentTabId });
+          });
         });
+      return true;
+    }
+    case 'trackSearchTab': {
+      if (typeof request.tabId === 'number') {
+        markPendingSearchTab(request.tabId);
+        sendResponse({ ok: true });
+      } else {
+        sendResponse({ ok: false });
+      }
+      return true;
+    }
+    case 'closeOtherTabsForOverlay': {
+      const senderTab = sender && sender.tab ? sender.tab : null;
+      if (!senderTab || typeof senderTab.id !== 'number' || typeof senderTab.windowId !== 'number') {
+        sendResponse({ ok: false, reason: 'invalid-sender' });
         return;
       }
-      const first = Array.isArray(results) && results.length > 0 ? results[0] : null;
-      const payload = first && typeof first.result === 'object' ? first.result : null;
-      sendResponse(payload || { ok: false, reason: 'no-result' });
-    });
-    return true;
-  } else if (request.action === 'iqiyiTryEnterPiPInMainWorld') {
-    const senderTab = sender && sender.tab ? sender.tab : null;
-    const tabId = senderTab && typeof senderTab.id === 'number' ? senderTab.id : null;
-    if (typeof tabId !== 'number') {
-      sendResponse({ ok: false, reason: 'no-tab' });
+      chrome.tabs.query({ windowId: senderTab.windowId }, (tabs) => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          sendResponse({ ok: false, reason: chrome.runtime.lastError.message || 'query-failed' });
+          return;
+        }
+        const ungroupedId = chrome && chrome.tabGroups && typeof chrome.tabGroups.TAB_GROUP_ID_NONE === 'number'
+          ? chrome.tabGroups.TAB_GROUP_ID_NONE
+          : -1;
+        const toCloseIds = (Array.isArray(tabs) ? tabs : [])
+          .filter((tab) => {
+            if (!tab || typeof tab.id !== 'number') {
+              return false;
+            }
+            if (tab.id === senderTab.id) {
+              return false;
+            }
+            if (tab.pinned) {
+              return false;
+            }
+            if (typeof tab.groupId === 'number' && tab.groupId !== ungroupedId) {
+              return false;
+            }
+            return true;
+          })
+          .map((tab) => tab.id);
+        if (toCloseIds.length <= 0) {
+          sendResponse({ ok: true, closedCount: 0 });
+          return;
+        }
+        chrome.tabs.remove(toCloseIds, () => {
+          if (chrome.runtime && chrome.runtime.lastError) {
+            sendResponse({ ok: false, reason: chrome.runtime.lastError.message || 'remove-failed' });
+            return;
+          }
+          sendResponse({ ok: true, closedCount: toCloseIds.length });
+        });
+      });
+      return true;
+    }
+    default:
+      return sendUnknownBackgroundMessageResponse(sendResponse);
+  }
+}
+
+function handleShortcutMessage(request, sender, sendResponse) {
+  switch (request.action) {
+    case 'getShowSearchShortcut': {
+      getConfiguredFallbackShortcut((shortcut) => {
+        sendResponse({ shortcut: shortcut || '' });
+      });
+      return true;
+    }
+    case 'getCopyCurrentUrlCommandShortcut': {
+      getConfiguredCopyUrlCommandShortcut((shortcut) => {
+        sendResponse({ shortcut: shortcut || '' });
+      });
+      return true;
+    }
+    case 'triggerShowSearchFromPageHotkey': {
+      const senderTab = sender && sender.tab ? sender.tab : null;
+      if (!senderTab || typeof senderTab.id !== 'number') {
+        logHotkeyDebug('page-hotkey-invalid-sender', {
+          hasSender: Boolean(sender),
+          hasTab: Boolean(sender && sender.tab)
+        });
+        sendResponse({ ok: false });
+        return;
+      }
+      const shouldPrefillCurrentUrl = Boolean(request && request.prefillCurrentUrl);
+      const triggerSource = shouldPrefillCurrentUrl ? 'page-hotkey-prefill' : 'page-hotkey';
+      logHotkeyDebug('received', {
+        command: SHOW_SEARCH_COMMAND_NAME,
+        source: triggerSource,
+        tabId: senderTab.id,
+        url: senderTab.url || '',
+        pendingUrl: senderTab.pendingUrl || '',
+        prefillCurrentUrl: shouldPrefillCurrentUrl
+      });
+      rememberPageHotkeyContext(senderTab);
+      triggerShowSearchForTab(senderTab, triggerSource);
+      sendResponse({ ok: true });
       return;
     }
-    const frameId = sender && typeof sender.frameId === 'number' ? sender.frameId : 0;
-    chrome.scripting.executeScript({
-      target: { tabId: tabId, frameIds: [frameId] },
-      world: 'MAIN',
-      func: async () => {
-        const result = {
-          ok: true,
-          before: Boolean(document.pictureInPictureElement),
-          after: Boolean(document.pictureInPictureElement),
-          attempted: false,
-          used: '',
-          error: ''
-        };
+    case 'getShortcutRules': {
+      loadShortcutRules().then((items) => {
+        sendResponse({ items: items });
+      });
+      return true;
+    }
+    default:
+      return sendUnknownBackgroundMessageResponse(sendResponse);
+  }
+}
 
-        const callMethod = async (obj, candidates) => {
-          if (!obj || typeof obj !== 'object' || !Array.isArray(candidates)) {
-            return false;
-          }
-          for (const candidate of candidates) {
-            const name = typeof candidate === 'string' ? candidate : candidate && candidate.name;
-            const args = (candidate && Array.isArray(candidate.args)) ? candidate.args : [];
-            if (typeof obj[name] !== 'function') {
-              continue;
-            }
-            try {
-              const output = obj[name].apply(obj, args);
-              if (output && typeof output.then === 'function') {
-                await output;
-              }
-              result.attempted = true;
-              result.used = `method:${name}${args.length ? '(args)' : ''}`;
-              if (document.pictureInPictureElement) {
-                return true;
-              }
-            } catch (e) {
-              // Try next candidate.
-            }
-          }
-          return false;
-        };
+function handlePipMessage(request, sender, sendResponse) {
+  switch (request.action) {
+    case 'pipRequestOwnership': {
+      requestGlobalPipOwnership(sender, request && request.kind ? String(request.kind) : '')
+        .then((result) => {
+          sendResponse(result);
+        })
+        .catch((error) => {
+          sendResponse({
+            ok: false,
+            granted: false,
+            reason: error && error.message ? error.message : String(error || 'ownership-request-failed')
+          });
+        });
+      return true;
+    }
+    case 'pipReleaseOwnership': {
+      releaseGlobalPipOwnership(sender, request && request.token ? String(request.token) : '')
+        .then((result) => {
+          sendResponse(result);
+        })
+        .catch((error) => {
+          sendResponse({
+            ok: false,
+            released: false,
+            reason: error && error.message ? error.message : String(error || 'ownership-release-failed')
+          });
+        });
+      return true;
+    }
+    case 'siteTryEnterPiPInMainWorld': {
+      const senderTab = sender && sender.tab ? sender.tab : null;
+      const tabId = senderTab && typeof senderTab.id === 'number' ? senderTab.id : null;
+      if (typeof tabId !== 'number') {
+        sendResponse({ ok: false, reason: 'no-tab' });
+        return;
+      }
+      const frameId = sender && typeof sender.frameId === 'number' ? sender.frameId : 0;
+      chrome.scripting.executeScript({
+        target: { tabId: tabId, frameIds: [frameId] },
+        world: 'MAIN',
+        func: async () => {
+          const result = {
+            ok: true,
+            before: Boolean(document.pictureInPictureElement),
+            after: Boolean(document.pictureInPictureElement),
+            attempted: false,
+            used: '',
+            error: ''
+          };
 
-        const trySetPiPProperty = (obj) => {
-          if (!obj || typeof obj !== 'object' || !('pictureInPicture' in obj)) {
-            return false;
-          }
-          try {
-            obj.pictureInPicture = true;
-            result.attempted = true;
-            result.used = 'property:pictureInPicture';
-            return Boolean(document.pictureInPictureElement);
-          } catch (e) {
-            return false;
-          }
-        };
-
-        const getPrimaryVideo = () => {
           const selectors = [
+            '.xgplayer video',
+            '.xgplayer-video-wrap video',
+            '.xg-video-container video',
             '.iqp-player-videolayer video',
             '.iqp-player video',
-            '#flashbox video',
+            '.bpx-player-video-wrap video',
             '#player video',
             'video'
           ];
+
+          const host = String(location.hostname || '').toLowerCase();
+          const isDouyinHost = host.endsWith('.douyin.com') || host === 'douyin.com';
+          const isIqiyiHost = host.endsWith('.iqiyi.com') || host === 'iqiyi.com' || host.includes('.iqiyi.');
+          const candidateVideos = [];
+          const seen = new WeakSet();
+          const pushVideo = (video) => {
+            if (!(video instanceof HTMLVideoElement)) {
+              return;
+            }
+            if (!video.isConnected || seen.has(video)) {
+              return;
+            }
+            seen.add(video);
+            candidateVideos.push(video);
+          };
+
           for (const selector of selectors) {
             const nodes = Array.from(document.querySelectorAll(selector));
             for (const node of nodes) {
-              if (!(node instanceof HTMLVideoElement)) {
-                continue;
-              }
-              if (node.matches('.player_outer_video video') || node.getAttribute('outer') === '1') {
-                continue;
-              }
-              return node;
+              pushVideo(node);
             }
           }
-          return null;
-        };
-
-        const roots = [];
-        const rootSet = new WeakSet();
-        const pushRoot = (obj) => {
-          if (!obj || typeof obj !== 'object') {
-            return;
-          }
-          if (rootSet.has(obj)) {
-            return;
-          }
-          rootSet.add(obj);
-          roots.push(obj);
-        };
-
-        try {
-          if (window.webPlay &&
-              window.webPlay.wonder &&
-              typeof window.webPlay.wonder.getPlayer === 'function') {
-            pushRoot(window.webPlay.wonder.getPlayer());
-          }
-        } catch (e) {}
-        try {
-          if (window.webPlay &&
-              window.webPlay.wonder &&
-              typeof window.webPlay.wonder.getPCBridge === 'function') {
-            pushRoot(window.webPlay.wonder.getPCBridge());
-          }
-        } catch (e) {}
-        try {
-          if (window.webPlay &&
-              window.webPlay.wonder &&
-              window.webPlay.wonder._manager &&
-              window.webPlay.wonder._manager._players &&
-              typeof window.webPlay.wonder._manager._players === 'object') {
-            Object.values(window.webPlay.wonder._manager._players).forEach((player) => {
-              pushRoot(player);
-            });
-          }
-        } catch (e) {}
-
-        const collectLoaderPlayers = async (timeoutMs) => {
-          if (!window.QiyiPlayerLoader || typeof window.QiyiPlayerLoader.ready !== 'function') {
-            return;
-          }
-          await new Promise((resolve) => {
-            let done = false;
-            const finish = () => {
-              if (done) {
-                return;
-              }
-              done = true;
-              resolve();
-            };
-            const timer = setTimeout(finish, Math.max(120, Number(timeoutMs || 260)));
-            try {
-              window.QiyiPlayerLoader.ready((manager) => {
-                try {
-                  if (manager && typeof manager === 'object') {
-                    pushRoot(manager);
-                    if (manager._players && typeof manager._players === 'object') {
-                      Object.values(manager._players).forEach((player) => {
-                        pushRoot(player);
-                      });
-                    }
-                    if (typeof manager.getPlayerById === 'function') {
-                      ['mainContent', 'root', 'player', '5fcma2g3wzdcvv2smpk4d3h3vq'].forEach((id) => {
-                        try {
-                          pushRoot(manager.getPlayerById(id));
-                        } catch (e) {}
-                      });
-                    }
-                  }
-                } catch (e) {
-                  // Ignore manager traversal errors.
-                } finally {
-                  clearTimeout(timer);
-                  finish();
-                }
-              });
-            } catch (e) {
-              clearTimeout(timer);
-              finish();
-            }
+          Array.from(document.querySelectorAll('video')).forEach((node) => {
+            pushVideo(node);
           });
-        };
 
-        await collectLoaderPlayers(280);
-        if (!roots.length) {
-          await collectLoaderPlayers(360);
-        }
-
-        const methodCandidates = [
-          { name: 'openPictureInPicture', args: [] },
-          { name: 'toggleBrowserPicInPic', args: [] },
-          { name: 'togglePictureInPicture', args: [] },
-          { name: 'togglePip', args: [] },
-          { name: 'enterPictureInPicture', args: [] },
-          { name: 'setSmallWindowMode', args: [true] }
-        ];
-
-        const nestedKeys = [
-          '_playBack',
-          'playBack',
-          '_player',
-          'player',
-          '_playProxy',
-          'videoInfo',
-          '_videoInfo'
-        ];
-
-        for (const root of roots) {
-          if (document.pictureInPictureElement) {
-            break;
-          }
-          await callMethod(root, methodCandidates);
-          if (document.pictureInPictureElement) {
-            break;
-          }
-          trySetPiPProperty(root);
-          if (document.pictureInPictureElement) {
-            break;
-          }
-          for (const key of nestedKeys) {
-            if (!root || typeof root !== 'object') {
-              continue;
+          const getArea = (video) => {
+            if (!video || typeof video.getBoundingClientRect !== 'function') {
+              return 0;
             }
-            const nested = root[key];
-            if (!nested || typeof nested !== 'object') {
-              continue;
+            const rect = video.getBoundingClientRect();
+            const width = Math.max(0, Number(rect.width || 0));
+            const height = Math.max(0, Number(rect.height || 0));
+            return width * height;
+          };
+
+          const hasBoost = (video) => {
+            if (!video || typeof video.closest !== 'function') {
+              return false;
             }
-            await callMethod(nested, methodCandidates);
+            if (host.endsWith('.douyin.com') || host === 'douyin.com') {
+              return Boolean(video.closest('.xgplayer, .xgplayer-video-wrap, .xg-video-container'));
+            }
+            if (host.endsWith('.iqiyi.com') || host === 'iqiyi.com' || host.includes('.iqiyi.')) {
+              return Boolean(video.closest('.iqp-player, .iqp-player-videolayer, #flashbox, #player'));
+            }
+            if (host.endsWith('.bilibili.com') || host === 'bilibili.com') {
+              return Boolean(video.closest('.bpx-player-video-wrap, .bilibili-player-video-wrap, #bilibili-player, #player'));
+            }
+            return false;
+          };
+
+          const scoreVideo = (video) => {
+            if (!(video instanceof HTMLVideoElement) || !video.isConnected) {
+              return -1;
+            }
+            const area = getArea(video);
+            const resolution = Math.max(
+              0,
+              Number(video.videoWidth || 0) * Number(video.videoHeight || 0)
+            );
+            const hasFrame = resolution > 0 || Number(video.readyState || 0) >= 1;
+            if (!hasFrame) {
+              return -1;
+            }
+            const playingBoost = (!video.paused && !video.ended && Number(video.readyState || 0) >= 2)
+              ? 1_000_000_000
+              : 0;
+            const profileBoost = hasBoost(video) ? 180_000_000 : 0;
+            const resolutionBoost = Math.min(80_000_000, Math.floor(resolution / 24));
+            return playingBoost + profileBoost + resolutionBoost + area;
+          };
+
+          candidateVideos.sort((a, b) => scoreVideo(b) - scoreVideo(a));
+
+          for (const video of candidateVideos) {
             if (document.pictureInPictureElement) {
               break;
             }
-            trySetPiPProperty(nested);
-            if (document.pictureInPictureElement) {
-              break;
+            if (scoreVideo(video) < 0) {
+              continue;
             }
-          }
-        }
-
-        if (!document.pictureInPictureElement) {
-          const video = getPrimaryVideo();
-          if (video && typeof video.requestPictureInPicture === 'function') {
+            try {
+              video.autoPictureInPicture = true;
+            } catch (e) {}
             try {
               if (video.disablePictureInPicture) {
                 video.disablePictureInPicture = false;
               }
+            } catch (e) {}
+            try {
               if (video.hasAttribute('disablepictureinpicture')) {
                 video.removeAttribute('disablepictureinpicture');
               }
+            } catch (e) {}
+            if (isIqiyiHost && video.paused && !video.ended) {
+              try {
+                await video.play();
+              } catch (e) {}
+            }
+            if (typeof video.requestPictureInPicture !== 'function') {
+              continue;
+            }
+            try {
               result.attempted = true;
               result.used = 'video.requestPictureInPicture';
               await video.requestPictureInPicture();
+              if (document.pictureInPictureElement) {
+                break;
+              }
             } catch (e) {
               result.error = e && e.name ? String(e.name) : String(e);
             }
           }
-        }
 
-        result.after = Boolean(document.pictureInPictureElement);
-        return result;
-      }
-    }, (results) => {
-      if (chrome.runtime && chrome.runtime.lastError) {
-        sendResponse({
-          ok: false,
-          reason: chrome.runtime.lastError.message || 'executeScript-failed'
-        });
+          result.after = Boolean(document.pictureInPictureElement);
+          return result;
+        }
+      }, (results) => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          sendResponse({
+            ok: false,
+            reason: chrome.runtime.lastError.message || 'executeScript-failed'
+          });
+          return;
+        }
+        const first = Array.isArray(results) && results.length > 0 ? results[0] : null;
+        const payload = first && typeof first.result === 'object' ? first.result : null;
+        sendResponse(payload || { ok: false, reason: 'no-result' });
+      });
+      return true;
+    }
+    case 'iqiyiTryEnterPiPInMainWorld': {
+      const senderTab = sender && sender.tab ? sender.tab : null;
+      const tabId = senderTab && typeof senderTab.id === 'number' ? senderTab.id : null;
+      if (typeof tabId !== 'number') {
+        sendResponse({ ok: false, reason: 'no-tab' });
         return;
       }
-      const first = Array.isArray(results) && results.length > 0 ? results[0] : null;
-      const payload = first && typeof first.result === 'object' ? first.result : null;
-      sendResponse(payload || { ok: false, reason: 'no-result' });
-    });
-    return true;
-  } else if (request.action === 'iqiyiSetupAutoPiPInMainWorld') {
-    const senderTab = sender && sender.tab ? sender.tab : null;
-    const tabId = senderTab && typeof senderTab.id === 'number' ? senderTab.id : null;
-    if (typeof tabId !== 'number') {
-      sendResponse({ ok: false, reason: 'no-tab' });
-      return;
-    }
-    const frameId = sender && typeof sender.frameId === 'number' ? sender.frameId : 0;
-    chrome.scripting.executeScript({
-      target: { tabId: tabId, frameIds: [frameId] },
-      world: 'MAIN',
-      func: () => {
-        const result = {
-          ok: true,
-          bound: false,
-          preparedVideos: 0,
-          error: ''
-        };
-        try {
-          if (window.__lumnoIqiyiAutoPipSetupDone2026) {
-            result.bound = true;
-            return result;
-          }
+      const frameId = sender && typeof sender.frameId === 'number' ? sender.frameId : 0;
+      chrome.scripting.executeScript({
+        target: { tabId: tabId, frameIds: [frameId] },
+        world: 'MAIN',
+        func: async () => {
+          const result = {
+            ok: true,
+            before: Boolean(document.pictureInPictureElement),
+            after: Boolean(document.pictureInPictureElement),
+            attempted: false,
+            used: '',
+            error: ''
+          };
+
+          const callMethod = async (obj, candidates) => {
+            if (!obj || typeof obj !== 'object' || !Array.isArray(candidates)) {
+              return false;
+            }
+            for (const candidate of candidates) {
+              const name = typeof candidate === 'string' ? candidate : candidate && candidate.name;
+              const args = (candidate && Array.isArray(candidate.args)) ? candidate.args : [];
+              if (typeof obj[name] !== 'function') {
+                continue;
+              }
+              try {
+                const output = obj[name].apply(obj, args);
+                if (output && typeof output.then === 'function') {
+                  await output;
+                }
+                result.attempted = true;
+                result.used = `method:${name}${args.length ? '(args)' : ''}`;
+                if (document.pictureInPictureElement) {
+                  return true;
+                }
+              } catch (e) {
+                // Try next candidate.
+              }
+            }
+            return false;
+          };
+
+          const trySetPiPProperty = (obj) => {
+            if (!obj || typeof obj !== 'object' || !('pictureInPicture' in obj)) {
+              return false;
+            }
+            try {
+              obj.pictureInPicture = true;
+              result.attempted = true;
+              result.used = 'property:pictureInPicture';
+              return Boolean(document.pictureInPictureElement);
+            } catch (e) {
+              return false;
+            }
+          };
 
           const getPrimaryVideo = () => {
             const selectors = [
@@ -2612,524 +2599,713 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
             return null;
           };
 
-          const prepareVideo = (video) => {
-            if (!(video instanceof HTMLVideoElement)) {
-              return false;
+          const roots = [];
+          const rootSet = new WeakSet();
+          const pushRoot = (obj) => {
+            if (!obj || typeof obj !== 'object') {
+              return;
             }
-            if (video.matches('.player_outer_video video') || video.getAttribute('outer') === '1') {
-              return false;
+            if (rootSet.has(obj)) {
+              return;
             }
-            try {
-              video.autoPictureInPicture = true;
-            } catch (e) {}
-            try {
-              if (video.disablePictureInPicture) {
-                video.disablePictureInPicture = false;
-              }
-            } catch (e) {}
-            try {
-              if (video.hasAttribute('disablepictureinpicture')) {
-                video.removeAttribute('disablepictureinpicture');
-              }
-            } catch (e) {}
-            return true;
+            rootSet.add(obj);
+            roots.push(obj);
           };
 
-          const prepareExistingVideos = () => {
-            let count = 0;
-            const list = Array.from(document.querySelectorAll('video'));
-            for (const video of list) {
-              if (prepareVideo(video)) {
-                count += 1;
-              }
-            }
-            return count;
-          };
-
-          const mediaSession = ('mediaSession' in navigator) ? navigator.mediaSession : null;
-          const proto = mediaSession ? Object.getPrototypeOf(mediaSession) : null;
-          const nativeSetActionHandler = proto && typeof proto.setActionHandler === 'function'
-            ? proto.setActionHandler
-            : null;
-
-          if (mediaSession && nativeSetActionHandler) {
-            nativeSetActionHandler.call(mediaSession, 'enterpictureinpicture', async () => {
-              const video = getPrimaryVideo();
-              if (!video || typeof video.requestPictureInPicture !== 'function') {
-                return;
-              }
-              try {
-                prepareVideo(video);
-                if (!video.paused || document.visibilityState === 'hidden') {
-                  await video.requestPictureInPicture();
-                }
-              } catch (e) {}
-            });
-            nativeSetActionHandler.call(mediaSession, 'leavepictureinpicture', async () => {
-              try {
-                if (document.pictureInPictureElement && typeof document.exitPictureInPicture === 'function') {
-                  await document.exitPictureInPicture();
-                }
-              } catch (e) {}
-            });
-            result.bound = true;
-          }
-
-          result.preparedVideos = prepareExistingVideos();
-
-          if (!window.__lumnoIqiyiAutoPipObserver2026) {
-            const observer = new MutationObserver(() => {
-              prepareExistingVideos();
-            });
-            observer.observe(document.documentElement || document.body, {
-              childList: true,
-              subtree: true
-            });
-            window.__lumnoIqiyiAutoPipObserver2026 = observer;
-          }
-
-          window.__lumnoIqiyiAutoPipSetupDone2026 = true;
-          return result;
-        } catch (e) {
-          result.ok = false;
-          result.error = e && e.message ? String(e.message) : String(e);
-          return result;
-        }
-      }
-    }, (results) => {
-      if (chrome.runtime && chrome.runtime.lastError) {
-        sendResponse({
-          ok: false,
-          reason: chrome.runtime.lastError.message || 'executeScript-failed'
-        });
-        return;
-      }
-      const first = Array.isArray(results) && results.length > 0 ? results[0] : null;
-      const payload = first && typeof first.result === 'object' ? first.result : null;
-      sendResponse(payload || { ok: false, reason: 'no-result' });
-    });
-    return true;
-  } else if (request.action === 'forceExitPiPInMainWorld') {
-    const senderTab = sender && sender.tab ? sender.tab : null;
-    const tabId = senderTab && typeof senderTab.id === 'number' ? senderTab.id : null;
-    if (typeof tabId !== 'number') {
-      sendResponse({ ok: false, reason: 'no-tab' });
-      return;
-    }
-    const frameId = sender && typeof sender.frameId === 'number' ? sender.frameId : 0;
-    chrome.scripting.executeScript({
-      target: { tabId: tabId, frameIds: [frameId] },
-      world: 'MAIN',
-      func: async () => {
-        const result = {
-          ok: true,
-          before: Boolean(document.pictureInPictureElement),
-          after: Boolean(document.pictureInPictureElement),
-          attemptedExit: false,
-          error: ''
-        };
-        try {
-          if (document.pictureInPictureElement && typeof document.exitPictureInPicture === 'function') {
-            result.attemptedExit = true;
-            await document.exitPictureInPicture();
-          }
-        } catch (e) {
-          result.error = e && e.name ? String(e.name) : String(e);
-        }
-        result.after = Boolean(document.pictureInPictureElement);
-        return result;
-      }
-    }, (results) => {
-      if (chrome.runtime && chrome.runtime.lastError) {
-        sendResponse({
-          ok: false,
-          reason: chrome.runtime.lastError.message || 'executeScript-failed'
-        });
-        return;
-      }
-      const first = Array.isArray(results) && results.length > 0 ? results[0] : null;
-      const payload = first && typeof first.result === 'object' ? first.result : null;
-      sendResponse(payload || { ok: false, reason: 'no-result' });
-    });
-    return true;
-  } else if (request.action === 'ytForceExitPiPInMainWorld') {
-    const senderTab = sender && sender.tab ? sender.tab : null;
-    const tabId = senderTab && typeof senderTab.id === 'number' ? senderTab.id : null;
-    if (typeof tabId !== 'number') {
-      sendResponse({ ok: false, reason: 'no-tab' });
-      return;
-    }
-    const frameId = sender && typeof sender.frameId === 'number' ? sender.frameId : 0;
-    chrome.scripting.executeScript({
-      target: { tabId: tabId, frameIds: [frameId] },
-      world: 'MAIN',
-      func: async () => {
-        const result = {
-          ok: true,
-          before: Boolean(document.pictureInPictureElement),
-          after: Boolean(document.pictureInPictureElement),
-          attemptedExit: false,
-          unminimized: false,
-          error: ''
-        };
-
-        const getPlayer = () => {
-          const moviePlayer = document.getElementById('movie_player');
-          if (moviePlayer && typeof moviePlayer === 'object') {
-            return moviePlayer;
-          }
-          const ytdPlayer = document.querySelector('ytd-player');
-          if (ytdPlayer && typeof ytdPlayer.getPlayer === 'function') {
-            try {
-              return ytdPlayer.getPlayer();
-            } catch (e) {
-              return null;
-            }
-          }
-          return null;
-        };
-
-        const callPlayerMethod = (player, name, args) => {
-          if (!player || typeof player[name] !== 'function') {
-            return false;
-          }
           try {
-            player[name].apply(player, Array.isArray(args) ? args : []);
-            return true;
-          } catch (e) {
-            return false;
-          }
-        };
-
-        const forceUnminimize = () => {
-          const player = getPlayer();
-          if (!player) {
-            return false;
-          }
-          let changed = false;
-          changed = callPlayerMethod(player, 'setMinimized', [false]) || changed;
-          changed = callPlayerMethod(player, 'setMinimized', [0]) || changed;
-          changed = callPlayerMethod(player, 'setMinimized', [null]) || changed;
-          changed = callPlayerMethod(player, 'setMinimized', []) || changed;
-          return changed;
-        };
-
-        result.unminimized = forceUnminimize();
-        try {
-          if (document.pictureInPictureElement && typeof document.exitPictureInPicture === 'function') {
-            result.attemptedExit = true;
-            await document.exitPictureInPicture();
-          }
-        } catch (e) {
-          result.error = e && e.name ? String(e.name) : String(e);
-        }
-        result.unminimized = forceUnminimize() || result.unminimized;
-        result.after = Boolean(document.pictureInPictureElement);
-        return result;
-      }
-    }, (results) => {
-      if (chrome.runtime && chrome.runtime.lastError) {
-        sendResponse({
-          ok: false,
-          reason: chrome.runtime.lastError.message || 'executeScript-failed'
-        });
-        return;
-      }
-      const first = Array.isArray(results) && results.length > 0 ? results[0] : null;
-      const payload = first && typeof first.result === 'object' ? first.result : null;
-      sendResponse(payload || { ok: false, reason: 'no-result' });
-    });
-    return true;
-  } else if (request.action === 'searchOrNavigate') {
-    const query = request.query ? String(request.query) : '';
-    const forceSearch = Boolean(request.forceSearch);
-    loadShortcutRules().then((rules) => {
-      const shortcutUrl = getShortcutUrl(query, rules);
-      if (shortcutUrl) {
-        chrome.tabs.create({ url: shortcutUrl });
-        sendResponse({ ok: true, url: shortcutUrl });
-        return;
-      }
-      const directUrl = !forceSearch ? getDirectNavigationUrl(query) : '';
-      if (directUrl) {
-        chrome.tabs.create({ url: directUrl });
-        sendResponse({ ok: true, url: directUrl });
-      } else {
-        // It's a search query - use browser default search engine
-        const fallbackUrl = buildDefaultSearchUrl(query);
-        if (chrome && chrome.search && typeof chrome.search.query === 'function') {
-          markPendingSearchTab(null);
+            if (window.webPlay &&
+                window.webPlay.wonder &&
+                typeof window.webPlay.wonder.getPlayer === 'function') {
+              pushRoot(window.webPlay.wonder.getPlayer());
+            }
+          } catch (e) {}
           try {
-            chrome.search.query({ text: query, disposition: 'NEW_TAB' }, () => {
-              if (chrome.runtime && chrome.runtime.lastError) {
-                pendingSearchAt = 0;
-                pendingSearchTabId = null;
-                chrome.tabs.create({ url: fallbackUrl });
-                sendResponse({ ok: true, url: fallbackUrl });
-                return;
-              }
-              sendResponse({ ok: true, url: fallbackUrl });
-            });
-            return;
-          } catch (e) {
-            pendingSearchAt = 0;
-            pendingSearchTabId = null;
-          }
-        }
-        chrome.tabs.create({ url: fallbackUrl });
-        sendResponse({ ok: true, url: fallbackUrl });
-      }
-    });
-    return true;
-  } else if (request.action === 'getSearchSuggestions') {
-    const query = request.query;
-    getSearchSuggestions(query).then(suggestions => {
-      sendResponse({ suggestions: suggestions });
-    }).catch(() => {
-      sendResponse({ suggestions: [] });
-    });
-    return true; // Keep the message channel open for async response
-  } else if (request.action === 'recordSearchSuggestionSelection') {
-    recordSearchSuggestionSelection(request)
-      .then((result) => {
-        sendResponse(result);
-      })
-      .catch((error) => {
-        sendResponse({
-          ok: false,
-          reason: error && error.message ? error.message : 'record-selection-failed'
-        });
-      });
-    return true;
-  } else if (request.action === 'deleteHistoryUrl') {
-    const targetUrl = typeof request.url === 'string' ? request.url : '';
-    if (!targetUrl) {
-      sendResponse({ ok: false, reason: 'invalid-url' });
-      return;
-    }
-    if (!chrome.history || typeof chrome.history.deleteUrl !== 'function') {
-      sendResponse({ ok: false, reason: 'history-api-unavailable' });
-      return;
-    }
-    chrome.history.deleteUrl({ url: targetUrl }, () => {
-      if (chrome.runtime && chrome.runtime.lastError) {
-        sendResponse({ ok: false, reason: chrome.runtime.lastError.message || 'delete-history-failed' });
-        return;
-      }
-      sendResponse({ ok: true, url: targetUrl });
-    });
-    return true;
-  } else if (request.action === 'getTabsForOverlay') {
-    ensureTabSwitchStatsLoaded()
-      .catch(() => {})
-      .finally(() => {
-        const currentTabId = sender && sender.tab && typeof sender.tab.id === 'number'
-          ? sender.tab.id
-          : null;
-        chrome.tabs.query({}, (tabs) => {
-          const normalizedTabs = (Array.isArray(tabs) ? tabs : [])
-            .map((tab) => {
-              const resolvedUrl = getResolvedTabUrl(tab);
-              return {
-                ...tab,
-                url: resolvedUrl || ''
+            if (window.webPlay &&
+                window.webPlay.wonder &&
+                typeof window.webPlay.wonder.getPCBridge === 'function') {
+              pushRoot(window.webPlay.wonder.getPCBridge());
+            }
+          } catch (e) {}
+          try {
+            if (window.webPlay &&
+                window.webPlay.wonder &&
+                window.webPlay.wonder._manager &&
+                window.webPlay.wonder._manager._players &&
+                typeof window.webPlay.wonder._manager._players === 'object') {
+              Object.values(window.webPlay.wonder._manager._players).forEach((player) => {
+                pushRoot(player);
+              });
+            }
+          } catch (e) {}
+
+          const collectLoaderPlayers = async (timeoutMs) => {
+            if (!window.QiyiPlayerLoader || typeof window.QiyiPlayerLoader.ready !== 'function') {
+              return;
+            }
+            await new Promise((resolve) => {
+              let done = false;
+              const finish = () => {
+                if (done) {
+                  return;
+                }
+                done = true;
+                resolve();
               };
-            })
-            .filter((tab) => (
-              tab &&
-              tab.incognito !== true
-            ));
-          syncTabSwitchStatsFromTabList(normalizedTabs);
-          const sortedTabs = sortTabsForOverlay(normalizedTabs);
-          tabOverlayFetchSeq += 1;
-          const withSeq = sortedTabs.map((tab) => ({
-            ...tab,
-            _xTabFetchSeq: tabOverlayFetchSeq
-          }));
-          sendResponse({ tabs: withSeq, currentTabId: currentTabId });
-        });
-      });
-    return true;
-  } else if (request.action === 'getSiteSearchProviders') {
-    loadSiteSearchProviders().then((items) => {
-      sendResponse({ items: items });
-    });
-    return true;
-  } else if (request.action === 'runSiteSearchProviderQuery') {
-    runInteractiveSiteSearchProvider(
-      request.provider,
-      request.query,
-      sender,
-      request.disposition
-    ).then((result) => {
-      sendResponse(result);
-    }).catch((error) => {
-      sendResponse({
-        ok: false,
-        reason: error && error.message ? error.message : 'interactive-site-search-failed'
-      });
-    });
-    return true;
-  } else if (request.action === 'getShortcutRules') {
-    loadShortcutRules().then((items) => {
-      sendResponse({ items: items });
-    });
-    return true;
-  } else if (request.action === 'trackSearchTab') {
-    if (typeof request.tabId === 'number') {
-      markPendingSearchTab(request.tabId);
-      sendResponse({ ok: true });
-    } else {
-      sendResponse({ ok: false });
-    }
-    return true;
-  } else if (request.action === 'getLocaleMessages') {
-    const locale = normalizeLocaleForMessages(request.locale);
-    const localePath = chrome.runtime.getURL(`_locales/${locale}/messages.json`);
-    fetch(localePath)
-      .then((response) => response.json())
-      .then((messages) => {
-        sendResponse({ messages: messages || {} });
-      })
-      .catch(() => {
-        sendResponse({ messages: {} });
-      });
-    return true;
-  } else if (request.action === 'getFileSchemeAccessStatus') {
-    checkFileSchemeAccess((isAllowed) => {
-      sendResponse({
-        ok: true,
-        allowed: isAllowed === true,
-        supported: isAllowed !== null,
-        detailsUrl: getExtensionDetailsUrl()
-      });
-    });
-    return true;
-  } else if (request.action === 'openOptionsPage') {
-    openExtensionOptionsPage((ok) => {
-      sendResponse({ ok: ok !== false });
-    });
-    return true;
-  } else if (request.action === 'closeOtherTabsForOverlay') {
-    const senderTab = sender && sender.tab ? sender.tab : null;
-    if (!senderTab || typeof senderTab.id !== 'number' || typeof senderTab.windowId !== 'number') {
-      sendResponse({ ok: false, reason: 'invalid-sender' });
-      return;
-    }
-    chrome.tabs.query({ windowId: senderTab.windowId }, (tabs) => {
-      if (chrome.runtime && chrome.runtime.lastError) {
-        sendResponse({ ok: false, reason: chrome.runtime.lastError.message || 'query-failed' });
-        return;
-      }
-      const ungroupedId = chrome && chrome.tabGroups && typeof chrome.tabGroups.TAB_GROUP_ID_NONE === 'number'
-        ? chrome.tabGroups.TAB_GROUP_ID_NONE
-        : -1;
-      const toCloseIds = (Array.isArray(tabs) ? tabs : [])
-        .filter((tab) => {
-          if (!tab || typeof tab.id !== 'number') {
-            return false;
+              const timer = setTimeout(finish, Math.max(120, Number(timeoutMs || 260)));
+              try {
+                window.QiyiPlayerLoader.ready((manager) => {
+                  try {
+                    if (manager && typeof manager === 'object') {
+                      pushRoot(manager);
+                      if (manager._players && typeof manager._players === 'object') {
+                        Object.values(manager._players).forEach((player) => {
+                          pushRoot(player);
+                        });
+                      }
+                      if (typeof manager.getPlayerById === 'function') {
+                        ['mainContent', 'root', 'player', '5fcma2g3wzdcvv2smpk4d3h3vq'].forEach((id) => {
+                          try {
+                            pushRoot(manager.getPlayerById(id));
+                          } catch (e) {}
+                        });
+                      }
+                    }
+                  } catch (e) {
+                    // Ignore manager traversal errors.
+                  } finally {
+                    clearTimeout(timer);
+                    finish();
+                  }
+                });
+              } catch (e) {
+                clearTimeout(timer);
+                finish();
+              }
+            });
+          };
+
+          await collectLoaderPlayers(280);
+          if (!roots.length) {
+            await collectLoaderPlayers(360);
           }
-          if (tab.id === senderTab.id) {
-            return false;
+
+          const methodCandidates = [
+            { name: 'openPictureInPicture', args: [] },
+            { name: 'toggleBrowserPicInPic', args: [] },
+            { name: 'togglePictureInPicture', args: [] },
+            { name: 'togglePip', args: [] },
+            { name: 'enterPictureInPicture', args: [] },
+            { name: 'setSmallWindowMode', args: [true] }
+          ];
+
+          const nestedKeys = [
+            '_playBack',
+            'playBack',
+            '_player',
+            'player',
+            '_playProxy',
+            'videoInfo',
+            '_videoInfo'
+          ];
+
+          for (const root of roots) {
+            if (document.pictureInPictureElement) {
+              break;
+            }
+            await callMethod(root, methodCandidates);
+            if (document.pictureInPictureElement) {
+              break;
+            }
+            trySetPiPProperty(root);
+            if (document.pictureInPictureElement) {
+              break;
+            }
+            for (const key of nestedKeys) {
+              if (!root || typeof root !== 'object') {
+                continue;
+              }
+              const nested = root[key];
+              if (!nested || typeof nested !== 'object') {
+                continue;
+              }
+              await callMethod(nested, methodCandidates);
+              if (document.pictureInPictureElement) {
+                break;
+              }
+              trySetPiPProperty(nested);
+              if (document.pictureInPictureElement) {
+                break;
+              }
+            }
           }
-          if (tab.pinned) {
-            return false;
+
+          if (!document.pictureInPictureElement) {
+            const video = getPrimaryVideo();
+            if (video && typeof video.requestPictureInPicture === 'function') {
+              try {
+                if (video.disablePictureInPicture) {
+                  video.disablePictureInPicture = false;
+                }
+                if (video.hasAttribute('disablepictureinpicture')) {
+                  video.removeAttribute('disablepictureinpicture');
+                }
+                result.attempted = true;
+                result.used = 'video.requestPictureInPicture';
+                await video.requestPictureInPicture();
+              } catch (e) {
+                result.error = e && e.name ? String(e.name) : String(e);
+              }
+            }
           }
-          if (typeof tab.groupId === 'number' && tab.groupId !== ungroupedId) {
-            return false;
-          }
-          return true;
-        })
-        .map((tab) => tab.id);
-      if (toCloseIds.length <= 0) {
-        sendResponse({ ok: true, closedCount: 0 });
-        return;
-      }
-      chrome.tabs.remove(toCloseIds, () => {
+
+          result.after = Boolean(document.pictureInPictureElement);
+          return result;
+        }
+      }, (results) => {
         if (chrome.runtime && chrome.runtime.lastError) {
-          sendResponse({ ok: false, reason: chrome.runtime.lastError.message || 'remove-failed' });
+          sendResponse({
+            ok: false,
+            reason: chrome.runtime.lastError.message || 'executeScript-failed'
+          });
           return;
         }
-        sendResponse({ ok: true, closedCount: toCloseIds.length });
+        const first = Array.isArray(results) && results.length > 0 ? results[0] : null;
+        const payload = first && typeof first.result === 'object' ? first.result : null;
+        sendResponse(payload || { ok: false, reason: 'no-result' });
       });
-    });
-    return true;
-  } else if (request.action === 'openExtensionShortcutsPage') {
-    openExtensionShortcutsPage((ok) => {
-      sendResponse({ ok: ok !== false });
-    });
-    return true;
-  } else if (request.action === 'openBookmarkManager') {
-    openBookmarkManagerPage().then((url) => {
-      sendResponse({ ok: true, url: url });
-    }).catch(() => {
-      sendResponse({ ok: false });
-    });
-    return true;
-  } else if (request.action === 'createTab') {
-    const targetUrl = typeof request.url === 'string' ? request.url : '';
-    if (!targetUrl) {
-      sendResponse({ ok: false });
-      return;
+      return true;
     }
-    chrome.tabs.create({ url: targetUrl }, () => {
-      sendResponse({ ok: !(chrome.runtime && chrome.runtime.lastError) });
-    });
-    return true;
-  } else if (request.action === 'openNewTab') {
-    const newtabUrl = chrome.runtime.getURL('src/newtab/newtab.html?focus=1');
-    chrome.tabs.create({ url: newtabUrl }, () => {
-      sendResponse({ ok: !(chrome.runtime && chrome.runtime.lastError) });
-    });
-    return true;
-  } else if (request.action === 'openExtensionDetailsPage') {
-    const detailsUrl = getExtensionDetailsUrl();
-    chrome.tabs.create({ url: detailsUrl }, () => {
-      sendResponse({ ok: !(chrome.runtime && chrome.runtime.lastError), url: detailsUrl });
-    });
-    return true;
-  } else if (request.action === 'resolveFaviconCandidates') {
-    const targetUrl = request.url || '';
-    const hostOverride = request.host || '';
-    const fallbackUrl = request.fallbackUrl || '';
-    const preferredTheme = request.preferredTheme || '';
-    const options = {
-      includeChromeFallback: request.excludeChromeFallback ? false : true
-    };
-    resolveFaviconCandidates(targetUrl, hostOverride, fallbackUrl, preferredTheme, options).then((urls) => {
-      sendResponse({ urls: Array.isArray(urls) ? urls : [] });
-    }).catch(() => {
-      sendResponse({ urls: [] });
-    });
-    return true;
-  } else if (request.action === 'getFaviconData') {
-    const targetUrl = request.url || '';
-    if (!targetUrl || typeof targetUrl !== 'string' || targetUrl.startsWith('data:') || isBlockedLocalFaviconUrl(targetUrl)) {
-      if (targetUrl && isBlockedLocalFaviconUrl(targetUrl)) {
-        logBlockedLocalFavicon(targetUrl, 'message:getFaviconData');
+    case 'iqiyiSetupAutoPiPInMainWorld': {
+      const senderTab = sender && sender.tab ? sender.tab : null;
+      const tabId = senderTab && typeof senderTab.id === 'number' ? senderTab.id : null;
+      if (typeof tabId !== 'number') {
+        sendResponse({ ok: false, reason: 'no-tab' });
+        return;
       }
-      sendResponse({ data: '' });
-      return;
+      const frameId = sender && typeof sender.frameId === 'number' ? sender.frameId : 0;
+      chrome.scripting.executeScript({
+        target: { tabId: tabId, frameIds: [frameId] },
+        world: 'MAIN',
+        func: () => {
+          const result = {
+            ok: true,
+            bound: false,
+            preparedVideos: 0,
+            error: ''
+          };
+          try {
+            if (window.__lumnoIqiyiAutoPipSetupDone2026) {
+              result.bound = true;
+              return result;
+            }
+
+            const getPrimaryVideo = () => {
+              const selectors = [
+                '.iqp-player-videolayer video',
+                '.iqp-player video',
+                '#flashbox video',
+                '#player video',
+                'video'
+              ];
+              for (const selector of selectors) {
+                const nodes = Array.from(document.querySelectorAll(selector));
+                for (const node of nodes) {
+                  if (!(node instanceof HTMLVideoElement)) {
+                    continue;
+                  }
+                  if (node.matches('.player_outer_video video') || node.getAttribute('outer') === '1') {
+                    continue;
+                  }
+                  return node;
+                }
+              }
+              return null;
+            };
+
+            const prepareVideo = (video) => {
+              if (!(video instanceof HTMLVideoElement)) {
+                return false;
+              }
+              if (video.matches('.player_outer_video video') || video.getAttribute('outer') === '1') {
+                return false;
+              }
+              try {
+                video.autoPictureInPicture = true;
+              } catch (e) {}
+              try {
+                if (video.disablePictureInPicture) {
+                  video.disablePictureInPicture = false;
+                }
+              } catch (e) {}
+              try {
+                if (video.hasAttribute('disablepictureinpicture')) {
+                  video.removeAttribute('disablepictureinpicture');
+                }
+              } catch (e) {}
+              return true;
+            };
+
+            const prepareExistingVideos = () => {
+              let count = 0;
+              const list = Array.from(document.querySelectorAll('video'));
+              for (const video of list) {
+                if (prepareVideo(video)) {
+                  count += 1;
+                }
+              }
+              return count;
+            };
+
+            const mediaSession = ('mediaSession' in navigator) ? navigator.mediaSession : null;
+            const proto = mediaSession ? Object.getPrototypeOf(mediaSession) : null;
+            const nativeSetActionHandler = proto && typeof proto.setActionHandler === 'function'
+              ? proto.setActionHandler
+              : null;
+
+            if (mediaSession && nativeSetActionHandler) {
+              nativeSetActionHandler.call(mediaSession, 'enterpictureinpicture', async () => {
+                const video = getPrimaryVideo();
+                if (!video || typeof video.requestPictureInPicture !== 'function') {
+                  return;
+                }
+                try {
+                  prepareVideo(video);
+                  if (!video.paused || document.visibilityState === 'hidden') {
+                    await video.requestPictureInPicture();
+                  }
+                } catch (e) {}
+              });
+              nativeSetActionHandler.call(mediaSession, 'leavepictureinpicture', async () => {
+                try {
+                  if (document.pictureInPictureElement && typeof document.exitPictureInPicture === 'function') {
+                    await document.exitPictureInPicture();
+                  }
+                } catch (e) {}
+              });
+              result.bound = true;
+            }
+
+            result.preparedVideos = prepareExistingVideos();
+
+            if (!window.__lumnoIqiyiAutoPipObserver2026) {
+              const observer = new MutationObserver(() => {
+                prepareExistingVideos();
+              });
+              observer.observe(document.documentElement || document.body, {
+                childList: true,
+                subtree: true
+              });
+              window.__lumnoIqiyiAutoPipObserver2026 = observer;
+            }
+
+            window.__lumnoIqiyiAutoPipSetupDone2026 = true;
+            return result;
+          } catch (e) {
+            result.ok = false;
+            result.error = e && e.message ? String(e.message) : String(e);
+            return result;
+          }
+        }
+      }, (results) => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          sendResponse({
+            ok: false,
+            reason: chrome.runtime.lastError.message || 'executeScript-failed'
+          });
+          return;
+        }
+        const first = Array.isArray(results) && results.length > 0 ? results[0] : null;
+        const payload = first && typeof first.result === 'object' ? first.result : null;
+        sendResponse(payload || { ok: false, reason: 'no-result' });
+      });
+      return true;
     }
-    try {
-      const targetHost = new URL(targetUrl).hostname;
-      if (shouldBlockFaviconForHost(targetHost)) {
+    case 'forceExitPiPInMainWorld': {
+      const senderTab = sender && sender.tab ? sender.tab : null;
+      const tabId = senderTab && typeof senderTab.id === 'number' ? senderTab.id : null;
+      if (typeof tabId !== 'number') {
+        sendResponse({ ok: false, reason: 'no-tab' });
+        return;
+      }
+      const frameId = sender && typeof sender.frameId === 'number' ? sender.frameId : 0;
+      chrome.scripting.executeScript({
+        target: { tabId: tabId, frameIds: [frameId] },
+        world: 'MAIN',
+        func: async () => {
+          const result = {
+            ok: true,
+            before: Boolean(document.pictureInPictureElement),
+            after: Boolean(document.pictureInPictureElement),
+            attemptedExit: false,
+            error: ''
+          };
+          try {
+            if (document.pictureInPictureElement && typeof document.exitPictureInPicture === 'function') {
+              result.attemptedExit = true;
+              await document.exitPictureInPicture();
+            }
+          } catch (e) {
+            result.error = e && e.name ? String(e.name) : String(e);
+          }
+          result.after = Boolean(document.pictureInPictureElement);
+          return result;
+        }
+      }, (results) => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          sendResponse({
+            ok: false,
+            reason: chrome.runtime.lastError.message || 'executeScript-failed'
+          });
+          return;
+        }
+        const first = Array.isArray(results) && results.length > 0 ? results[0] : null;
+        const payload = first && typeof first.result === 'object' ? first.result : null;
+        sendResponse(payload || { ok: false, reason: 'no-result' });
+      });
+      return true;
+    }
+    case 'ytForceExitPiPInMainWorld': {
+      const senderTab = sender && sender.tab ? sender.tab : null;
+      const tabId = senderTab && typeof senderTab.id === 'number' ? senderTab.id : null;
+      if (typeof tabId !== 'number') {
+        sendResponse({ ok: false, reason: 'no-tab' });
+        return;
+      }
+      const frameId = sender && typeof sender.frameId === 'number' ? sender.frameId : 0;
+      chrome.scripting.executeScript({
+        target: { tabId: tabId, frameIds: [frameId] },
+        world: 'MAIN',
+        func: async () => {
+          const result = {
+            ok: true,
+            before: Boolean(document.pictureInPictureElement),
+            after: Boolean(document.pictureInPictureElement),
+            attemptedExit: false,
+            unminimized: false,
+            error: ''
+          };
+
+          const getPlayer = () => {
+            const moviePlayer = document.getElementById('movie_player');
+            if (moviePlayer && typeof moviePlayer === 'object') {
+              return moviePlayer;
+            }
+            const ytdPlayer = document.querySelector('ytd-player');
+            if (ytdPlayer && typeof ytdPlayer.getPlayer === 'function') {
+              try {
+                return ytdPlayer.getPlayer();
+              } catch (e) {
+                return null;
+              }
+            }
+            return null;
+          };
+
+          const callPlayerMethod = (player, name, args) => {
+            if (!player || typeof player[name] !== 'function') {
+              return false;
+            }
+            try {
+              player[name].apply(player, Array.isArray(args) ? args : []);
+              return true;
+            } catch (e) {
+              return false;
+            }
+          };
+
+          const forceUnminimize = () => {
+            const player = getPlayer();
+            if (!player) {
+              return false;
+            }
+            let changed = false;
+            changed = callPlayerMethod(player, 'setMinimized', [false]) || changed;
+            changed = callPlayerMethod(player, 'setMinimized', [0]) || changed;
+            changed = callPlayerMethod(player, 'setMinimized', [null]) || changed;
+            changed = callPlayerMethod(player, 'setMinimized', []) || changed;
+            return changed;
+          };
+
+          result.unminimized = forceUnminimize();
+          try {
+            if (document.pictureInPictureElement && typeof document.exitPictureInPicture === 'function') {
+              result.attemptedExit = true;
+              await document.exitPictureInPicture();
+            }
+          } catch (e) {
+            result.error = e && e.name ? String(e.name) : String(e);
+          }
+          result.unminimized = forceUnminimize() || result.unminimized;
+          result.after = Boolean(document.pictureInPictureElement);
+          return result;
+        }
+      }, (results) => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          sendResponse({
+            ok: false,
+            reason: chrome.runtime.lastError.message || 'executeScript-failed'
+          });
+          return;
+        }
+        const first = Array.isArray(results) && results.length > 0 ? results[0] : null;
+        const payload = first && typeof first.result === 'object' ? first.result : null;
+        sendResponse(payload || { ok: false, reason: 'no-result' });
+      });
+      return true;
+    }
+    default:
+      return sendUnknownBackgroundMessageResponse(sendResponse);
+  }
+}
+
+function handleSearchMessage(request, sender, sendResponse) {
+  switch (request.action) {
+    case 'searchOrNavigate': {
+      const query = request.query ? String(request.query) : '';
+      const forceSearch = Boolean(request.forceSearch);
+      loadShortcutRules().then((rules) => {
+        const shortcutUrl = getShortcutUrl(query, rules);
+        if (shortcutUrl) {
+          chrome.tabs.create({ url: shortcutUrl });
+          sendResponse({ ok: true, url: shortcutUrl });
+          return;
+        }
+        const directUrl = !forceSearch ? getDirectNavigationUrl(query) : '';
+        if (directUrl) {
+          chrome.tabs.create({ url: directUrl });
+          sendResponse({ ok: true, url: directUrl });
+        } else {
+          // It's a search query - use browser default search engine
+          const fallbackUrl = buildDefaultSearchUrl(query);
+          if (chrome && chrome.search && typeof chrome.search.query === 'function') {
+            markPendingSearchTab(null);
+            try {
+              chrome.search.query({ text: query, disposition: 'NEW_TAB' }, () => {
+                if (chrome.runtime && chrome.runtime.lastError) {
+                  pendingSearchAt = 0;
+                  pendingSearchTabId = null;
+                  chrome.tabs.create({ url: fallbackUrl });
+                  sendResponse({ ok: true, url: fallbackUrl });
+                  return;
+                }
+                sendResponse({ ok: true, url: fallbackUrl });
+              });
+              return;
+            } catch (e) {
+              pendingSearchAt = 0;
+              pendingSearchTabId = null;
+            }
+          }
+          chrome.tabs.create({ url: fallbackUrl });
+          sendResponse({ ok: true, url: fallbackUrl });
+        }
+      });
+      return true;
+    }
+    case 'getSearchSuggestions': {
+      const query = request.query;
+      getSearchSuggestions(query).then(suggestions => {
+        sendResponse({ suggestions: suggestions });
+      }).catch(() => {
+        sendResponse({ suggestions: [] });
+      });
+      return true; // Keep the message channel open for async response
+    }
+    case 'recordSearchSuggestionSelection': {
+      recordSearchSuggestionSelection(request)
+        .then((result) => {
+          sendResponse(result);
+        })
+        .catch((error) => {
+          sendResponse({
+            ok: false,
+            reason: error && error.message ? error.message : 'record-selection-failed'
+          });
+        });
+      return true;
+    }
+    case 'deleteHistoryUrl': {
+      const targetUrl = typeof request.url === 'string' ? request.url : '';
+      if (!targetUrl) {
+        sendResponse({ ok: false, reason: 'invalid-url' });
+        return;
+      }
+      if (!chrome.history || typeof chrome.history.deleteUrl !== 'function') {
+        sendResponse({ ok: false, reason: 'history-api-unavailable' });
+        return;
+      }
+      chrome.history.deleteUrl({ url: targetUrl }, () => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          sendResponse({ ok: false, reason: chrome.runtime.lastError.message || 'delete-history-failed' });
+          return;
+        }
+        sendResponse({ ok: true, url: targetUrl });
+      });
+      return true;
+    }
+    default:
+      return sendUnknownBackgroundMessageResponse(sendResponse);
+  }
+}
+
+function handleSiteSearchMessage(request, sender, sendResponse) {
+  switch (request.action) {
+    case 'getSiteSearchProviders': {
+      loadSiteSearchProviders().then((items) => {
+        sendResponse({ items: items });
+      });
+      return true;
+    }
+    case 'runSiteSearchProviderQuery': {
+      runInteractiveSiteSearchProvider(
+        request.provider,
+        request.query,
+        sender,
+        request.disposition
+      ).then((result) => {
+        sendResponse(result);
+      }).catch((error) => {
+        sendResponse({
+          ok: false,
+          reason: error && error.message ? error.message : 'interactive-site-search-failed'
+        });
+      });
+      return true;
+    }
+    default:
+      return sendUnknownBackgroundMessageResponse(sendResponse);
+  }
+}
+
+function handleLocaleAndPermissionMessage(request, sender, sendResponse) {
+  switch (request.action) {
+    case 'getLocaleMessages': {
+      const locale = normalizeLocaleForMessages(request.locale);
+      const localePath = chrome.runtime.getURL(`_locales/${locale}/messages.json`);
+      fetch(localePath)
+        .then((response) => response.json())
+        .then((messages) => {
+          sendResponse({ messages: messages || {} });
+        })
+        .catch(() => {
+          sendResponse({ messages: {} });
+        });
+      return true;
+    }
+    case 'getFileSchemeAccessStatus': {
+      checkFileSchemeAccess((isAllowed) => {
+        sendResponse({
+          ok: true,
+          allowed: isAllowed === true,
+          supported: isAllowed !== null,
+          detailsUrl: getExtensionDetailsUrl()
+        });
+      });
+      return true;
+    }
+    default:
+      return sendUnknownBackgroundMessageResponse(sendResponse);
+  }
+}
+
+function handleExtensionPageMessage(request, sender, sendResponse) {
+  switch (request.action) {
+    case 'openOptionsPage': {
+      openExtensionOptionsPage((ok) => {
+        sendResponse({ ok: ok !== false });
+      });
+      return true;
+    }
+    case 'openExtensionShortcutsPage': {
+      openExtensionShortcutsPage((ok) => {
+        sendResponse({ ok: ok !== false });
+      });
+      return true;
+    }
+    case 'openBookmarkManager': {
+      openBookmarkManagerPage().then((url) => {
+        sendResponse({ ok: true, url: url });
+      }).catch(() => {
+        sendResponse({ ok: false });
+      });
+      return true;
+    }
+    case 'createTab': {
+      const targetUrl = typeof request.url === 'string' ? request.url : '';
+      if (!targetUrl) {
+        sendResponse({ ok: false });
+        return;
+      }
+      chrome.tabs.create({ url: targetUrl }, () => {
+        sendResponse({ ok: !(chrome.runtime && chrome.runtime.lastError) });
+      });
+      return true;
+    }
+    case 'openNewTab': {
+      const newtabUrl = chrome.runtime.getURL('src/newtab/newtab.html?focus=1');
+      chrome.tabs.create({ url: newtabUrl }, () => {
+        sendResponse({ ok: !(chrome.runtime && chrome.runtime.lastError) });
+      });
+      return true;
+    }
+    case 'openExtensionDetailsPage': {
+      const detailsUrl = getExtensionDetailsUrl();
+      chrome.tabs.create({ url: detailsUrl }, () => {
+        sendResponse({ ok: !(chrome.runtime && chrome.runtime.lastError), url: detailsUrl });
+      });
+      return true;
+    }
+    default:
+      return sendUnknownBackgroundMessageResponse(sendResponse);
+  }
+}
+
+function handleFaviconMessage(request, sender, sendResponse) {
+  switch (request.action) {
+    case 'resolveFaviconCandidates': {
+      const targetUrl = request.url || '';
+      const hostOverride = request.host || '';
+      const fallbackUrl = request.fallbackUrl || '';
+      const preferredTheme = request.preferredTheme || '';
+      const options = {
+        includeChromeFallback: request.excludeChromeFallback ? false : true
+      };
+      resolveFaviconCandidates(targetUrl, hostOverride, fallbackUrl, preferredTheme, options).then((urls) => {
+        sendResponse({ urls: Array.isArray(urls) ? urls : [] });
+      }).catch(() => {
+        sendResponse({ urls: [] });
+      });
+      return true;
+    }
+    case 'getFaviconData': {
+      const targetUrl = request.url || '';
+      if (!targetUrl || typeof targetUrl !== 'string' || targetUrl.startsWith('data:') || isBlockedLocalFaviconUrl(targetUrl)) {
+        if (targetUrl && isBlockedLocalFaviconUrl(targetUrl)) {
+          logBlockedLocalFavicon(targetUrl, 'message:getFaviconData');
+        }
         sendResponse({ data: '' });
         return;
       }
-    } catch (e) {
-      // Ignore parse failures and continue with non-local handling.
+      try {
+        const targetHost = new URL(targetUrl).hostname;
+        if (shouldBlockFaviconForHost(targetHost)) {
+          sendResponse({ data: '' });
+          return;
+        }
+      } catch (e) {
+        // Ignore parse failures and continue with non-local handling.
+      }
+      fetchFaviconData(targetUrl).then((dataUrl) => {
+        sendResponse({ data: dataUrl || '' });
+      }).catch(() => {
+        sendResponse({ data: '' });
+      });
+      return true;
     }
-    fetchFaviconData(targetUrl).then((dataUrl) => {
-      sendResponse({ data: dataUrl || '' });
-    }).catch(() => {
-      sendResponse({ data: '' });
-    });
-    return true;
+    default:
+      return sendUnknownBackgroundMessageResponse(sendResponse);
   }
-  sendResponse({ ok: false });
-  return;
-});
+}
 
 let shortcutRulesCache = null;
 let shortcutRulesPromise = null;
@@ -9332,161 +9508,15 @@ function toggleBlackRectangle(tabs, overlayContext) {
     }
 
     function getProviderHost(provider) {
-      if (!provider || !provider.template) {
-        return '';
-      }
-      try {
-        const url = provider.template.replace(/\{query\}/g, 'test');
-        return normalizeHost(new URL(url).hostname);
-      } catch (e) {
-        return '';
-      }
-    }
-
-    function suggestionMatchesProvider(suggestion, provider) {
-      if (!suggestion || !provider || !suggestion.url) {
-        return false;
-      }
-      const normalizedSuggestion = getSuggestionHost(suggestion);
-      const normalizedProvider = getProviderHost(provider);
-      if (!normalizedSuggestion || !normalizedProvider) {
-        return false;
-      }
-      return normalizedSuggestion === normalizedProvider ||
-        normalizedSuggestion.endsWith(`.${normalizedProvider}`) ||
-        normalizedProvider.endsWith(`.${normalizedSuggestion}`);
-    }
-
-    function isAsciiToken(token) {
-      return /^[a-z0-9]+$/i.test(token || '');
-    }
-
-    function isProviderTokenEligible(token) {
-      if (!token) {
-        return false;
-      }
-      const normalized = String(token).trim();
-      if (!normalized) {
-        return false;
-      }
-      if (isAsciiToken(normalized)) {
-        return normalized.length >= 3;
-      }
-      return normalized.length >= 2;
-    }
-
-    function providerMatchesSuggestion(provider, suggestion) {
-      if (!provider || !suggestion) {
-        return false;
-      }
-      if (suggestionMatchesProvider(suggestion, provider)) {
-        return true;
-      }
-      const titleText = String(suggestion.title || '').toLowerCase();
-      const urlText = String(suggestion.url || '').toLowerCase();
-      const hostText = normalizeHost(getSuggestionHost(suggestion));
-      const haystack = `${titleText} ${urlText} ${hostText}`;
-      const tokens = [provider.key, provider.name].concat(provider.aliases || []);
-      for (let i = 0; i < tokens.length; i += 1) {
-        const token = String(tokens[i] || '').toLowerCase().trim();
-        if (!isProviderTokenEligible(token)) {
-          continue;
-        }
-        if (token && haystack.includes(token)) {
-          return true;
-        }
-      }
-      return false;
+      return SEARCH_UTILS.getSiteSearchProviderHost(provider);
     }
 
     function findProviderForSuggestionMatch(suggestion, providers) {
-      if (!suggestion) {
-        return null;
-      }
-      const eligibleTypes = new Set(['topSite', 'history', 'bookmark']);
-      if (!eligibleTypes.has(suggestion.type) && !suggestion.isTopSite) {
-        return null;
-      }
-      return (providers || []).find((provider) => providerMatchesSuggestion(provider, suggestion)) || null;
-    }
-
-    function findSiteSearchProviderByKey(trigger, providers) {
-      const key = String(trigger || '').toLowerCase();
-      if (!key) {
-        return null;
-      }
-      return (providers || []).find((provider) => String(provider.key || '').toLowerCase() === key) || null;
-    }
-
-    function findSiteSearchProvider(trigger, providers) {
-      const key = String(trigger || '').toLowerCase();
-      if (!key) {
-        return null;
-      }
-      return (providers || []).find((provider) => {
-        const providerKey = String(provider.key || '').toLowerCase();
-        if (providerKey === key) {
-          return true;
-        }
-        const aliases = Array.isArray(provider.aliases) ? provider.aliases : [];
-        return aliases.some((alias) => String(alias).toLowerCase() === key);
-      }) || null;
-    }
-
-    function findSiteSearchProviderByInput(input, providers) {
-      const raw = String(input || '').trim();
-      if (!raw) {
-        return null;
-      }
-      const firstToken = raw.split(/\s+/)[0];
-      const keyMatch = findSiteSearchProvider(firstToken, providers) ||
-        findSiteSearchProviderByKey(firstToken, providers);
-      if (keyMatch) {
-        return keyMatch;
-      }
-      let host = '';
-      if (/[./]/.test(firstToken)) {
-        try {
-          const url = firstToken.includes('://') ? firstToken : `https://${firstToken}`;
-          host = new URL(url).hostname;
-        } catch (e) {
-          host = firstToken.split('/')[0] || '';
-        }
-      }
-      if (!host) {
-        return null;
-      }
-      const normalizedHost = normalizeHost(host);
-      return (providers || []).find((provider) => {
-        const providerHost = normalizeHost(getProviderHost(provider));
-        if (!providerHost) {
-          return false;
-        }
-        return normalizedHost === providerHost ||
-          normalizedHost.endsWith(`.${providerHost}`) ||
-          providerHost.endsWith(`.${normalizedHost}`);
-      }) || null;
+      return SEARCH_UTILS.findProviderForSiteSearchSuggestion(suggestion, providers);
     }
 
     function getInlineSiteSearchCandidate(input, providers) {
-      const raw = String(input || '').trim();
-      if (!raw) {
-        return null;
-      }
-      const tokens = raw.split(/\s+/);
-      if (tokens.length < 2) {
-        return null;
-      }
-      const provider = findSiteSearchProviderByInput(raw, providers);
-      if (!provider) {
-        return null;
-      }
-      const firstToken = tokens[0];
-      const remainder = raw.slice(raw.indexOf(firstToken) + firstToken.length).trim();
-      if (!remainder) {
-        return null;
-      }
-      return { provider: provider, query: remainder };
+      return SEARCH_UTILS.getInlineSiteSearchCandidate(input, providers);
     }
 
     function promoteStrongNavigationMatch(list, rawQuery) {
@@ -9568,88 +9598,10 @@ function toggleBlackRectangle(tabs, overlayContext) {
       return null;
     }
 
-    function getProviderHost(provider) {
-      if (!provider || !provider.template) {
-        return '';
-      }
-      try {
-        const url = provider.template.replace(/\{query\}/g, 'test');
-        return normalizeHost(new URL(url).hostname);
-      } catch (e) {
-        return '';
-      }
-    }
-
-    function getSuggestionHost(suggestion) {
-      if (!suggestion || !suggestion.url) {
-        return '';
-      }
-      try {
-        return normalizeHost(new URL(suggestion.url).hostname);
-      } catch (e) {
-        return '';
-      }
-    }
-
-    function hostsMatch(a, b) {
-      if (!a || !b) {
-        return false;
-      }
-      return a === b || a.endsWith(`.${b}`) || b.endsWith(`.${a}`);
-    }
-
-    function providerMatchesInputPrefix(provider, input) {
-      const needle = String(input || '').toLowerCase();
-      if (!needle || !provider) {
-        return false;
-      }
-      const allowPrefix = needle.length >= 2;
-      const tokens = [provider.key, provider.name].concat(provider.aliases || []);
-      for (let i = 0; i < tokens.length; i += 1) {
-        const token = String(tokens[i] || '').toLowerCase();
-        if (!token) {
-          continue;
-        }
-        if (token === needle || (allowPrefix && token.startsWith(needle))) {
-          return true;
-        }
-      }
-      const host = normalizeHost(getProviderHost(provider));
-      if (host) {
-        const hostToken = host.split('.')[0] || host;
-        if (hostToken === needle || (allowPrefix && hostToken.startsWith(needle))) {
-          return true;
-        }
-      }
-      return false;
-    }
-
     function getSiteSearchTriggerCandidate(input, providers, topSiteMatch) {
-      const trimmed = String(input || '').trim();
-      if (!trimmed || /\s/.test(trimmed)) {
-        return null;
-      }
-      let provider = findSiteSearchProvider(trimmed, providers) ||
-        findSiteSearchProviderByKey(trimmed, providers);
-      if (!provider && topSiteMatch) {
-        provider = (providers || []).find((candidate) => {
-          if (!suggestionMatchesProvider(topSiteMatch, candidate)) {
-            return false;
-          }
-          return providerMatchesInputPrefix(candidate, trimmed);
-        }) || null;
-      }
-      if (!provider) {
-        return null;
-      }
-      if (topSiteMatch && trimmed.length <= 2 && matchesTopSitePrefix(topSiteMatch, trimmed)) {
-        const providerHost = getProviderHost(provider);
-        const topHost = getSuggestionHost(topSiteMatch);
-        if (!hostsMatch(providerHost, topHost)) {
-          return null;
-        }
-      }
-      return provider;
+      return SEARCH_UTILS.getSiteSearchTriggerCandidate(input, providers, topSiteMatch, {
+        matchesTopSitePrefix
+      });
     }
 
     function activateSiteSearch(provider) {

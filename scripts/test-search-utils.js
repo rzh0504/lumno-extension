@@ -157,4 +157,51 @@ assert.strictEqual(
   'searchTerms templates should normalize to query templates'
 );
 
+const githubProvider = {
+  key: 'gh',
+  aliases: ['github'],
+  name: 'GitHub',
+  template: 'https://github.com/search?q={query}'
+};
+assert.strictEqual(
+  search.findSiteSearchProvider('github', [githubProvider]),
+  githubProvider,
+  'provider aliases should match site-search triggers'
+);
+assert.strictEqual(
+  search.findSiteSearchProviderByInput('docs.github.com lumno', [githubProvider]),
+  githubProvider,
+  'provider input parsing should match subdomains to provider hosts'
+);
+assert.deepStrictEqual(
+  search.getInlineSiteSearchCandidate('gh lumno extension', [githubProvider]),
+  { provider: githubProvider, query: 'lumno extension' },
+  'inline site-search parsing should preserve the query after the provider trigger'
+);
+assert.ok(
+  search.suggestionMatchesSiteSearchProvider(
+    { type: 'topSite', title: 'GitHub Docs', url: 'https://docs.github.com/' },
+    githubProvider
+  ),
+  'provider host matching should accept subdomain suggestions'
+);
+assert.strictEqual(
+  search.findProviderForSiteSearchSuggestion(
+    { type: 'history', title: 'GitHub Docs', url: 'https://docs.github.com/' },
+    [githubProvider]
+  ),
+  githubProvider,
+  'provider suggestion matching should work for eligible suggestion types'
+);
+assert.strictEqual(
+  search.getSiteSearchTriggerCandidate(
+    'gh',
+    [githubProvider],
+    { type: 'topSite', title: 'GitLab', url: 'https://gitlab.com/' },
+    { matchesTopSitePrefix: () => true }
+  ),
+  null,
+  'short provider triggers should not hijack a mismatched top-site prefix'
+);
+
 console.log('search utils tests passed');

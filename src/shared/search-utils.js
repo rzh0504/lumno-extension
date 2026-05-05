@@ -1987,6 +1987,233 @@
     return buildSearchUrlFromTemplate(template, String(query || '').trim() || 'test');
   }
 
+  function getUrlHost(url) {
+    if (!url) {
+      return '';
+    }
+    try {
+      return normalizeHost(new URL(String(url)).hostname);
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function getSearchSuggestionHost(suggestion) {
+    return getUrlHost(suggestion && suggestion.url);
+  }
+
+  function getSiteSearchProviderHost(provider) {
+    if (!provider || !provider.template) {
+      return '';
+    }
+    try {
+      const url = String(provider.template).replace(/\{query\}/g, 'test');
+      return normalizeHost(new URL(url).hostname);
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function siteSearchHostsMatch(a, b) {
+    const hostA = normalizeHost(a);
+    const hostB = normalizeHost(b);
+    if (!hostA || !hostB) {
+      return false;
+    }
+    return hostA === hostB || hostA.endsWith(`.${hostB}`) || hostB.endsWith(`.${hostA}`);
+  }
+
+  function findSiteSearchProvider(trigger, providers) {
+    const key = String(trigger || '').toLowerCase();
+    if (!key) {
+      return null;
+    }
+    return (providers || []).find((provider) => {
+      const providerKey = String(provider && provider.key || '').toLowerCase();
+      if (providerKey === key) {
+        return true;
+      }
+      const aliases = Array.isArray(provider && provider.aliases) ? provider.aliases : [];
+      return aliases.some((alias) => String(alias).toLowerCase() === key);
+    }) || null;
+  }
+
+  function findSiteSearchProviderByKey(trigger, providers) {
+    const key = String(trigger || '').toLowerCase();
+    if (!key) {
+      return null;
+    }
+    return (providers || []).find((provider) => String(provider && provider.key || '').toLowerCase() === key) || null;
+  }
+
+  function suggestionMatchesSiteSearchProvider(suggestion, provider) {
+    if (!suggestion || !provider || !suggestion.url) {
+      return false;
+    }
+    return siteSearchHostsMatch(getSearchSuggestionHost(suggestion), getSiteSearchProviderHost(provider));
+  }
+
+  function isAsciiProviderToken(token) {
+    return /^[a-z0-9]+$/i.test(token || '');
+  }
+
+  function isSiteSearchProviderTokenEligible(token) {
+    if (!token) {
+      return false;
+    }
+    const normalized = String(token).trim();
+    if (!normalized) {
+      return false;
+    }
+    if (isAsciiProviderToken(normalized)) {
+      return normalized.length >= 3;
+    }
+    return normalized.length >= 2;
+  }
+
+  function providerMatchesSiteSearchSuggestion(provider, suggestion) {
+    if (!provider || !suggestion) {
+      return false;
+    }
+    if (suggestionMatchesSiteSearchProvider(suggestion, provider)) {
+      return true;
+    }
+    const titleText = String(suggestion.title || '').toLowerCase();
+    const urlText = String(suggestion.url || '').toLowerCase();
+    const hostText = normalizeHost(getSearchSuggestionHost(suggestion));
+    const haystack = `${titleText} ${urlText} ${hostText}`;
+    const tokens = [provider.key, provider.name].concat(provider.aliases || []);
+    for (let i = 0; i < tokens.length; i += 1) {
+      const token = String(tokens[i] || '').toLowerCase().trim();
+      if (!isSiteSearchProviderTokenEligible(token)) {
+        continue;
+      }
+      if (token && haystack.includes(token)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function findProviderForSiteSearchSuggestion(suggestion, providers) {
+    if (!suggestion) {
+      return null;
+    }
+    const eligibleTypes = new Set(['topSite', 'history', 'bookmark']);
+    if (!eligibleTypes.has(suggestion.type) && !suggestion.isTopSite) {
+      return null;
+    }
+    return (providers || []).find((provider) => providerMatchesSiteSearchSuggestion(provider, suggestion)) || null;
+  }
+
+  function findSiteSearchProviderByInput(input, providers) {
+    const raw = String(input || '').trim();
+    if (!raw) {
+      return null;
+    }
+    const firstToken = raw.split(/\s+/)[0];
+    const keyMatch = findSiteSearchProvider(firstToken, providers) ||
+      findSiteSearchProviderByKey(firstToken, providers);
+    if (keyMatch) {
+      return keyMatch;
+    }
+    let host = '';
+    if (/[./]/.test(firstToken)) {
+      try {
+        const url = firstToken.includes('://') ? firstToken : `https://${firstToken}`;
+        host = new URL(url).hostname;
+      } catch (e) {
+        host = firstToken.split('/')[0] || '';
+      }
+    }
+    if (!host) {
+      return null;
+    }
+    const normalizedHost = normalizeHost(host);
+    return (providers || []).find((provider) => siteSearchHostsMatch(
+      normalizedHost,
+      getSiteSearchProviderHost(provider)
+    )) || null;
+  }
+
+  function getInlineSiteSearchCandidate(input, providers) {
+    const raw = String(input || '').trim();
+    if (!raw) {
+      return null;
+    }
+    const tokens = raw.split(/\s+/);
+    if (tokens.length < 2) {
+      return null;
+    }
+    const provider = findSiteSearchProviderByInput(raw, providers);
+    if (!provider) {
+      return null;
+    }
+    const firstToken = tokens[0];
+    const remainder = raw.slice(raw.indexOf(firstToken) + firstToken.length).trim();
+    if (!remainder) {
+      return null;
+    }
+    return { provider: provider, query: remainder };
+  }
+
+  function providerMatchesSiteSearchInputPrefix(provider, input) {
+    const needle = String(input || '').toLowerCase();
+    if (!needle || !provider) {
+      return false;
+    }
+    const allowPrefix = needle.length >= 2;
+    const tokens = [provider.key, provider.name].concat(provider.aliases || []);
+    for (let i = 0; i < tokens.length; i += 1) {
+      const token = String(tokens[i] || '').toLowerCase();
+      if (!token) {
+        continue;
+      }
+      if (token === needle || (allowPrefix && token.startsWith(needle))) {
+        return true;
+      }
+    }
+    const host = normalizeHost(getSiteSearchProviderHost(provider));
+    if (host) {
+      const hostToken = host.split('.')[0] || host;
+      if (hostToken === needle || (allowPrefix && hostToken.startsWith(needle))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function getSiteSearchTriggerCandidate(input, providers, topSiteMatch, options) {
+    const trimmed = String(input || '').trim();
+    if (!trimmed || /\s/.test(trimmed)) {
+      return null;
+    }
+    let provider = findSiteSearchProvider(trimmed, providers) ||
+      findSiteSearchProviderByKey(trimmed, providers);
+    if (!provider && topSiteMatch) {
+      provider = (providers || []).find((candidate) => {
+        if (!suggestionMatchesSiteSearchProvider(topSiteMatch, candidate)) {
+          return false;
+        }
+        return providerMatchesSiteSearchInputPrefix(candidate, trimmed);
+      }) || null;
+    }
+    if (!provider) {
+      return null;
+    }
+    const matchesTopSitePrefix = options && typeof options.matchesTopSitePrefix === 'function'
+      ? options.matchesTopSitePrefix
+      : null;
+    if (topSiteMatch && trimmed.length <= 2 && matchesTopSitePrefix && matchesTopSitePrefix(topSiteMatch, trimmed)) {
+      const providerHost = getSiteSearchProviderHost(provider);
+      const topHost = getSearchSuggestionHost(topSiteMatch);
+      if (!siteSearchHostsMatch(providerHost, topHost)) {
+        return null;
+      }
+    }
+    return provider;
+  }
+
   return Object.freeze({
     SEARCH_POLICY,
     SEARCH_SELECTION_POLICY,
@@ -2012,7 +2239,12 @@
     getSearchTermCoverageStats,
     getStrongNavigationMatchScore,
     getDefaultSiteSearchProviders,
+    getInlineSiteSearchCandidate,
+    getSearchSuggestionHost,
     getSiteSearchProviderDisplayNameMessage,
+    getSiteSearchProviderHost,
+    getSiteSearchTriggerCandidate,
+    getUrlHost,
     hasOpenAndSubmitSiteSearchAction,
     inheritSiteSearchProviderBehavior,
     isAiSiteSearchProvider,
@@ -2021,6 +2253,11 @@
     isSearchLikelyBrandProductQuery,
     isSearchLikelyDirectNavigationQuery,
     isShortAsciiSearchTerm,
+    isSiteSearchProviderTokenEligible,
+    findProviderForSiteSearchSuggestion,
+    findSiteSearchProvider,
+    findSiteSearchProviderByInput,
+    findSiteSearchProviderByKey,
     mergeCustomProviders,
     mergeItemsByUrl,
     matchesSearchQueryText,
@@ -2030,9 +2267,13 @@
     normalizeHost,
     normalizeSiteSearchProvider,
     normalizeSiteSearchTemplate,
+    providerMatchesSiteSearchInputPrefix,
+    providerMatchesSiteSearchSuggestion,
     promoteStrongNavigationMatch,
     recordSearchSelectionInStats,
     sanitizeSiteSearchProviders,
-    shouldAllowLooseTextContains
+    shouldAllowLooseTextContains,
+    siteSearchHostsMatch,
+    suggestionMatchesSiteSearchProvider
   });
 });
