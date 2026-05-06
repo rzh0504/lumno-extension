@@ -91,7 +91,7 @@
       }
       return null;
     }
-    const rgbMatch = trimmed.match(/^rgb\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*\)$/);
+    const rgbMatch = trimmed.match(/^rgba?\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)(?:\s*,\s*(?:[0-9.]+|[0-9.]+%))?\s*\)$/);
     if (rgbMatch) {
       const r = Number(rgbMatch[1]);
       const g = Number(rgbMatch[2]);
@@ -187,6 +187,8 @@
   function createDefaultTheme() {
     const theme = buildTheme(defaultAccentColor);
     theme._xIsDefault = true;
+    theme._xIsBrand = false;
+    theme._xThemeSource = 'fallback';
     return theme;
   }
 
@@ -194,6 +196,7 @@
     const theme = buildTheme(defaultAccentColor);
     theme._xIsBrand = true;
     theme._xIsUrl = true;
+    theme._xThemeSource = 'url';
     return theme;
   }
 
@@ -244,56 +247,19 @@
     }
   }
 
-  function hashStringToHue(value) {
-    if (!value) {
-      return 0;
-    }
-    let hash = 0;
-    for (let i = 0; i < value.length; i += 1) {
-      hash = ((hash << 5) - hash) + value.charCodeAt(i);
-      hash |= 0;
-    }
-    return Math.abs(hash) % 360;
-  }
-
-  function hslToRgb(h, s, l) {
-    const c = (1 - Math.abs(2 * l - 1)) * s;
-    const hp = h / 60;
-    const x = c * (1 - Math.abs((hp % 2) - 1));
-    let r = 0;
-    let g = 0;
-    let b = 0;
-    if (hp >= 0 && hp < 1) {
-      r = c; g = x; b = 0;
-    } else if (hp >= 1 && hp < 2) {
-      r = x; g = c; b = 0;
-    } else if (hp >= 2 && hp < 3) {
-      r = 0; g = c; b = x;
-    } else if (hp >= 3 && hp < 4) {
-      r = 0; g = x; b = c;
-    } else if (hp >= 4 && hp < 5) {
-      r = x; g = 0; b = c;
-    } else if (hp >= 5 && hp < 6) {
-      r = c; g = 0; b = x;
-    }
-    const m = l - c / 2;
-    return [
-      Math.round((r + m) * 255),
-      Math.round((g + m) * 255),
-      Math.round((b + m) * 255)
-    ];
-  }
-
   function buildFallbackThemeForHost(hostname) {
-    if (!hostname) {
-      return null;
-    }
-    const hue = hashStringToHue(hostname);
-    const accent = hslToRgb(hue, 0.55, 0.52);
-    const theme = buildTheme(accent);
-    theme._xIsBrand = true;
+    const theme = createDefaultTheme();
     theme._xIsFallback = true;
     return theme;
+  }
+
+  function getThemeFingerprint(theme) {
+    const source = theme && theme._xThemeSource
+      ? String(theme._xThemeSource)
+      : (theme && theme._xIsDefault ? 'fallback' : (theme && theme._xIsBrand ? 'brand' : 'unknown'));
+    const rgb = theme && (theme.accentRgb || parseCssColor(theme.accent));
+    const accent = rgb && rgb.length === 3 ? rgb : defaultAccentColor;
+    return `${source}:${accent.join(',')}`;
   }
 
   function hasThemeTokenInUrl(url, token) {
@@ -482,9 +448,8 @@
     normalizeFaviconHost,
     getBrandAccentForHost,
     getBrandAccentForUrl,
-    hashStringToHue,
-    hslToRgb,
     buildFallbackThemeForHost,
+    getThemeFingerprint,
     hasThemeTokenInUrl,
     shouldSkipThemeUpgradeCandidate,
     getKnownThemedFaviconCandidates,

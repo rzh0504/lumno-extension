@@ -1947,7 +1947,8 @@ const BACKGROUND_MESSAGE_ROUTE_GROUPS = Object.freeze({
   ]),
   favicon: Object.freeze([
     'resolveFaviconCandidates',
-    'getFaviconData'
+    'getFaviconData',
+    'resolveSiteThemeColor'
   ])
 });
 
@@ -2470,6 +2471,17 @@ function handleFaviconMessage(request, sender, sendResponse) {
       });
       return true;
     }
+    case 'resolveSiteThemeColor': {
+      const targetUrl = request.url || '';
+      const hostOverride = request.host || '';
+      const preferredTheme = request.preferredTheme || '';
+      resolveSiteThemeColor(targetUrl, hostOverride, preferredTheme).then((result) => {
+        sendResponse(result || { accentRgb: null, source: '' });
+      }).catch(() => {
+        sendResponse({ accentRgb: null, source: '' });
+      });
+      return true;
+    }
     default:
       return sendUnknownBackgroundMessageResponse(sendResponse);
   }
@@ -2531,6 +2543,8 @@ const faviconPending = new Map();
 const titlePinyinCache = new Map();
 const faviconResolveCache = new Map();
 const faviconResolvePending = new Map();
+const siteThemeColorCache = new Map();
+const siteThemeColorPending = new Map();
 const blockedLocalFaviconLogCache = new Set();
 
 function logBlockedLocalFavicon(url, source) {
@@ -3502,6 +3516,197 @@ function parseHtmlIconCandidates(html, pageUrl, preferredTheme) {
     }
   });
   return list;
+}
+
+function getHtmlAttributeValue(tag, name) {
+  if (!tag || !name) {
+    return '';
+  }
+  const pattern = new RegExp(`\\b${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i');
+  const match = String(tag).match(pattern);
+  return match ? String(match[2] || match[3] || match[4] || '').trim() : '';
+}
+
+function parseCssThemeColor(color) {
+  const value = String(color || '').trim().toLowerCase();
+  if (!value || value === 'transparent') {
+    return null;
+  }
+  if (value.startsWith('#')) {
+    const hex = value.slice(1);
+    if (hex.length === 3) {
+      const r = parseInt(hex[0] + hex[0], 16);
+      const g = parseInt(hex[1] + hex[1], 16);
+      const b = parseInt(hex[2] + hex[2], 16);
+      return [r, g, b].every((channel) => Number.isFinite(channel)) ? [r, g, b] : null;
+    }
+    if (hex.length === 6) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return [r, g, b].every((channel) => Number.isFinite(channel)) ? [r, g, b] : null;
+    }
+    return null;
+  }
+  const rgbMatch = value.match(/^rgba?\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)(?:\s*,\s*(?:[0-9.]+|[0-9.]+%))?\s*\)$/);
+  if (!rgbMatch) {
+    return null;
+  }
+  const rgb = [Number(rgbMatch[1]), Number(rgbMatch[2]), Number(rgbMatch[3])];
+  return rgb.every((channel) => Number.isFinite(channel) && channel >= 0 && channel <= 255)
+    ? rgb.map((channel) => Math.round(channel))
+    : null;
+}
+
+function getThemeMediaScore(media, preferredTheme) {
+  const theme = normalizeThemePreference(preferredTheme);
+  const value = String(media || '').toLowerCase();
+  if (!value) {
+    return 8;
+  }
+  const wantsDark = value.includes('prefers-color-scheme') && value.includes('dark');
+  const wantsLight = value.includes('prefers-color-scheme') && value.includes('light');
+  if (theme === 'dark') {
+    return wantsDark ? 28 : (wantsLight ? -18 : 4);
+  }
+  if (theme === 'light') {
+    return wantsLight ? 28 : (wantsDark ? -18 : 4);
+  }
+  return wantsDark || wantsLight ? 12 : 4;
+}
+
+function parseHtmlThemeColorCandidates(html, pageUrl, preferredTheme) {
+  const list = [];
+  const metaMatches = String(html || '').match(/<meta\b[^>]*>/gi) || [];
+  metaMatches.forEach((tag) => {
+    const name = getHtmlAttributeValue(tag, 'name').toLowerCase();
+    if (name !== 'theme-color') {
+      return;
+    }
+    const accentRgb = parseCssThemeColor(getHtmlAttributeValue(tag, 'content'));
+    if (!accentRgb) {
+      return;
+    }
+    list.push({
+      accentRgb,
+      source: 'meta',
+      score: 80 + getThemeMediaScore(getHtmlAttributeValue(tag, 'media'), preferredTheme)
+    });
+  });
+  const manifestMatches = String(html || '').match(/<link\b[^>]*>/gi) || [];
+  manifestMatches.forEach((tag) => {
+    const rel = getHtmlAttributeValue(tag, 'rel').toLowerCase();
+    const hrefRaw = getHtmlAttributeValue(tag, 'href');
+    if (!rel.includes('manifest') || !hrefRaw) {
+      return;
+    }
+    try {
+      list.push({
+        manifestUrl: new URL(hrefRaw, pageUrl).href,
+        source: 'meta',
+        score: 42
+      });
+    } catch (e) {
+      // Ignore malformed manifest links.
+    }
+  });
+  return list;
+}
+
+function pickBestThemeColorCandidate(candidates) {
+  const sorted = (Array.isArray(candidates) ? candidates : [])
+    .filter((item) => item && (item.accentRgb || item.manifestUrl))
+    .sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+  return sorted[0] || null;
+}
+
+function fetchManifestThemeColor(manifestUrl) {
+  if (!manifestUrl || isBlockedLocalFaviconUrl(manifestUrl)) {
+    return Promise.resolve(null);
+  }
+  try {
+    const parsed = new URL(manifestUrl);
+    if (!/^https?:$/i.test(parsed.protocol) || shouldBlockFaviconForHost(parsed.hostname)) {
+      return Promise.resolve(null);
+    }
+  } catch (e) {
+    return Promise.resolve(null);
+  }
+  return fetch(manifestUrl, { cache: 'force-cache' })
+    .then((response) => {
+      if (!response || !response.ok) {
+        return null;
+      }
+      return response.json();
+    })
+    .then((manifest) => {
+      const accentRgb = parseCssThemeColor(manifest && (manifest.theme_color || manifest.background_color));
+      return accentRgb ? { accentRgb, source: 'meta' } : null;
+    })
+    .catch(() => null);
+}
+
+function resolveSiteThemeColor(targetUrl, hostOverride, preferredTheme) {
+  const inputUrl = String(targetUrl || '').trim();
+  if (!inputUrl) {
+    return Promise.resolve(null);
+  }
+  let parsed = null;
+  try {
+    parsed = new URL(inputUrl);
+  } catch (e) {
+    return Promise.resolve(null);
+  }
+  if (!/^https?:$/i.test(parsed.protocol)) {
+    return Promise.resolve(null);
+  }
+  if (shouldBlockFaviconForHost(parsed.hostname) || (hostOverride && shouldBlockFaviconForHost(hostOverride))) {
+    logBlockedLocalFavicon(targetUrl || hostOverride || '', 'resolveSiteThemeColor');
+    return Promise.resolve(null);
+  }
+  const normalizedHost = normalizeFaviconHost(hostOverride || parsed.hostname);
+  const normalizedTheme = normalizeThemePreference(preferredTheme);
+  const cacheKey = `${normalizedHost}::${parsed.origin}::${normalizedTheme || 'auto'}`;
+  if (siteThemeColorCache.has(cacheKey)) {
+    return Promise.resolve(siteThemeColorCache.get(cacheKey));
+  }
+  if (siteThemeColorPending.has(cacheKey)) {
+    return siteThemeColorPending.get(cacheKey);
+  }
+  if (!canFetchPageForFavicon(inputUrl)) {
+    siteThemeColorCache.set(cacheKey, null);
+    return Promise.resolve(null);
+  }
+  const promise = fetch(inputUrl, { cache: 'force-cache' })
+    .then((response) => {
+      if (!response || !response.ok) {
+        return '';
+      }
+      return response.text();
+    })
+    .then((html) => {
+      const candidates = parseHtmlThemeColorCandidates(html, inputUrl, normalizedTheme);
+      const best = pickBestThemeColorCandidate(candidates);
+      if (!best) {
+        return null;
+      }
+      if (best.accentRgb) {
+        return { accentRgb: best.accentRgb, source: 'meta' };
+      }
+      return fetchManifestThemeColor(best.manifestUrl);
+    })
+    .then((result) => {
+      siteThemeColorCache.set(cacheKey, result || null);
+      siteThemeColorPending.delete(cacheKey);
+      return result || null;
+    })
+    .catch(() => {
+      siteThemeColorCache.set(cacheKey, null);
+      siteThemeColorPending.delete(cacheKey);
+      return null;
+    });
+  siteThemeColorPending.set(cacheKey, promise);
+  return promise;
 }
 
 function buildFaviconFallbackCandidates(pageUrl, hostOverride, fallbackUrl, preferredTheme, options) {
@@ -5686,6 +5891,10 @@ function toggleBlackRectangle(tabs, overlayContext) {
     stopOverlayViewportSizeSync();
     stopOverlayAntiTranslateObserver();
     if (overlayElement) {
+      if (typeof overlayElement._lumnoAiModeEffectsCleanup === 'function') {
+        overlayElement._lumnoAiModeEffectsCleanup();
+        overlayElement._lumnoAiModeEffectsCleanup = null;
+      }
       const mountHost = overlayElement._lumnoOverlayHost || overlayElement;
       mountHost.remove();
     }
@@ -5819,6 +6028,14 @@ function toggleBlackRectangle(tabs, overlayContext) {
     let siteSearchTriggerState = null;
     let siteSearchState = null;
     let openTabsSearchModeActive = false;
+    let aiModeFrame = null;
+    let aiModeDecorFrame = null;
+    let aiModeSweepFrame = null;
+    let aiModeDecor = null;
+    let aiModeSweep = null;
+    let aiModeEffectsActive = false;
+    let aiModeExpandedSweepPlayed = false;
+    const AI_MODE_SWEEP_DURATION_MS = 1800;
     let isComposing = false;
     let selectedIndex = -1; // -1 means input is focused, 0+ means suggestion is selected
     const suggestionItems = [];
@@ -5837,6 +6054,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
       });
       updateSelection();
       updateModeBadge(searchInput ? searchInput.value : '');
+      refreshAiModeBeamTheme();
       if (previousResolvedTheme !== nextResolvedTheme) {
         refreshOverlayThemeAwareFavicons();
       }
@@ -6169,6 +6387,198 @@ function toggleBlackRectangle(tabs, overlayContext) {
       font: inherit !important;
       vertical-align: baseline !important;
     `;
+
+    function createAiModeEffectFrame(id, overflow) {
+      const frame = document.createElement('div');
+      applyNoTranslate(frame);
+      frame.id = id;
+      frame.setAttribute('aria-hidden', 'true');
+      frame.style.cssText = `
+        all: unset !important;
+        position: absolute !important;
+        inset: 0 !important;
+        display: block !important;
+        box-sizing: border-box !important;
+        border-radius: inherit !important;
+        pointer-events: none !important;
+        overflow: ${overflow} !important;
+      `;
+      return frame;
+    }
+
+    function ensureAiModeFrames() {
+      if (aiModeFrame && aiModeDecorFrame && aiModeSweepFrame) {
+        return aiModeFrame;
+      }
+      if (!aiModeFrame) {
+        aiModeFrame = createAiModeEffectFrame('_x_extension_ai_mode_effect_frame_2026_unique_', 'visible');
+        aiModeFrame.style.setProperty('z-index', '1', 'important');
+      }
+      if (!aiModeDecorFrame) {
+        aiModeDecorFrame = createAiModeEffectFrame('_x_extension_ai_mode_decor_frame_2026_unique_', 'visible');
+      }
+      if (!aiModeSweepFrame) {
+        aiModeSweepFrame = createAiModeEffectFrame('_x_extension_ai_mode_sweep_frame_2026_unique_', 'hidden');
+      }
+      if (aiModeDecorFrame.parentNode !== aiModeFrame) {
+        aiModeFrame.appendChild(aiModeDecorFrame);
+      }
+      if (aiModeSweepFrame.parentNode !== aiModeFrame) {
+        aiModeFrame.appendChild(aiModeSweepFrame);
+      }
+      if (aiModeFrame.parentNode !== overlay) {
+        overlay.insertBefore(aiModeFrame, overlay.firstChild || null);
+      }
+      inputContainer.style.setProperty('position', 'relative', 'important');
+      inputContainer.style.setProperty('z-index', '2', 'important');
+      suggestionsContainer.style.setProperty('position', 'relative', 'important');
+      suggestionsContainer.style.setProperty('z-index', '2', 'important');
+      return aiModeFrame;
+    }
+
+    function getAiModeBeamThemeName() {
+      return isOverlayDarkMode() ? 'dark' : 'light';
+    }
+
+    function syncAiModeDecorAppearance() {
+      if (!aiModeDecor || !aiModeDecor.beam) {
+        return;
+      }
+      const resolvedTheme = getAiModeBeamThemeName();
+      const strength = resolvedTheme === 'light' ? 0.64 : 0.82;
+      aiModeDecor.beam.style.setProperty('--beam-strength', String(strength), 'important');
+      aiModeDecor.setTheme(resolvedTheme);
+    }
+
+    function ensureAiModeDecor() {
+      if (aiModeDecor) {
+        return aiModeDecor;
+      }
+      ensureAiModeFrames();
+      if (
+        !aiModeDecorFrame ||
+        typeof window._x_extension_createBorderBeamEffect_2026_unique_ !== 'function'
+      ) {
+        return null;
+      }
+      aiModeDecor = window._x_extension_createBorderBeamEffect_2026_unique_({
+        target: aiModeDecorFrame,
+        themeTarget: overlay,
+        borderRadius: 28,
+        borderWidth: 1,
+        edgeOffset: 0,
+        zIndex: 0,
+        spread: 6,
+        duration: 2.4,
+        hueRange: 13,
+        strength: getAiModeBeamThemeName() === 'light' ? 0.64 : 0.82,
+        theme: 'auto',
+        active: false
+      });
+      return aiModeDecor;
+    }
+
+    function ensureAiModeSweep() {
+      if (aiModeSweep) {
+        return aiModeSweep;
+      }
+      ensureAiModeFrames();
+      if (
+        !aiModeSweepFrame ||
+        typeof window._x_extension_createAiSweepEffect_2026_unique_ !== 'function'
+      ) {
+        return null;
+      }
+      aiModeSweep = window._x_extension_createAiSweepEffect_2026_unique_({
+        target: aiModeSweepFrame,
+        themeTarget: overlay,
+        borderRadius: 28,
+        zIndex: 0,
+        duration: AI_MODE_SWEEP_DURATION_MS,
+        maxDisplacement: 24
+      });
+      return aiModeSweep;
+    }
+
+    function playAiModeSweep() {
+      const sweep = ensureAiModeSweep();
+      if (!sweep) {
+        return;
+      }
+      sweep.setTheme('auto');
+      sweep.play();
+    }
+
+    function setAiModeBeamActive(provider, options) {
+      const nextActive = Boolean(provider && isAiSiteSearchProvider(provider));
+      if (!nextActive) {
+        if (aiModeDecor) {
+          aiModeDecor.setActive(false);
+        }
+        aiModeEffectsActive = false;
+        aiModeExpandedSweepPlayed = false;
+        return;
+      }
+      const decor = ensureAiModeDecor();
+      if (decor) {
+        syncAiModeDecorAppearance();
+        decor.setActive(true);
+      }
+      if (!aiModeEffectsActive || Boolean(options && options.animate)) {
+        aiModeExpandedSweepPlayed = false;
+        playAiModeSweep();
+      }
+      aiModeEffectsActive = true;
+    }
+
+    function refreshAiModeBeamTheme() {
+      if (!siteSearchState || !isAiSiteSearchProvider(siteSearchState)) {
+        return;
+      }
+      if (aiModeDecor) {
+        syncAiModeDecorAppearance();
+      }
+      if (aiModeSweep && typeof aiModeSweep.setTheme === 'function') {
+        aiModeSweep.setTheme('auto');
+      }
+    }
+
+    function clearAiModeBeamEffects() {
+      if (aiModeDecor) {
+        aiModeDecor.setActive(false);
+      }
+      aiModeEffectsActive = false;
+      aiModeExpandedSweepPlayed = false;
+    }
+
+    function playAiModeExpandedSweepIfNeeded() {
+      if (
+        !siteSearchState ||
+        !isAiSiteSearchProvider(siteSearchState) ||
+        !aiModeEffectsActive ||
+        aiModeExpandedSweepPlayed
+      ) {
+        return;
+      }
+      aiModeExpandedSweepPlayed = true;
+      playAiModeSweep();
+    }
+
+    overlay._lumnoAiModeEffectsCleanup = () => {
+      if (aiModeDecor && typeof aiModeDecor.destroy === 'function') {
+        aiModeDecor.destroy();
+      }
+      if (aiModeSweep && typeof aiModeSweep.destroy === 'function') {
+        aiModeSweep.destroy();
+      }
+      aiModeDecor = null;
+      aiModeSweep = null;
+      aiModeFrame = null;
+      aiModeDecorFrame = null;
+      aiModeSweepFrame = null;
+      aiModeEffectsActive = false;
+      aiModeExpandedSweepPlayed = false;
+    };
 
     function updateInputRightPadding() {
       if (!searchInput) {
@@ -6747,9 +7157,12 @@ function toggleBlackRectangle(tabs, overlayContext) {
 
     const defaultTheme = buildTheme(defaultAccentColor);
     defaultTheme._xIsDefault = true;
+    defaultTheme._xIsBrand = false;
+    defaultTheme._xThemeSource = 'fallback';
     const urlHighlightTheme = buildTheme(defaultAccentColor);
     urlHighlightTheme._xIsBrand = true;
     urlHighlightTheme._xIsUrl = true;
+    urlHighlightTheme._xThemeSource = 'url';
     const overlayThemeTokens = {
       light: {
         bg: 'linear-gradient(135deg, rgba(255, 255, 255, 0.97) 0%, rgba(255, 255, 255, 0.95) 100%)',
@@ -7294,54 +7707,11 @@ function toggleBlackRectangle(tabs, overlayContext) {
       }
     }
 
-    function hashStringToHue(value) {
-      if (!value) {
-        return 0;
-      }
-      let hash = 0;
-      for (let i = 0; i < value.length; i += 1) {
-        hash = ((hash << 5) - hash) + value.charCodeAt(i);
-        hash |= 0;
-      }
-      return Math.abs(hash) % 360;
-    }
-
-    function hslToRgb(h, s, l) {
-      const c = (1 - Math.abs(2 * l - 1)) * s;
-      const hp = h / 60;
-      const x = c * (1 - Math.abs((hp % 2) - 1));
-      let r = 0;
-      let g = 0;
-      let b = 0;
-      if (hp >= 0 && hp < 1) {
-        r = c; g = x; b = 0;
-      } else if (hp >= 1 && hp < 2) {
-        r = x; g = c; b = 0;
-      } else if (hp >= 2 && hp < 3) {
-        r = 0; g = c; b = x;
-      } else if (hp >= 3 && hp < 4) {
-        r = 0; g = x; b = c;
-      } else if (hp >= 4 && hp < 5) {
-        r = x; g = 0; b = c;
-      } else if (hp >= 5 && hp < 6) {
-        r = c; g = 0; b = x;
-      }
-      const m = l - c / 2;
-      return [
-        Math.round((r + m) * 255),
-        Math.round((g + m) * 255),
-        Math.round((b + m) * 255)
-      ];
-    }
-
     function buildFallbackThemeForHost(hostname) {
-      if (!hostname) {
-        return null;
-      }
-      const hue = hashStringToHue(hostname);
-      const accent = hslToRgb(hue, 0.55, 0.52);
-      const theme = buildTheme(accent);
-      theme._xIsBrand = true;
+      const theme = buildTheme(defaultAccentColor);
+      theme._xIsDefault = true;
+      theme._xIsBrand = false;
+      theme._xThemeSource = 'fallback';
       theme._xIsFallback = true;
       return theme;
     }
@@ -8091,6 +8461,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
     function setSiteSearchPrefix(provider, theme, options) {
       const prefixText = getSiteSearchPrefixText(provider);
       const isAi = isAiSiteSearchProvider(provider);
+      setAiModeBeamActive(provider, options);
       setInputModePrefix(prefixText, theme, {
         ...(options || {}),
         iconUrl: isAi ? getProviderIcon(provider) : '',
@@ -8109,6 +8480,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
 
     function clearSiteSearchPrefix() {
       clearInputModePrefix();
+      clearAiModeBeamEffects();
     }
 
     window.addEventListener('resize', updateSiteSearchPrefixLayout);
@@ -11887,6 +12259,9 @@ function toggleBlackRectangle(tabs, overlayContext) {
         updateSelection();
         if (shouldAnimateGrowth) {
           animateSuggestionsGrowth(suggestionsContainer, previousHeight);
+        }
+        if (allSuggestions.length > 0) {
+          requestAnimationFrame(playAiModeExpandedSweepIfNeeded);
         }
 
       // Update keyboard navigation

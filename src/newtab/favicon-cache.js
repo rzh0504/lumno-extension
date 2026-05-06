@@ -12,6 +12,9 @@
     faviconDataPersistStorageKey: '_x_extension_favicon_data_cache_2024_unique_',
     faviconDataPersistMaxEntries: 220,
     faviconDataPersistMaxLength: 24000,
+    siteThemePersistStorageKey: '_x_extension_site_theme_cache_2026_unique_',
+    siteThemePersistTtlMs: 1000 * 60 * 60 * 24 * 30,
+    siteThemePersistMaxEntries: 800,
     faviconVisitDirtyStorageKey: '_x_extension_favicon_visit_dirty_2026_unique_',
     faviconVisitDirtyTtlMs: 1000 * 60 * 60 * 24,
     faviconVisitDirtyMaxEntries: 600,
@@ -46,6 +49,13 @@
     const faviconDataPersistMaxLength = Number.isFinite(config.faviconDataPersistMaxLength)
       ? config.faviconDataPersistMaxLength
       : DEFAULTS.faviconDataPersistMaxLength;
+    const siteThemePersistStorageKey = config.siteThemePersistStorageKey || DEFAULTS.siteThemePersistStorageKey;
+    const siteThemePersistTtlMs = Number.isFinite(config.siteThemePersistTtlMs)
+      ? config.siteThemePersistTtlMs
+      : DEFAULTS.siteThemePersistTtlMs;
+    const siteThemePersistMaxEntries = Number.isFinite(config.siteThemePersistMaxEntries)
+      ? config.siteThemePersistMaxEntries
+      : DEFAULTS.siteThemePersistMaxEntries;
     const faviconVisitDirtyStorageKey = config.faviconVisitDirtyStorageKey || DEFAULTS.faviconVisitDirtyStorageKey;
     const faviconVisitDirtyTtlMs = Number.isFinite(config.faviconVisitDirtyTtlMs)
       ? config.faviconVisitDirtyTtlMs
@@ -59,6 +69,7 @@
 
     const faviconPersistCache = new Map();
     const faviconDataPersistCache = new Map();
+    const siteThemePersistCache = new Map();
     const faviconVisitDirtyCache = new Map();
     let faviconPersistLoaded = false;
     let faviconPersistLoadPromise = null;
@@ -66,6 +77,9 @@
     let faviconDataPersistLoaded = false;
     let faviconDataPersistLoadPromise = null;
     let faviconDataPersistWriteTimer = null;
+    let siteThemePersistLoaded = false;
+    let siteThemePersistLoadPromise = null;
+    let siteThemePersistWriteTimer = null;
     let faviconVisitDirtyLoaded = false;
     let faviconVisitDirtyLoadPromise = null;
 
@@ -124,6 +138,49 @@
       });
       valid.sort((a, b) => b.updatedAt - a.updatedAt);
       return valid.slice(0, faviconDataPersistMaxEntries);
+    }
+
+    function normalizeAccentRgb(value) {
+      if (!Array.isArray(value) || value.length !== 3) {
+        return null;
+      }
+      const rgb = value.map((channel) => Math.round(Number(channel)));
+      if (!rgb.every((channel) => Number.isFinite(channel) && channel >= 0 && channel <= 255)) {
+        return null;
+      }
+      return rgb;
+    }
+
+    function normalizeThemeSource(value) {
+      const source = String(value || '').trim().toLowerCase();
+      if (source === 'brand' || source === 'meta' || source === 'favicon') {
+        return source;
+      }
+      return '';
+    }
+
+    function getValidSiteThemePersistEntries(rawEntries) {
+      const now = Date.now();
+      const input = rawEntries && typeof rawEntries === 'object' ? rawEntries : {};
+      const valid = [];
+      Object.keys(input).forEach((key) => {
+        const item = input[key];
+        if (!item || typeof item !== 'object') {
+          return;
+        }
+        const accentRgb = normalizeAccentRgb(item.accentRgb);
+        const source = normalizeThemeSource(item.source);
+        const updatedAt = Number(item.updatedAt || 0);
+        if (!key || !accentRgb || !source || !Number.isFinite(updatedAt)) {
+          return;
+        }
+        if (now - updatedAt > siteThemePersistTtlMs) {
+          return;
+        }
+        valid.push({ key, accentRgb, source, updatedAt });
+      });
+      valid.sort((a, b) => b.updatedAt - a.updatedAt);
+      return valid.slice(0, siteThemePersistMaxEntries);
     }
 
     function getValidFaviconVisitDirtyEntries(rawEntries) {
@@ -198,6 +255,37 @@
       return faviconDataPersistLoadPromise;
     }
 
+    function loadSiteThemePersistCache() {
+      if (siteThemePersistLoadPromise) {
+        return siteThemePersistLoadPromise;
+      }
+      if (!storageArea) {
+        siteThemePersistLoaded = true;
+        siteThemePersistLoadPromise = Promise.resolve();
+        return siteThemePersistLoadPromise;
+      }
+      if (siteThemePersistLoaded) {
+        siteThemePersistLoadPromise = Promise.resolve();
+        return siteThemePersistLoadPromise;
+      }
+      siteThemePersistLoadPromise = new Promise((resolve) => {
+        storageArea.get([siteThemePersistStorageKey], (result) => {
+          const payload = result && result[siteThemePersistStorageKey];
+          const entries = getValidSiteThemePersistEntries(payload && payload.entries ? payload.entries : null);
+          entries.forEach((item) => {
+            siteThemePersistCache.set(item.key, {
+              accentRgb: item.accentRgb,
+              source: item.source,
+              updatedAt: item.updatedAt
+            });
+          });
+          siteThemePersistLoaded = true;
+          resolve();
+        });
+      });
+      return siteThemePersistLoadPromise;
+    }
+
     function loadFaviconVisitDirtyCache() {
       if (faviconVisitDirtyLoadPromise) {
         return faviconVisitDirtyLoadPromise;
@@ -229,6 +317,7 @@
       return Promise.all([
         loadFaviconPersistCache(),
         loadFaviconDataPersistCache(),
+        loadSiteThemePersistCache(),
         loadFaviconVisitDirtyCache()
       ]).then(() => undefined).catch(() => undefined);
     }
@@ -301,6 +390,43 @@
         });
         storageArea.set({
           [faviconDataPersistStorageKey]: {
+            version: 1,
+            entries: serialized,
+            updatedAt: Date.now()
+          }
+        });
+      }, 600);
+    }
+
+    function schedulePersistSiteThemeCache() {
+      if (!storageArea) {
+        return;
+      }
+      if (siteThemePersistWriteTimer !== null) {
+        return;
+      }
+      siteThemePersistWriteTimer = windowObj.setTimeout(() => {
+        siteThemePersistWriteTimer = null;
+        const entries = Array.from(siteThemePersistCache.entries())
+          .map(([key, value]) => ({
+            key: String(key || ''),
+            accentRgb: normalizeAccentRgb(value && value.accentRgb),
+            source: normalizeThemeSource(value && value.source),
+            updatedAt: Number(value && value.updatedAt ? value.updatedAt : 0)
+          }))
+          .filter((item) => item.key && item.accentRgb && item.source && Number.isFinite(item.updatedAt))
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+          .slice(0, siteThemePersistMaxEntries);
+        const serialized = {};
+        entries.forEach((item) => {
+          serialized[item.key] = {
+            accentRgb: item.accentRgb,
+            source: item.source,
+            updatedAt: item.updatedAt
+          };
+        });
+        storageArea.set({
+          [siteThemePersistStorageKey]: {
             version: 1,
             entries: serialized,
             updatedAt: Date.now()
@@ -436,9 +562,63 @@
       schedulePersistFaviconDataCache();
     }
 
+    function getPersistedThemeEntry(cacheKey) {
+      const key = normalizeFaviconHost(cacheKey);
+      if (!key) {
+        return null;
+      }
+      const cached = siteThemePersistCache.get(key);
+      const accentRgb = cached ? normalizeAccentRgb(cached.accentRgb) : null;
+      const source = cached ? normalizeThemeSource(cached.source) : '';
+      if (!cached || !accentRgb || !source) {
+        return null;
+      }
+      const now = Date.now();
+      if (!Number.isFinite(cached.updatedAt) || now - cached.updatedAt > siteThemePersistTtlMs) {
+        siteThemePersistCache.delete(key);
+        schedulePersistSiteThemeCache();
+        return null;
+      }
+      return {
+        accentRgb,
+        source,
+        updatedAt: cached.updatedAt
+      };
+    }
+
+    function setPersistedThemeEntry(cacheKey, entry) {
+      const key = normalizeFaviconHost(cacheKey);
+      const accentRgb = normalizeAccentRgb(entry && entry.accentRgb);
+      const source = normalizeThemeSource(entry && entry.source);
+      if (!key || !accentRgb || !source) {
+        return false;
+      }
+      const current = siteThemePersistCache.get(key);
+      const currentRgb = current ? normalizeAccentRgb(current.accentRgb) : null;
+      const currentSource = current ? normalizeThemeSource(current.source) : '';
+      if (currentRgb && currentSource === source && currentRgb.join(',') === accentRgb.join(',')) {
+        return false;
+      }
+      siteThemePersistCache.set(key, {
+        accentRgb,
+        source,
+        updatedAt: Date.now()
+      });
+      if (siteThemePersistCache.size > siteThemePersistMaxEntries * 2) {
+        const compact = Array.from(siteThemePersistCache.entries())
+          .sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0))
+          .slice(0, siteThemePersistMaxEntries);
+        siteThemePersistCache.clear();
+        compact.forEach(([k, v]) => siteThemePersistCache.set(k, v));
+      }
+      schedulePersistSiteThemeCache();
+      return true;
+    }
+
     return {
       isFaviconPersistLoaded: () => faviconPersistLoaded,
       isFaviconDataPersistLoaded: () => faviconDataPersistLoaded,
+      isSiteThemePersistLoaded: () => siteThemePersistLoaded,
       ensureCachesReady,
       waitForCachesOrTimeout,
       isHostVisitDirty,
@@ -446,7 +626,9 @@
       getPersistedEntry,
       setPersistedUrl,
       getPersistedDataEntry,
-      setPersistedData
+      setPersistedData,
+      getPersistedThemeEntry,
+      setPersistedThemeEntry
     };
   }
 

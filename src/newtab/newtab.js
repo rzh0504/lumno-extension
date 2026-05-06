@@ -1,6 +1,8 @@
 (function() {
   const root = document.getElementById('_x_extension_newtab_root_2024_unique_');
   const createSearchInput = window._x_extension_createSearchInput_2024_unique_;
+  const createBorderBeamEffect = window._x_extension_createBorderBeamEffect_2026_unique_;
+  const createAiSweepEffect = window._x_extension_createAiSweepEffect_2026_unique_;
   if (!root || typeof createSearchInput !== 'function') {
     return;
   }
@@ -91,6 +93,14 @@
   let currentBookmarkColumns = 4;
   let tabRankScoreDebugEnabled = false;
   let searchLayer = null;
+  const AI_MODE_SWEEP_DURATION_MS = 1800;
+  let aiModeFrame = null;
+  let aiModeDecorFrame = null;
+  let aiModeSweepFrame = null;
+  let aiModeDecor = null;
+  let aiModeSweep = null;
+  let aiModeEffectsActive = false;
+  let aiModeExpandedSweepPlayed = false;
   let wordmarkContainer = null;
   let wordmarkImageEl = null;
   let pageNoticeBanner = null;
@@ -1690,6 +1700,7 @@
     applyLanguageStrings();
     updateSelection();
     updateModeBadge(inputParts && inputParts.input ? inputParts.input.value : '');
+    refreshAiModeBeamTheme();
     refreshFallbackIcons();
     if (didResolvedThemeChange) {
       refreshThemeAwareFavicons();
@@ -2249,6 +2260,13 @@
   const getBrandAccentForHost = NEWTAB_FAVICON_THEME.getBrandAccentForHost;
   const getBrandAccentForUrl = NEWTAB_FAVICON_THEME.getBrandAccentForUrl;
   const buildFallbackThemeForHost = NEWTAB_FAVICON_THEME.buildFallbackThemeForHost;
+  const getThemeFingerprint = typeof NEWTAB_FAVICON_THEME.getThemeFingerprint === 'function'
+    ? NEWTAB_FAVICON_THEME.getThemeFingerprint
+    : ((theme) => {
+      const rgb = theme && (theme.accentRgb || parseCssColor(theme.accent));
+      const accent = rgb && rgb.length === 3 ? rgb : defaultAccentColor;
+      return `${theme && theme._xThemeSource ? theme._xThemeSource : 'unknown'}:${accent.join(',')}`;
+    });
   const normalizeHost = NEWTAB_FAVICON_THEME.normalizeHost;
   const normalizeFaviconHost = NEWTAB_FAVICON_THEME.normalizeFaviconHost;
   const hasThemeTokenInUrl = NEWTAB_FAVICON_THEME.hasThemeTokenInUrl;
@@ -2263,6 +2281,7 @@
   window._x_extension_theme_color_cache_2024_unique_ = themeColorCache;
   const themeHostCache = window._x_extension_theme_host_cache_2024_unique_ || new Map();
   window._x_extension_theme_host_cache_2024_unique_ = themeHostCache;
+  const siteThemeRequestPending = new Map();
 
   function getHighlightColors(theme) {
     const resolvedTheme = getThemeForMode(theme);
@@ -2289,26 +2308,233 @@
     }
   }
 
+  function normalizeAccentRgb(value) {
+    if (!Array.isArray(value) || value.length !== 3) {
+      return null;
+    }
+    const rgb = value.map((channel) => Math.round(Number(channel)));
+    return rgb.every((channel) => Number.isFinite(channel) && channel >= 0 && channel <= 255)
+      ? rgb
+      : null;
+  }
+
+  function normalizeThemeSource(source) {
+    const value = String(source || '').trim().toLowerCase();
+    if (value === 'brand' || value === 'meta' || value === 'favicon' || value === 'url') {
+      return value;
+    }
+    return 'fallback';
+  }
+
+  function getThemeSourcePriority(source) {
+    const value = normalizeThemeSource(source);
+    if (value === 'brand') {
+      return 40;
+    }
+    if (value === 'meta') {
+      return 34;
+    }
+    if (value === 'favicon') {
+      return 24;
+    }
+    if (value === 'url') {
+      return 18;
+    }
+    return 10;
+  }
+
+  function getThemeSource(theme) {
+    if (!theme) {
+      return 'fallback';
+    }
+    return normalizeThemeSource(theme._xThemeSource || (theme._xIsDefault ? 'fallback' : (theme._xIsBrand ? 'brand' : 'fallback')));
+  }
+
+  function getThemeColorFingerprint(theme) {
+    const rgb = theme && normalizeAccentRgb(theme.accentRgb || parseCssColor(theme.accent));
+    return (rgb || defaultAccentColor).join(',');
+  }
+
+  function buildThemeFromAccent(accentRgb, source) {
+    const rgb = normalizeAccentRgb(accentRgb);
+    if (!rgb) {
+      return defaultTheme;
+    }
+    const theme = buildTheme(rgb);
+    const normalizedSource = normalizeThemeSource(source);
+    theme._xThemeSource = normalizedSource;
+    theme._xIsBrand = normalizedSource !== 'fallback';
+    theme._xIsDefault = normalizedSource === 'fallback';
+    return theme;
+  }
+
+  function isPersistableTheme(theme) {
+    const source = getThemeSource(theme);
+    return source === 'brand' || source === 'meta' || source === 'favicon';
+  }
+
+  function getProviderThemeHost(provider) {
+    return normalizeHost(getProviderHost(provider));
+  }
+
+  function getThemeHostForSuggestion(suggestion) {
+    if (!suggestion) {
+      return '';
+    }
+    if (suggestion.provider) {
+      return getProviderThemeHost(suggestion.provider);
+    }
+    if (suggestion.url) {
+      return getHostFromUrl(suggestion.url);
+    }
+    if (suggestion.favicon) {
+      return getHostFromUrl(suggestion.favicon);
+    }
+    return '';
+  }
+
+  function getThemePageUrlForSuggestion(suggestion, hostKey) {
+    if (suggestion && suggestion.url) {
+      try {
+        const parsed = new URL(suggestion.url);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+          return parsed.href;
+        }
+      } catch (e) {
+        // Ignore malformed URLs.
+      }
+    }
+    const host = normalizeHost(hostKey || '');
+    return host ? `https://${host}/` : '';
+  }
+
+  function refreshThemeConsumersForHost(hostKey, theme) {
+    const normalizedHost = normalizeHost(hostKey);
+    if (!normalizedHost || !theme) {
+      return;
+    }
+    recentCards.forEach((card) => {
+      if (card && normalizeHost(card._xHost || '') === normalizedHost) {
+        card._xTheme = theme;
+        applyRecentCardTheme(card, theme, normalizedHost);
+      }
+    });
+    bookmarkCards.forEach((card) => {
+      if (card && normalizeHost(card._xHost || '') === normalizedHost) {
+        card._xTheme = theme;
+        applyBookmarkCardTheme(card, theme, normalizedHost);
+      }
+    });
+    suggestionItems.forEach((item) => {
+      if (item && normalizeHost(item._xThemeHost || '') === normalizedHost) {
+        item._xTheme = theme;
+        applyThemeVariables(item, theme);
+      }
+    });
+    if (siteSearchState && getProviderThemeHost(siteSearchState) === normalizedHost) {
+      setSiteSearchPrefix(siteSearchState, theme);
+    }
+    updateSelection();
+  }
+
+  function setResolvedThemeForHost(hostKey, theme, options) {
+    const normalizedHost = normalizeHost(hostKey);
+    const nextTheme = theme || defaultTheme;
+    const iconUrl = options && options.iconUrl ? String(options.iconUrl) : '';
+    if (iconUrl) {
+      themeColorCache.set(iconUrl, nextTheme);
+    }
+    if (!normalizedHost) {
+      return nextTheme;
+    }
+    const currentTheme = themeHostCache.get(normalizedHost);
+    if (currentTheme && getThemeSourcePriority(getThemeSource(currentTheme)) > getThemeSourcePriority(getThemeSource(nextTheme))) {
+      if (iconUrl) {
+        themeColorCache.set(iconUrl, currentTheme);
+      }
+      return currentTheme;
+    }
+    const previousFingerprint = currentTheme ? getThemeFingerprint(currentTheme) : '';
+    const nextFingerprint = getThemeFingerprint(nextTheme);
+    if (currentTheme && previousFingerprint === nextFingerprint) {
+      return currentTheme;
+    }
+    const shouldRefreshConsumers = !currentTheme ||
+      getThemeColorFingerprint(currentTheme) !== getThemeColorFingerprint(nextTheme);
+    themeHostCache.set(normalizedHost, nextTheme);
+    if (isPersistableTheme(nextTheme) && (!options || options.persist !== false)) {
+      setPersistedSiteThemeEntry(normalizedHost, nextTheme);
+    }
+    if (shouldRefreshConsumers && (!options || options.refresh !== false)) {
+      refreshThemeConsumersForHost(normalizedHost, nextTheme);
+    }
+    return nextTheme;
+  }
+
+  function getPersistedThemeForHost(hostKey) {
+    const normalizedHost = normalizeHost(hostKey);
+    if (!normalizedHost) {
+      return null;
+    }
+    const entry = getPersistedSiteThemeEntry(normalizedHost);
+    const accentRgb = entry ? normalizeAccentRgb(entry.accentRgb) : null;
+    if (!accentRgb) {
+      return null;
+    }
+    const theme = buildThemeFromAccent(accentRgb, entry.source);
+    return setResolvedThemeForHost(normalizedHost, theme, { persist: false, refresh: false });
+  }
+
+  function requestSiteThemeColor(pageUrl, hostKey) {
+    const url = String(pageUrl || '').trim();
+    const host = normalizeHost(hostKey);
+    if (!url || !host || !chrome || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') {
+      return Promise.resolve(null);
+    }
+    const requestKey = `${host}::${url}::${getFaviconPreferredTheme()}`;
+    if (siteThemeRequestPending.has(requestKey)) {
+      return siteThemeRequestPending.get(requestKey);
+    }
+    const promise = new Promise((resolve) => {
+      chrome.runtime.sendMessage({
+        action: 'resolveSiteThemeColor',
+        url,
+        host,
+        preferredTheme: getFaviconPreferredTheme()
+      }, (response) => {
+        const accentRgb = response && normalizeAccentRgb(response.accentRgb);
+        resolve(accentRgb ? { accentRgb, source: response.source || 'meta' } : null);
+      });
+    }).catch(() => null).then((result) => {
+      siteThemeRequestPending.delete(requestKey);
+      return result;
+    });
+    siteThemeRequestPending.set(requestKey, promise);
+    return promise;
+  }
+
   function getThemeFromUrl(url, hostOverride) {
     if (!url) {
       return Promise.resolve(defaultTheme);
     }
-    const hostKey = hostOverride || getHostFromUrl(url);
+    const hostKey = normalizeHost(hostOverride || getHostFromUrl(url));
     const isProxy = isFaviconProxyUrl(url);
     const useHostCache = hostKey && (!isProxy || Boolean(hostOverride));
     if (useHostCache && themeHostCache.has(hostKey)) {
-      return Promise.resolve(themeHostCache.get(hostKey));
+      const cachedTheme = themeHostCache.get(hostKey);
+      if (cachedTheme && !cachedTheme._xIsDefault) {
+        return Promise.resolve(cachedTheme);
+      }
     }
     if (themeColorCache.has(url)) {
       return Promise.resolve(themeColorCache.get(url));
     }
     const brandAccent = (isProxy && hostOverride) ? null : getBrandAccentForUrl(url);
     if (brandAccent) {
-      const brandTheme = buildTheme(brandAccent);
-      brandTheme._xIsBrand = true;
+      const brandTheme = buildThemeFromAccent(brandAccent, 'brand');
       themeColorCache.set(url, brandTheme);
       if (useHostCache) {
-        themeHostCache.set(hostKey, brandTheme);
+        setResolvedThemeForHost(hostKey, brandTheme, { iconUrl: url });
       }
       return Promise.resolve(brandTheme);
     }
@@ -2323,11 +2549,10 @@
             resolve(defaultTheme);
             return;
           }
-          const theme = buildTheme(avg);
-          theme._xIsBrand = true;
+          const theme = buildThemeFromAccent(avg, 'favicon');
           themeColorCache.set(url, theme);
           if (useHostCache) {
-            themeHostCache.set(hostKey, theme);
+            setResolvedThemeForHost(hostKey, theme, { iconUrl: url });
           }
           resolve(theme);
         };
@@ -2353,11 +2578,10 @@
               resolve(defaultTheme);
               return;
             }
-            const theme = buildTheme(avg);
-            theme._xIsBrand = true;
+            const theme = buildThemeFromAccent(avg, 'favicon');
             themeColorCache.set(url, theme);
             if (useHostCache) {
-              themeHostCache.set(hostKey, theme);
+              setResolvedThemeForHost(hostKey, theme, { iconUrl: url });
             }
             resolve(theme);
           };
@@ -2379,11 +2603,10 @@
           resolve(defaultTheme);
           return;
         }
-        const theme = buildTheme(avg);
-        theme._xIsBrand = true;
+        const theme = buildThemeFromAccent(avg, 'favicon');
         themeColorCache.set(url, theme);
         if (useHostCache) {
-          themeHostCache.set(hostKey, theme);
+          setResolvedThemeForHost(hostKey, theme, { iconUrl: url });
         }
         resolve(theme);
       };
@@ -2395,10 +2618,6 @@
     });
   }
 
-  function getProviderThemeHost(provider) {
-    return normalizeHost(getProviderHost(provider));
-  }
-
   function buildAndCacheBrandThemeForHost(hostKey, iconUrl) {
     const normalizedHost = normalizeHost(hostKey);
     if (!normalizedHost) {
@@ -2408,9 +2627,11 @@
     if (!brandAccent) {
       return null;
     }
-    const brandTheme = buildTheme(brandAccent);
-    brandTheme._xIsBrand = true;
-    themeHostCache.set(normalizedHost, brandTheme);
+    const brandTheme = buildThemeFromAccent(brandAccent, 'brand');
+    setResolvedThemeForHost(normalizedHost, brandTheme, {
+      iconUrl,
+      refresh: false
+    });
     if (iconUrl) {
       themeColorCache.set(iconUrl, brandTheme);
     }
@@ -2430,7 +2651,23 @@
     if (brandTheme) {
       return Promise.resolve(brandTheme);
     }
-    return getThemeFromUrl(iconUrl, hostKey);
+    const persistedTheme = getPersistedThemeForHost(hostKey);
+    if (persistedTheme && !isHostFaviconVisitDirty(hostKey)) {
+      return Promise.resolve(persistedTheme);
+    }
+    return requestSiteThemeColor(getThemePageUrlForSuggestion({ provider }, hostKey), hostKey).then((siteTheme) => {
+      if (siteTheme) {
+        return setResolvedThemeForHost(
+          hostKey,
+          buildThemeFromAccent(siteTheme.accentRgb, siteTheme.source || 'meta'),
+          { iconUrl }
+        );
+      }
+      if (persistedTheme) {
+        return persistedTheme;
+      }
+      return getThemeFromUrl(iconUrl, hostKey);
+    });
   }
 
   function shouldUseBrandTheme(suggestion) {
@@ -2451,21 +2688,30 @@
     if (suggestion && suggestion.provider) {
       return getThemeForProvider(suggestion.provider);
     }
-    if (suggestion && suggestion.url) {
-      const brandAccent = getBrandAccentForUrl(suggestion.url);
-      if (brandAccent) {
-        const brandTheme = buildTheme(brandAccent);
-        brandTheme._xIsBrand = true;
-        return Promise.resolve(brandTheme);
-      }
+    const hostKey = getThemeHostForSuggestion(suggestion);
+    const iconUrl = getThemeSourceForSuggestion(suggestion);
+    const brandTheme = buildAndCacheBrandThemeForHost(hostKey, iconUrl);
+    if (brandTheme) {
+      return Promise.resolve(brandTheme);
     }
-    const hostKey = suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : '';
-    return getThemeFromUrl(getThemeSourceForSuggestion(suggestion), hostKey).then((theme) => {
-      if (theme && !theme._xIsDefault) {
-        return theme;
+    const persistedTheme = getPersistedThemeForHost(hostKey);
+    if (persistedTheme && !isHostFaviconVisitDirty(hostKey)) {
+      return Promise.resolve(persistedTheme);
+    }
+    return requestSiteThemeColor(getThemePageUrlForSuggestion(suggestion, hostKey), hostKey).then((siteTheme) => {
+      if (siteTheme) {
+        return setResolvedThemeForHost(
+          hostKey,
+          buildThemeFromAccent(siteTheme.accentRgb, siteTheme.source || 'meta'),
+          { iconUrl }
+        );
       }
-      const fallback = buildFallbackThemeForHost(hostKey);
-      return fallback || theme;
+      if (persistedTheme) {
+        return persistedTheme;
+      }
+      return getThemeFromUrl(iconUrl, hostKey).then((theme) => (
+        theme && !theme._xIsDefault ? theme : defaultTheme
+      ));
     });
   }
 
@@ -2486,10 +2732,11 @@
       if (brandTheme) {
         return brandTheme;
       }
-      const fallbackTheme = buildFallbackThemeForHost(hostKey);
-      if (fallbackTheme) {
-        return fallbackTheme;
+      const persistedTheme = getPersistedThemeForHost(hostKey);
+      if (persistedTheme) {
+        return persistedTheme;
       }
+      return defaultTheme;
     }
     if (suggestion && suggestion.url) {
       const hostKey = getHostFromUrl(suggestion.url);
@@ -2499,18 +2746,17 @@
       if (themeColorCache.has(suggestion.url)) {
         return themeColorCache.get(suggestion.url);
       }
-      const brandAccent = getBrandAccentForUrl(suggestion.url);
-      if (brandAccent) {
-        const brandTheme = buildTheme(brandAccent);
-        brandTheme._xIsBrand = true;
+      const brandTheme = buildAndCacheBrandThemeForHost(hostKey, suggestion.url);
+      if (brandTheme) {
         return brandTheme;
       }
-      const fallbackTheme = buildFallbackThemeForHost(hostKey);
-      if (fallbackTheme) {
-        return fallbackTheme;
+      const persistedTheme = getPersistedThemeForHost(hostKey);
+      if (persistedTheme) {
+        return persistedTheme;
       }
+      return defaultTheme;
     }
-    return null;
+    return defaultTheme;
   }
 
   function isNewtabDarkMode() {
@@ -2593,12 +2839,18 @@
     return faviconCacheRuntime.isFaviconDataPersistLoaded();
   }
 
+  function isSiteThemePersistLoaded() {
+    return typeof faviconCacheRuntime.isSiteThemePersistLoaded === 'function'
+      ? faviconCacheRuntime.isSiteThemePersistLoaded()
+      : true;
+  }
+
   function waitForFaviconCachesOrTimeout(maxWaitMs) {
     return faviconCacheRuntime.waitForCachesOrTimeout(maxWaitMs);
   }
 
   function areFaviconRenderCachesReady() {
-    return isFaviconPersistLoaded() && isFaviconDataPersistLoaded();
+    return isFaviconPersistLoaded() && isFaviconDataPersistLoaded() && isSiteThemePersistLoaded();
   }
 
   function waitForFaviconRenderCaches(maxWaitMs) {
@@ -2630,6 +2882,26 @@
 
   function setPersistedFaviconData(cacheKey, dataUrl) {
     faviconCacheRuntime.setPersistedData(cacheKey, dataUrl);
+  }
+
+  function getPersistedSiteThemeEntry(hostKey) {
+    return typeof faviconCacheRuntime.getPersistedThemeEntry === 'function'
+      ? faviconCacheRuntime.getPersistedThemeEntry(hostKey)
+      : null;
+  }
+
+  function setPersistedSiteThemeEntry(hostKey, theme) {
+    if (!theme || !isPersistableTheme(theme)) {
+      return false;
+    }
+    const accentRgb = normalizeAccentRgb(theme.accentRgb || parseCssColor(theme.accent));
+    if (!accentRgb || typeof faviconCacheRuntime.setPersistedThemeEntry !== 'function') {
+      return false;
+    }
+    return faviconCacheRuntime.setPersistedThemeEntry(hostKey, {
+      accentRgb,
+      source: getThemeSource(theme)
+    });
   }
 
   const faviconViewRuntime = NEWTAB_FAVICON_VIEW.createFaviconViewRuntime({
@@ -2739,12 +3011,14 @@
   }
 
   function preloadThemeFromFavicon(url, dataUrl, hostOverride) {
-    if (!url || themeColorCache.has(url)) {
+    const cachedTheme = themeColorCache.get(url);
+    if (!url || (cachedTheme && !cachedTheme._xIsDefault)) {
       return;
     }
-    const hostKey = hostOverride || getHostFromUrl(url);
+    const hostKey = normalizeHost(hostOverride || getHostFromUrl(url));
     const useHostCache = hostKey && (Boolean(hostOverride) || !isFaviconProxyUrl(url));
-    if (useHostCache && themeHostCache.has(hostKey)) {
+    const cachedHostTheme = useHostCache ? themeHostCache.get(hostKey) : null;
+    if (cachedHostTheme && getThemeSourcePriority(getThemeSource(cachedHostTheme)) > getThemeSourcePriority('favicon')) {
       return;
     }
     if (!dataUrl) {
@@ -2756,11 +3030,10 @@
       if (!avg) {
         return;
       }
-      const theme = buildTheme(avg);
-      theme._xIsBrand = true;
+      const theme = buildThemeFromAccent(avg, 'favicon');
       themeColorCache.set(url, theme);
       if (useHostCache) {
-        themeHostCache.set(hostKey, theme);
+        setResolvedThemeForHost(hostKey, theme, { iconUrl: url });
       }
     };
     image.onerror = function() {};
@@ -4335,8 +4608,222 @@
     }, 2200);
   }
 
+  function getAiModeBeamThemeName() {
+    return isNewtabDarkMode() ? 'dark' : 'light';
+  }
+
+  function createAiModeFrameElement(id, overflow) {
+    const frame = document.createElement('div');
+    frame.id = id;
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.cssText = `
+      all: unset;
+      position: absolute;
+      inset: 0;
+      display: block;
+      box-sizing: border-box;
+      border-radius: inherit;
+      pointer-events: none;
+      overflow: ${overflow};
+    `;
+    return frame;
+  }
+
+  function ensureAiModeFrames() {
+    if (!aiModeFrame) {
+      aiModeFrame = document.createElement('div');
+      aiModeFrame.id = '_x_extension_newtab_ai_mode_effect_frame_2026_unique_';
+      aiModeFrame.setAttribute('aria-hidden', 'true');
+      aiModeFrame.style.cssText = `
+        all: unset;
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 0;
+        height: 0;
+        display: block;
+        box-sizing: border-box;
+        border-radius: 28px;
+        pointer-events: none;
+        overflow: visible;
+        z-index: 25;
+      `;
+    }
+    if (!aiModeDecorFrame) {
+      aiModeDecorFrame = createAiModeFrameElement(
+        '_x_extension_newtab_ai_mode_decor_frame_2026_unique_',
+        'visible'
+      );
+    }
+    if (!aiModeSweepFrame) {
+      aiModeSweepFrame = createAiModeFrameElement(
+        '_x_extension_newtab_ai_mode_sweep_frame_2026_unique_',
+        'hidden'
+      );
+    }
+    if (aiModeDecorFrame.parentNode !== aiModeFrame) {
+      aiModeFrame.appendChild(aiModeDecorFrame);
+    }
+    if (aiModeSweepFrame.parentNode !== aiModeFrame) {
+      aiModeFrame.appendChild(aiModeSweepFrame);
+    }
+    if (aiModeFrame.parentNode !== document.body) {
+      document.body.appendChild(aiModeFrame);
+    }
+    updateAiModeFrameLayout();
+    return aiModeFrame;
+  }
+
+  function getAiModeFrameRect() {
+    const suggestionsVisible = suggestionsContainer &&
+      suggestionsContainer.getAttribute('data-visible') === 'true';
+    if (suggestionsVisible && suggestionsSurface) {
+      const surfaceRect = suggestionsSurface.getBoundingClientRect();
+      if (surfaceRect.width > 0 && surfaceRect.height > 0) {
+        return surfaceRect;
+      }
+    }
+    const anchor = root || searchLayer || (inputParts && inputParts.container);
+    return anchor ? anchor.getBoundingClientRect() : null;
+  }
+
+  function updateAiModeFrameLayout() {
+    if (!aiModeFrame) {
+      return;
+    }
+    const rect = getAiModeFrameRect();
+    if (!rect) {
+      return;
+    }
+    const left = Math.round(rect.left);
+    const top = Math.round(rect.top);
+    const width = Math.max(0, Math.round(rect.width));
+    const height = Math.max(0, Math.round(rect.height));
+    aiModeFrame.style.setProperty('left', `${left}px`);
+    aiModeFrame.style.setProperty('top', `${top}px`);
+    aiModeFrame.style.setProperty('width', `${width}px`);
+    aiModeFrame.style.setProperty('height', `${height}px`);
+    aiModeFrame.style.setProperty('border-radius', '28px');
+  }
+
+  function syncAiModeDecorAppearance() {
+    if (!aiModeDecor || !aiModeDecor.beam) {
+      return;
+    }
+    const resolvedTheme = getAiModeBeamThemeName();
+    const strength = resolvedTheme === 'light' ? 0.64 : 0.82;
+    aiModeDecor.beam.style.setProperty('--beam-strength', String(strength), 'important');
+    aiModeDecor.setTheme(resolvedTheme);
+  }
+
+  function ensureAiModeDecor() {
+    if (aiModeDecor) {
+      return aiModeDecor;
+    }
+    ensureAiModeFrames();
+    if (!aiModeDecorFrame || typeof createBorderBeamEffect !== 'function') {
+      return null;
+    }
+    aiModeDecor = createBorderBeamEffect({
+      target: aiModeDecorFrame,
+      themeTarget: document.body || root,
+      borderRadius: 28,
+      borderWidth: 1,
+      edgeOffset: 0,
+      zIndex: 0,
+      spread: 6,
+      duration: 2.4,
+      hueRange: 13,
+      strength: getAiModeBeamThemeName() === 'light' ? 0.64 : 0.82,
+      theme: 'auto',
+      active: false
+    });
+    return aiModeDecor;
+  }
+
+  function ensureAiModeSweep() {
+    if (aiModeSweep) {
+      return aiModeSweep;
+    }
+    ensureAiModeFrames();
+    if (!aiModeSweepFrame || typeof createAiSweepEffect !== 'function') {
+      return null;
+    }
+    aiModeSweep = createAiSweepEffect({
+      target: aiModeSweepFrame,
+      themeTarget: document.body || root,
+      borderRadius: 28,
+      zIndex: 0,
+      duration: AI_MODE_SWEEP_DURATION_MS,
+      maxDisplacement: 24
+    });
+    return aiModeSweep;
+  }
+
+  function playAiModeSweep() {
+    updateAiModeFrameLayout();
+    const sweep = ensureAiModeSweep();
+    if (!sweep) {
+      return;
+    }
+    sweep.setTheme('auto');
+    sweep.play();
+  }
+
+  function setAiModeBeamActive(provider, options) {
+    const nextActive = Boolean(provider && isAiSiteSearchProvider(provider));
+    if (!nextActive) {
+      clearAiModeBeamEffects();
+      return;
+    }
+    updateAiModeFrameLayout();
+    const decor = ensureAiModeDecor();
+    if (decor) {
+      syncAiModeDecorAppearance();
+      decor.setActive(true);
+    }
+    if (!aiModeEffectsActive || Boolean(options && options.animate)) {
+      aiModeExpandedSweepPlayed = false;
+      playAiModeSweep();
+    }
+    aiModeEffectsActive = true;
+  }
+
+  function refreshAiModeBeamTheme() {
+    if (!siteSearchState || !isAiSiteSearchProvider(siteSearchState)) {
+      return;
+    }
+    updateAiModeFrameLayout();
+    syncAiModeDecorAppearance();
+    if (aiModeSweep && typeof aiModeSweep.setTheme === 'function') {
+      aiModeSweep.setTheme('auto');
+    }
+  }
+
+  function playAiModeExpandedSweepIfNeeded() {
+    if (
+      !siteSearchState ||
+      !isAiSiteSearchProvider(siteSearchState) ||
+      !aiModeEffectsActive ||
+      aiModeExpandedSweepPlayed
+    ) {
+      return;
+    }
+    aiModeExpandedSweepPlayed = true;
+    playAiModeSweep();
+  }
+
+  function clearAiModeBeamEffects() {
+    if (aiModeDecor) {
+      aiModeDecor.setActive(false);
+    }
+    aiModeEffectsActive = false;
+    aiModeExpandedSweepPlayed = false;
+  }
+
   function setSuggestionsVisible(visible) {
     const shouldShow = Boolean(visible);
+    const wasVisible = suggestionsContainer.getAttribute('data-visible') === 'true';
     if (root) {
       if (shouldShow) {
         root.style.setProperty('z-index', '22');
@@ -4389,8 +4876,14 @@
     if (suggestionsOutline) {
       suggestionsOutline.setAttribute('data-visible', shouldShow ? 'true' : 'false');
     }
+    if (aiModeFrame) {
+      requestAnimationFrame(updateAiModeFrameLayout);
+    }
     if (shouldShow) {
       requestAnimationFrame(updateSuggestionsFloatingLayout);
+      if (!wasVisible) {
+        requestAnimationFrame(playAiModeExpandedSweepIfNeeded);
+      }
     }
   }
 
@@ -4433,6 +4926,7 @@
         suggestionsOutline.style.setProperty('height', `${surfaceHeight}px`);
       }
     }
+    updateAiModeFrameLayout();
   }
 
   function isEnglishQuery(query) {
@@ -7129,8 +7623,10 @@
         url: tab.url || '',
         favicon: tab.favIconUrl || ''
       };
+      const themeHost = getThemeHostForSuggestion(themeSourceSuggestion);
       const immediateTheme = getImmediateThemeForSuggestion(themeSourceSuggestion) || defaultTheme;
       suggestionItem._xTheme = immediateTheme;
+      suggestionItem._xThemeHost = themeHost;
       applyThemeVariables(suggestionItem, immediateTheme);
       getThemeForSuggestion(themeSourceSuggestion).then((theme) => {
         if (!suggestionItem.isConnected) {
@@ -7453,6 +7949,7 @@
         suggestionItems.push(suggestionItem);
         suggestionItem._xIsSearchSuggestion = true;
         suggestionItem._xTheme = immediateTheme;
+        suggestionItem._xThemeHost = getThemeHostForSuggestion(suggestion);
         suggestionItem._xIsAutocompleteTop = isPrimaryHighlight;
         applyThemeVariables(suggestionItem, immediateTheme);
 
@@ -9318,6 +9815,7 @@
     const prefixText = getSiteSearchPrefixText(provider);
     const shouldAnimate = Boolean(options && options.animate);
     const isAi = isAiSiteSearchProvider(provider);
+    setAiModeBeamActive(provider, options);
     const prefixOptions = {
       ...(options || {}),
       iconUrl: isAi ? getProviderIcon(provider) : '',
@@ -9345,6 +9843,7 @@
     searchInput.placeholder = defaultPlaceholder;
     searchInput.style.setProperty('caret-color', defaultCaretColor);
     updateSiteSearchPrefixLayout();
+    clearAiModeBeamEffects();
   }
 
   window.addEventListener('resize', () => {
