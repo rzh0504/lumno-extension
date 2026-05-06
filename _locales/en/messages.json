@@ -779,6 +779,9 @@
   "ask_ai_provider_query": {
     "message": "Ask {site} \"{query}\""
   },
+  "site_search_tab_hint": {
+    "message": "Search {site}"
+  },
   "search_query": {
     "message": "Search \"{query}\""
   },

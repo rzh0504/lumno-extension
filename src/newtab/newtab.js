@@ -72,6 +72,7 @@
     resolveInitialLanguageReady = resolve;
   });
   let modeBadge = null;
+  let siteSearchTabHint = null;
   const recentCards = [];
   const bookmarkCards = [];
   const bookmarkCardElementCache = new Map();
@@ -2097,12 +2098,14 @@
     const shouldShow = isModeCommand(rawValue || '');
     if (!shouldShow) {
       modeBadge.style.setProperty('display', 'none');
+      updateInputRightPadding();
       return;
     }
     modeBadge.textContent = formatMessage('mode_badge', '模式：{mode}', {
       mode: getThemeModeLabel(currentThemeMode)
     });
     modeBadge.style.setProperty('display', 'inline-flex');
+    updateInputRightPadding();
   }
 
   function getNextThemeMode(mode) {
@@ -7131,6 +7134,7 @@
   function clearSearchSuggestions() {
     inlineSearchState = null;
     siteSearchTriggerState = null;
+    clearSiteSearchTabHint();
     suggestionsContainer.innerHTML = '';
     suggestionItems.length = 0;
     currentSuggestions = [];
@@ -7258,17 +7262,13 @@
       let primaryHighlightReason = 'none';
       let strongNavigationMatch = null;
       let topSiteMatch = null;
-      let siteSearchPrompt = null;
       let mergedProvider = null;
       let primarySuggestion = null;
       const inlineEnabled = Boolean(inlineSuggestion);
       let siteSearchTrigger = null;
       const preferAutocompleteFirst = searchResultPriorityMode !== 'search';
       if (!modeCommandActive && !hasCommand) {
-        const exactSiteSearchTrigger = (!siteSearchState && !inlineEnabled)
-          ? getSiteSearchTriggerCandidate(rawTagInput, providersForTags, null)
-          : null;
-        if (!siteSearchState && !inlineEnabled && !exactSiteSearchTrigger && preferAutocompleteFirst) {
+        if (!siteSearchState && !inlineEnabled && preferAutocompleteFirst) {
           strongNavigationMatch = promoteStrongNavigationMatch(allSuggestions, latestRawQuery.trim());
           if (strongNavigationMatch) {
             primaryHighlightIndex = 0;
@@ -7277,25 +7277,9 @@
           topSiteMatch = promoteTopSiteMatch(allSuggestions, latestRawQuery.trim());
         }
         siteSearchTrigger = (!siteSearchState && !inlineEnabled)
-          ? (exactSiteSearchTrigger || getSiteSearchTriggerCandidate(rawTagInput, providersForTags, topSiteMatch))
+          ? getSiteSearchTriggerCandidate(rawTagInput, providersForTags, topSiteMatch)
           : null;
-        if (siteSearchTrigger && (exactSiteSearchTrigger || (!topSiteMatch && !strongNavigationMatch))) {
-          siteSearchPrompt = {
-            type: 'siteSearchPrompt',
-            title: getSiteSearchActionTitle(siteSearchTrigger),
-            url: '',
-            favicon: getProviderIcon(siteSearchTrigger),
-            provider: siteSearchTrigger
-          };
-          if (!isSuggestionBlockedBySearchBlacklist(siteSearchPrompt)) {
-            allSuggestions.unshift(siteSearchPrompt);
-            primaryHighlightIndex = 0;
-            primaryHighlightReason = 'siteSearchPrompt';
-          } else {
-            siteSearchPrompt = null;
-          }
-        }
-        if (!siteSearchState && !inlineEnabled && !siteSearchPrompt && !strongNavigationMatch && preferAutocompleteFirst) {
+        if (!siteSearchState && !inlineEnabled && !strongNavigationMatch && preferAutocompleteFirst) {
           autocompleteCandidate = getAutocompleteCandidate(allSuggestions, latestRawQuery);
           if (autocompleteCandidate) {
             const candidateIndex = allSuggestions.findIndex((suggestion) => {
@@ -7327,7 +7311,7 @@
           allSuggestions = filterBlacklistedSuggestions(allSuggestions, query);
           primaryHighlightIndex = 0;
           primaryHighlightReason = 'inline';
-        } else if (!siteSearchPrompt && !strongNavigationMatch && topSiteMatch && preferAutocompleteFirst) {
+        } else if (!strongNavigationMatch && topSiteMatch && preferAutocompleteFirst) {
           primaryHighlightIndex = 0;
           primaryHighlightReason = 'topSite';
         }
@@ -7354,16 +7338,23 @@
         siteSearchTriggerState = resolvedProvider
           ? { provider: resolvedProvider, rawInput: rawTagInput }
           : null;
+        if (siteSearchTriggerState) {
+          setSiteSearchTabHint(resolvedProvider);
+        } else {
+          clearSiteSearchTabHint();
+        }
       } else if (modeCommandActive) {
         clearAutocomplete();
         inlineSearchState = null;
         siteSearchTriggerState = null;
+        clearSiteSearchTabHint();
         primaryHighlightIndex = 0;
         primaryHighlightReason = 'modeSwitch';
       } else if (hasCommand) {
         clearAutocomplete();
         inlineSearchState = null;
         siteSearchTriggerState = null;
+        clearSiteSearchTabHint();
         primaryHighlightIndex = 0;
         primaryHighlightReason = 'command';
       }
@@ -7963,7 +7954,6 @@
           flex-shrink: 0 !important;
         `;
 
-        const isTopSiteMatch = Boolean(topSiteMatch && suggestion === topSiteMatch);
         const isDirectHighlight = isPrimaryHighlight &&
           (suggestion.type === 'directUrl' || suggestion.type === 'browserPage');
         const isMergedHighlight = Boolean(mergedProvider && primarySuggestion === suggestion && isPrimaryHighlight);
@@ -7974,14 +7964,8 @@
             primaryHighlightReason === 'autocomplete' ||
             isDirectHighlight ||
             isMergedHighlight);
-        const shouldShowSiteSearchTag = !isPrimarySearchSuggest && isPrimaryHighlight &&
-          ((siteSearchTrigger && (primaryHighlightReason === 'siteSearchPrompt' || isTopSiteMatch)) ||
-            isMergedHighlight);
         if (shouldShowEnterTag) {
           actionTags.appendChild(createActionTag(t('action_go_current_tab', '前往'), 'Enter'));
-        }
-        if (shouldShowSiteSearchTag) {
-          actionTags.appendChild(createActionTag(t('action_search', '搜索'), 'Tab'));
         }
         if (isPrimaryHighlight && onlyKeywordSuggestions && suggestion.type === 'newtab') {
           actionTags.appendChild(createActionTag(getSearchActionLabel(), 'Enter'));
@@ -8906,6 +8890,39 @@
     z-index: 1;
   `;
   inputParts.container.appendChild(modeBadge);
+  siteSearchTabHint = document.createElement('span');
+  siteSearchTabHint.id = '_x_extension_newtab_site_search_tab_hint_2026_unique_';
+  siteSearchTabHint.setAttribute('aria-hidden', 'true');
+  siteSearchTabHint.textContent = '';
+  siteSearchTabHint.style.cssText = `
+    all: unset;
+    position: absolute;
+    right: 52px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    max-width: min(300px, 52%);
+    min-width: 0;
+    height: 32px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--x-nt-tag-text, #6B7280);
+    box-sizing: border-box;
+    font-size: 14px;
+    font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    line-height: 20px;
+    letter-spacing: 0;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    z-index: 1;
+  `;
+  inputParts.container.appendChild(siteSearchTabHint);
   const searchInput = inputParts.input;
   searchInputRef = searchInput;
   const inputContainer = inputParts.container;
@@ -8993,6 +9010,92 @@
       window.open(chrome.runtime.getURL('src/options/options.html'), '_blank');
     });
   }
+
+  function updateInputRightPadding() {
+    if (!searchInput) {
+      return;
+    }
+    const baseRightReserve = 96;
+    let totalReserve = baseRightReserve;
+    if (modeBadge && modeBadge.style.getPropertyValue('display') !== 'none') {
+      const badgeWidth = Math.ceil(modeBadge.getBoundingClientRect().width || 0);
+      totalReserve = Math.max(totalReserve, 52 + badgeWidth + 12);
+    }
+    if (siteSearchTabHint && siteSearchTabHint.style.getPropertyValue('display') !== 'none') {
+      const hintWidth = Math.ceil(siteSearchTabHint.getBoundingClientRect().width || 0);
+      totalReserve = Math.max(totalReserve, 52 + hintWidth + 12);
+    }
+    searchInput.style.setProperty('padding-right', `${totalReserve}px`);
+  }
+
+  function setSiteSearchTabHint(provider) {
+    if (!siteSearchTabHint || siteSearchState) {
+      return;
+    }
+    const site = getSiteSearchDisplayName(provider);
+    const label = formatMessage('site_search_tab_hint', '使用 {site} 搜索', { site });
+    siteSearchTabHint.textContent = '';
+    const keyLabel = document.createElement('span');
+    keyLabel.textContent = 'Tab';
+    keyLabel.style.cssText = `
+      all: unset;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 34px;
+      height: 26px;
+      padding: 0 7px;
+      border-radius: 8px;
+      border: 1px solid var(--x-nt-panel-border, rgba(0, 0, 0, 0.08));
+      background: var(--x-nt-tag-bg, #F3F4F6);
+      color: var(--x-nt-tag-text, #6B7280);
+      box-sizing: border-box;
+      font-size: 11px;
+      font-family: inherit;
+      font-weight: 700;
+      line-height: 16px;
+      letter-spacing: 0;
+      white-space: nowrap;
+      flex: 0 0 auto;
+    `;
+    const textLabel = document.createElement('span');
+    textLabel.textContent = label;
+    textLabel.style.cssText = `
+      all: unset;
+      display: inline-block;
+      min-width: 0;
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--x-nt-tag-text, #6B7280);
+      font-size: 13px;
+      font-family: inherit;
+      font-weight: 400;
+      line-height: 20px;
+      letter-spacing: 0;
+      flex: 1 1 auto;
+    `;
+    siteSearchTabHint.appendChild(keyLabel);
+    siteSearchTabHint.appendChild(textLabel);
+    if (provider) {
+      siteSearchTabHint.setAttribute('title', label);
+    } else {
+      siteSearchTabHint.removeAttribute('title');
+    }
+    siteSearchTabHint.style.setProperty('display', 'inline-flex');
+    updateInputRightPadding();
+  }
+
+  function clearSiteSearchTabHint() {
+    if (!siteSearchTabHint) {
+      return;
+    }
+    siteSearchTabHint.style.setProperty('display', 'none');
+    siteSearchTabHint.removeAttribute('title');
+    updateInputRightPadding();
+  }
+
   if (storageArea) {
     storageArea.get([SEARCH_RESULT_PRIORITY_STORAGE_KEY], (result) => {
       const raw = result ? result[SEARCH_RESULT_PRIORITY_STORAGE_KEY] : null;
