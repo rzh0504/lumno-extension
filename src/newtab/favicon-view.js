@@ -50,6 +50,9 @@
     const faviconRevalidateIntervalMs = Number.isFinite(config.faviconRevalidateIntervalMs)
       ? config.faviconRevalidateIntervalMs
       : (1000 * 60 * 60 * 12);
+    const faviconSoftRevalidateDelayMs = Number.isFinite(config.faviconSoftRevalidateDelayMs)
+      ? config.faviconSoftRevalidateDelayMs
+      : 900;
     let themeFaviconRescueTimer = null;
 
     function createImage() {
@@ -568,22 +571,19 @@
         )) ||
         (preferredTheme === 'dark' && knownHasPreferredVariant && Boolean(persistedDataUrl)) ||
         (knownHasPreferredVariant && persistedMissingPreferredToken);
+      const persistedDataIsStale = Number.isFinite(persistedDataAge) &&
+        persistedDataAge > faviconRevalidateIntervalMs;
       let shouldRevalidatePersistedData = forceRevalidate || isVisitDirty ||
         !persistedDataUrl ||
         !Number.isFinite(persistedDataAge) ||
-        persistedDataAge > faviconRevalidateIntervalMs;
+        persistedDataIsStale;
       const persistedAge = persistedEntry && Number.isFinite(persistedEntry.updatedAt)
         ? (now - persistedEntry.updatedAt)
         : Number.POSITIVE_INFINITY;
-      const persistedIsProxy = Boolean(persistedFavicon) && config.isFaviconProxyUrl(persistedFavicon);
       let shouldRevalidatePersisted = forceRevalidate || isVisitDirty ||
-        persistedIsProxy ||
         !persistedFavicon ||
         !Number.isFinite(persistedAge) ||
         persistedAge > faviconRevalidateIntervalMs;
-      if (persistedIsProxy) {
-        persistedDataUrl = '';
-      }
       if (shouldForceThemeRevalidate) {
         shouldRevalidatePersistedData = true;
         shouldRevalidatePersisted = true;
@@ -605,6 +605,7 @@
         isVisitDirty,
         shouldRevalidatePersisted,
         shouldRevalidatePersistedData,
+        persistedDataIsStale,
         hasExplicitDarkFavicon,
         shouldPreferDarkTokenUpgrades: preferredTheme === 'dark' &&
           (knownHasPreferredVariant || hasExplicitDarkFavicon),
@@ -634,6 +635,9 @@
       if (!state.persistedDataUrl) {
         return false;
       }
+      if (state.persistedFavicon && !faviconDataCache.has(state.persistedFavicon)) {
+        faviconDataCache.set(state.persistedFavicon, state.persistedDataUrl);
+      }
       const applied = setFaviconSrcWithAnimation(img, state.persistedDataUrl, { persist: false });
       const reused = !applied && canReuseCurrentFavicon(img, state.persistedDataUrl);
       if (reused) {
@@ -646,57 +650,52 @@
       const siteSvgFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon.svg` : '';
       const siteDarkSvgFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon-dark.svg` : '';
       const siteLightSvgFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon-light.svg` : '';
-      const sitePngFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon.png` : '';
-      const site32PngFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon-32x32.png` : '';
-      const site16PngFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon-16x16.png` : '';
       const siteIcoFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon.ico` : '';
-      const siteAppleTouchIcon = state.faviconHostKey ? `https://${state.faviconHostKey}/apple-touch-icon.png` : '';
-      const siteAppleTouchIconPrecomposed = state.faviconHostKey ? `https://${state.faviconHostKey}/apple-touch-icon-precomposed.png` : '';
-      const siteIconPng = state.faviconHostKey ? `https://${state.faviconHostKey}/icon.png` : '';
-      const themedCandidates = state.preferredTheme === 'dark'
+      const rootThemedCandidates = state.preferredTheme === 'dark'
         ? [
           siteDarkSvgFavicon,
           siteSvgFavicon,
-          sitePngFavicon,
           siteIcoFavicon,
-          site32PngFavicon,
-          site16PngFavicon,
-          siteAppleTouchIcon,
-          siteAppleTouchIconPrecomposed,
-          siteIconPng,
           siteLightSvgFavicon
         ]
         : [
           siteLightSvgFavicon,
           siteSvgFavicon,
-          sitePngFavicon,
           siteIcoFavicon,
-          site32PngFavicon,
-          site16PngFavicon,
-          siteAppleTouchIcon,
-          siteAppleTouchIconPrecomposed,
-          siteIconPng,
           siteDarkSvgFavicon
         ];
-      const nonGoogleThemedCandidates = dedupeFaviconCandidateUrls([
-        ...state.knownThemedCandidates,
-        ...themedCandidates
-      ]);
+      const knownThemedCandidates = dedupeFaviconCandidateUrls(state.knownThemedCandidates);
+      const genericRootCandidates = dedupeFaviconCandidateUrls(rootThemedCandidates);
       const persistedProxyFavicon = config.isFaviconProxyUrl(state.persistedFavicon) ? state.persistedFavicon : '';
       const persistedSiteFavicon = persistedProxyFavicon ? '' : state.persistedFavicon;
-      const preferredSeedCandidates = state.preferredTheme === 'dark'
-        ? (state.shouldRevalidatePersisted
-          ? [...nonGoogleThemedCandidates, persistedSiteFavicon]
-          : [persistedSiteFavicon, ...nonGoogleThemedCandidates])
-        : (state.shouldRevalidatePersisted
-          ? [...nonGoogleThemedCandidates, persistedSiteFavicon]
-          : [persistedSiteFavicon, ...nonGoogleThemedCandidates]);
+      const shouldPreferPersistedSiteFavicon = Boolean(persistedSiteFavicon) &&
+        !state.shouldPreferDarkTokenUpgrades &&
+        !shouldSkipThemeUpgradeCandidate(persistedSiteFavicon, state.preferredTheme, '');
+      const primaryCandidates = state.shouldPreferDarkTokenUpgrades
+        ? [
+          ...knownThemedCandidates,
+          ...genericRootCandidates,
+          persistedSiteFavicon,
+          state.googleFavicon
+        ]
+        : (shouldPreferPersistedSiteFavicon
+          ? [
+            persistedSiteFavicon,
+            ...knownThemedCandidates,
+            state.googleFavicon,
+            ...genericRootCandidates
+          ]
+          : [
+            ...knownThemedCandidates,
+            state.googleFavicon,
+            persistedProxyFavicon,
+            persistedSiteFavicon,
+            ...genericRootCandidates
+          ]);
 
       return {
         localCandidates: dedupeFaviconCandidateUrls([
-          ...preferredSeedCandidates,
-          persistedSiteFavicon,
-          state.googleFavicon,
+          ...primaryCandidates,
           persistedProxyFavicon,
           state.faviconIsFavicon
         ])
@@ -732,12 +731,28 @@
       if (
         !nextSrc.startsWith('data:') &&
         !isChromeMonogramFaviconUrl(nextSrc) &&
-        !config.isFaviconProxyUrl(nextSrc) &&
         !shouldKeepTokenizedSource
       ) {
         attachFaviconData(img, nextSrc, state.hostKey);
       }
       return true;
+    }
+
+    function scheduleSoftThemeAwareFaviconRevalidate(img, state, optionsArg) {
+      if (!img || !state || !state.url) {
+        return;
+      }
+      setTimer(() => {
+        if (!state.isSessionMounted()) {
+          return;
+        }
+        attachFaviconWithFallbacks(img, state.url, state.hostKey, {
+          ...(optionsArg || {}),
+          forceRevalidate: true,
+          skipPersistedDataPrime: true,
+          deferRevalidate: false
+        });
+      }, faviconSoftRevalidateDelayMs);
     }
 
     function requestResolvedThemeAwareFaviconCandidates(state) {
@@ -830,8 +845,16 @@
         return;
       }
       syncThemeAwareFaviconAttributes(img, state);
-      const persistedDataApplied = primePersistedThemeAwareFaviconData(img, state);
-      if (persistedDataApplied && !state.shouldRevalidatePersistedData) {
+      const shouldSkipPersistedDataPrime = Boolean(optionsArg && optionsArg.skipPersistedDataPrime);
+      const persistedDataApplied = shouldSkipPersistedDataPrime
+        ? false
+        : primePersistedThemeAwareFaviconData(img, state);
+      const shouldContinueAfterPersistedData = state.shouldRevalidatePersistedData || state.shouldRevalidatePersisted;
+      if (persistedDataApplied && !shouldContinueAfterPersistedData) {
+        return;
+      }
+      if (persistedDataApplied && (!optionsArg || optionsArg.deferRevalidate !== false)) {
+        scheduleSoftThemeAwareFaviconRevalidate(img, state, optionsArg);
         return;
       }
 

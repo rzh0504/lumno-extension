@@ -11,7 +11,7 @@
     faviconPersistMaxEntries: 800,
     faviconDataPersistStorageKey: '_x_extension_favicon_data_cache_2024_unique_',
     faviconDataPersistMaxEntries: 220,
-    faviconDataPersistMaxLength: 24000,
+    faviconDataPersistMaxLength: 96000,
     siteThemePersistStorageKey: '_x_extension_site_theme_cache_2026_unique_',
     siteThemePersistTtlMs: 1000 * 60 * 60 * 24 * 30,
     siteThemePersistMaxEntries: 800,
@@ -114,7 +114,7 @@
       if (!raw || raw.length > faviconDataPersistMaxLength) {
         return false;
       }
-      return /^data:image\/(?:png|webp|svg\+xml|x-icon|jpeg|jpg);base64,/i.test(raw);
+      return /^data:image\/(?:png|webp|svg\+xml|x-icon|vnd\.microsoft\.icon|jpeg|jpg);base64,/i.test(raw);
     }
 
     function getValidFaviconDataPersistEntries(rawEntries) {
