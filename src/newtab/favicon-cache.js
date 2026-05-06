@@ -157,7 +157,6 @@
         faviconPersistLoadPromise = Promise.resolve();
         return faviconPersistLoadPromise;
       }
-      faviconPersistLoaded = true;
       faviconPersistLoadPromise = new Promise((resolve) => {
         storageArea.get([faviconPersistStorageKey], (result) => {
           const payload = result && result[faviconPersistStorageKey];
@@ -165,6 +164,7 @@
           entries.forEach((item) => {
             faviconPersistCache.set(item.key, { url: item.url, updatedAt: item.updatedAt });
           });
+          faviconPersistLoaded = true;
           resolve();
         });
       });
@@ -184,7 +184,6 @@
         faviconDataPersistLoadPromise = Promise.resolve();
         return faviconDataPersistLoadPromise;
       }
-      faviconDataPersistLoaded = true;
       faviconDataPersistLoadPromise = new Promise((resolve) => {
         storageArea.get([faviconDataPersistStorageKey], (result) => {
           const payload = result && result[faviconDataPersistStorageKey];
@@ -192,6 +191,7 @@
           entries.forEach((item) => {
             faviconDataPersistCache.set(item.key, { dataUrl: item.dataUrl, updatedAt: item.updatedAt });
           });
+          faviconDataPersistLoaded = true;
           resolve();
         });
       });
@@ -211,7 +211,6 @@
         faviconVisitDirtyLoadPromise = Promise.resolve();
         return faviconVisitDirtyLoadPromise;
       }
-      faviconVisitDirtyLoaded = true;
       faviconVisitDirtyLoadPromise = new Promise((resolve) => {
         storageArea.get([faviconVisitDirtyStorageKey], (result) => {
           const payload = result && result[faviconVisitDirtyStorageKey];
@@ -219,6 +218,7 @@
           entries.forEach((item) => {
             faviconVisitDirtyCache.set(item.key, item.updatedAt);
           });
+          faviconVisitDirtyLoaded = true;
           resolve();
         });
       });

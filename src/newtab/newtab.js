@@ -2597,6 +2597,17 @@
     return faviconCacheRuntime.waitForCachesOrTimeout(maxWaitMs);
   }
 
+  function areFaviconRenderCachesReady() {
+    return isFaviconPersistLoaded() && isFaviconDataPersistLoaded();
+  }
+
+  function waitForFaviconRenderCaches(maxWaitMs) {
+    if (areFaviconRenderCachesReady()) {
+      return Promise.resolve();
+    }
+    return waitForFaviconCachesOrTimeout(maxWaitMs);
+  }
+
   function isHostFaviconVisitDirty(hostname) {
     return faviconCacheRuntime.isHostVisitDirty(hostname);
   }
@@ -3797,7 +3808,10 @@
   }
 
   function hydrateSectionsFromCache() {
-    readSectionCache(NEWTAB_RECENT_CACHE_STORAGE_KEY).then((items) => {
+    Promise.all([
+      readSectionCache(NEWTAB_RECENT_CACHE_STORAGE_KEY),
+      waitForFaviconRenderCaches(FAVICON_CACHE_BOOT_WAIT_MS)
+    ]).then(([items]) => {
       if (!Array.isArray(items) || items.length === 0) {
         return;
       }
@@ -3809,7 +3823,10 @@
       renderRecentSites(cachedItems);
       recentLoadedOnce = true;
     });
-    readSectionCache(NEWTAB_BOOKMARK_CACHE_STORAGE_KEY).then((items) => {
+    Promise.all([
+      readSectionCache(NEWTAB_BOOKMARK_CACHE_STORAGE_KEY),
+      waitForFaviconRenderCaches(FAVICON_CACHE_BOOT_WAIT_MS)
+    ]).then(([items]) => {
       if (!Array.isArray(items) || items.length === 0) {
         return;
       }
@@ -3835,9 +3852,9 @@
     }
     const forceReload = Boolean(options && options.force);
     const skipFaviconWait = Boolean(options && options.skipFaviconWait);
-    if (!skipFaviconWait && (!isFaviconPersistLoaded() || !isFaviconDataPersistLoaded())) {
+    if (!skipFaviconWait && !areFaviconRenderCachesReady()) {
       const waitMs = forceReload ? Math.min(80, FAVICON_CACHE_BOOT_WAIT_MS) : FAVICON_CACHE_BOOT_WAIT_MS;
-      waitForFaviconCachesOrTimeout(waitMs).then(() => {
+      waitForFaviconRenderCaches(waitMs).then(() => {
         loadBookmarks({ force: forceReload, skipFaviconWait: true });
       });
       return;
@@ -3911,6 +3928,14 @@
       return;
     }
     const forceReload = Boolean(options && options.force);
+    const skipFaviconWait = Boolean(options && options.skipFaviconWait);
+    if (!skipFaviconWait && !areFaviconRenderCachesReady()) {
+      const waitMs = forceReload ? Math.min(80, FAVICON_CACHE_BOOT_WAIT_MS) : FAVICON_CACHE_BOOT_WAIT_MS;
+      waitForFaviconRenderCaches(waitMs).then(() => {
+        loadRecentSites({ force: forceReload, skipFaviconWait: true });
+      });
+      return;
+    }
     if (!forceReload && !recentDataDirty && recentLoadedOnce) {
       updateBookmarkSectionPosition();
       return;
