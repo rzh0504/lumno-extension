@@ -4114,6 +4114,55 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       return tag;
     }
 
+    function setSuggestionActionButtonVisible(button, visible) {
+      if (!button) {
+        return;
+      }
+      button.setAttribute('data-visible', visible ? 'true' : 'false');
+    }
+
+    function setSuggestionActionButtonPalette(button, text, bg, border) {
+      if (!button) {
+        return;
+      }
+      button.style.setProperty(
+        '--x-ov-suggestion-action-button-text',
+        text || 'var(--x-ov-subtext, #9CA3AF)'
+      );
+      button.style.setProperty('--x-ov-suggestion-action-button-bg', bg || 'transparent');
+      button.style.setProperty('--x-ov-suggestion-action-button-border', border || 'transparent');
+    }
+
+    function applySuggestionVisitButtonState(button, visible, active, resolvedTheme) {
+      if (!button) {
+        return;
+      }
+      setSuggestionActionButtonVisible(button, visible);
+      if (active && resolvedTheme) {
+        setSuggestionActionButtonPalette(
+          button,
+          resolvedTheme.buttonText,
+          resolvedTheme.buttonBg,
+          resolvedTheme.buttonBorder
+        );
+        return;
+      }
+      setSuggestionActionButtonPalette(button, 'var(--x-ov-subtext, #9CA3AF)', 'transparent', 'transparent');
+    }
+
+    function applySuggestionSwitchButtonState(button, visible, active) {
+      if (!button) {
+        return;
+      }
+      setSuggestionActionButtonVisible(button, visible);
+      setSuggestionActionButtonPalette(
+        button,
+        active ? 'var(--x-ov-text, #1F2937)' : 'var(--x-ov-subtext, #9CA3AF)',
+        'transparent',
+        'transparent'
+      );
+    }
+
     function applySearchSuggestionHighlight(item, theme) {
       const highlight = getHighlightColors(theme);
       setSuggestionRowColors(item, highlight.bg, highlight.border);
@@ -4129,20 +4178,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       const shouldHideSourceTags = Boolean(item._xHasSwitchAction);
       if (item._xVisitButton) {
         const shouldHide = Boolean(item._xAlwaysHideVisitButton || (isActive && item._xHasActionTags));
-        item._xVisitButton.style.setProperty('display', shouldHide ? 'none' : 'inline-flex', 'important');
-        if (shouldHide) {
-          item._xVisitButton.style.setProperty('background-color', 'transparent', 'important');
-          item._xVisitButton.style.setProperty('border', '1px solid transparent', 'important');
-        }
-        if (isActive) {
-          item._xVisitButton.style.setProperty('color', resolvedTheme.buttonText, 'important');
-          item._xVisitButton.style.setProperty('background-color', resolvedTheme.buttonBg, 'important');
-          item._xVisitButton.style.setProperty('border', `1px solid ${resolvedTheme.buttonBorder}`, 'important');
-        } else {
-          item._xVisitButton.style.setProperty('color', 'var(--x-ov-subtext, #9CA3AF)', 'important');
-          item._xVisitButton.style.setProperty('background-color', 'transparent', 'important');
-          item._xVisitButton.style.setProperty('border', '1px solid transparent', 'important');
-        }
+        applySuggestionVisitButtonState(item._xVisitButton, !shouldHide, isActive, resolvedTheme);
       }
       if (item._xHistoryDeleteButton) {
         const shouldShowHistoryDelete = Boolean(item._xHasHistoryDeleteButton && item._xIsHovering);
@@ -4246,9 +4282,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             item._xEntryActionTag.style.setProperty('--x-ext-key-border', palette.keyBorder, 'important');
           }
           if (item._xSwitchButton) {
-            item._xSwitchButton.style.setProperty('color', 'var(--x-ov-text, #1F2937)', 'important');
             const shouldShowTags = Boolean(item._xTagContainer && item._xHasActionTags);
-            item._xSwitchButton.style.setProperty('display', shouldShowTags ? 'none' : 'inline-flex', 'important');
+            applySuggestionSwitchButtonState(item._xSwitchButton, !shouldShowTags, true);
           }
           if (item._xTagContainer) {
             setSuggestionActionTagsVisible(item._xTagContainer, item._xHasActionTags);
@@ -4256,8 +4291,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         } else {
           resetSearchSuggestion(item);
           if (item._xSwitchButton) {
-            item._xSwitchButton.style.setProperty('color', 'var(--x-ov-subtext, #9CA3AF)', 'important');
-            item._xSwitchButton.style.setProperty('display', 'inline-flex', 'important');
+            applySuggestionSwitchButtonState(item._xSwitchButton, true, false);
           }
           if (item._xTagContainer) {
             setSuggestionActionTagsVisible(item._xTagContainer, false);
@@ -4391,28 +4425,9 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
 
         const entryVisitButton = document.createElement('button');
         applyNoTranslate(entryVisitButton);
-        entryVisitButton.style.cssText = `
-          all: unset !important;
-          background: transparent !important;
-          color: var(--x-ov-subtext, #9CA3AF) !important;
-          border: 1px solid transparent !important;
-          border-radius: 16px !important;
-          font-size: 12px !important;
-          font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-          cursor: pointer !important;
-          transition: background-color 0.2s ease !important;
-          padding: 6px 12px !important;
-          box-sizing: border-box !important;
-          margin: 0 !important;
-          line-height: 1 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          display: inline-flex !important;
-          align-items: center !important;
-          gap: 4px !important;
-          vertical-align: baseline !important;
-        `;
+        entryVisitButton.className = 'x-ov-suggestion-action-button x-ov-suggestion-visit-button';
+        setSuggestionActionButtonVisible(entryVisitButton, true);
+        setSuggestionActionButtonPalette(entryVisitButton, 'var(--x-ov-subtext, #9CA3AF)', 'transparent', 'transparent');
         setInlineLabelWithIcon(
           entryVisitButton,
           t('action_search', '搜索'),
@@ -4536,48 +4551,14 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         const switchButton = document.createElement('button');
         applyNoTranslate(switchButton);
         switchButton.id = `_x_extension_switch_button_${index}_2024_unique_`;
-        switchButton.style.cssText = `
-          all: unset !important;
-          background: transparent !important;
-          color: var(--x-ov-subtext, #4B5563) !important;
-          border: none !important;
-          border-radius: 6px !important;
-          font-size: 12px !important;
-          font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-          cursor: pointer !important;
-          transition: background-color 0.2s ease !important;
-          height: 26px !important;
-          padding: 0 12px !important;
-          box-sizing: border-box !important;
-          margin: 0 !important;
-          line-height: 1 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          display: inline-flex !important;
-          align-items: center !important;
-          gap: 4px !important;
-          vertical-align: baseline !important;
-        `;
-        const switchButtonLabel = document.createElement('span');
-        setProtectedPlainText(switchButtonLabel, t('switch_to_tab', '切换到标签页'));
-        switchButtonLabel.style.cssText = `
-          all: unset !important;
-          display: inline-flex !important;
-          align-items: center !important;
-          line-height: 1 !important;
-        `;
-        const switchButtonIcon = document.createElement('span');
-        applyNoTranslate(switchButtonIcon);
-        switchButtonIcon.innerHTML = getRiSvg('ri-arrow-right-line', 'ri-size-12');
-        switchButtonIcon.style.cssText = `
-          all: unset !important;
-          display: inline-flex !important;
-          align-items: center !important;
-          line-height: 1 !important;
-        `;
-        switchButton.appendChild(switchButtonLabel);
-        switchButton.appendChild(switchButtonIcon);
+        switchButton.className = 'x-ov-suggestion-action-button x-ov-suggestion-switch-button';
+        setSuggestionActionButtonVisible(switchButton, true);
+        setSuggestionActionButtonPalette(switchButton, 'var(--x-ov-subtext, #4B5563)', 'transparent', 'transparent');
+        setInlineLabelWithIcon(
+          switchButton,
+          t('switch_to_tab', '切换到标签页'),
+          getRiSvg('ri-arrow-right-line', 'ri-size-12')
+        );
         suggestionItem._xSwitchButton = switchButton;
 
         const actionTags = document.createElement('div');
@@ -5590,33 +5571,12 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           // Create visit button
           const visitButton = document.createElement('button');
           applyNoTranslate(visitButton);
-          visitButton.style.cssText = `
-            all: unset !important;
-            background: transparent !important;
-            color: var(--x-ov-subtext, #9CA3AF) !important;
-            border: 1px solid transparent !important;
-            border-radius: 16px !important;
-            font-size: 12px !important;
-            font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-            cursor: pointer !important;
-            transition: background-color 0.2s ease !important;
-            padding: 6px 12px !important;
-            box-sizing: border-box !important;
-            margin: 0 !important;
-            line-height: 1 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            display: inline-flex !important;
-            align-items: center !important;
-            gap: 4px !important;
-            vertical-align: baseline !important;
-            transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 160ms ease !important;
-          `;
-          applyNoTranslate(visitButton);
+          visitButton.className = 'x-ov-suggestion-action-button x-ov-suggestion-visit-button';
+          setSuggestionActionButtonVisible(visitButton, true);
+          setSuggestionActionButtonPalette(visitButton, 'var(--x-ov-subtext, #9CA3AF)', 'transparent', 'transparent');
           suggestionItem._xAlwaysHideVisitButton = suggestion.type === 'modeSwitch';
           if (suggestionItem._xAlwaysHideVisitButton) {
-            visitButton.style.setProperty('display', 'none', 'important');
+            setSuggestionActionButtonVisible(visitButton, false);
           }
 
           if (suggestion.type === 'newtab') {

@@ -479,3 +479,40 @@
   font-weight: 500;
   line-height: 1;
 }
+
+#_x_extension_overlay_2024_unique_ .x-ov-suggestion-action-button {
+  all: unset;
+  background: var(--x-ov-suggestion-action-button-bg, transparent);
+  color: var(--x-ov-suggestion-action-button-text, var(--x-ov-subtext, #9CA3AF));
+  font-size: 12px;
+  font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 160ms ease;
+  box-sizing: border-box;
+  margin: 0;
+  line-height: 1;
+  text-decoration: none;
+  list-style: none;
+  outline: none;
+  display: none;
+  align-items: center;
+  gap: 4px;
+  vertical-align: baseline;
+}
+
+#_x_extension_overlay_2024_unique_ .x-ov-suggestion-action-button[data-visible="true"] {
+  display: inline-flex;
+}
+
+#_x_extension_overlay_2024_unique_ .x-ov-suggestion-visit-button {
+  border: 1px solid var(--x-ov-suggestion-action-button-border, transparent);
+  border-radius: 16px;
+  padding: 6px 12px;
+}
+
+#_x_extension_overlay_2024_unique_ .x-ov-suggestion-switch-button {
+  border: none;
+  border-radius: 6px;
+  height: 26px;
+  padding: 0 12px;
+}
