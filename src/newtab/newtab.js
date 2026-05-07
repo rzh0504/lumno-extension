@@ -6407,44 +6407,32 @@
     item.style.setProperty('border', '1px solid transparent', 'important');
   }
 
+  function applySuggestionTagStyles(tag, resolvedTheme, isActive) {
+    if (!tag) {
+      return;
+    }
+    tag.style.setProperty(
+      '--x-nt-suggestion-tag-bg',
+      isActive ? resolvedTheme.tagBg : (tag._xDefaultBg || 'var(--x-nt-tag-bg, #F3F4F6)')
+    );
+    tag.style.setProperty(
+      '--x-nt-suggestion-tag-text',
+      isActive ? resolvedTheme.tagText : (tag._xDefaultText || 'var(--x-nt-tag-text, #6B7280)')
+    );
+    tag.style.setProperty(
+      '--x-nt-suggestion-tag-border',
+      isActive ? resolvedTheme.tagBorder : (tag._xDefaultBorder || 'transparent')
+    );
+  }
+
   function applySearchActionStyles(item, theme, isActive) {
     const resolvedTheme = getThemeForMode(theme);
     item.setAttribute('data-active', isActive ? 'true' : 'false');
     item.setAttribute('data-has-action-tags', item._xHasActionTags ? 'true' : 'false');
     applyMarkVariables(item, isActive ? resolvedTheme : defaultTheme);
-    if (item._xHistoryTag) {
-      if (isActive) {
-        item._xHistoryTag.style.setProperty('background', resolvedTheme.tagBg, 'important');
-        item._xHistoryTag.style.setProperty('color', resolvedTheme.tagText, 'important');
-        item._xHistoryTag.style.setProperty('border', `1px solid ${resolvedTheme.tagBorder}`, 'important');
-      } else {
-        item._xHistoryTag.style.setProperty('background', item._xHistoryTag._xDefaultBg || 'var(--x-nt-tag-bg, #F3F4F6)', 'important');
-        item._xHistoryTag.style.setProperty('color', item._xHistoryTag._xDefaultText || 'var(--x-nt-tag-text, #6B7280)', 'important');
-        item._xHistoryTag.style.setProperty('border', `1px solid ${item._xHistoryTag._xDefaultBorder || 'transparent'}`, 'important');
-      }
-    }
-    if (item._xBookmarkTag) {
-      if (isActive) {
-        item._xBookmarkTag.style.setProperty('background', resolvedTheme.tagBg, 'important');
-        item._xBookmarkTag.style.setProperty('color', resolvedTheme.tagText, 'important');
-        item._xBookmarkTag.style.setProperty('border', `1px solid ${resolvedTheme.tagBorder}`, 'important');
-      } else {
-        item._xBookmarkTag.style.setProperty('background', item._xBookmarkTag._xDefaultBg || 'var(--x-nt-bookmark-tag-bg, #FEF3C7)', 'important');
-        item._xBookmarkTag.style.setProperty('color', item._xBookmarkTag._xDefaultText || 'var(--x-nt-bookmark-tag-text, #D97706)', 'important');
-        item._xBookmarkTag.style.setProperty('border', `1px solid ${item._xBookmarkTag._xDefaultBorder || 'transparent'}`, 'important');
-      }
-    }
-    if (item._xTopSiteTag) {
-      if (isActive) {
-        item._xTopSiteTag.style.setProperty('background', resolvedTheme.tagBg, 'important');
-        item._xTopSiteTag.style.setProperty('color', resolvedTheme.tagText, 'important');
-        item._xTopSiteTag.style.setProperty('border', `1px solid ${resolvedTheme.tagBorder}`, 'important');
-      } else {
-        item._xTopSiteTag.style.setProperty('background', item._xTopSiteTag._xDefaultBg || 'var(--x-nt-tag-bg, #F3F4F6)', 'important');
-        item._xTopSiteTag.style.setProperty('color', item._xTopSiteTag._xDefaultText || 'var(--x-nt-tag-text, #6B7280)', 'important');
-        item._xTopSiteTag.style.setProperty('border', `1px solid ${item._xTopSiteTag._xDefaultBorder || 'transparent'}`, 'important');
-      }
-    }
+    applySuggestionTagStyles(item._xHistoryTag, resolvedTheme, isActive);
+    applySuggestionTagStyles(item._xBookmarkTag, resolvedTheme, isActive);
+    applySuggestionTagStyles(item._xTopSiteTag, resolvedTheme, isActive);
     if (item._xTagContainer) {
       item._xTagContainer.setAttribute('data-active', isActive ? 'true' : 'false');
     }
@@ -7508,28 +7496,11 @@
           }
           const historyTag = document.createElement('span');
           historyTag.textContent = t('search_tag_history', '历史');
+          historyTag.className = 'x-nt-suggestion-tag';
+          historyTag.setAttribute('data-tag-type', 'history');
           historyTag._xDefaultBg = 'var(--x-nt-tag-bg, #F3F4F6)';
           historyTag._xDefaultText = 'var(--x-nt-tag-text, #6B7280)';
           historyTag._xDefaultBorder = 'transparent';
-          historyTag.style.cssText = `
-            all: unset !important;
-            background: var(--x-nt-tag-bg, #F3F4F6) !important;
-            color: var(--x-nt-tag-text, #6B7280) !important;
-            font-size: 10px !important;
-            font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-            padding: 4px 6px !important;
-            border-radius: 8px !important;
-            box-sizing: border-box !important;
-            line-height: 1.2 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            border: 1px solid transparent !important;
-            display: inline-flex !important;
-            align-items: center !important;
-            vertical-align: middle !important;
-            flex-shrink: 0 !important;
-          `;
           textWrapper.appendChild(historyTag);
           suggestionItem._xHistoryTag = historyTag;
         }
@@ -7541,28 +7512,11 @@
           }
           const topSiteTag = document.createElement('span');
           topSiteTag.textContent = t('search_tag_top_site', '常用');
+          topSiteTag.className = 'x-nt-suggestion-tag';
+          topSiteTag.setAttribute('data-tag-type', 'top-site');
           topSiteTag._xDefaultBg = 'var(--x-nt-tag-bg, #F3F4F6)';
           topSiteTag._xDefaultText = 'var(--x-nt-tag-text, #6B7280)';
           topSiteTag._xDefaultBorder = 'transparent';
-          topSiteTag.style.cssText = `
-            all: unset !important;
-            background: var(--x-nt-tag-bg, #F3F4F6) !important;
-            color: var(--x-nt-tag-text, #6B7280) !important;
-            font-size: 10px !important;
-            font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-            padding: 4px 6px !important;
-            border-radius: 8px !important;
-            box-sizing: border-box !important;
-            line-height: 1.2 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            border: 1px solid transparent !important;
-            display: inline-flex !important;
-            align-items: center !important;
-            vertical-align: middle !important;
-            flex-shrink: 0 !important;
-          `;
           textWrapper.appendChild(topSiteTag);
           suggestionItem._xTopSiteTag = topSiteTag;
         }
@@ -7592,28 +7546,11 @@
           }
           const bookmarkTag = document.createElement('span');
           bookmarkTag.textContent = t('search_tag_bookmark', '书签');
+          bookmarkTag.className = 'x-nt-suggestion-tag';
+          bookmarkTag.setAttribute('data-tag-type', 'bookmark');
           bookmarkTag._xDefaultBg = 'var(--x-nt-bookmark-tag-bg, #FEF3C7)';
           bookmarkTag._xDefaultText = 'var(--x-nt-bookmark-tag-text, #D97706)';
           bookmarkTag._xDefaultBorder = 'transparent';
-          bookmarkTag.style.cssText = `
-            all: unset !important;
-            background: var(--x-nt-bookmark-tag-bg, #FEF3C7) !important;
-            color: var(--x-nt-bookmark-tag-text, #D97706) !important;
-            font-size: 10px !important;
-            font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-            padding: 4px 6px !important;
-            border-radius: 8px !important;
-            box-sizing: border-box !important;
-            line-height: 1.2 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            border: 1px solid transparent !important;
-            display: inline-flex !important;
-            align-items: center !important;
-            vertical-align: middle !important;
-            flex-shrink: 0 !important;
-          `;
           textWrapper.appendChild(bookmarkTag);
           suggestionItem._xBookmarkTag = bookmarkTag;
         }
