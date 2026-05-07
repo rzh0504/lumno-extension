@@ -594,7 +594,7 @@ Implementation note: Task 7 layout slice completed on 2026-05-07. Added `src/new
 - Modify: `src/newtab/newtab.js`
 - Modify: `package.json`
 
-- [ ] Move suggestion row DOM rendering, action tags, hover state, history delete button, tooltip attachment, and row icon setup to `LumnoNewtabSuggestionsView`.
+- [x] Move suggestion row DOM rendering, action tags, hover state, history delete button, tooltip attachment, and row icon setup to `LumnoNewtabSuggestionsView`.
 
 Required API:
 
@@ -618,16 +618,16 @@ suggestionsView.clear();
 suggestionsView.destroy();
 ```
 
-- [ ] Preserve keyboard semantics in `newtab.js`; move DOM painting only.
+- [x] Preserve keyboard semantics in `newtab.js`; move DOM painting only.
 
-- [ ] Convert suggestion row visual state to class/data-state where possible:
+- [x] Convert suggestion row visual state to class/data-state where possible:
   - `data-selected`;
   - `data-hover`;
   - `data-autocomplete-top`;
   - `data-history-delete-visible`;
   - CSS variables for theme colors.
 
-- [ ] Validate:
+- [x] Validate:
   - first result promotion;
   - inline autocomplete;
   - ArrowUp/ArrowDown wrap and scroll;
@@ -645,6 +645,8 @@ git diff --check
 ```
 
 Commit message: `Extract newtab suggestions view`
+
+Implementation note: Task 8 completed on 2026-05-07. Added `src/newtab/suggestions-view.js` with `LumnoNewtabSuggestionsView.createSuggestionsView(...)`, moved search suggestion rows, open-tab switch rows, action tags, history delete controls, tooltip attachment, row icon setup, and selected/hover painting out of `newtab.js`. `newtab.js` keeps suggestion ranking, autocomplete, selected-index movement, scrolling, and activation semantics. Moved suggestion favicon, mark, URL line, action tag, tab switch button, and non-favicon icon emphasis styling into `newtab.html` classes/data attributes. Size and style effect: style audit now reads `src/newtab/newtab.js lines=7716` and `src/newtab/suggestions-view.js lines=875`; style audit changed from `TOTAL important=1186 setPropertyImportant=250 cssText=95 styleWrites=639` to `TOTAL important=1003 setPropertyImportant=237 cssText=81 styleWrites=606`; `src/newtab/newtab.js` changed from `important=183 setPropertyImportant=13 cssText=19 styleWrites=135` to `important=0 setPropertyImportant=0 cssText=5 styleWrites=83`. Verified with `node --check src/newtab/suggestions-view.js`, `node --check src/newtab/newtab.js`, `npm run check`, `npm run audit:style`, `npm run audit:i18n`, `npm run test:search`, `npm run test:newtab-stores`, `npm run package:store`, and `git diff --check`. Browser validation used the existing Chrome Dev window: the newtab loaded without blanking, `gm` rendered the suggestions list, ArrowDown/ArrowUp moved highlight, `Tab` entered Gemini mode, `hello` rendered the AI suggestion row, `/s` rendered the settings command row, and `/n` rendered the new-tab command row. DevTools MCP still reported a stale closed selected page, so console inspection was not available in this pass; screenshot saved at `dist/.checks/refactor-after-task-8/newtab-suggestions-view-gemini.png`.
 
 ---
 
@@ -669,7 +671,7 @@ Commit message: `Extract newtab suggestions view`
   - overlay viewport/zoom synchronization;
   - favicon optical alignment until class-rendered fallback is verified.
 
-- [ ] Newtab first pass:
+- [x] Newtab first pass:
   - suggestion row hover/selected/action state to class/data-state;
   - history delete button state to class/data-state;
   - bookmark/recent section visibility to classes;

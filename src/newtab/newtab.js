@@ -45,6 +45,7 @@
   const NEWTAB_PAGE_NOTICE = globalThis.LumnoNewtabPageNotice || {};
   const NEWTAB_TOAST = globalThis.LumnoNewtabToast || {};
   const NEWTAB_LAYOUT = globalThis.LumnoNewtabLayout || {};
+  const NEWTAB_SUGGESTIONS_VIEW = globalThis.LumnoNewtabSuggestionsView || {};
   if (typeof NEWTAB_FAVICON_CACHE.createFaviconCache !== 'function' ||
       typeof NEWTAB_FAVICON_THEME.buildTheme !== 'function' ||
       typeof NEWTAB_FAVICON_VIEW.createFaviconViewRuntime !== 'function' ||
@@ -53,7 +54,8 @@
       typeof NEWTAB_BOOKMARKS_STORE.buildBookmarkFolderCache !== 'function' ||
       typeof NEWTAB_PAGE_NOTICE.renderPageNotice !== 'function' ||
       typeof NEWTAB_TOAST.createToastController !== 'function' ||
-      typeof NEWTAB_LAYOUT.createLayoutController !== 'function') {
+      typeof NEWTAB_LAYOUT.createLayoutController !== 'function' ||
+      typeof NEWTAB_SUGGESTIONS_VIEW.createSuggestionsView !== 'function') {
     console.warn('Lumno: newtab helpers not available.');
     return;
   }
@@ -570,50 +572,10 @@
     return normalizeLocale(navigator.language || 'en');
   }
 
-  function escapeRegExp(text) {
-    return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
-
   function sanitizeDisplayText(text) {
     const raw = String(text || '');
     const withoutSpecial = raw.replace(/[\u0000-\u001F\u007F-\u009F\uFEFF\uFFF9-\uFFFD]|\p{Co}/gu, '');
     return withoutSpecial.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '');
-  }
-
-  function renderHighlightedText(target, text, query, styles) {
-    const safeText = sanitizeDisplayText(text);
-    const needle = String(query || '').trim();
-    if (!needle) {
-      target.textContent = safeText;
-      return;
-    }
-    const parts = safeText.split(new RegExp(`(${escapeRegExp(needle)})`, 'gi'));
-    if (parts.length === 1) {
-      target.textContent = safeText;
-      return;
-    }
-    parts.forEach((part) => {
-      if (!part) {
-        return;
-      }
-      if (part.toLowerCase() === needle.toLowerCase()) {
-        const mark = document.createElement('mark');
-        mark.style.background = styles && styles.background
-          ? styles.background
-          : 'var(--x-ext-mark-bg, #CFE8FF)';
-        mark.style.color = styles && styles.color
-          ? styles.color
-          : 'var(--x-ext-mark-text, #1E3A8A)';
-        mark.style.padding = '0 1px';
-        mark.style.borderRadius = '2px';
-        mark.style.lineHeight = 'inherit';
-        mark.style.fontFamily = "'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
-        mark.textContent = part;
-        target.appendChild(mark);
-      } else {
-        target.appendChild(document.createTextNode(part));
-      }
-    });
   }
 
   function loadLocaleMessages(locale) {
@@ -3098,41 +3060,6 @@
     image.src = dataUrl;
   }
 
-  function createSuggestionInlineIcon(iconName, tone) {
-    const icon = document.createElement('span');
-    icon.innerHTML = getRiSvg(iconName, 'ri-size-16');
-    icon.className = 'x-nt-suggestion-inline-icon';
-    if (tone) {
-      icon.setAttribute('data-tone', tone);
-    }
-    return icon;
-  }
-
-  function createSearchIcon(tone) {
-    const icon = createSuggestionInlineIcon('ri-search-line', tone);
-    return icon;
-  }
-
-  function createLinkIcon(tone) {
-    const icon = createSuggestionInlineIcon('ri-link', tone);
-    return icon;
-  }
-
-  function getNonFaviconIconBg() {
-    return isNewtabDarkMode() ? 'rgba(255, 255, 255, 0.12)' : '#FFFFFF';
-  }
-
-  function setNonFaviconIconBg(item, isActive) {
-    if (!item || !item._xIconWrap || item._xIconIsFavicon) {
-      return;
-    }
-    item._xIconWrap.style.setProperty(
-      'background-color',
-      isActive ? getNonFaviconIconBg() : 'transparent',
-      'important'
-    );
-  }
-
   const FAVICON_GOOGLE_SIZE = 128;
 
   function getThemeSourceForSuggestion(suggestion) {
@@ -3161,60 +3088,6 @@
       return '';
     }
     return `https://${hostname}/favicon.ico`;
-  }
-
-  function createActionTag(labelText, keyLabel) {
-    const tag = document.createElement('span');
-    tag.style.cssText = `
-      all: unset;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--x-ext-tag-bg, #EEF6FF);
-      color: var(--x-ext-tag-text, #1E3A8A);
-      border: 1px solid var(--x-ext-tag-border, #BFDBFE);
-      padding: 4px 10px 4px 8px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1;
-      text-decoration: none;
-      list-style: none;
-      outline: none;
-      box-sizing: border-box;
-      vertical-align: middle;
-      white-space: nowrap;
-    `;
-
-    const label = document.createElement('span');
-    label.textContent = labelText;
-    label.style.cssText = `
-      all: unset;
-      font-weight: 500;
-      line-height: 1;
-    `;
-
-    const keycap = document.createElement('span');
-    keycap.textContent = keyLabel;
-    keycap.style.cssText = `
-      all: unset;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 2px 7px;
-      border-radius: 6px;
-      background: var(--x-ext-key-bg, #FFFFFF);
-      color: var(--x-ext-key-text, #1E3A8A);
-      border: 1px solid var(--x-ext-key-border, #BFDBFE);
-      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
-      font-size: 10px;
-      font-weight: 500;
-      line-height: 1;
-    `;
-
-    tag.appendChild(label);
-    tag.appendChild(keycap);
-    return tag;
   }
 
   function navigateToUrl(url) {
@@ -5890,31 +5763,6 @@
     };
   }
 
-  function buildUrlLine(url) {
-    if (!url) {
-      return null;
-    }
-    const urlLine = document.createElement('span');
-    urlLine.textContent = url;
-    urlLine.style.cssText = `
-      all: unset;
-      color: var(--x-nt-link, #2563EB);
-      font-size: 12px;
-      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      text-decoration: none;
-      display: inline-block;
-      max-width: 60%;
-      line-height: 1.4;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    `;
-    return urlLine;
-  }
-
   function buildSearchUrl(template, query) {
     if (!template) {
       return '';
@@ -6375,9 +6223,57 @@
   let lastSuggestionResponse = [];
   let siteSearchTriggerState = null;
   let lastRenderedQuery = '';
+  const suggestionsView = NEWTAB_SUGGESTIONS_VIEW.createSuggestionsView({
+    document,
+    container: suggestionsContainer,
+    items: suggestionItems,
+    t,
+    getRiSvg,
+    sanitizeDisplayText,
+    formatTabRankDebugText,
+    isTabRankScoreDebugEnabled: () => tabRankScoreDebugEnabled,
+    shouldBlockFaviconForHost,
+    getHostFromUrl,
+    getThemeHostForSuggestion,
+    getImmediateThemeForSuggestion,
+    getThemeForSuggestion,
+    getThemeForMode,
+    getHoverColors,
+    getNeutralHoverActionColors,
+    applyThemeVariables,
+    applyMarkVariables,
+    applyFaviconOpticalAlignment,
+    applyFaviconOpticalShift,
+    applyFallbackIcon,
+    attachFaviconWithFallbacks,
+    reportMissingIcon,
+    preloadIcon,
+    setSuggestionsVisible,
+    onSetSelectedIndex: (nextIndex) => {
+      selectedIndex = nextIndex;
+    },
+    getSelectedIndex: () => selectedIndex,
+    onSwitchToTab: (tab) => {
+      chrome.runtime.sendMessage({
+        action: 'switchToTab',
+        tabId: tab.id
+      });
+    },
+    onActivateSuggestion: activateRenderedSuggestion,
+    onDeleteHistory: deleteRenderedHistorySuggestion,
+    showTopActionTooltip,
+    hideTopActionTooltip,
+    getSearchActionLabel,
+    getDefaultSearchEngineThemeUrl,
+    getBrandAccentForUrl,
+    buildThemeFromAccent,
+    defaultTheme,
+    urlHighlightTheme,
+    openTabSuggestionLimit: NEWTAB_OPEN_TAB_SUGGESTION_LIMIT
+  });
 
   function getAutoHighlightIndex() {
-    return suggestionItems.findIndex((item) => Boolean(item && item._xIsAutocompleteTop));
+    return suggestionsView.getAutoHighlightIndex();
   }
 
   function isSameSuggestion(a, b) {
@@ -6413,123 +6309,58 @@
     return true;
   }
 
-  function applySearchSuggestionHighlight(item) {
-    item.setAttribute('data-row-state', 'active');
+  function updateSelection() {
+    suggestionsView.updateSelection(selectedIndex);
   }
 
-  function resetSearchSuggestion(item) {
-    item.removeAttribute('data-row-state');
-  }
-
-  function applySearchSuggestionHover(item) {
-    item.setAttribute('data-row-state', 'hover');
-  }
-
-  function applyTabSuggestionHighlight(item, theme) {
-    const highlight = getHighlightColors(theme);
-    item.style.setProperty('background', highlight.bg, 'important');
-    item.style.setProperty('border', `1px solid ${highlight.border}`, 'important');
-  }
-
-  function resetTabSuggestion(item) {
-    item.style.setProperty('background', 'transparent', 'important');
-    item.style.setProperty('border', '1px solid transparent', 'important');
-  }
-
-  function applySuggestionTagStyles(tag, resolvedTheme, isActive) {
-    if (!tag) {
+  function activateRenderedSuggestion(suggestion, query) {
+    if (suggestion.type === 'commandNewTab') {
+      chrome.runtime.sendMessage({ action: 'openNewTab' });
       return;
     }
-    tag.style.setProperty(
-      '--x-nt-suggestion-tag-bg',
-      isActive ? resolvedTheme.tagBg : (tag._xDefaultBg || 'var(--x-nt-tag-bg, #F3F4F6)')
-    );
-    tag.style.setProperty(
-      '--x-nt-suggestion-tag-text',
-      isActive ? resolvedTheme.tagText : (tag._xDefaultText || 'var(--x-nt-tag-text, #6B7280)')
-    );
-    tag.style.setProperty(
-      '--x-nt-suggestion-tag-border',
-      isActive ? resolvedTheme.tagBorder : (tag._xDefaultBorder || 'transparent')
-    );
+    if (suggestion.type === 'commandSettings') {
+      chrome.runtime.sendMessage({ action: 'openOptionsPage' });
+      return;
+    }
+    if (suggestion.type === 'siteSearchPrompt' && suggestion.provider) {
+      activateSiteSearch(suggestion.provider);
+      inputParts.input.focus();
+      return;
+    }
+    if (suggestion.type === 'modeSwitch') {
+      setThemeMode(suggestion.nextMode);
+      inputParts.input.focus();
+      return;
+    }
+    if (suggestion.provider && suggestion.searchQuery) {
+      runSiteSearchProviderQuery(suggestion.provider, suggestion.searchQuery, 'currentTab');
+      return;
+    }
+    if (suggestion.forceSearch && suggestion.searchQuery) {
+      navigateToQuery(suggestion.searchQuery, true);
+      return;
+    }
+    recordSearchSuggestionSelection(suggestion, query);
+    navigateToUrl(suggestion.url);
   }
 
-  function applySearchActionStyles(item, theme, isActive) {
-    const resolvedTheme = getThemeForMode(theme);
-    item.setAttribute('data-active', isActive ? 'true' : 'false');
-    item.setAttribute('data-has-action-tags', item._xHasActionTags ? 'true' : 'false');
-    applyMarkVariables(item, isActive ? resolvedTheme : defaultTheme);
-    applySuggestionTagStyles(item._xHistoryTag, resolvedTheme, isActive);
-    applySuggestionTagStyles(item._xBookmarkTag, resolvedTheme, isActive);
-    applySuggestionTagStyles(item._xTopSiteTag, resolvedTheme, isActive);
-    if (item._xTagContainer) {
-      item._xTagContainer.setAttribute('data-active', isActive ? 'true' : 'false');
-    }
-    if (item._xHistoryDeleteButton) {
-      const shouldShowHistoryDelete = Boolean(item._xHasHistoryDeleteButton && item._xIsHovering);
-      item.setAttribute('data-history-delete-visible', shouldShowHistoryDelete ? 'true' : 'false');
-      if (shouldShowHistoryDelete) {
-        item._xHistoryDeleteButton.style.setProperty(
-          '--x-nt-history-delete-color',
-          isActive ? resolvedTheme.buttonText : 'var(--x-nt-subtext, #6B7280)'
-        );
-        item._xHistoryDeleteButton.style.setProperty(
-          '--x-nt-history-delete-bg',
-          isActive ? resolvedTheme.buttonBg : 'transparent'
-        );
-        item._xHistoryDeleteButton.style.setProperty(
-          '--x-nt-history-delete-border',
-          isActive ? resolvedTheme.buttonBorder : 'transparent'
-        );
-      } else {
-        item._xHistoryDeleteButton.style.setProperty('--x-nt-history-delete-bg', 'transparent');
-        item._xHistoryDeleteButton.style.setProperty('--x-nt-history-delete-border', 'transparent');
-        item._xHistoryDeleteButton.style.setProperty('--x-nt-history-delete-color', 'var(--x-nt-subtext, #6B7280)');
+  function deleteRenderedHistorySuggestion(suggestion) {
+    chrome.runtime.sendMessage({
+      action: 'deleteHistoryUrl',
+      url: suggestion.url
+    }, function(response) {
+      if (chrome.runtime && chrome.runtime.lastError) {
+        return;
       }
-    }
-  }
-
-  function updateSelection() {
-    suggestionItems.forEach((item, index) => {
-      const isSelected = index === selectedIndex;
-      const shouldAutoHighlight = selectedIndex === -1 && item._xIsAutocompleteTop;
-      const isHighlighted = isSelected || shouldAutoHighlight;
-      if (item._xIsSearchSuggestion) {
-          const theme = item._xTheme || defaultTheme;
-        if (isHighlighted) {
-            applySearchSuggestionHighlight(item);
-          } else {
-            resetSearchSuggestion(item);
-          }
-          applySearchActionStyles(item, theme, isHighlighted);
-          setNonFaviconIconBg(item, Boolean(isHighlighted || item._xIsHovering));
-          if (item._xDirectIconWrap) {
-            const shouldShow = isHighlighted && theme && theme._xIsBrand;
-            const resolvedTheme = getThemeForMode(theme || defaultTheme);
-            item._xDirectIconWrap.style.setProperty(
-              'color',
-              shouldShow ? resolvedTheme.accent : 'var(--x-nt-subtext, #6B7280)',
-              'important'
-            );
-          }
-          return;
-        }
-      setNonFaviconIconBg(item, Boolean(isHighlighted || item._xIsHovering));
-      const theme = item._xTheme || defaultTheme;
-      if (isSelected) {
-        applyTabSuggestionHighlight(item, theme);
-        if (item._xSwitchButton) {
-          item._xSwitchButton.style.setProperty('color', 'var(--x-nt-text, #111827)', 'important');
-        }
-      } else {
-        resetTabSuggestion(item);
-        if (item._xSwitchButton) {
-          item._xSwitchButton.style.setProperty('color', 'var(--x-nt-subtext, #9CA3AF)', 'important');
-        }
+      if (!response || response.ok !== true) {
+        return;
       }
-      if (item._xTitle) {
-        item._xTitle.style.setProperty('font-weight', isHighlighted ? '600' : '400', 'important');
+      const refreshQuery = latestQuery || (inputParts && inputParts.input ? String(inputParts.input.value || '').trim() : '');
+      if (!refreshQuery) {
+        clearSearchSuggestions();
+        return;
       }
+      requestSuggestions(refreshQuery, { immediate: true });
     });
   }
 
@@ -6549,293 +6380,9 @@
   }
 
   function renderTabSuggestions(tabList) {
-    suggestionsContainer.innerHTML = '';
-    suggestionItems.length = 0;
     currentSuggestions = [];
     lastRenderedQuery = '';
-    const list = Array.isArray(tabList)
-      ? tabList.slice(0, Math.max(1, NEWTAB_OPEN_TAB_SUGGESTION_LIMIT))
-      : [];
-    if (list.length === 0) {
-      setSuggestionsVisible(false);
-      return;
-    }
-    list.forEach((tab) => {
-      if (tab && tab.favIconUrl) {
-        preloadIcon(tab.favIconUrl);
-      }
-    });
-    list.forEach((tab, index) => {
-      const suggestionItem = document.createElement('div');
-      suggestionItem.id = `_x_extension_newtab_suggestion_item_${index}_2024_unique_`;
-      const isLastItem = index === list.length - 1;
-      suggestionItem.style.cssText = `
-        all: unset !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: space-between !important;
-        padding: 12px 16px !important;
-        background: transparent !important;
-        border: 1px solid transparent !important;
-        border-radius: 16px !important;
-        cursor: pointer !important;
-        transition: background-color 0.2s ease !important;
-        box-sizing: border-box !important;
-        margin: 0 0 ${isLastItem ? '0' : '6px'} 0 !important;
-        line-height: 1.5 !important;
-        text-decoration: none !important;
-        list-style: none !important;
-        outline: none !important;
-        color: inherit !important;
-        font-size: 100% !important;
-        font: inherit !important;
-        vertical-align: baseline !important;
-      `;
-      suggestionItem._xIsSearchSuggestion = false;
-      suggestionItem._xIsAutocompleteTop = false;
-      suggestionItems.push(suggestionItem);
-
-      const leftSide = document.createElement('div');
-      leftSide.style.cssText = `
-        all: unset !important;
-        display: flex !important;
-        align-items: center !important;
-        gap: 12px !important;
-        flex: 1 !important;
-        min-width: 0 !important;
-        box-sizing: border-box !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        line-height: 1 !important;
-        text-decoration: none !important;
-        list-style: none !important;
-        outline: none !important;
-        background: transparent !important;
-        color: inherit !important;
-        font-size: 100% !important;
-        font: inherit !important;
-        vertical-align: baseline !important;
-      `;
-
-      const favicon = document.createElement('img');
-      favicon.setAttribute('data-x-nt-suggestion-icon', '1');
-      let hostForTab = '';
-      try {
-        hostForTab = tab && tab.url ? new URL(tab.url).hostname : '';
-      } catch (e) {
-        hostForTab = '';
-      }
-      const useFallback = !tab.favIconUrl || shouldBlockFaviconForHost(hostForTab);
-      favicon.decoding = 'async';
-      favicon.loading = 'eager';
-      favicon.referrerPolicy = 'no-referrer';
-      if (index < 4) {
-        favicon.fetchPriority = 'high';
-      }
-      const isFallbackIcon = useFallback;
-      favicon.style.cssText = `
-        all: unset !important;
-        width: ${isFallbackIcon ? '18px' : '16px'} !important;
-        height: ${isFallbackIcon ? '18px' : '16px'} !important;
-        border-radius: 2px !important;
-        box-sizing: border-box !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        line-height: 1 !important;
-        text-decoration: none !important;
-        list-style: none !important;
-        outline: none !important;
-        background: transparent !important;
-        color: inherit !important;
-        font-size: 100% !important;
-        font: inherit !important;
-        vertical-align: baseline !important;
-        display: block !important;
-      `;
-      applyFaviconOpticalAlignment(favicon);
-      favicon.addEventListener('load', function() {
-        applyFaviconOpticalShift(favicon);
-      });
-      if (useFallback) {
-        applyFallbackIcon(favicon);
-      } else {
-        favicon.src = tab.favIconUrl;
-      }
-      const iconSlot = document.createElement('span');
-      iconSlot.style.cssText = `
-        all: unset !important;
-        width: 24px !important;
-        height: 24px !important;
-        flex: 0 0 24px !important;
-        flex-shrink: 0 !important;
-        border-radius: 8px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        box-sizing: border-box !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        line-height: 1 !important;
-        text-decoration: none !important;
-        list-style: none !important;
-        outline: none !important;
-        background: transparent !important;
-        transition: background-color 0.2s ease !important;
-        color: var(--x-nt-subtext, #6B7280) !important;
-        font-size: 100% !important;
-        font: inherit !important;
-        vertical-align: baseline !important;
-      `;
-      iconSlot.appendChild(favicon);
-      suggestionItem._xIconWrap = iconSlot;
-      suggestionItem._xIconIsFavicon = !useFallback;
-      favicon.onerror = function() {
-        reportMissingIcon('tab', tab && tab.url ? tab.url : '', favicon.src);
-        applyFallbackIcon(favicon);
-        favicon.style.width = '18px';
-        favicon.style.height = '18px';
-        suggestionItem._xIconIsFavicon = false;
-      };
-
-      const title = document.createElement('span');
-      title.textContent = sanitizeDisplayText(tab.title || t('untitled', '无标题'));
-      title.style.cssText = `
-        all: unset !important;
-        color: var(--x-nt-text, #111827) !important;
-        font-size: 14px !important;
-        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        max-width: 100% !important;
-        box-sizing: border-box !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        line-height: 1.5 !important;
-        text-decoration: none !important;
-        list-style: none !important;
-        outline: none !important;
-        background: transparent !important;
-        display: inline-block !important;
-        vertical-align: baseline !important;
-      `;
-      suggestionItem._xTitle = title;
-
-      const switchButton = document.createElement('button');
-      switchButton.innerHTML = `${t('switch_to_tab', '切换到标签页')} ${getRiSvg('ri-arrow-right-line', 'ri-size-12')}`;
-      switchButton.style.cssText = `
-        all: unset !important;
-        background: transparent !important;
-        color: var(--x-nt-subtext, #6B7280) !important;
-        border: none !important;
-        border-radius: 6px !important;
-        font-size: 12px !important;
-        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-        cursor: pointer !important;
-        transition: background-color 0.2s ease !important;
-        padding: 6px 12px !important;
-        box-sizing: border-box !important;
-        margin: 0 !important;
-        line-height: 1.5 !important;
-        text-decoration: none !important;
-        list-style: none !important;
-        outline: none !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        gap: 4px !important;
-        vertical-align: baseline !important;
-      `;
-      suggestionItem._xSwitchButton = switchButton;
-
-      suggestionItem.addEventListener('mouseenter', function() {
-        if (suggestionItems.indexOf(this) !== selectedIndex) {
-          this._xIsHovering = true;
-          setNonFaviconIconBg(this, true);
-          if (selectedIndex === -1 && this._xIsAutocompleteTop) {
-            return;
-          }
-          const theme = this._xTheme;
-          if (theme && theme._xIsBrand) {
-            const hover = getHoverColors(theme);
-            this.style.setProperty('background-color', hover.bg, 'important');
-            this.style.setProperty('border', `1px solid ${hover.border}`, 'important');
-          } else {
-            this.style.setProperty('background-color', 'var(--x-nt-hover-bg, #F3F4F6)', 'important');
-            this.style.setProperty('border', '1px solid transparent', 'important');
-          }
-        }
-      });
-
-      suggestionItem.addEventListener('mouseleave', function() {
-        if (suggestionItems.indexOf(this) !== selectedIndex) {
-          this._xIsHovering = false;
-          updateSelection();
-        }
-      });
-
-      switchButton.addEventListener('click', function(event) {
-        event.stopPropagation();
-        chrome.runtime.sendMessage({
-          action: 'switchToTab',
-          tabId: tab.id
-        });
-      });
-
-      suggestionItem.addEventListener('click', function() {
-        chrome.runtime.sendMessage({
-          action: 'switchToTab',
-          tabId: tab.id
-        });
-      });
-
-      leftSide.appendChild(iconSlot);
-      leftSide.appendChild(title);
-      if (tabRankScoreDebugEnabled) {
-        const rankDebug = document.createElement('span');
-        rankDebug.textContent = formatTabRankDebugText(tab);
-        rankDebug.style.cssText = `
-          all: unset !important;
-          display: inline-flex !important;
-          align-items: center !important;
-          margin-left: 8px !important;
-          padding: 1px 6px !important;
-          border-radius: 999px !important;
-          color: var(--x-nt-subtext, #6B7280) !important;
-          background: color-mix(in srgb, var(--x-nt-suggestions-bg, rgba(255, 255, 255, 0.96)) 70%, #94A3B8 30%) !important;
-          border: 1px solid color-mix(in srgb, var(--x-nt-border, rgba(0, 0, 0, 0.08)) 75%, #94A3B8 25%) !important;
-          font-size: 10px !important;
-          font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-          line-height: 1.2 !important;
-          white-space: nowrap !important;
-          vertical-align: baseline !important;
-          flex-shrink: 0 !important;
-        `;
-        leftSide.appendChild(rankDebug);
-      }
-      suggestionItem.appendChild(leftSide);
-      suggestionItem.appendChild(switchButton);
-      suggestionsContainer.appendChild(suggestionItem);
-
-      const themeSourceSuggestion = {
-        url: tab.url || '',
-        favicon: tab.favIconUrl || ''
-      };
-      const themeHost = getThemeHostForSuggestion(themeSourceSuggestion);
-      const immediateTheme = getImmediateThemeForSuggestion(themeSourceSuggestion) || defaultTheme;
-      suggestionItem._xTheme = immediateTheme;
-      suggestionItem._xThemeHost = themeHost;
-      applyThemeVariables(suggestionItem, immediateTheme);
-      getThemeForSuggestion(themeSourceSuggestion).then((theme) => {
-        if (!suggestionItem.isConnected) {
-          return;
-        }
-        suggestionItem._xTheme = theme;
-        updateSelection();
-      });
-    });
-
-    selectedIndex = -1;
-    setSuggestionsVisible(true);
+    suggestionsView.renderTabs(tabList);
   }
 
   function requestTabsAndRender() {
@@ -6853,13 +6400,11 @@
     inlineSearchState = null;
     siteSearchTriggerState = null;
     clearSiteSearchTabHint();
-    suggestionsContainer.innerHTML = '';
-    suggestionItems.length = 0;
+    suggestionsView.clear();
     currentSuggestions = [];
     lastSuggestionResponse = [];
     selectedIndex = -1;
     lastRenderedQuery = '';
-    setSuggestionsVisible(false);
   }
 
   function renderSuggestions(suggestions, query) {
@@ -7083,485 +6628,21 @@
       const canAppend = query === lastRenderedQuery &&
         isSuggestionPrefix(currentSuggestions, allSuggestions);
       const startIndex = canAppend ? currentSuggestions.length : 0;
-      if (!canAppend) {
-        suggestionsContainer.innerHTML = '';
-        suggestionItems.length = 0;
-        selectedIndex = -1;
-      } else {
-        suggestionItems.forEach((item, index) => {
-          item._xIsAutocompleteTop = index === primaryHighlightIndex;
-        });
-      }
 
       currentSuggestions = allSuggestions;
       lastRenderedQuery = query;
       warmIconCache(allSuggestions);
-
-      allSuggestions.forEach(function(suggestion, index) {
-        if (index < startIndex) {
-          return;
-        }
-        const suggestionItem = document.createElement('div');
-        suggestionItem.id = `_x_extension_newtab_suggestion_item_${index}_2024_unique_`;
-        suggestionItem.className = 'x-nt-suggestion-item';
-        const isLastItem = index === allSuggestions.length - 1;
-        suggestionItem.setAttribute('data-last', isLastItem ? 'true' : 'false');
-        const isPrimaryHighlight = index === primaryHighlightIndex;
-        const isPrimarySearchSuggest = isPrimaryHighlight && suggestion.type === 'googleSuggest';
-        let immediateTheme = getImmediateThemeForSuggestion(suggestion) || defaultTheme;
-        if (suggestion.type === 'directUrl' || suggestion.type === 'browserPage') {
-          immediateTheme = urlHighlightTheme;
-        }
-        const shouldUseSearchEngineTheme = isPrimarySearchSuggest ||
-          (onlyKeywordSuggestions && isPrimaryHighlight && suggestion.type === 'newtab');
-        if (shouldUseSearchEngineTheme) {
-          const engineAccent = getBrandAccentForUrl(getDefaultSearchEngineThemeUrl());
-          if (engineAccent) {
-            immediateTheme = buildTheme(engineAccent);
-            immediateTheme._xIsBrand = true;
-          }
-        }
-        if (isPrimaryHighlight) {
-          applySearchSuggestionHighlight(suggestionItem);
-        }
-        suggestionItems.push(suggestionItem);
-        suggestionItem._xIsSearchSuggestion = true;
-        suggestionItem._xTheme = immediateTheme;
-        suggestionItem._xThemeHost = getThemeHostForSuggestion(suggestion);
-        suggestionItem._xIsAutocompleteTop = isPrimaryHighlight;
-        applyThemeVariables(suggestionItem, immediateTheme);
-
-        const leftSide = document.createElement('div');
-        leftSide.className = 'x-nt-suggestion-left';
-
-        let iconNode = null;
-        let iconWrapper = null;
-        if (suggestion.type === 'browserPage') {
-          iconNode = createSuggestionInlineIcon('ri-window-2-line');
-        } else if (suggestion.type === 'directUrl') {
-          iconNode = createSearchIcon();
-        } else if (suggestion.type === 'commandNewTab') {
-          iconNode = createSuggestionInlineIcon('ri-add-line', 'subtext');
-        } else if (suggestion.type === 'commandSettings') {
-          iconNode = createSuggestionInlineIcon('ri-settings-3-line', 'subtext');
-        } else if (suggestion.type === 'modeSwitch' && suggestion.favicon) {
-          const favicon = document.createElement('img');
-          favicon.setAttribute('data-x-nt-suggestion-icon', '1');
-          favicon.decoding = 'async';
-          favicon.loading = 'eager';
-          favicon.referrerPolicy = 'no-referrer';
-          if (index < 4) {
-            favicon.fetchPriority = 'high';
-          }
-          favicon.style.cssText = `
-            all: unset !important;
-            width: 16px !important;
-            height: 16px !important;
-            border-radius: 2px !important;
-            box-sizing: border-box !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            line-height: 1 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            background: transparent !important;
-            color: inherit !important;
-            font-size: 100% !important;
-            font: inherit !important;
-            vertical-align: baseline !important;
-            display: block !important;
-          `;
-          applyFaviconOpticalAlignment(favicon);
-          favicon.src = suggestion.favicon || '';
-          favicon.onerror = function() {
-            const fallbackIcon = createSearchIcon('subtext');
-            if (favicon.parentNode) {
-              favicon.parentNode.replaceChild(fallbackIcon, favicon);
-            }
-          };
-          iconNode = favicon;
-        } else if (suggestion.type === 'newtab' || suggestion.type === 'googleSuggest') {
-          const searchIcon = createSearchIcon('subtext');
-          iconNode = searchIcon;
-        } else if (
-          suggestion.favicon &&
-          (suggestion.type === 'siteSearch' ||
-            suggestion.type === 'inlineSiteSearch' ||
-            suggestion.type === 'siteSearchPrompt')
-        ) {
-          const favicon = document.createElement('img');
-          favicon.setAttribute('data-x-nt-suggestion-icon', '1');
-          favicon.decoding = 'async';
-          favicon.loading = 'eager';
-          favicon.referrerPolicy = 'no-referrer';
-          if (index < 4) {
-            favicon.fetchPriority = 'high';
-          }
-          favicon.style.cssText = `
-            all: unset !important;
-            width: 16px !important;
-            height: 16px !important;
-            border-radius: 2px !important;
-            box-sizing: border-box !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            line-height: 1 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            background: transparent !important;
-            color: inherit !important;
-            font-size: 100% !important;
-            font: inherit !important;
-            vertical-align: baseline !important;
-            display: block !important;
-            object-fit: contain !important;
-          `;
-          applyFaviconOpticalAlignment(favicon);
-          favicon.src = suggestion.favicon || '';
-          favicon.onerror = function() {
-            const fallbackIcon = createSearchIcon('subtext');
-            if (favicon.parentNode) {
-              favicon.parentNode.replaceChild(fallbackIcon, favicon);
-            }
-          };
-          iconNode = favicon;
-        } else if (suggestion.favicon) {
-          const suggestionHost = suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : '';
-          const isLocalSuggestion = suggestionHost && shouldBlockFaviconForHost(suggestionHost);
-          if (isLocalSuggestion) {
-            iconNode = createLinkIcon();
-          } else {
-            const favicon = document.createElement('img');
-            favicon.setAttribute('data-x-nt-suggestion-icon', '1');
-            favicon.decoding = 'async';
-            favicon.loading = 'eager';
-            favicon.referrerPolicy = 'no-referrer';
-            if (index < 4) {
-              favicon.fetchPriority = 'high';
-            }
-            const faviconPageUrl = suggestion && suggestion.url ? suggestion.url : (suggestion.favicon || '');
-            favicon.style.cssText = `
-              all: unset !important;
-              width: 16px !important;
-              height: 16px !important;
-              border-radius: 2px !important;
-              box-sizing: border-box !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              line-height: 1 !important;
-              text-decoration: none !important;
-              list-style: none !important;
-              outline: none !important;
-              background: transparent !important;
-              color: inherit !important;
-              font-size: 100% !important;
-              font: inherit !important;
-              vertical-align: baseline !important;
-              display: block !important;
-              object-fit: contain !important;
-            `;
-            applyFaviconOpticalAlignment(favicon);
-            attachFaviconWithFallbacks(favicon, faviconPageUrl, suggestionHost);
-            iconNode = favicon;
-          }
-        } else {
-          const suggestionHost = suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : '';
-          if (suggestionHost && shouldBlockFaviconForHost(suggestionHost)) {
-            const linkIcon = createLinkIcon('subtext');
-            iconNode = linkIcon;
-          } else {
-            const searchIcon = createSearchIcon('subtext');
-            iconNode = searchIcon;
-          }
-        }
-
-        if (iconNode) {
-          const isFaviconIcon = iconNode.tagName === 'IMG';
-          const iconSlot = document.createElement('span');
-          iconSlot.className = 'x-nt-suggestion-icon-slot';
-          iconSlot._xIsFavicon = isFaviconIcon;
-          iconSlot.appendChild(iconNode);
-          iconNode = iconSlot;
-          suggestionItem._xIconWrap = iconSlot;
-          suggestionItem._xIconIsFavicon = isFaviconIcon;
-          if (suggestion.type === 'directUrl' || suggestion.type === 'browserPage') {
-            iconWrapper = iconSlot;
-          }
-        }
-
-        const textWrapper = document.createElement('div');
-        textWrapper.className = 'x-nt-suggestion-text';
-
-        const title = document.createElement('span');
-        const baseTitle = suggestion.title || '';
-        let highlightedTitle;
-        if (isPrimarySearchSuggest ||
-            suggestion.type === 'chatgpt' ||
-            suggestion.type === 'perplexity' ||
-            suggestion.type === 'newtab' ||
-            suggestion.type === 'siteSearch' ||
-            suggestion.type === 'inlineSiteSearch' ||
-            suggestion.type === 'siteSearchPrompt' ||
-            suggestion.type === 'modeSwitch') {
-          highlightedTitle = baseTitle;
-        } else {
-          highlightedTitle = baseTitle;
-        }
-        title.textContent = '';
-        renderHighlightedText(title, highlightedTitle, query, {
-          background: 'var(--x-ext-mark-bg, #CFE8FF)',
-          color: 'var(--x-ext-mark-text, #1E3A8A)'
-        });
-        title.className = 'x-nt-suggestion-title';
-        suggestionItem._xTitle = title;
-
-        textWrapper.appendChild(title);
-        const reasonText = Array.isArray(suggestion.reasons)
-          ? suggestion.reasons.map((item) => String(item || '').trim()).filter(Boolean).join(' · ')
-          : '';
-        if (tabRankScoreDebugEnabled && reasonText) {
-          const reasonLine = document.createElement('span');
-          reasonLine.textContent = reasonText;
-          reasonLine.className = 'x-nt-suggestion-reason';
-          textWrapper.appendChild(reasonLine);
-        }
-
-        if (suggestion.type === 'history' && !suggestion.isTopSite) {
-          const urlLine = buildUrlLine(suggestion.url || '');
-          if (urlLine) {
-            textWrapper.appendChild(urlLine);
-          }
-          const historyTag = document.createElement('span');
-          historyTag.textContent = t('search_tag_history', '历史');
-          historyTag.className = 'x-nt-suggestion-tag';
-          historyTag.setAttribute('data-tag-type', 'history');
-          historyTag._xDefaultBg = 'var(--x-nt-tag-bg, #F3F4F6)';
-          historyTag._xDefaultText = 'var(--x-nt-tag-text, #6B7280)';
-          historyTag._xDefaultBorder = 'transparent';
-          textWrapper.appendChild(historyTag);
-          suggestionItem._xHistoryTag = historyTag;
-        }
-
-        if (suggestion.type === 'topSite' || suggestion.isTopSite) {
-          const urlLine = buildUrlLine(suggestion.url || '');
-          if (urlLine) {
-            textWrapper.appendChild(urlLine);
-          }
-          const topSiteTag = document.createElement('span');
-          topSiteTag.textContent = t('search_tag_top_site', '常用');
-          topSiteTag.className = 'x-nt-suggestion-tag';
-          topSiteTag.setAttribute('data-tag-type', 'top-site');
-          topSiteTag._xDefaultBg = 'var(--x-nt-tag-bg, #F3F4F6)';
-          topSiteTag._xDefaultText = 'var(--x-nt-tag-text, #6B7280)';
-          topSiteTag._xDefaultBorder = 'transparent';
-          textWrapper.appendChild(topSiteTag);
-          suggestionItem._xTopSiteTag = topSiteTag;
-        }
-
-        if (suggestion.type === 'bookmark') {
-          if (suggestion.path) {
-            const bookmarkPath = document.createElement('span');
-            bookmarkPath.textContent = suggestion.path;
-            bookmarkPath.className = 'x-nt-suggestion-bookmark-path';
-            textWrapper.appendChild(bookmarkPath);
-          }
-          const bookmarkTag = document.createElement('span');
-          bookmarkTag.textContent = t('search_tag_bookmark', '书签');
-          bookmarkTag.className = 'x-nt-suggestion-tag';
-          bookmarkTag.setAttribute('data-tag-type', 'bookmark');
-          bookmarkTag._xDefaultBg = 'var(--x-nt-bookmark-tag-bg, #FEF3C7)';
-          bookmarkTag._xDefaultText = 'var(--x-nt-bookmark-tag-text, #D97706)';
-          bookmarkTag._xDefaultBorder = 'transparent';
-          textWrapper.appendChild(bookmarkTag);
-          suggestionItem._xBookmarkTag = bookmarkTag;
-        }
-
-        const rightSide = document.createElement('div');
-        rightSide.className = 'x-nt-suggestion-right';
-
-        const actionTags = document.createElement('div');
-        actionTags.className = 'x-nt-suggestion-action-tags';
-
-        const isDirectHighlight = isPrimaryHighlight &&
-          (suggestion.type === 'directUrl' || suggestion.type === 'browserPage');
-        const isMergedHighlight = Boolean(mergedProvider && primarySuggestion === suggestion && isPrimaryHighlight);
-        const shouldShowEnterTag = !isPrimarySearchSuggest && isPrimaryHighlight &&
-          !onlyKeywordSuggestions &&
-          (primaryHighlightReason === 'topSite' ||
-            primaryHighlightReason === 'inline' ||
-            primaryHighlightReason === 'autocomplete' ||
-            isDirectHighlight ||
-            isMergedHighlight);
-        if (shouldShowEnterTag) {
-          actionTags.appendChild(createActionTag(t('action_go_current_tab', '前往'), 'Enter'));
-        }
-        if (isPrimaryHighlight && onlyKeywordSuggestions && suggestion.type === 'newtab') {
-          actionTags.appendChild(createActionTag(getSearchActionLabel(), 'Enter'));
-        }
-
-        suggestionItem._xTagContainer = actionTags;
-        suggestionItem._xHasActionTags = actionTags.childNodes.length > 0;
-
-        suggestionItem.addEventListener('mouseenter', function() {
-          this._xIsHovering = true;
-          setNonFaviconIconBg(this, true);
-          updateSelection();
-          if (suggestionItems.indexOf(this) !== selectedIndex) {
-            if (selectedIndex === -1 && this._xIsAutocompleteTop) {
-              return;
-            }
-            applySearchSuggestionHover(this);
-          }
-        });
-
-        suggestionItem.addEventListener('mouseleave', function() {
-          this._xIsHovering = false;
-          updateSelection();
-        });
-
-        suggestionItem.addEventListener('click', function() {
-          if (suggestion.type === 'commandNewTab') {
-            chrome.runtime.sendMessage({ action: 'openNewTab' });
-            return;
-          }
-          if (suggestion.type === 'commandSettings') {
-            chrome.runtime.sendMessage({ action: 'openOptionsPage' });
-            return;
-          }
-          if (suggestion.type === 'siteSearchPrompt' && suggestion.provider) {
-            activateSiteSearch(suggestion.provider);
-            inputParts.input.focus();
-            return;
-          }
-          if (suggestion.type === 'modeSwitch') {
-            setThemeMode(suggestion.nextMode);
-            inputParts.input.focus();
-            return;
-          }
-          if (suggestion.provider && suggestion.searchQuery) {
-            runSiteSearchProviderQuery(suggestion.provider, suggestion.searchQuery, 'currentTab');
-            return;
-          }
-          if (suggestion.forceSearch && suggestion.searchQuery) {
-            navigateToQuery(suggestion.searchQuery, true);
-            return;
-          }
-          recordSearchSuggestionSelection(suggestion, query);
-          navigateToUrl(suggestion.url);
-        });
-
-        leftSide.appendChild(iconNode);
-        leftSide.appendChild(textWrapper);
-        suggestionItem.appendChild(leftSide);
-        rightSide.appendChild(actionTags);
-        let historyDeleteButton = null;
-        let historyDeleteSlot = null;
-        if (suggestion.type === 'history' && !suggestion.isTopSite) {
-          historyDeleteSlot = document.createElement('div');
-          historyDeleteSlot.className = 'x-nt-history-delete-slot';
-          historyDeleteButton = document.createElement('button');
-          historyDeleteButton.type = 'button';
-          historyDeleteButton.className = 'x-nt-history-delete-button';
-          const removeHistoryTooltipText = t('search_remove_history_tooltip', '移除该历史');
-          historyDeleteButton.innerHTML = getRiSvg('ri-delete-bin-6-line', 'ri-size-14');
-          historyDeleteButton.setAttribute('aria-label', removeHistoryTooltipText);
-          historyDeleteButton.addEventListener('mouseenter', function() {
-            const itemIndex = suggestionItems.indexOf(suggestionItem);
-            const isSelected = itemIndex === selectedIndex;
-            const shouldAutoHighlight = selectedIndex === -1 && suggestionItem._xIsAutocompleteTop;
-            const shouldUseThemeHover = Boolean(isSelected || shouldAutoHighlight);
-            const buttonThemeSource = suggestionItem._xTheme || defaultTheme;
-            const resolvedTheme = getThemeForMode(buttonThemeSource);
-            const hoverColors = shouldUseThemeHover
-              ? getHoverColors(buttonThemeSource)
-              : getNeutralHoverActionColors();
-            showTopActionTooltip(historyDeleteButton, removeHistoryTooltipText);
-            historyDeleteButton.style.removeProperty('transform');
-            historyDeleteButton.style.setProperty(
-              '--x-nt-history-delete-hover-bg',
-              hoverColors.bg
-            );
-            historyDeleteButton.style.setProperty(
-              '--x-nt-history-delete-hover-border',
-              hoverColors.border
-            );
-            historyDeleteButton.style.setProperty(
-              '--x-nt-history-delete-hover-color',
-              shouldUseThemeHover ? resolvedTheme.buttonText : hoverColors.text
-            );
-            historyDeleteButton.setAttribute('data-hover', 'true');
-          });
-          historyDeleteButton.addEventListener('mouseleave', function() {
-            hideTopActionTooltip();
-            historyDeleteButton.removeAttribute('data-hover');
-            historyDeleteButton.style.removeProperty('transform');
-          });
-          historyDeleteButton.addEventListener('focus', function() {
-            showTopActionTooltip(historyDeleteButton, removeHistoryTooltipText);
-          });
-          historyDeleteButton.addEventListener('blur', function() {
-            hideTopActionTooltip();
-            historyDeleteButton.removeAttribute('data-hover');
-            historyDeleteButton.style.removeProperty('transform');
-          });
-          historyDeleteButton.addEventListener('pointerup', function() {
-            historyDeleteButton.style.setProperty('transform', 'none');
-          });
-          historyDeleteButton.addEventListener('pointercancel', function() {
-            historyDeleteButton.style.setProperty('transform', 'none');
-          });
-          historyDeleteButton.addEventListener('click', function(event) {
-            event.preventDefault();
-            event.stopPropagation();
-            chrome.runtime.sendMessage({
-              action: 'deleteHistoryUrl',
-              url: suggestion.url
-            }, function(response) {
-              if (chrome.runtime && chrome.runtime.lastError) {
-                return;
-              }
-              if (!response || response.ok !== true) {
-                return;
-              }
-              const refreshQuery = latestQuery || (inputParts && inputParts.input ? String(inputParts.input.value || '').trim() : '');
-              if (!refreshQuery) {
-                clearSearchSuggestions();
-                return;
-              }
-              requestSuggestions(refreshQuery, { immediate: true });
-            });
-          });
-          historyDeleteSlot.appendChild(historyDeleteButton);
-        }
-        if (historyDeleteSlot) {
-          rightSide.appendChild(historyDeleteSlot);
-        }
-        suggestionItem.appendChild(rightSide);
-        if (iconWrapper) {
-          suggestionItem._xDirectIconWrap = iconWrapper;
-        }
-        suggestionItem._xHistoryDeleteButton = historyDeleteButton;
-        suggestionItem._xHistoryDeleteSlot = historyDeleteSlot;
-        suggestionItem._xHasHistoryDeleteButton = Boolean(historyDeleteButton);
-        suggestionsContainer.appendChild(suggestionItem);
-
-        if (!shouldUseSearchEngineTheme &&
-            !(onlyKeywordSuggestions && suggestion.type === 'newtab') &&
-            suggestion.type !== 'directUrl' &&
-            suggestion.type !== 'browserPage') {
-          getThemeForSuggestion(suggestion).then((theme) => {
-            if (!suggestionItem.isConnected) {
-              return;
-            }
-            suggestionItem._xTheme = theme;
-            applyThemeVariables(suggestionItem, theme);
-            updateSelection();
-          });
-        }
+      suggestionsView.render({
+        suggestions: allSuggestions,
+        query,
+        canAppend,
+        startIndex,
+        primaryHighlightIndex,
+        primarySuggestion,
+        primaryHighlightReason,
+        onlyKeywordSuggestions,
+        mergedProvider
       });
-
       updateSelection();
       setSuggestionsVisible(true);
     });
