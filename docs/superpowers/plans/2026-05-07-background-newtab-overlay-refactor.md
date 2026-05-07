@@ -512,7 +512,7 @@ Implementation note: Task 6 completed on 2026-05-07. Added `src/newtab/recent-si
 - Modify: `src/newtab/newtab.js`
 - Modify: `package.json`
 
-- [ ] Extract the notice banner into `LumnoNewtabPageNotice`.
+- [x] Extract the notice banner into `LumnoNewtabPageNotice`.
 
 Required API:
 
@@ -526,7 +526,7 @@ renderPageNotice({
 });
 ```
 
-- [ ] Extract toast helpers into `LumnoNewtabToast.createToastController(toastElement, { t })`.
+- [x] Extract toast helpers into `LumnoNewtabToast.createToastController(toastElement, { t })`.
 
 Required methods:
 
@@ -579,6 +579,8 @@ git diff --check
 Expected size effect: `newtab.js` should drop by at least 2,000 lines across Tasks 6 and 7.
 
 Commit message: `Extract newtab layout and card views`
+
+Implementation note: Task 7 partial progress on 2026-05-07. Added `src/newtab/page-notice.js` for the file-access notice renderer and `src/newtab/toast.js` for toast timing/state; `newtab.js` now keeps the file-access permission decision and delegates banner/toast DOM helpers. This intentionally leaves layout writes and recent/bookmark card views in `newtab.js` for a separate, more visual validation pass. Size effect for this slice: `src/newtab/newtab.js` dropped from 9,263 to 9,217 lines. Verified with `node --check src/newtab/page-notice.js`, `node --check src/newtab/toast.js`, `node --check src/newtab/newtab.js`, `npm run check`, `npm run audit:style`, `npm run test:newtab-stores`, `git diff --check`, and `npm run package:store`. Browser validation used Chrome Dev: newtab loaded without a blank page, focus-on-load still landed in the input, `gm` + Tab entered Gemini mode, `hello` rendered the AI suggestion, and the `notice=file-access` URL path rewrote back to `focus=1` on this machine because file URL access is already allowed. Screenshot saved at `dist/.checks/refactor-after-task-7/newtab-notice-toast-slice.png`.
 
 ---
 

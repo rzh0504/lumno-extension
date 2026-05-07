@@ -42,12 +42,16 @@
   const NEWTAB_FAVICON_VIEW = globalThis.LumnoNewtabFaviconView || {};
   const NEWTAB_RECENT_STORE = globalThis.LumnoNewtabRecentSitesStore || {};
   const NEWTAB_BOOKMARKS_STORE = globalThis.LumnoNewtabBookmarksStore || {};
+  const NEWTAB_PAGE_NOTICE = globalThis.LumnoNewtabPageNotice || {};
+  const NEWTAB_TOAST = globalThis.LumnoNewtabToast || {};
   if (typeof NEWTAB_FAVICON_CACHE.createFaviconCache !== 'function' ||
       typeof NEWTAB_FAVICON_THEME.buildTheme !== 'function' ||
       typeof NEWTAB_FAVICON_VIEW.createFaviconViewRuntime !== 'function' ||
       typeof SEARCH_INPUT_MODE.createInputModeController !== 'function' ||
       typeof NEWTAB_RECENT_STORE.normalizeRecentSiteItem !== 'function' ||
-      typeof NEWTAB_BOOKMARKS_STORE.buildBookmarkFolderCache !== 'function') {
+      typeof NEWTAB_BOOKMARKS_STORE.buildBookmarkFolderCache !== 'function' ||
+      typeof NEWTAB_PAGE_NOTICE.renderPageNotice !== 'function' ||
+      typeof NEWTAB_TOAST.createToastController !== 'function') {
     console.warn('Lumno: newtab helpers not available.');
     return;
   }
@@ -95,7 +99,7 @@
   let currentLanguageMode = 'system';
   let defaultPlaceholderText = '搜索或输入网址...';
   let toastElement = null;
-  let toastTimer = null;
+  let toastController = null;
   let currentRecentMode = 'most';
   let currentRecentCount = 4;
   let currentBookmarkCount = 8;
@@ -104,7 +108,7 @@
   let searchLayer = null;
   let wordmarkContainer = null;
   let wordmarkImageEl = null;
-  let pageNoticeBanner = null;
+  let pageNoticeController = null;
   let newtabWordmarkVisible = true;
   let bookmarkCurrentPage = 0;
   let bookmarkAllItems = [];
@@ -162,6 +166,7 @@
   let currentNewtabWidthMode = 'wide';
   let currentRecentGridColumns = 4;
   toastElement = document.getElementById('_x_extension_toast_2024_unique_');
+  toastController = NEWTAB_TOAST.createToastController(toastElement, { windowObj: window });
 
   function normalizeRecentCount(value) {
     return NEWTAB_RECENT_STORE.normalizeRecentCount(value);
@@ -309,88 +314,54 @@
   }
 
   function dismissPageNoticeBanner() {
-    if (pageNoticeBanner && pageNoticeBanner.parentNode) {
-      pageNoticeBanner.parentNode.removeChild(pageNoticeBanner);
+    if (pageNoticeController && typeof pageNoticeController.dismiss === 'function') {
+      pageNoticeController.dismiss();
+      return;
     }
-    pageNoticeBanner = null;
     clearPageNoticeQueryParam();
   }
 
-  function ensurePageNoticeBanner() {
-    if (pageNoticeBanner) {
-      return pageNoticeBanner;
+  function openExtensionDetailsPage(detailsUrl) {
+    if (chrome && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+      chrome.runtime.sendMessage({ action: 'openExtensionDetailsPage' }, (response) => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          if (detailsUrl) {
+            window.open(detailsUrl, '_blank');
+          }
+          return;
+        }
+        if (!response || response.ok !== true) {
+          const fallbackUrl = response && response.url ? response.url : detailsUrl;
+          if (fallbackUrl) {
+            window.open(fallbackUrl, '_blank');
+          }
+        }
+      });
+      return;
     }
-    pageNoticeBanner = document.createElement('div');
-    pageNoticeBanner.id = '_x_extension_newtab_notice_banner_2026_unique_';
-    return pageNoticeBanner;
+    if (detailsUrl) {
+      window.open(detailsUrl, '_blank');
+    }
   }
 
   function showFileAccessNotice(detailsUrl) {
-    const banner = ensurePageNoticeBanner();
-    banner.textContent = '';
-
-    const content = document.createElement('div');
-    content.className = 'x-nt-page-notice-content';
-
-    const icon = document.createElement('div');
-    icon.setAttribute('aria-hidden', 'true');
-    icon.innerHTML = getRiSvg('ri-error-warning-line', 'ri-size-20');
-    icon.className = 'x-nt-page-notice-icon';
-
-    const message = document.createElement('div');
-    message.textContent = t('newtab_file_access_notice_title', '由于浏览器限制，若要在本地文件页面（如 PDF、HTML）中唤起聚焦搜索，请手动开启“允许访问文件网址”');
-    message.className = 'x-nt-page-notice-message';
-
-    const primaryButton = document.createElement('button');
-    primaryButton.type = 'button';
-    primaryButton.textContent = t('newtab_file_access_notice_open_cta', '前往开启');
-    primaryButton.className = 'x-nt-page-notice-primary';
-    primaryButton.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (chrome && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
-        chrome.runtime.sendMessage({ action: 'openExtensionDetailsPage' }, (response) => {
-          if (chrome.runtime && chrome.runtime.lastError) {
-            if (detailsUrl) {
-              window.open(detailsUrl, '_blank');
-            }
-            return;
-          }
-          if (!response || response.ok !== true) {
-            const fallbackUrl = response && response.url ? response.url : detailsUrl;
-            if (fallbackUrl) {
-              window.open(fallbackUrl, '_blank');
-            }
-          }
-        });
-        return;
-      }
-      if (detailsUrl) {
-        window.open(detailsUrl, '_blank');
-      }
+    pageNoticeController = NEWTAB_PAGE_NOTICE.renderPageNotice({
+      params: pageSearchParams,
+      chromeApi: chrome,
+      document,
+      windowObj: window,
+      bottomDock,
+      messages: {
+        t,
+        getRiSvg,
+        detailsUrl
+      },
+      onClose: () => {
+        pageNoticeController = null;
+        clearPageNoticeQueryParam();
+      },
+      openExtensionDetailsPage
     });
-
-    const closeButton = document.createElement('button');
-    closeButton.type = 'button';
-    closeButton.setAttribute('aria-label', t('newtab_file_access_notice_close', '关闭提示'));
-    closeButton.innerHTML = getRiSvg('ri-close-line', 'ri-size-16');
-    closeButton.className = 'x-nt-page-notice-close';
-    closeButton.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      dismissPageNoticeBanner();
-    });
-
-    content.appendChild(icon);
-    content.appendChild(message);
-    banner.appendChild(content);
-    banner.appendChild(primaryButton);
-    banner.appendChild(closeButton);
-
-    if (document.body && !banner.parentNode) {
-      const referenceNode = bottomDock && bottomDock.parentNode === document.body ? bottomDock : null;
-      document.body.insertBefore(banner, referenceNode);
-    }
   }
 
   function maybeShowFileAccessNotice() {
@@ -4545,32 +4516,15 @@
   }
 
   function hideToast() {
-    if (!toastElement) {
-      return;
+    if (toastController && typeof toastController.hide === 'function') {
+      toastController.hide();
     }
-    if (toastTimer) {
-      clearTimeout(toastTimer);
-      toastTimer = null;
-    }
-    toastElement.setAttribute('data-show', 'false');
   }
 
   function showToast(message, isError) {
-    if (!toastElement || !message) {
-      return;
+    if (toastController && typeof toastController.show === 'function') {
+      toastController.show(message, { error: Boolean(isError) });
     }
-    hideToast();
-    toastElement.textContent = message;
-    if (isError) {
-      toastElement.style.setProperty('background', 'rgba(153, 27, 27, 0.92)');
-    } else {
-      toastElement.style.removeProperty('background');
-    }
-    toastElement.setAttribute('data-show', 'true');
-    toastTimer = setTimeout(() => {
-      toastTimer = null;
-      toastElement.setAttribute('data-show', 'false');
-    }, 2200);
   }
 
   function setSuggestionsVisible(visible) {
