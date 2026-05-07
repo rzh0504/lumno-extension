@@ -19,6 +19,8 @@ const injectedScriptFiles = [
   'src/shared/search-input-mode.js',
   'src/shared/search-input.css',
   'src/shared/url-guards.js',
+  'src/newtab/recent-sites-view.js',
+  'src/newtab/bookmarks-view.js',
   'src/newtab/suggestions-view.js',
   'src/overlay/runtime.js',
   'src/overlay/favicon-view.js',

@@ -45,6 +45,8 @@
   const NEWTAB_PAGE_NOTICE = globalThis.LumnoNewtabPageNotice || {};
   const NEWTAB_TOAST = globalThis.LumnoNewtabToast || {};
   const NEWTAB_LAYOUT = globalThis.LumnoNewtabLayout || {};
+  const NEWTAB_RECENT_VIEW = globalThis.LumnoNewtabRecentSitesView || {};
+  const NEWTAB_BOOKMARKS_VIEW = globalThis.LumnoNewtabBookmarksView || {};
   const NEWTAB_SUGGESTIONS_VIEW = globalThis.LumnoNewtabSuggestionsView || {};
   if (typeof NEWTAB_FAVICON_CACHE.createFaviconCache !== 'function' ||
       typeof NEWTAB_FAVICON_THEME.buildTheme !== 'function' ||
@@ -55,6 +57,8 @@
       typeof NEWTAB_PAGE_NOTICE.renderPageNotice !== 'function' ||
       typeof NEWTAB_TOAST.createToastController !== 'function' ||
       typeof NEWTAB_LAYOUT.createLayoutController !== 'function' ||
+      typeof NEWTAB_RECENT_VIEW.createRecentSitesView !== 'function' ||
+      typeof NEWTAB_BOOKMARKS_VIEW.createBookmarksView !== 'function' ||
       typeof NEWTAB_SUGGESTIONS_VIEW.createSuggestionsView !== 'function') {
     console.warn('Lumno: newtab helpers not available.');
     return;
@@ -138,6 +142,8 @@
   let bookmarkWheelLastAt = 0;
   let recentMouseInsideSection = false;
   let recentMouseLeftAt = 0;
+  let recentSitesView = null;
+  let bookmarksView = null;
   const BOOKMARK_WHEEL_SWITCH_COOLDOWN_MS = 220;
   const BOOKMARK_HOVER_DELAY_FROM_RECENT_MS = 56;
   const BOOKMARK_HOVER_RECENT_TRANSFER_WINDOW_MS = 220;
@@ -3321,6 +3327,33 @@
   const bookmarkGrid = document.createElement('div');
   bookmarkGrid.id = '_x_extension_newtab_bookmarks_grid_2024_unique_';
   applyBookmarkGridColumns();
+  bookmarksView = NEWTAB_BOOKMARKS_VIEW.createBookmarksView({
+    documentObj: document,
+    windowObj: window,
+    grid: bookmarkGrid,
+    cards: bookmarkCards,
+    cardElementCache: bookmarkCardElementCache,
+    t,
+    formatMessage,
+    sanitizeDisplayText,
+    getHostFromUrl,
+    getSiteDisplayName,
+    getUrlDisplay,
+    getRiSvg,
+    getFigmaFolderSvg,
+    initFolderPathMorph,
+    playFolderPathMorph,
+    stableHashCode,
+    normalizeHost,
+    attachFaviconWithFallbacks,
+    getImmediateThemeForSuggestion,
+    queueThemeForTarget,
+    applyCardTheme: applyBookmarkCardTheme,
+    shouldDelayHoverFromRecent: shouldDelayBookmarkHoverFromRecent,
+    hoverDelayFromRecentMs: BOOKMARK_HOVER_DELAY_FROM_RECENT_MS,
+    openFolder: openBookmarkFolder,
+    navigateToUrl
+  });
   bookmarkSection.appendChild(bookmarkHeader);
   bookmarkSection.appendChild(bookmarkGrid);
   let bookmarkRenderSignature = '';
@@ -3354,6 +3387,38 @@
   const recentGrid = document.createElement('div');
   recentGrid.id = '_x_extension_newtab_recent_sites_grid_2024_unique_';
   applyRecentGridColumns();
+  recentSitesView = NEWTAB_RECENT_VIEW.createRecentSitesView({
+    documentObj: document,
+    windowObj: window,
+    grid: recentGrid,
+    cards: recentCards,
+    t,
+    formatMessage,
+    sanitizeDisplayText,
+    getOwnExtensionPageDisplay,
+    getHostFromUrl,
+    getSiteDisplayName,
+    getUrlDisplay,
+    getRiSvg,
+    attachFaviconWithFallbacks,
+    getImmediateThemeForSuggestion,
+    queueThemeForTarget,
+    applyCardTheme: applyRecentCardTheme,
+    getCurrentRecentCount: () => currentRecentCount,
+    isPinned: isRecentSitePinned,
+    getPinnedCount: () => pinnedRecentSites.length,
+    getMaxPinnedCount: () => MAX_PINNED_RECENT_SITES,
+    canDismiss: canDismissRecentCard,
+    getDismissTooltip: getRecentDismissTooltip,
+    updatePinButton: updateRecentPinButton,
+    updateDismissButton: updateRecentDismissButton,
+    showToast,
+    showTopActionTooltip,
+    hideTopActionTooltip,
+    navigateToUrl,
+    togglePinned: togglePinnedRecentSite,
+    hideTemporarily: hideRecentSiteTemporarily
+  });
   recentSection.appendChild(recentHeading);
   recentSection.appendChild(recentGrid);
   let recentRenderSignature = '';
@@ -3446,46 +3511,6 @@
     bookmarkWheelLastAt = now;
     switchBookmarkPage(targetPage);
   }, { passive: false });
-
-  function getBookmarksSignature(items) {
-    if (!Array.isArray(items) || items.length === 0) {
-      return '';
-    }
-    return items.map((item, index) => {
-      const id = item && item.id ? String(item.id) : '';
-      const type = item && item.type ? String(item.type) : '';
-      const title = item && item.title ? String(item.title) : '';
-      const url = item && item.url ? String(item.url) : '';
-      const themeUrl = item && item.themeUrl ? String(item.themeUrl) : '';
-      return `${index}::${id}::${type}::${title}::${url}::${themeUrl}`;
-    }).join('\n');
-  }
-
-  function getBookmarkCacheKey(item) {
-    if (!item) {
-      return '';
-    }
-    const id = item.id ? String(item.id) : '';
-    const type = item.type ? String(item.type) : '';
-    const title = item.title ? String(item.title) : '';
-    const url = item.url ? String(item.url) : '';
-    const themeUrl = item.themeUrl ? String(item.themeUrl) : '';
-    return `${id}::${type}::${title}::${url}::${themeUrl}`;
-  }
-
-  function syncBookmarkCardElementCache(items) {
-    // Keep cache across folder levels so entering subfolders does not reload favicons.
-    // Soft-limit cache size to avoid unbounded growth.
-    const MAX_CACHE_SIZE = 1500;
-    if (bookmarkCardElementCache.size <= MAX_CACHE_SIZE) {
-      return;
-    }
-    const keys = Array.from(bookmarkCardElementCache.keys());
-    const removeCount = Math.max(1, bookmarkCardElementCache.size - MAX_CACHE_SIZE);
-    for (let i = 0; i < removeCount && i < keys.length; i += 1) {
-      bookmarkCardElementCache.delete(keys[i]);
-    }
-  }
 
   function getBookmarkPageCount() {
     const total = Array.isArray(bookmarkAllItems) ? bookmarkAllItems.length : 0;
@@ -3696,22 +3721,18 @@
 
   function renderBookmarks(items) {
     const normalizedItems = Array.isArray(items) ? items : [];
-    const nextSignature = `${bookmarkCurrentFolderId}##${getBookmarksSignature(normalizedItems)}`;
     const isAtRoot = String(bookmarkCurrentFolderId || '') === String(bookmarkRootFolderId || '1');
-    const appendEmptyFolderState = () => {
-      const emptyState = document.createElement('div');
-      emptyState.className = 'x-nt-bookmark-empty';
-      emptyState.innerHTML = `${getRiSvg('ri-file-3-line', 'ri-size-16')}<span>${t('bookmarks_empty_folder', '暂无内容')}</span>`;
-      bookmarkGrid.appendChild(emptyState);
-    };
-    if (nextSignature === bookmarkRenderSignature) {
+    const renderResult = bookmarksView.render(normalizedItems, {
+      signature: bookmarkRenderSignature,
+      folderId: bookmarkCurrentFolderId,
+      rootFolderId: bookmarkRootFolderId
+    });
+    if (!renderResult.changed) {
       if (normalizedItems.length === 0) {
         if (isAtRoot) {
           setContentSectionVisible(bookmarkSection, false);
         } else {
           setContentSectionVisible(bookmarkSection, true);
-          bookmarkGrid.innerHTML = '';
-          appendEmptyFolderState();
         }
       } else {
         setContentSectionVisible(bookmarkSection, true);
@@ -3721,54 +3742,22 @@
       updateBookmarkPagerState();
       return;
     }
-    bookmarkRenderSignature = nextSignature;
-    bookmarkGrid.innerHTML = '';
-    bookmarkCards.length = 0;
+    bookmarkRenderSignature = renderResult.signature;
     if (normalizedItems.length === 0) {
       if (isAtRoot) {
         setContentSectionVisible(bookmarkSection, false);
       } else {
         setContentSectionVisible(bookmarkSection, true);
-        appendEmptyFolderState();
       }
       updateBookmarkGridHeightLock();
       updateBookmarkSectionPosition();
       updateBookmarkPagerState();
       return;
     }
-    normalizedItems.forEach((item, index) => {
-      const cacheKey = getBookmarkCacheKey(item);
-      let card = cacheKey ? bookmarkCardElementCache.get(cacheKey) : null;
-      if (!card) {
-        card = buildBookmarkCard(item, index);
-        if (card && cacheKey) {
-          bookmarkCardElementCache.set(cacheKey, card);
-        }
-      }
-      if (card) {
-        applyBookmarkCardTheme(card, card._xTheme, card._xHost || '');
-        bookmarkCards.push(card);
-        bookmarkGrid.appendChild(card);
-      }
-    });
     setContentSectionVisible(bookmarkSection, true);
     updateBookmarkPagerState();
     updateBookmarkGridHeightLock();
     updateBookmarkSectionPosition();
-  }
-
-  function getRecentSitesSignature(items) {
-    if (!Array.isArray(items) || items.length === 0) {
-      return '';
-    }
-    return items.map((item, index) => {
-      const url = item && item.url ? String(item.url) : '';
-      const title = item && item.title ? String(item.title) : '';
-      const siteName = item && item.siteName ? String(item.siteName) : '';
-      const lastVisitTime = item && item.lastVisitTime ? String(item.lastVisitTime) : '';
-      const visitCount = item && item.visitCount ? String(item.visitCount) : '';
-      return `${index}::${url}::${title}::${siteName}::${lastVisitTime}::${visitCount}`;
-    }).join('\n');
   }
 
   function renderRecentSites(items) {
@@ -3803,8 +3792,10 @@
       });
     recentSourceItems = normalizedSourceItems.slice();
     const mergedItems = mergeRecentSitesWithPinned(normalizedSourceItems, getRecentLimit());
-    const nextSignature = getRecentSitesSignature(mergedItems);
-    if (nextSignature === recentRenderSignature) {
+    const renderResult = recentSitesView.render(mergedItems, {
+      signature: recentRenderSignature
+    });
+    if (!renderResult.changed) {
       if (mergedItems.length === 0) {
         setContentSectionVisible(recentSection, false);
       } else {
@@ -3813,20 +3804,12 @@
       updateBookmarkSectionPosition();
       return;
     }
-    recentRenderSignature = nextSignature;
-    recentGrid.innerHTML = '';
-    recentCards.length = 0;
+    recentRenderSignature = renderResult.signature;
     if (mergedItems.length === 0) {
       setContentSectionVisible(recentSection, false);
       updateBookmarkSectionPosition();
       return;
     }
-    mergedItems.forEach((item, index) => {
-      const card = buildRecentSiteCard(item, index);
-      if (card) {
-        recentGrid.appendChild(card);
-      }
-    });
     setContentSectionVisible(recentSection, true);
     updateBookmarkSectionPosition();
   }
@@ -3949,8 +3932,7 @@
       bookmarkRootVisibleCount = 0;
       bookmarkCurrentPage = 0;
       bookmarkRenderSignature = '';
-      bookmarkGrid.innerHTML = '';
-      bookmarkCards.length = 0;
+      bookmarksView.clear();
       setContentSectionVisible(bookmarkSection, false);
       bookmarkDataDirty = false;
       bookmarkLoadedOnce = true;
@@ -3967,8 +3949,7 @@
         bookmarkRootVisibleCount = 0;
         bookmarkCurrentPage = 0;
         bookmarkRenderSignature = '';
-        bookmarkGrid.innerHTML = '';
-        bookmarkCards.length = 0;
+        bookmarksView.clear();
         setContentSectionVisible(bookmarkSection, false);
         bookmarkDataDirty = false;
         bookmarkLoadedOnce = true;
@@ -3981,7 +3962,7 @@
         bookmarkRootTotalCount = bookmarkAllItems.length;
         bookmarkRootVisibleCount = Math.min(getBookmarkLimit(), bookmarkAllItems.length);
       }
-      syncBookmarkCardElementCache(bookmarkAllItems);
+      bookmarksView.syncCardElementCache(bookmarkAllItems);
       const pageCount = getBookmarkPageCount();
       if (bookmarkCurrentPage > (pageCount - 1)) {
         bookmarkCurrentPage = pageCount - 1;
@@ -4024,8 +4005,7 @@
     if (!recentLimit || recentLimit <= 0) {
       recentRenderSignature = '';
       recentSourceItems = [];
-      recentCards.length = 0;
-      recentGrid.innerHTML = '';
+      recentSitesView.clear();
       setContentSectionVisible(recentSection, false);
       recentDataDirty = false;
       recentLoadedOnce = true;
@@ -5052,289 +5032,6 @@
     card.style.setProperty('--x-nt-bookmark-shadow-rgb', colors.shadowRgb);
   }
 
-  function buildRecentSiteCard(item, index) {
-    if (!item || !item.url) {
-      return null;
-    }
-    const ownExtensionDisplay = getOwnExtensionPageDisplay(item.url, item.title);
-    const host = ownExtensionDisplay ? 'lumno.kubai.design' : (item.host || getHostFromUrl(item.url) || '');
-    const siteName = ownExtensionDisplay ? ownExtensionDisplay.siteName : getSiteDisplayName(host, item.title);
-    const titleText = ownExtensionDisplay
-      ? ownExtensionDisplay.titleText
-      : (item.title || siteName || item.url);
-    const card = document.createElement('div');
-    card.className = 'x-nt-recent-card';
-    card.tabIndex = 0;
-    card.setAttribute('role', 'button');
-    card.setAttribute('aria-label', formatMessage('open_prefix', '打开 {title}', {
-      title: titleText
-    }));
-    card._xHost = host;
-    const themeSuggestion = { type: 'history', url: item.url, title: item.title || '' };
-    const immediateTheme = getImmediateThemeForSuggestion(themeSuggestion);
-    card._xTheme = immediateTheme;
-    applyRecentCardTheme(card, immediateTheme, host);
-    queueThemeForTarget(card, themeSuggestion, (theme) => {
-      if (card.isConnected) {
-        card._xTheme = theme || card._xTheme;
-        applyRecentCardTheme(card, theme, host);
-      }
-    }, { priority: index < 4 ? 0 : 2 });
-
-    const inner = document.createElement('div');
-    inner.className = 'x-nt-recent-inner';
-    const header = document.createElement('div');
-    header.className = 'x-nt-recent-header';
-    const faviconImage = document.createElement('img');
-    faviconImage.className = 'x-nt-recent-favicon';
-    faviconImage.alt = siteName || t('site_icon_alt', '站点');
-    const eagerCount = Math.min(4, currentRecentCount);
-    const shouldEager = index < eagerCount;
-    faviconImage.loading = shouldEager ? 'eager' : 'lazy';
-    if (shouldEager) {
-      faviconImage.fetchPriority = 'high';
-    }
-    attachFaviconWithFallbacks(faviconImage, item.url, host);
-    const name = document.createElement('div');
-    name.className = 'x-nt-recent-name';
-    name.textContent = siteName;
-    name.title = siteName;
-    const dismissButton = document.createElement('button');
-    dismissButton.type = 'button';
-    dismissButton.className = 'x-nt-recent-dismiss';
-    updateRecentDismissButton(dismissButton, item);
-    card._xDismissButton = dismissButton;
-    header.appendChild(faviconImage);
-    header.appendChild(name);
-    header.appendChild(dismissButton);
-
-    const title = document.createElement('div');
-    title.className = 'x-nt-recent-title';
-    const safeTitleText = sanitizeDisplayText(titleText);
-    title.textContent = safeTitleText;
-    title.title = safeTitleText;
-
-    const urlLine = document.createElement('div');
-    urlLine.className = 'x-nt-recent-url';
-    urlLine.title = item.url;
-    const urlText = document.createElement('span');
-    urlText.className = 'x-nt-recent-url-text';
-    urlText.textContent = ownExtensionDisplay ? ownExtensionDisplay.urlText : getUrlDisplay(item.url);
-
-    const actionLine = document.createElement('div');
-    actionLine.className = 'x-nt-recent-action';
-    const actionText = document.createElement('span');
-    actionText.textContent = t('action_go_current_tab', '前往');
-    actionLine.appendChild(actionText);
-    const actionIcon = document.createElement('span');
-    actionIcon.innerHTML = getRiSvg('ri-arrow-right-line', 'ri-size-12');
-    actionLine.appendChild(actionIcon);
-    card._xActionText = actionText;
-    card._xTitleText = safeTitleText;
-
-    const pinButton = document.createElement('button');
-    pinButton.type = 'button';
-    pinButton.className = 'x-nt-recent-pin';
-    const pinned = isRecentSitePinned(item);
-    updateRecentPinButton(pinButton, pinned, !pinned && pinnedRecentSites.length >= MAX_PINNED_RECENT_SITES);
-    card._xPinButton = pinButton;
-    urlLine.appendChild(actionLine);
-    urlLine.appendChild(urlText);
-    urlLine.appendChild(pinButton);
-
-    inner.appendChild(header);
-    inner.appendChild(title);
-    card.appendChild(inner);
-    card.appendChild(urlLine);
-    recentCards.push(card);
-
-    let isCardPointerActive = false;
-    let hasNavigateAttempted = false;
-    let rollbackTimerId = null;
-    let hoverUnlockTimerId = null;
-    let isHoverLocked = false;
-    const rollbackClassName = 'x-nt-recent-card--rollback';
-    const ROLLBACK_ANIMATION_MS = 220;
-    const HOVER_REENABLE_DELAY_MS = 1000;
-    const clearRollbackTimer = () => {
-      if (rollbackTimerId !== null) {
-        window.clearTimeout(rollbackTimerId);
-        rollbackTimerId = null;
-      }
-    };
-    const clearHoverUnlockTimer = () => {
-      if (hoverUnlockTimerId !== null) {
-        window.clearTimeout(hoverUnlockTimerId);
-        hoverUnlockTimerId = null;
-      }
-    };
-    const lockHoverAfterRollback = () => {
-      clearHoverUnlockTimer();
-      isHoverLocked = true;
-      card.classList.add(rollbackClassName);
-      hoverUnlockTimerId = window.setTimeout(() => {
-        hoverUnlockTimerId = null;
-        isHoverLocked = false;
-        card.classList.remove(rollbackClassName);
-      }, ROLLBACK_ANIMATION_MS + HOVER_REENABLE_DELAY_MS);
-    };
-    const markNavigationSuccess = () => {
-      clearRollbackTimer();
-      clearHoverUnlockTimer();
-    };
-    const scheduleRollbackIfPending = () => {
-      clearRollbackTimer();
-      rollbackTimerId = window.setTimeout(() => {
-        rollbackTimerId = null;
-        if (document.visibilityState === 'hidden') {
-          return;
-        }
-        lockHoverAfterRollback();
-        hasNavigateAttempted = false;
-      }, 180);
-    };
-    const navigateFromCard = () => {
-      if (hasNavigateAttempted) {
-        return;
-      }
-      hasNavigateAttempted = true;
-      if (!isHoverLocked) {
-        card.classList.remove(rollbackClassName);
-      }
-      navigateToUrl(item.url);
-      scheduleRollbackIfPending();
-    };
-    const swallowPinEvent = (event) => {
-      if (!event) {
-        return;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-    };
-    card.addEventListener('pointerdown', (event) => {
-      if (event.button !== 0) {
-        return;
-      }
-      isCardPointerActive = true;
-      if (typeof card.setPointerCapture === 'function') {
-        try {
-          card.setPointerCapture(event.pointerId);
-        } catch (error) {
-          // Ignore capture errors and keep pointer flow fallback.
-        }
-      }
-      navigateFromCard();
-    });
-    card.addEventListener('pointercancel', () => {
-      isCardPointerActive = false;
-    });
-    card.addEventListener('pointerup', (event) => {
-      if (event.button !== 0 || !isCardPointerActive) {
-        return;
-      }
-      isCardPointerActive = false;
-    });
-    card.addEventListener('pointerleave', () => {
-      if (!hasNavigateAttempted && !isHoverLocked) {
-        card.classList.remove(rollbackClassName);
-      }
-    });
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        markNavigationSuccess();
-        document.removeEventListener('visibilitychange', onVisibilityChange);
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    window.addEventListener('pagehide', markNavigationSuccess, { once: true });
-    card.addEventListener('click', () => {
-      navigateFromCard();
-    });
-    card.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        navigateFromCard();
-      }
-    });
-    pinButton.addEventListener('pointerdown', swallowPinEvent);
-    pinButton.addEventListener('click', (event) => {
-      swallowPinEvent(event);
-      if (!pinned && pinnedRecentSites.length >= MAX_PINNED_RECENT_SITES) {
-        showToast(t('recent_pin_limit_toast', '最多只能置顶 3 个卡片'), false);
-        updateRecentPinButton(pinButton, false, true);
-        return;
-      }
-      togglePinnedRecentSite(item).then((result) => {
-        if (!result || !card.isConnected) {
-          return;
-        }
-        if (result.limitReached) {
-          showToast(t('recent_pin_limit_toast', '最多只能置顶 3 个卡片'), false);
-        }
-        updateRecentPinButton(
-          pinButton,
-          Boolean(result.pinned),
-          Boolean(!result.pinned && result.limitReached)
-        );
-      });
-    });
-    pinButton.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') {
-        return;
-      }
-      swallowPinEvent(event);
-      pinButton.click();
-    });
-    dismissButton.addEventListener('pointerdown', swallowPinEvent);
-    dismissButton.addEventListener('click', (event) => {
-      swallowPinEvent(event);
-      if (!canDismissRecentCard()) {
-        return;
-      }
-      hideRecentSiteTemporarily(item).then((result) => {
-        if (!result || !result.hidden) {
-          return;
-        }
-        showToast(
-          result.wasPinned
-            ? t('recent_dismiss_pinned_toast', '已取消置顶并从最近访问移除，再次访问后会重新出现')
-            : t('recent_dismiss_toast', '已从最近访问移除，再次访问后会重新出现'),
-          false
-        );
-      });
-    });
-    dismissButton.addEventListener('keydown', (event) => {
-      if (!canDismissRecentCard()) {
-        return;
-      }
-      if (event.key !== 'Enter' && event.key !== ' ') {
-        return;
-      }
-      swallowPinEvent(event);
-      dismissButton.click();
-    });
-    dismissButton.addEventListener('mouseenter', () => {
-      if (!canDismissRecentCard()) {
-        return;
-      }
-      const label = getRecentDismissTooltip(item);
-      updateRecentDismissButton(dismissButton, item);
-      showTopActionTooltip(dismissButton, label);
-    });
-    dismissButton.addEventListener('mouseleave', hideTopActionTooltip);
-    dismissButton.addEventListener('focus', () => {
-      if (!canDismissRecentCard()) {
-        return;
-      }
-      const label = getRecentDismissTooltip(item);
-      updateRecentDismissButton(dismissButton, item);
-      showTopActionTooltip(dismissButton, label);
-    });
-    dismissButton.addEventListener('blur', hideTopActionTooltip);
-
-    return card;
-  }
-
   function shouldDelayBookmarkHoverFromRecent(pointerType) {
     if (pointerType && pointerType !== 'mouse') {
       return false;
@@ -5346,174 +5043,6 @@
       return false;
     }
     return (Date.now() - recentMouseLeftAt) <= BOOKMARK_HOVER_RECENT_TRANSFER_WINDOW_MS;
-  }
-
-  function buildBookmarkCard(item, index) {
-    if (!item || (!item.url && item.type !== 'folder')) {
-      return null;
-    }
-    const isFolder = item.type === 'folder';
-    const themeUrl = item.themeUrl || item.url || '';
-    const host = item.host || getHostFromUrl(themeUrl) || '';
-    const siteName = getSiteDisplayName(host, item.title);
-    const titleText = item.title || siteName || (item.url ? getUrlDisplay(item.url) : t('bookmarks_heading', '书签'));
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.className = 'x-nt-bookmark-card';
-    if (isFolder) {
-      card.classList.add('x-nt-bookmark-card--folder');
-    }
-    card.title = titleText;
-    card._xTitleText = titleText;
-    card.setAttribute('aria-label', formatMessage('open_prefix', '打开 {title}', {
-      title: titleText
-    }));
-    card._xNoThemeTint = isFolder;
-
-    const themeSuggestion = { type: isFolder ? 'bookmark' : 'bookmark', url: themeUrl, title: titleText };
-    const immediateTheme = getImmediateThemeForSuggestion(themeSuggestion);
-    card._xTheme = immediateTheme;
-    card._xHost = host;
-    applyBookmarkCardTheme(card, immediateTheme, host);
-    if (themeUrl) {
-      queueThemeForTarget(card, themeSuggestion, (theme) => {
-        if (!card.isConnected) {
-          return;
-        }
-        card._xTheme = theme || card._xTheme;
-        applyBookmarkCardTheme(card, card._xTheme, host);
-      }, { priority: index < 4 ? 0 : 2 });
-    }
-
-    let icon = null;
-    let folderIcon = null;
-    if (isFolder) {
-      folderIcon = document.createElement('span');
-      folderIcon.className = 'x-nt-bookmark-icon x-nt-bookmark-icon--figma';
-      folderIcon.innerHTML = getFigmaFolderSvg(`${item.id || 'folder'}-${index}`);
-      folderIcon.setAttribute('aria-hidden', 'true');
-      initFolderPathMorph(folderIcon);
-      icon = folderIcon;
-    } else {
-      const favicon = document.createElement('img');
-      favicon.className = 'x-nt-bookmark-icon';
-      favicon.alt = siteName || t('site_icon_alt', '站点');
-      favicon.loading = index < 4 ? 'eager' : 'lazy';
-      if (index < 4) {
-        favicon.fetchPriority = 'high';
-      }
-      attachFaviconWithFallbacks(favicon, item.url, host);
-      icon = favicon;
-    }
-
-    const title = document.createElement('span');
-    title.className = 'x-nt-bookmark-title';
-    title.textContent = sanitizeDisplayText(titleText);
-
-    card.appendChild(icon);
-    card.appendChild(title);
-    if (isFolder && Array.isArray(item.previewUrls) && item.previewUrls.length > 0) {
-      const previewWrap = document.createElement('span');
-      previewWrap.className = 'x-nt-folder-preview';
-      const maxPreview = Math.min(4, item.previewUrls.length);
-      for (let i = 0; i < maxPreview; i += 1) {
-        const url = item.previewUrls[i];
-        if (!url) {
-          continue;
-        }
-        let previewHost = '';
-        try {
-          previewHost = normalizeHost(new URL(url).hostname);
-        } catch (error) {
-          previewHost = '';
-        }
-        const previewFavicon = document.createElement('img');
-        previewFavicon.className = 'x-nt-folder-preview-favicon';
-        const rotationSeed = stableHashCode(`${url}|${i}|${item.id || ''}`);
-        const rotationDeg = ((rotationSeed % 13) - 6) * 0.5;
-        previewFavicon.style.setProperty('--x-nt-folder-favicon-rot', `${rotationDeg.toFixed(2)}deg`);
-        previewFavicon.style.zIndex = String(10 + i);
-        previewFavicon.alt = '';
-        previewFavicon.loading = 'eager';
-        previewFavicon.decoding = 'async';
-        previewFavicon.setAttribute('aria-hidden', 'true');
-        attachFaviconWithFallbacks(previewFavicon, url, previewHost);
-        previewWrap.appendChild(previewFavicon);
-      }
-      card.appendChild(previewWrap);
-    }
-    let hoverIntentTimer = null;
-    let isHoverVisualActive = false;
-    const clearHoverIntentTimer = () => {
-      if (hoverIntentTimer !== null) {
-        window.clearTimeout(hoverIntentTimer);
-        hoverIntentTimer = null;
-      }
-    };
-    const setHoverVisualActive = (active) => {
-      if (isHoverVisualActive === active) {
-        return;
-      }
-      isHoverVisualActive = active;
-      card.classList.toggle('x-nt-bookmark-card--hover', active);
-      if (folderIcon) {
-        playFolderPathMorph(folderIcon, active);
-      }
-    };
-    const activateBookmarkHoverVisual = (event) => {
-      const pointerType = event && typeof event.pointerType === 'string' ? event.pointerType : '';
-      if (!shouldDelayBookmarkHoverFromRecent(pointerType)) {
-        clearHoverIntentTimer();
-        setHoverVisualActive(true);
-        return;
-      }
-      clearHoverIntentTimer();
-      hoverIntentTimer = window.setTimeout(() => {
-        hoverIntentTimer = null;
-        setHoverVisualActive(true);
-      }, BOOKMARK_HOVER_DELAY_FROM_RECENT_MS);
-    };
-    card.addEventListener('pointerenter', (event) => {
-      activateBookmarkHoverVisual(event);
-    });
-    card.addEventListener('pointerleave', () => {
-      clearHoverIntentTimer();
-      setHoverVisualActive(false);
-    });
-    card.addEventListener('pointercancel', () => {
-      clearHoverIntentTimer();
-      setHoverVisualActive(false);
-    });
-    card.addEventListener('focus', () => {
-      clearHoverIntentTimer();
-      setHoverVisualActive(true);
-    });
-    card.addEventListener('blur', () => {
-      clearHoverIntentTimer();
-      setHoverVisualActive(false);
-    });
-    card.addEventListener('pointerdown', () => {
-      clearHoverIntentTimer();
-      setHoverVisualActive(true);
-    });
-    card.addEventListener('click', () => {
-      if (isFolder) {
-        openBookmarkFolder(item.id);
-        return;
-      }
-      navigateToUrl(item.url);
-    });
-    card.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        if (isFolder) {
-          openBookmarkFolder(item.id);
-          return;
-        }
-        navigateToUrl(item.url);
-      }
-    });
-    return card;
   }
 
   function getAutocompleteCandidate(allSuggestions, rawQuery) {
