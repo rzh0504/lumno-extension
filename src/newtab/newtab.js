@@ -3087,17 +3087,23 @@
     image.src = dataUrl;
   }
 
-  function createSearchIcon() {
+  function createSuggestionInlineIcon(iconName, tone) {
     const icon = document.createElement('span');
-    icon.innerHTML = getRiSvg('ri-search-line', 'ri-size-16');
+    icon.innerHTML = getRiSvg(iconName, 'ri-size-16');
     icon.className = 'x-nt-suggestion-inline-icon';
+    if (tone) {
+      icon.setAttribute('data-tone', tone);
+    }
     return icon;
   }
 
-  function createLinkIcon() {
-    const icon = document.createElement('span');
-    icon.innerHTML = getRiSvg('ri-link', 'ri-size-16');
-    icon.className = 'x-nt-suggestion-inline-icon';
+  function createSearchIcon(tone) {
+    const icon = createSuggestionInlineIcon('ri-search-line', tone);
+    return icon;
+  }
+
+  function createLinkIcon(tone) {
+    const icon = createSuggestionInlineIcon('ri-link', tone);
     return icon;
   }
 
@@ -7151,79 +7157,13 @@
         let iconNode = null;
         let iconWrapper = null;
         if (suggestion.type === 'browserPage') {
-          const themedIcon = document.createElement('span');
-          themedIcon.innerHTML = getRiSvg('ri-window-2-line', 'ri-size-16');
-          themedIcon.style.cssText = `
-            all: unset !important;
-            width: 16px !important;
-            height: 16px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            box-sizing: border-box !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            line-height: 1 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            background: transparent !important;
-            color: inherit !important;
-            font-size: 100% !important;
-            font: inherit !important;
-            vertical-align: baseline !important;
-          `;
-          iconNode = themedIcon;
+          iconNode = createSuggestionInlineIcon('ri-window-2-line');
         } else if (suggestion.type === 'directUrl') {
           iconNode = createSearchIcon();
         } else if (suggestion.type === 'commandNewTab') {
-          const plusIcon = document.createElement('span');
-          plusIcon.innerHTML = getRiSvg('ri-add-line', 'ri-size-16');
-          plusIcon.style.cssText = `
-            all: unset !important;
-            width: 16px !important;
-            height: 16px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            box-sizing: border-box !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            line-height: 1 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            background: transparent !important;
-            color: var(--x-nt-subtext, #6B7280) !important;
-            font-size: 100% !important;
-            font: inherit !important;
-            vertical-align: baseline !important;
-          `;
-          iconNode = plusIcon;
+          iconNode = createSuggestionInlineIcon('ri-add-line', 'subtext');
         } else if (suggestion.type === 'commandSettings') {
-          const gearIcon = document.createElement('span');
-          gearIcon.innerHTML = getRiSvg('ri-settings-3-line', 'ri-size-16');
-          gearIcon.style.cssText = `
-            all: unset !important;
-            width: 16px !important;
-            height: 16px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            box-sizing: border-box !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            line-height: 1 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            background: transparent !important;
-            color: var(--x-nt-subtext, #6B7280) !important;
-            font-size: 100% !important;
-            font: inherit !important;
-            vertical-align: baseline !important;
-          `;
-          iconNode = gearIcon;
+          iconNode = createSuggestionInlineIcon('ri-settings-3-line', 'subtext');
         } else if (suggestion.type === 'modeSwitch' && suggestion.favicon) {
           const favicon = document.createElement('img');
           favicon.setAttribute('data-x-nt-suggestion-icon', '1');
@@ -7255,16 +7195,14 @@
           applyFaviconOpticalAlignment(favicon);
           favicon.src = suggestion.favicon || '';
           favicon.onerror = function() {
-            const fallbackIcon = createSearchIcon();
-            fallbackIcon.style.setProperty('color', 'var(--x-nt-subtext, #6B7280)', 'important');
+            const fallbackIcon = createSearchIcon('subtext');
             if (favicon.parentNode) {
               favicon.parentNode.replaceChild(fallbackIcon, favicon);
             }
           };
           iconNode = favicon;
         } else if (suggestion.type === 'newtab' || suggestion.type === 'googleSuggest') {
-          const searchIcon = createSearchIcon();
-          searchIcon.style.setProperty('color', 'var(--x-nt-subtext, #6B7280)', 'important');
+          const searchIcon = createSearchIcon('subtext');
           iconNode = searchIcon;
         } else if (
           suggestion.favicon &&
@@ -7303,8 +7241,7 @@
           applyFaviconOpticalAlignment(favicon);
           favicon.src = suggestion.favicon || '';
           favicon.onerror = function() {
-            const fallbackIcon = createSearchIcon();
-            fallbackIcon.style.setProperty('color', 'var(--x-nt-subtext, #6B7280)', 'important');
+            const fallbackIcon = createSearchIcon('subtext');
             if (favicon.parentNode) {
               favicon.parentNode.replaceChild(fallbackIcon, favicon);
             }
@@ -7352,12 +7289,10 @@
         } else {
           const suggestionHost = suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : '';
           if (suggestionHost && shouldBlockFaviconForHost(suggestionHost)) {
-            const linkIcon = createLinkIcon();
-            linkIcon.style.setProperty('color', 'var(--x-nt-subtext, #6B7280)', 'important');
+            const linkIcon = createLinkIcon('subtext');
             iconNode = linkIcon;
           } else {
-            const searchIcon = createSearchIcon();
-            searchIcon.style.setProperty('color', 'var(--x-nt-subtext, #6B7280)', 'important');
+            const searchIcon = createSearchIcon('subtext');
             iconNode = searchIcon;
           }
         }
