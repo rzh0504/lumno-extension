@@ -2856,6 +2856,17 @@
     target.style.setProperty('--x-ext-key-text', resolvedTheme.keyText);
     target.style.setProperty('--x-ext-key-border', resolvedTheme.keyBorder);
     target.style.setProperty('--x-ext-icon-color', resolvedTheme.accent);
+    const highlight = getHighlightColors(theme);
+    const hover = resolvedTheme._xIsBrand
+      ? getHoverColors(theme)
+      : {
+        bg: 'var(--x-nt-hover-bg, #F3F4F6)',
+        border: 'transparent'
+      };
+    target.style.setProperty('--x-nt-suggestion-active-bg', highlight.bg);
+    target.style.setProperty('--x-nt-suggestion-active-border', highlight.border);
+    target.style.setProperty('--x-nt-suggestion-hover-bg', hover.bg);
+    target.style.setProperty('--x-nt-suggestion-hover-border', hover.border);
   }
 
   function applyMarkVariables(target, theme) {
@@ -6402,13 +6413,25 @@
     return true;
   }
 
-  function applySearchSuggestionHighlight(item, theme) {
+  function applySearchSuggestionHighlight(item) {
+    item.setAttribute('data-row-state', 'active');
+  }
+
+  function resetSearchSuggestion(item) {
+    item.removeAttribute('data-row-state');
+  }
+
+  function applySearchSuggestionHover(item) {
+    item.setAttribute('data-row-state', 'hover');
+  }
+
+  function applyTabSuggestionHighlight(item, theme) {
     const highlight = getHighlightColors(theme);
     item.style.setProperty('background', highlight.bg, 'important');
     item.style.setProperty('border', `1px solid ${highlight.border}`, 'important');
   }
 
-  function resetSearchSuggestion(item) {
+  function resetTabSuggestion(item) {
     item.style.setProperty('background', 'transparent', 'important');
     item.style.setProperty('border', '1px solid transparent', 'important');
   }
@@ -6477,7 +6500,7 @@
       if (item._xIsSearchSuggestion) {
           const theme = item._xTheme || defaultTheme;
         if (isHighlighted) {
-            applySearchSuggestionHighlight(item, theme);
+            applySearchSuggestionHighlight(item);
           } else {
             resetSearchSuggestion(item);
           }
@@ -6497,12 +6520,12 @@
       setNonFaviconIconBg(item, Boolean(isHighlighted || item._xIsHovering));
       const theme = item._xTheme || defaultTheme;
       if (isSelected) {
-        applySearchSuggestionHighlight(item, theme);
+        applyTabSuggestionHighlight(item, theme);
         if (item._xSwitchButton) {
           item._xSwitchButton.style.setProperty('color', 'var(--x-nt-text, #111827)', 'important');
         }
       } else {
-        resetSearchSuggestion(item);
+        resetTabSuggestion(item);
         if (item._xSwitchButton) {
           item._xSwitchButton.style.setProperty('color', 'var(--x-nt-subtext, #9CA3AF)', 'important');
         }
@@ -7085,6 +7108,7 @@
         suggestionItem.id = `_x_extension_newtab_suggestion_item_${index}_2024_unique_`;
         suggestionItem.className = 'x-nt-suggestion-item';
         const isLastItem = index === allSuggestions.length - 1;
+        suggestionItem.setAttribute('data-last', isLastItem ? 'true' : 'false');
         const isPrimaryHighlight = index === primaryHighlightIndex;
         const isPrimarySearchSuggest = isPrimaryHighlight && suggestion.type === 'googleSuggest';
         let immediateTheme = getImmediateThemeForSuggestion(suggestion) || defaultTheme;
@@ -7100,30 +7124,9 @@
             immediateTheme._xIsBrand = true;
           }
         }
-        const initialHighlight = isPrimaryHighlight ? getHighlightColors(immediateTheme) : null;
-        suggestionItem.style.cssText = `
-          all: unset !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: space-between !important;
-          padding: 12px 16px !important;
-          min-height: 44px !important;
-          background: ${isPrimaryHighlight ? initialHighlight.bg : 'transparent'} !important;
-          border: ${isPrimaryHighlight ? `1px solid ${initialHighlight.border}` : '1px solid transparent'} !important;
-          border-radius: 16px !important;
-          cursor: pointer !important;
-          transition: background-color 0.2s ease !important;
-          box-sizing: border-box !important;
-          margin: 0 0 ${isLastItem ? '0' : '6px'} 0 !important;
-          line-height: 1.5 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          color: inherit !important;
-          font-size: 100% !important;
-        font: inherit !important;
-        vertical-align: baseline !important;
-      `;
+        if (isPrimaryHighlight) {
+          applySearchSuggestionHighlight(suggestionItem);
+        }
         suggestionItems.push(suggestionItem);
         suggestionItem._xIsSearchSuggestion = true;
         suggestionItem._xTheme = immediateTheme;
@@ -7542,8 +7545,7 @@
             if (selectedIndex === -1 && this._xIsAutocompleteTop) {
               return;
             }
-            this.style.setProperty('background', 'var(--x-nt-hover-bg, #F3F4F6)', 'important');
-            this.style.setProperty('border', '1px solid transparent', 'important');
+            applySearchSuggestionHover(this);
           }
         });
 
