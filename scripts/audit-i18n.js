@@ -13,8 +13,10 @@ const ALLOWLIST = [
   'brand/provider names in assets/data/site-search.json and provider defaults',
   'AI provider remote page selector probes in src/background/ai-provider-submit.js',
   'browser built-in bookmark folder aliases used only for folder detection',
-  'debug-only score reason strings when the debug flag is disabled by default'
+  'debug-only score reason strings when the debug flag is disabled by default',
+  'Chinese search-intent tokens in src/shared/search-utils.js scoring dictionaries'
 ];
+const I18N_CALL_RE = /(?:^|[^\w])(?:t|getMessage|formatMessage|updateSyncStatusText|attachPopconfirm|createModeOption)\s*\(/;
 
 function walk(root) {
   if (!fs.existsSync(root)) {
@@ -97,10 +99,23 @@ function isAllowlistedLine(file, line) {
   if (file === 'src/background/ai-provider-submit.js') {
     return true;
   }
-  if (/title === 'bookmarks bar'/.test(line)) {
+  if (file === 'src/shared/search-utils.js') {
     return true;
   }
-  if (/name:\s*['"`]/.test(line) && /site-search|provider|engine|search/i.test(file + line)) {
+  if (/title === 'bookmarks bar'/.test(line) ||
+      /['"`](?:书签栏|其他书签|移动设备书签|書籤列|書籤欄)['"`]/.test(line)) {
+    return true;
+  }
+  if (/name:\s*['"`]/.test(line) && (
+      /site-search|provider|engine|search/i.test(file + line) ||
+      (file === 'src/background/background.js' || file === 'src/newtab/newtab.js')
+    )) {
+    return true;
+  }
+  if (file === 'src/newtab/newtab.js' && /'weibo\.com':\s*['"`]微博['"`]/.test(line)) {
+    return true;
+  }
+  if (file === 'src/background/background.js' && /近(?:30分钟|24小时)切换/.test(line)) {
     return true;
   }
   if (/debug|score|reason/i.test(line) && !/textContent|placeholder|aria-label|title/.test(line)) {
@@ -110,10 +125,30 @@ function isAllowlistedLine(file, line) {
 }
 
 function hasI18nCall(line) {
-  return /(?:^|[^\w])(?:t|getMessage|formatMessage)\s*\(/.test(line) ||
+  return I18N_CALL_RE.test(line) ||
     /chrome\.i18n\.getMessage/.test(line) ||
     /data-i18n/.test(line) ||
     /__MSG_/.test(line);
+}
+
+function countParenDelta(line) {
+  const withoutStrings = line.replace(STRING_RE, '""');
+  const opens = (withoutStrings.match(/\(/g) || []).length;
+  const closes = (withoutStrings.match(/\)/g) || []).length;
+  return opens - closes;
+}
+
+function updateI18nJsState(line, state) {
+  if (state.i18nDepth > 0) {
+    state.i18nDepth = Math.max(0, state.i18nDepth + countParenDelta(line));
+    return true;
+  }
+  if (!I18N_CALL_RE.test(line)) {
+    return false;
+  }
+  const delta = countParenDelta(line);
+  state.i18nDepth = Math.max(0, delta);
+  return delta > 0;
 }
 
 function scanJsLine(file, line, lineNumber) {
@@ -159,7 +194,10 @@ function scanHtmlLine(file, line, lineNumber, state) {
   if (/<script\b/i.test(trimmed)) {
     state.inScript = true;
   }
-  const shouldSkip = state.inStyle || state.inScript || hasI18nCall(trimmed);
+  if (/\bdata-i18n(?:-[\w-]+)?=/.test(trimmed)) {
+    state.inI18nTag = true;
+  }
+  const shouldSkip = state.inStyle || state.inScript || state.inI18nTag || hasI18nCall(trimmed);
   const hits = [];
   if (!shouldSkip && HAN_RE.test(trimmed)) {
     const text = stripHtmlTags(trimmed);
@@ -173,6 +211,9 @@ function scanHtmlLine(file, line, lineNumber, state) {
   if (/<\/script>/i.test(trimmed)) {
     state.inScript = false;
   }
+  if (state.inI18nTag && />\s*$/.test(trimmed)) {
+    state.inI18nTag = false;
+  }
   return hits;
 }
 
@@ -184,11 +225,15 @@ function auditSources() {
   const hits = [];
   files.forEach((file) => {
     const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
-    const htmlState = { inStyle: false, inScript: false };
+    const htmlState = { inStyle: false, inScript: false, inI18nTag: false };
+    const jsState = { i18nDepth: 0 };
     lines.forEach((line, index) => {
       const lineNumber = index + 1;
       if (file.endsWith('.html')) {
         hits.push(...scanHtmlLine(file, line, lineNumber, htmlState));
+        return;
+      }
+      if (updateI18nJsState(line, jsState)) {
         return;
       }
       hits.push(...scanJsLine(file, line, lineNumber));

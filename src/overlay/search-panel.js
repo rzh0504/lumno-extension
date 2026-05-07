@@ -402,7 +402,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   let overlayTabQuickSwitchEnabled = true;
   let overlayTabScoreDebugEnabled = false;
   let currentMessages = null;
-  let defaultPlaceholderText = '搜索或输入网址...';
+  let defaultPlaceholderText = 'Search or enter URL...';
   let lastSuggestionResponse = [];
   let overlaySearchEngineState = {
     id: '',

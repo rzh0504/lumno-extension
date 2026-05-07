@@ -449,7 +449,7 @@
     if (normalized.includes('exact')) {
       return {
         labelKey: 'blacklist_label_url',
-        labelFallback: 'URL 规则',
+        labelFallback: 'URL rule',
         placeholderKey: 'blacklist_placeholder_exact',
         placeholderFallback: 'example.com/path',
         prefixText: 'http(s)://'
@@ -458,7 +458,7 @@
     if (normalized.includes('suffix')) {
       return {
         labelKey: 'blacklist_label_url',
-        labelFallback: 'URL 规则',
+        labelFallback: 'URL rule',
         placeholderKey: 'blacklist_placeholder_domain',
         placeholderFallback: 'baidu.com',
         prefixText: ''
@@ -466,9 +466,9 @@
     }
     return {
       labelKey: 'blacklist_label_url',
-      labelFallback: 'URL 规则',
+      labelFallback: 'URL rule',
       placeholderKey: 'blacklist_placeholder_prefix',
-      placeholderFallback: 'baidu.com 或 baidu.com/search',
+      placeholderFallback: 'baidu.com or baidu.com/search',
       prefixText: 'http(s)://'
     };
   }

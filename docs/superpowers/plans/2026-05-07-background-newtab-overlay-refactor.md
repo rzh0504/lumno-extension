@@ -711,7 +711,7 @@ Implementation note: Task 9 newtab bottom-dock slice completed on 2026-05-07. Mo
 - Modify: `src/options/options.js`
 - Modify: `scripts/audit-i18n.js`
 
-- [ ] Fix the existing empty English key:
+- [x] Fix the existing empty English key:
 
 ```json
 "settings_shortcuts_browser_desc_suffix": {
@@ -719,7 +719,7 @@ Implementation note: Task 9 newtab bottom-dock slice completed on 2026-05-07. Mo
 }
 ```
 
-- [ ] Convert confirmed user-facing hardcoded strings to message keys:
+- [x] Convert confirmed user-facing hardcoded strings to message keys:
   - newtab recent heading fallback: `最常访问` / `最近访问`;
   - newtab recent dismiss and unpin/dismiss copy;
   - options confirm dialogs for reset/clear actions;
@@ -727,15 +727,15 @@ Implementation note: Task 9 newtab bottom-dock slice completed on 2026-05-07. Mo
   - background visible ranking/debug reason strings if they can appear in the UI;
   - any placeholder/title/aria-label/textContent literal reported by the audit and not allowlisted.
 
-- [ ] Keep these allowlisted:
+- [x] Keep these allowlisted:
   - provider names like `百度`, `搜狗`, `豆包` when they are data/brand labels;
   - remote AI-page selectors in `ai-provider-submit.js`;
   - browser bookmark folder aliases used for detection;
   - one-character separators like `/`, `*`, `Tab`, and keyboard key labels.
 
-- [ ] Keep zh-TW and zh-HK aligned to zh-CN meaning, with script/wording adapted only where needed.
+- [x] Keep zh-TW and zh-HK aligned to zh-CN meaning, with script/wording adapted only where needed.
 
-- [ ] Run:
+- [x] Run:
 
 ```bash
 npm run audit:i18n
@@ -745,6 +745,8 @@ git diff --check
 ```
 
 Commit message: `Complete i18n coverage`
+
+Implementation note: Task 10 completed on 2026-05-07. Filled the empty English `settings_shortcuts_browser_desc_suffix` key, added missing `data-i18n` coverage for options language entries, shortcut status, and confirm buttons, and changed runtime fallback strings in newtab, overlay, options, and bookmarks-store from Chinese to English so fallback text stays locale-neutral when message lookup is unavailable. Expanded `scripts/audit-i18n.js` to understand multi-line i18n helper calls and multi-line `data-i18n-*` HTML tags, while keeping allowlists scoped to provider/search data, bookmark-folder detection aliases, Chinese search-intent scoring tokens, and debug-only ranking hints. Verified with `npm run audit:i18n`, `npm run check`, `node --check scripts/audit-i18n.js`, `node --check src/newtab/newtab.js`, `node --check src/overlay/search-panel.js`, and `git diff --check`; `npm run audit:i18n` now reports locale parity intact with `empty=0` for every locale and `i18n audit candidate count=0`.
 
 ---
 

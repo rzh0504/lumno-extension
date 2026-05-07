@@ -205,7 +205,7 @@
     const opts = options && typeof options === 'object' ? options : {};
     const nodeMap = opts.nodeMap instanceof Map ? opts.nodeMap : new Map();
     const rootId = String(opts.rootId || '1');
-    const rootTitle = String(opts.rootTitle || '书签');
+    const rootTitle = String(opts.rootTitle || 'Bookmarks');
     const targetId = String(folderId || rootId);
     const path = [{ id: rootId, title: rootTitle }];
     if (targetId === rootId) {

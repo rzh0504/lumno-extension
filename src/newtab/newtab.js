@@ -99,7 +99,7 @@
   let searchBlacklistItems = [];
   let currentMessages = null;
   let currentLanguageMode = 'system';
-  let defaultPlaceholderText = '搜索或输入网址...';
+  let defaultPlaceholderText = 'Search or enter URL...';
   let toastElement = null;
   let toastController = null;
   let layoutController = null;
@@ -1445,7 +1445,7 @@
       return;
     }
     const key = currentRecentMode === 'most' ? 'recent_heading_most' : 'recent_heading_latest';
-    const fallback = currentRecentMode === 'most' ? '最常访问' : '最近访问';
+    const fallback = currentRecentMode === 'most' ? 'Most visited' : 'Recent visits';
     recentHeading.textContent = t(key, fallback);
   }
 
