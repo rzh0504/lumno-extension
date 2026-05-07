@@ -148,6 +148,9 @@
     const rightAnchorOffset = Number.isFinite(Number(config.rightAnchorOffset))
       ? Number(config.rightAnchorOffset)
       : (surface === 'overlay' ? 86 : 52);
+    const configuredBaseInputPaddingLeft = Number.isFinite(Number(config.baseInputPaddingLeft))
+      ? Number(config.baseInputPaddingLeft)
+      : null;
     const prefixTransition = config.prefixTransition || DEFAULT_PREFIX_TRANSITION;
     const defaultPlaceholder = Object.prototype.hasOwnProperty.call(config, 'defaultPlaceholder')
       ? config.defaultPlaceholder
@@ -324,7 +327,9 @@
     function getBaseInputPaddingLeft() {
       if (baseInputPaddingLeft === null) {
         const computed = parseFloat(win.getComputedStyle(input).paddingLeft);
-        baseInputPaddingLeft = Number.isFinite(computed) ? computed : 50;
+        baseInputPaddingLeft = Number.isFinite(computed) && computed > 0
+          ? computed
+          : (configuredBaseInputPaddingLeft || 50);
       }
       return baseInputPaddingLeft;
     }
@@ -391,15 +396,16 @@
       siteSearchPrefix.appendChild(text);
     }
 
-    function setInputModePrefixRestState() {
+    function setInputModePrefixRestState(restOptions) {
       if (inputModePrefixAnimationFrame !== null && win && typeof win.cancelAnimationFrame === 'function') {
         win.cancelAnimationFrame(inputModePrefixAnimationFrame);
         inputModePrefixAnimationFrame = null;
       }
+      const transitionEnabled = !restOptions || restOptions.transition !== false;
       setStyle(siteSearchPrefix, 'opacity', '1', useImportantStyles);
       setStyle(siteSearchPrefix, 'filter', 'blur(0px)', useImportantStyles);
       setStyle(siteSearchPrefix, 'transform', 'translateY(-50%)', useImportantStyles);
-      setStyle(siteSearchPrefix, 'transition', prefixTransition, useImportantStyles);
+      setStyle(siteSearchPrefix, 'transition', transitionEnabled ? prefixTransition : 'none', useImportantStyles);
     }
 
     function playInputModePrefixEnterAnimation() {
@@ -428,11 +434,14 @@
     function setPrefixText(prefixText, theme, prefixOptions) {
       const nextOptions = prefixOptions || {};
       const shouldAnimate = Boolean(nextOptions.animate && nextOptions.isAi);
+      if (!shouldAnimate) {
+        setStyle(siteSearchPrefix, 'transition', 'none', useImportantStyles);
+      }
       setInputModePrefixContent(prefixText, nextOptions);
       const visual = applyInputModePrefixVisual(theme, nextOptions);
       setStyle(siteSearchPrefix, 'display', 'inline-flex', useImportantStyles);
       if (!shouldAnimate) {
-        setInputModePrefixRestState();
+        setInputModePrefixRestState({ transition: false });
       }
       input.placeholder = '';
       setInputStyle(input, 'caret-color', visual.caretColor);
@@ -455,7 +464,7 @@
 
     function clearProviderPrefix() {
       siteSearchPrefix.textContent = '';
-      setInputModePrefixRestState();
+      setInputModePrefixRestState({ transition: false });
       setStyle(siteSearchPrefix, 'display', 'none', useImportantStyles);
       input.placeholder = getDefaultPlaceholder();
       setInputStyle(input, 'caret-color', defaultCaretColor);

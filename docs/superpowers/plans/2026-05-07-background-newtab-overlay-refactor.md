@@ -339,7 +339,7 @@ controller.destroy();
   - Escape/backspace mode exit;
   - theme update/caret update.
 
-- [ ] Validate:
+- [x] Validate:
   - `gm` + Tab prefix appears with the same icon, text, padding-left, caret color, and animation in both surfaces;
   - regular site-search prefix still has no AI icon unless current behavior says it should;
   - reduced motion disables entry animation as before.
@@ -355,7 +355,9 @@ git diff --check
 
 Commit message: `Share search input mode controller`
 
-Implementation note: Task 4 code migration completed on 2026-05-07. Added `src/shared/search-input-mode.js`, loaded it in newtab and overlay injection order, and replaced duplicated prefix pill, Tab hint, right-padding, caret, and AI/site-search mode calls in `background.js` and `newtab.js` with `LumnoSearchInputMode.createInputModeController(...)`. Verified with `node --check src/shared/search-input-mode.js`, `node --check src/background/background.js`, `node --check src/newtab/newtab.js`, `npm run check`, `npm run test:search`, `npm run audit:style`, and `git diff --check`. Current style audit summary is `TOTAL files=35 lines=45257 important=1533 setPropertyImportant=334 cssText=115 styleWrites=726 createElement=291`. Newtab renders without a blank page in screenshot `dist/.checks/refactor-after-task-4/newtab-open.png`; DevTools validation confirmed `gm` + Tab enters Gemini mode with prefix visible, input `padding-left: 141px`, caret `rgb(66, 133, 244)`, and AI suggestion rendering, with screenshots `dist/.checks/refactor-after-task-4/newtab-gm-tab-devtools.png` and `dist/.checks/refactor-after-task-4/newtab-gemini-hello-devtools.png`. Overlay hotkey validation reached `shortcut-matched` and `trigger-overlay`, then exposed a helper-global issue (`Lumno: input UI helper not available.`); fixed shared input helpers to install on `window` first for injected overlay compatibility. Full post-fix overlay visual validation remains pending because `chrome.runtime.reload()` closed the selected DevTools target and the MCP session stopped accepting page-selection commands.
+Implementation note: Task 4 code migration completed on 2026-05-07. Added `src/shared/search-input-mode.js`, loaded it in newtab and overlay injection order, and replaced duplicated prefix pill, Tab hint, right-padding, caret, and AI/site-search mode calls in `background.js` and `newtab.js` with `LumnoSearchInputMode.createInputModeController(...)`. Verified with `node --check src/shared/search-input-mode.js`, `node --check src/background/background.js`, `node --check src/newtab/newtab.js`, `npm run check`, `npm run test:search`, `npm run audit:style`, and `git diff --check`. Current style audit summary is `TOTAL files=35 lines=45257 important=1533 setPropertyImportant=334 cssText=115 styleWrites=726 createElement=291`. Newtab renders without a blank page in screenshot `dist/.checks/refactor-after-task-4/newtab-open.png`; DevTools validation confirmed `gm` + Tab enters Gemini mode with prefix visible, input `padding-left: 141px`, caret `rgb(66, 133, 244)`, and AI suggestion rendering, with screenshots `dist/.checks/refactor-after-task-4/newtab-gm-tab-devtools.png` and `dist/.checks/refactor-after-task-4/newtab-gemini-hello-devtools.png`. Overlay hotkey validation reached `shortcut-matched` and `trigger-overlay`, then exposed a helper-global issue (`Lumno: input UI helper not available.`); fixed shared input helpers to install on `window` first for injected overlay compatibility. Post-fix overlay validation was completed with Computer Use against the existing Chrome Dev session on `https://lumno.kubai.design/release/`. `chrome://extensions/shortcuts` showed this browser's Lumno command is `⌘T`, not `⌘⇧K`; pressing `⌘T` opened the overlay on an ordinary webpage, focused the shared input, and rendered suggestions. `gm` + Tab showed the Gemini prefix with stable padding/positioning, entering `hello` rendered the AI suggestion, and Escape closed the overlay cleanly. Screenshots are saved at `dist/.checks/refactor-after-task-4/overlay-open-real-shortcut.png`, `dist/.checks/refactor-after-task-4/overlay-gm-tab-real-shortcut.png`, and `dist/.checks/refactor-after-task-4/overlay-gemini-hello-real-shortcut.png`. During this validation, Gemini prompt submit needed a small runtime fix: after Enter, the helper now keeps watching briefly for Gemini's nearby send button, covered by `scripts/test-ai-provider-submit.js`.
+
+Follow-up validation after the Gemini submit and prefix padding fixes passed on 2026-05-07 with `npm run check`, `npm run test:search`, `npm run test:ai-provider-submit`, `npm run test:extension-routes`, `npm run test:newtab-fallback`, `npm run test:shortcut-rules`, `npm run test:url-guards`, `npm run audit:style`, `npm run audit:i18n`, and `git diff --check`. The current style audit summary is `TOTAL files=35 lines=45276 important=1533 setPropertyImportant=334 cssText=115 styleWrites=726 createElement=291`; the i18n audit still reports locale parity intact, one existing empty English key `settings_shortcuts_browser_desc_suffix`, and 74 hardcoded string candidates.
 
 ---
 
@@ -368,7 +370,7 @@ Implementation note: Task 4 code migration completed on 2026-05-07. Added `src/s
 - Modify: `scripts/package-store.js`
 - Modify: `package.json`
 
-- [ ] Move the injected page-side overlay controller currently embedded in `toggleBlackRectangle(...)` into `src/overlay/search-panel.js`.
+- [x] Move the injected page-side overlay controller currently embedded in `toggleBlackRectangle(...)` into `src/overlay/search-panel.js`.
 
 Required exported global:
 
@@ -378,13 +380,13 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
 };
 ```
 
-- [ ] Keep the service-worker side in `background.js` as orchestration only:
+- [x] Keep the service-worker side in `background.js` as orchestration only:
   - collect tabs/context;
   - inject files;
   - call `window._x_extension_toggleSearchOverlay_2026_unique_(tabs, overlayContext)` via `chrome.scripting.executeScript`;
   - handle injection errors and restricted-page fallback.
 
-- [ ] Overlay injection order must become:
+- [x] Overlay injection order must become:
 
 ```js
 [
@@ -402,9 +404,9 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
 ]
 ```
 
-- [ ] Do not rewrite suggestion rendering in this task. This is a move-only extraction plus call boundary change.
+- [x] Do not rewrite suggestion rendering in this task. This is a move-only extraction plus call boundary change.
 
-- [ ] Browser validation:
+- [x] Browser validation:
   - ordinary webpage overlay opens from hotkey;
   - input focuses;
   - query suggestions render;
@@ -425,6 +427,8 @@ git diff --check
 Expected size effect: `background.js` should drop by several thousand lines. If it does not, the move boundary was too timid.
 
 Commit message: `Extract overlay search panel runtime`
+
+Implementation note: Task 5 completed on 2026-05-07. Extracted the 6,762-line page-side overlay controller from `src/background/background.js` into `src/overlay/search-panel.js` as `window._x_extension_toggleSearchOverlay_2026_unique_`. `background.js` now builds an `overlayInjectionFiles` list, injects `src/overlay/search-panel.js` after the existing shared/overlay helpers, and calls the global helper through `chrome.scripting.executeScript(...)` with fallback handling if the helper is missing. Added the new file to `package.json` syntax checks plus `scripts/check-manifest-resources.js` and `scripts/package-store.js`. Size effect: `src/background/background.js` is now 5,328 lines, and `src/overlay/search-panel.js` is 6,764 lines. Verified with `node --check src/background/background.js`, `node --check src/overlay/search-panel.js`, `npm run check`, `npm run test:search`, `npm run test:ai-provider-submit`, `npm run test:extension-routes`, `npm run test:newtab-fallback`, `npm run test:shortcut-rules`, `npm run test:url-guards`, `npm run audit:style`, `npm run audit:i18n`, `git diff --check`, and `npm run package:store`. The style audit summary after extraction is `TOTAL files=36 lines=45310 important=1533 setPropertyImportant=334 cssText=115 styleWrites=726 createElement=291`; `background.js` now has `important=0` and `setPropertyImportant=0`, with the remaining overlay style debt living in `src/overlay/search-panel.js`. Browser validation used the existing Chrome Dev session on `https://lumno.kubai.design/release/`: `⌘T` opened the overlay, the input focused, suggestions rendered, `gm` + Tab entered Gemini mode, typing `hello` rendered the AI suggestion, Escape closed cleanly, and clicking the first open-tab switch action closed the overlay and switched to the target tab. Screenshots are saved at `dist/.checks/refactor-after-task-5/overlay-open-after-search-panel.png`, `dist/.checks/refactor-after-task-5/overlay-gm-tab-after-search-panel.png`, and `dist/.checks/refactor-after-task-5/overlay-gemini-hello-after-search-panel.png`.
 
 ---
 

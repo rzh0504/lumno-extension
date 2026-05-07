@@ -9418,6 +9418,7 @@
     modeBadgeElement: modeBadge,
     rightReserveBase: 96,
     rightAnchorOffset: 52,
+    baseInputPaddingLeft: 44,
     getThemeForMode,
     defaultTheme,
     defaultAccentColor,

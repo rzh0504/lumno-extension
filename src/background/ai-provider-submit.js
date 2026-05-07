@@ -73,7 +73,8 @@
       submitMode: String(settings.submitMode || '').trim(),
       contentEditableFillMode: String(settings.contentEditableFillMode || '').trim(),
       inputEventDataMode: String(settings.inputEventDataMode || '').trim(),
-      useNearbySendButton: Boolean(settings.useNearbySendButton)
+      useNearbySendButton: Boolean(settings.useNearbySendButton),
+      postEnterUseNearbySendButton: Boolean(settings.postEnterUseNearbySendButton)
     };
   }
 
@@ -116,7 +117,10 @@
         'button[aria-label*="send" i]',
         'button[aria-label*="submit" i]'
       ],
-      buttonWaitAttempts: 24
+      buttonWaitAttempts: 24,
+      postEnterDelayMs: 320,
+      postEnterButtonAttempts: 12,
+      postEnterUseNearbySendButton: true
     }),
     chatgptPrompt: createPromptStrategy({
       editorSelectors: [
@@ -262,6 +266,7 @@
           const contentEditableFillMode = String(config.contentEditableFillMode || '').trim();
           const inputEventDataMode = String(config.inputEventDataMode || '').trim();
           const useNearbySendButton = Boolean(config.useNearbySendButton);
+          const postEnterUseNearbySendButton = Boolean(config.postEnterUseNearbySendButton);
           const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
           const isVisible = (element) => {
             if (!element) {
@@ -331,8 +336,8 @@
             }
             return null;
           };
-          const findNearbySendButton = (editor) => {
-            if (!useNearbySendButton || !editor) {
+          const findNearbySendButton = (editor, shouldUseNearby) => {
+            if (!shouldUseNearby || !editor) {
               return null;
             }
             const editorRect = editor.getBoundingClientRect();
@@ -366,14 +371,15 @@
             candidates.sort((a, b) => a.score - b.score);
             return candidates.length > 0 ? candidates[0].button : null;
           };
-          const findSendButton = (editor) => {
+          const findSendButton = (editor, options) => {
+            const shouldUseNearby = Boolean(options && options.useNearby);
             for (const selector of sendButtonSelectors) {
               const button = queryAll(selector).find(isVisible);
               if (button) {
                 return button;
               }
             }
-            return findNearbySendButton(editor);
+            return findNearbySendButton(editor, shouldUseNearby);
           };
           const setNativeValue = (editor, value) => {
             const prototype = editor instanceof HTMLTextAreaElement
@@ -481,7 +487,7 @@
             }
             if (submitMode !== 'enter') {
               for (let sendAttempt = 0; sendAttempt < buttonWaitAttempts; sendAttempt += 1) {
-                const sendButton = findSendButton(editor);
+                const sendButton = findSendButton(editor, { useNearby: useNearbySendButton });
                 if (sendButton && isActionableButton(sendButton)) {
                   sendButton.click();
                   return { ok: true, method: 'button' };
@@ -501,7 +507,9 @@
             }
             if (getEditorText(editor) === promptText) {
               for (let postEnterAttempt = 0; postEnterAttempt < Math.max(1, postEnterButtonAttempts); postEnterAttempt += 1) {
-                const sendButton = findSendButton(editor);
+                const sendButton = findSendButton(editor, {
+                  useNearby: useNearbySendButton || postEnterUseNearbySendButton
+                });
                 if (sendButton && isActionableButton(sendButton)) {
                   sendButton.click();
                   return { ok: true, method: 'enter-button' };

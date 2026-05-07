@@ -22,6 +22,7 @@ const injectedScriptFiles = [
   'src/overlay/favicon-view.js',
   'src/overlay/shell.js',
   'src/overlay/lifecycle.js',
+  'src/overlay/search-panel.js',
   'src/content/document-pip-picker.js'
 ];
 
