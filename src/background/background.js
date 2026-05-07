@@ -48,6 +48,12 @@ try {
 }
 
 try {
+  importScripts(chrome.runtime.getURL('src/background/message-router.js'));
+} catch (error) {
+  console.warn('Lumno: failed to load background message router.', error);
+}
+
+try {
   importScripts(chrome.runtime.getURL('src/background/newtab-fallback.js'));
 } catch (error) {
   console.warn('Lumno: failed to load newtab fallback helpers.', error);
@@ -84,6 +90,7 @@ const openOnboardingPage = BACKGROUND_PAGES.openOnboardingPage;
 const openReleasePage = BACKGROUND_PAGES.openReleasePage;
 const openBookmarkManagerPage = BACKGROUND_PAGES.openBookmarkManagerPage;
 const openExtensionShortcutsPage = BACKGROUND_PAGES.openExtensionShortcutsPage;
+const BACKGROUND_MESSAGE_ROUTER = globalThis.LumnoBackgroundMessageRouter || {};
 const EXTENSION_ROUTES = globalThis.LumnoExtensionRoutes || {};
 const BACKGROUND_NEWTAB_FALLBACK = globalThis.LumnoBackgroundNewtabFallback || {};
 const isLocalFileLikeTargetUrl = BACKGROUND_NEWTAB_FALLBACK.isLocalFileLikeTargetUrl;
@@ -1950,65 +1957,84 @@ function runInteractiveSiteSearchProvider(provider, query, sender, disposition) 
 
 // Route message actions by feature area before invoking the original handlers.
 const BACKGROUND_MESSAGE_ROUTE_GROUPS = Object.freeze({
-  tabs: Object.freeze([
-    'switchToTab',
-    'reportTabVisible',
-    'getTabsForOverlay',
-    'trackSearchTab',
-    'closeOtherTabsForOverlay'
-  ]),
-  shortcuts: Object.freeze([
-    'getShowSearchShortcut',
-    'getCopyCurrentUrlCommandShortcut',
-    'triggerShowSearchFromPageHotkey',
-    'getShortcutRules'
-  ]),
-  pip: Object.freeze([
-    'pipRequestOwnership',
-    'pipReleaseOwnership',
-    'siteTryEnterPiPInMainWorld',
-    'iqiyiTryEnterPiPInMainWorld',
-    'iqiyiSetupAutoPiPInMainWorld',
-    'forceExitPiPInMainWorld',
-    'ytForceExitPiPInMainWorld'
-  ]),
-  search: Object.freeze([
-    'searchOrNavigate',
-    'getSearchSuggestions',
-    'recordSearchSuggestionSelection',
-    'deleteHistoryUrl'
-  ]),
-  siteSearch: Object.freeze([
-    'getSiteSearchProviders',
-    'runSiteSearchProviderQuery'
-  ]),
-  localeAndPermissions: Object.freeze([
-    'getLocaleMessages',
-    'getFileSchemeAccessStatus'
-  ]),
-  extensionPages: Object.freeze([
-    'openOptionsPage',
-    'openExtensionShortcutsPage',
-    'openBookmarkManager',
-    'createTab',
-    'openNewTab',
-    'openExtensionDetailsPage'
-  ]),
-  favicon: Object.freeze([
-    'resolveFaviconCandidates',
-    'getFaviconData',
-    'resolveSiteThemeColor'
-  ])
+  tabs: {
+    actions: [
+      'switchToTab',
+      'reportTabVisible',
+      'getTabsForOverlay',
+      'trackSearchTab',
+      'closeOtherTabsForOverlay'
+    ],
+    handler: handleTabMessage
+  },
+  shortcuts: {
+    actions: [
+      'getShowSearchShortcut',
+      'getCopyCurrentUrlCommandShortcut',
+      'triggerShowSearchFromPageHotkey',
+      'getShortcutRules'
+    ],
+    handler: handleShortcutMessage
+  },
+  pip: {
+    actions: [
+      'pipRequestOwnership',
+      'pipReleaseOwnership',
+      'siteTryEnterPiPInMainWorld',
+      'iqiyiTryEnterPiPInMainWorld',
+      'iqiyiSetupAutoPiPInMainWorld',
+      'forceExitPiPInMainWorld',
+      'ytForceExitPiPInMainWorld'
+    ],
+    handler: handlePipMessage
+  },
+  search: {
+    actions: [
+      'searchOrNavigate',
+      'getSearchSuggestions',
+      'recordSearchSuggestionSelection',
+      'deleteHistoryUrl'
+    ],
+    handler: handleSearchMessage
+  },
+  siteSearch: {
+    actions: [
+      'getSiteSearchProviders',
+      'runSiteSearchProviderQuery'
+    ],
+    handler: handleSiteSearchMessage
+  },
+  localeAndPermissions: {
+    actions: [
+      'getLocaleMessages',
+      'getFileSchemeAccessStatus'
+    ],
+    handler: handleLocaleAndPermissionMessage
+  },
+  extensionPages: {
+    actions: [
+      'openOptionsPage',
+      'openExtensionShortcutsPage',
+      'openBookmarkManager',
+      'createTab',
+      'openNewTab',
+      'openExtensionDetailsPage'
+    ],
+    handler: handleExtensionPageMessage
+  },
+  favicon: {
+    actions: [
+      'resolveFaviconCandidates',
+      'getFaviconData',
+      'resolveSiteThemeColor'
+    ],
+    handler: handleFaviconMessage
+  }
 });
 
-const BACKGROUND_MESSAGE_ROUTES = Object.freeze(
-  Object.entries(BACKGROUND_MESSAGE_ROUTE_GROUPS).reduce((routes, [group, actions]) => {
-    actions.forEach((action) => {
-      routes[action] = group;
-    });
-    return routes;
-  }, {})
-);
+const backgroundMessageRouter = typeof BACKGROUND_MESSAGE_ROUTER.createRouter === 'function'
+  ? BACKGROUND_MESSAGE_ROUTER.createRouter(BACKGROUND_MESSAGE_ROUTE_GROUPS)
+  : null;
 
 function sendUnknownBackgroundMessageResponse(sendResponse) {
   sendResponse({ ok: false });
@@ -2016,29 +2042,10 @@ function sendUnknownBackgroundMessageResponse(sendResponse) {
 }
 
 function dispatchBackgroundMessage(request, sender, sendResponse) {
-  const action = request && request.action;
-  const group = BACKGROUND_MESSAGE_ROUTES[action];
-
-  switch (group) {
-    case 'tabs':
-      return handleTabMessage(request, sender, sendResponse);
-    case 'shortcuts':
-      return handleShortcutMessage(request, sender, sendResponse);
-    case 'pip':
-      return handlePipMessage(request, sender, sendResponse);
-    case 'search':
-      return handleSearchMessage(request, sender, sendResponse);
-    case 'siteSearch':
-      return handleSiteSearchMessage(request, sender, sendResponse);
-    case 'localeAndPermissions':
-      return handleLocaleAndPermissionMessage(request, sender, sendResponse);
-    case 'extensionPages':
-      return handleExtensionPageMessage(request, sender, sendResponse);
-    case 'favicon':
-      return handleFaviconMessage(request, sender, sendResponse);
-    default:
-      return sendUnknownBackgroundMessageResponse(sendResponse);
+  if (backgroundMessageRouter && typeof BACKGROUND_MESSAGE_ROUTER.dispatch === 'function') {
+    return BACKGROUND_MESSAGE_ROUTER.dispatch(backgroundMessageRouter, request, sender, sendResponse);
   }
+  return sendUnknownBackgroundMessageResponse(sendResponse);
 }
 
 // Listen for extension runtime messages.

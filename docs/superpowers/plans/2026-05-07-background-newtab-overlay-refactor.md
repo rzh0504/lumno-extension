@@ -759,7 +759,7 @@ Implementation note: Task 10 completed on 2026-05-07. Filled the empty English `
 - Modify: `scripts/package-store.js`
 - Modify: `package.json`
 
-- [ ] Extract only the generic route dispatch machinery from `background.js` into `src/background/message-router.js`.
+- [x] Extract only the generic route dispatch machinery from `background.js` into `src/background/message-router.js`.
 
 Required API:
 
@@ -770,15 +770,15 @@ globalThis.LumnoBackgroundMessageRouter = {
 };
 ```
 
-- [ ] Keep handlers in `background.js` unless a handler group has explicit dependencies and no implicit globals.
+- [x] Keep handlers in `background.js` unless a handler group has explicit dependencies and no implicit globals.
 
-- [ ] After extraction, move low-risk handler groups one at a time only if they accept a dependency object:
+- [x] After extraction, move low-risk handler groups one at a time only if they accept a dependency object:
   - `extensionPages`;
   - `localeAndPermissions`;
   - `shortcuts` rule loading;
   - `newtabFallback`.
 
-- [ ] Do not move search, ranking, favicon resolver, or overlay-open orchestration in this task unless tests and browser validation cover the full path.
+- [x] Do not move search, ranking, favicon resolver, or overlay-open orchestration in this task unless tests and browser validation cover the full path.
 
 Run:
 
@@ -791,6 +791,8 @@ git diff --check
 ```
 
 Commit message: `Extract background message router`
+
+Implementation note: Task 11 completed on 2026-05-07. Added `src/background/message-router.js` with `LumnoBackgroundMessageRouter.createRouter(...)` and `dispatch(...)`, loaded it before background runtime message registration, and changed `background.js` to keep only the route group configuration plus the existing handler functions. Search, ranking, favicon resolution, and overlay-open orchestration remain in `background.js`; this slice intentionally moved only the generic action-to-handler dispatch machinery. Added `scripts/test-message-router.js` and `npm run test:message-router` for direct coverage of successful dispatch, unknown action responses, and duplicate action detection. Added the new runtime file to `npm run check:js`, `scripts/check-manifest-resources.js`, and `scripts/package-store.js`. Verified with `node --check src/background/message-router.js`, `node --check src/background/background.js`, `node --check scripts/test-message-router.js`, `npm run test:message-router`, `npm run test:shortcut-rules`, `npm run test:newtab-fallback`, `npm run check`, `npm run audit:style`, `npm run audit:i18n`, `npm run package:store`, and `git diff --check`. Browser validation used the existing Chrome Dev window: reloaded the unpacked Lumno extension from `chrome://extensions/?id=nkbkcafoocmnnconoijmhloecgamfcai`, opened a fresh newtab, and confirmed the page rendered plus `gm` suggestions appeared under the new message router.
 
 ---
 

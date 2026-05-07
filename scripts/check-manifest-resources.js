@@ -5,6 +5,7 @@ const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
 const missing = [];
 const injectedScriptFiles = [
   'src/background/extension-pages.js',
+  'src/background/message-router.js',
   'src/background/newtab-fallback.js',
   'src/background/shortcut-rules.js',
   'src/background/pip-ownership.js',
