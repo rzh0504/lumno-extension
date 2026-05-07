@@ -4047,15 +4047,35 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     window.addEventListener('keydown', overlayKeyCaptureHandler, true);
     document.addEventListener('keydown', keydownHandler);
 
+    function setSuggestionRowColors(item, bg, border) {
+      if (!item) {
+        return;
+      }
+      item.style.setProperty('--x-ov-suggestion-row-bg', bg || 'transparent');
+      item.style.setProperty('--x-ov-suggestion-row-border', border || 'transparent');
+    }
+
+    function setSuggestionActionTagsVisible(element, visible) {
+      if (!element) {
+        return;
+      }
+      element.setAttribute('data-visible', visible ? 'true' : 'false');
+    }
+
+    function setSuggestionTitleActive(title, active) {
+      if (!title) {
+        return;
+      }
+      title.style.setProperty('--x-ov-suggestion-title-weight', active ? '600' : '400');
+    }
+
     function applySearchSuggestionHighlight(item, theme) {
       const highlight = getHighlightColors(theme);
-      item.style.setProperty('background', highlight.bg, 'important');
-      item.style.setProperty('border', `1px solid ${highlight.border}`, 'important');
+      setSuggestionRowColors(item, highlight.bg, highlight.border);
     }
 
     function resetSearchSuggestion(item) {
-      item.style.setProperty('background', 'transparent', 'important');
-      item.style.setProperty('border', '1px solid transparent', 'important');
+      setSuggestionRowColors(item, 'transparent', 'transparent');
     }
 
     function applySearchActionStyles(item, theme, isActive) {
@@ -4167,10 +4187,10 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       }
       if (item._xTagContainer) {
         const shouldShow = isActive && item._xHasActionTags;
-        item._xTagContainer.style.setProperty('display', shouldShow ? 'inline-flex' : 'none', 'important');
+        setSuggestionActionTagsVisible(item._xTagContainer, shouldShow);
       }
       if (item._xTitle) {
-        item._xTitle.style.setProperty('font-weight', isActive ? '600' : '400', 'important');
+        setSuggestionTitleActive(item._xTitle, isActive);
       }
     }
 
@@ -4222,11 +4242,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             item._xSwitchButton.style.setProperty('display', shouldShowTags ? 'none' : 'inline-flex', 'important');
           }
           if (item._xTagContainer) {
-            item._xTagContainer.style.setProperty(
-              'display',
-              item._xHasActionTags ? 'inline-flex' : 'none',
-              'important'
-            );
+            setSuggestionActionTagsVisible(item._xTagContainer, item._xHasActionTags);
           }
         } else {
           resetSearchSuggestion(item);
@@ -4235,11 +4251,11 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             item._xSwitchButton.style.setProperty('display', 'inline-flex', 'important');
           }
           if (item._xTagContainer) {
-            item._xTagContainer.style.setProperty('display', 'none', 'important');
+            setSuggestionActionTagsVisible(item._xTagContainer, false);
           }
         }
         if (item._xTitle) {
-          item._xTitle.style.setProperty('font-weight', isHighlighted ? '600' : '400', 'important');
+          setSuggestionTitleActive(item._xTitle, isHighlighted);
         }
       });
     }
@@ -4284,44 +4300,15 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       const isDark = isOverlayDarkMode();
       const empty = document.createElement('div');
       applyNoTranslate(empty);
-      empty.style.cssText = `
-        all: unset !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 8px !important;
-        padding: 16px 14px !important;
-        margin: 0 !important;
-        border: none !important;
-        border-radius: 14px !important;
-        background: ${isDark ? 'transparent' : 'color-mix(in srgb, var(--x-ov-bg, #FFFFFF) 90%, var(--x-ov-hover-bg, #F3F4F6) 10%)'} !important;
-        color: var(--x-ov-subtext, #6B7280) !important;
-        box-sizing: border-box !important;
-        line-height: 1.4 !important;
-        text-decoration: none !important;
-        list-style: none !important;
-        outline: none !important;
-        font-size: 13px !important;
-        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-        vertical-align: baseline !important;
-      `;
+      empty.className = 'x-ov-empty-state';
+      empty.setAttribute('data-theme', isDark ? 'dark' : 'light');
       const icon = document.createElement('span');
       applyNoTranslate(icon);
       icon.innerHTML = getRiSvg('ri-file-3-line', 'ri-size-16');
-      icon.style.cssText = `
-        all: unset !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        color: var(--x-ov-subtext, #9CA3AF) !important;
-        line-height: 1 !important;
-      `;
+      icon.className = 'x-ov-empty-state__icon';
       const text = document.createElement('span');
       setProtectedPlainText(text, message || t('overlay_empty_result', '无匹配结果'));
-      text.style.cssText = `
-        all: unset !important;
-        line-height: 1.35 !important;
-      `;
+      text.className = 'x-ov-empty-state__text';
       empty.appendChild(icon);
       empty.appendChild(text);
       suggestionsContainer.appendChild(empty);
@@ -4352,28 +4339,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         applyNoTranslate(entryItem);
         entryItem.id = '_x_extension_open_tabs_mode_entry_2026_unique_';
         const entryIsLast = totalItems === 1;
-        entryItem.style.cssText = `
-          all: unset !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: space-between !important;
-          padding: 12px 16px !important;
-          background: transparent !important;
-          border: 1px solid transparent !important;
-          border-radius: 16px !important;
-          cursor: pointer !important;
-          transition: background-color 0.2s ease !important;
-          box-sizing: border-box !important;
-          margin: 0 0 ${entryIsLast ? '0' : '4px'} 0 !important;
-          line-height: 1.5 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          color: inherit !important;
-          font-size: 100% !important;
-          font: inherit !important;
-          vertical-align: baseline !important;
-        `;
+        entryItem.className = 'x-ov-suggestion-item';
+        entryItem.setAttribute('data-last', entryIsLast ? 'true' : 'false');
         entryItem._xIsSearchSuggestion = false;
         entryItem._xIsOpenTabsModeEntry = true;
         entryItem._xIsAutocompleteTop = false;
@@ -4381,51 +4348,9 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         suggestionItems.push(entryItem);
 
         const entryLeft = document.createElement('div');
-        entryLeft.style.cssText = `
-          all: unset !important;
-          display: flex !important;
-          align-items: center !important;
-          gap: 12px !important;
-          flex: 1 !important;
-          min-width: 0 !important;
-          box-sizing: border-box !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          line-height: 1 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          background: transparent !important;
-          color: inherit !important;
-          font-size: 100% !important;
-          font: inherit !important;
-          vertical-align: baseline !important;
-        `;
+        entryLeft.className = 'x-ov-suggestion-left';
         const entryIconSlot = document.createElement('span');
-        entryIconSlot.style.cssText = `
-          all: unset !important;
-          width: 24px !important;
-          height: 24px !important;
-          flex: 0 0 24px !important;
-          flex-shrink: 0 !important;
-          border-radius: 8px !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-          box-sizing: border-box !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          line-height: 1 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          background: transparent !important;
-          transition: background-color 0.2s ease !important;
-          color: var(--x-ov-subtext, #9CA3AF) !important;
-          font-size: 100% !important;
-          font: inherit !important;
-          vertical-align: baseline !important;
-        `;
+        entryIconSlot.className = 'x-ov-suggestion-icon-slot';
         const entryIcon = document.createElement('span');
         entryIcon.innerHTML = getRiSvg('ri-search-line', 'ri-size-16');
         entryIconSlot.appendChild(entryIcon);
@@ -4435,48 +4360,12 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         const entryTitle = document.createElement('span');
         applyNoTranslate(entryTitle);
         setProtectedPlainText(entryTitle, t('search_open_tabs_only_entry', '搜索已打开标签页'));
-        entryTitle.style.cssText = `
-          all: unset !important;
-          color: var(--x-ov-text, #111827) !important;
-          font-size: 14px !important;
-          font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-          white-space: nowrap !important;
-          overflow: hidden !important;
-          text-overflow: ellipsis !important;
-          max-width: 100% !important;
-          box-sizing: border-box !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          line-height: 1.5 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          background: transparent !important;
-          display: inline-block !important;
-          vertical-align: baseline !important;
-        `;
+        entryTitle.className = 'x-ov-suggestion-title';
         entryItem._xTitle = entryTitle;
 
         const entryActionTags = document.createElement('div');
-        entryActionTags.style.cssText = `
-          all: unset !important;
-          display: none !important;
-          align-items: center !important;
-          gap: 6px !important;
-          box-sizing: border-box !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          line-height: 1 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          background: transparent !important;
-          color: inherit !important;
-          font-size: 100% !important;
-          font: inherit !important;
-          vertical-align: baseline !important;
-          flex-shrink: 0 !important;
-        `;
+        entryActionTags.className = 'x-ov-suggestion-action-tags';
+        setSuggestionActionTagsVisible(entryActionTags, false);
         const entryActionTag = createActionTag(t('action_search', '搜索'), 'Tab');
         entryActionTag.style.setProperty('cursor', 'pointer', 'important');
         const entryTagPalette = getOverlayActionTagPalette();
@@ -4529,8 +4418,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             if (selectedIndex === -1 && this._xIsAutocompleteTop) {
               return;
             }
-            this.style.setProperty('background-color', 'var(--x-ov-hover-bg)', 'important');
-            this.style.setProperty('border', '1px solid transparent', 'important');
+            setSuggestionRowColors(this, 'var(--x-ov-hover-bg)', 'transparent');
           }
         });
         entryItem.addEventListener('mouseleave', function() {
@@ -4554,25 +4442,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         entryLeft.appendChild(entryIconSlot);
         entryLeft.appendChild(entryTitle);
         const entryRight = document.createElement('div');
-        entryRight.style.cssText = `
-          all: unset !important;
-          display: inline-flex !important;
-          align-items: center !important;
-          gap: 8px !important;
-          flex-shrink: 0 !important;
-          box-sizing: border-box !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          line-height: 1 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          background: transparent !important;
-          color: inherit !important;
-          font-size: 100% !important;
-          font: inherit !important;
-          vertical-align: baseline !important;
-        `;
+        entryRight.className = 'x-ov-suggestion-right';
         entryRight.appendChild(entryActionTags);
         entryRight.appendChild(entryVisitButton);
         entryItem.appendChild(entryLeft);
@@ -4586,28 +4456,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         applyNoTranslate(suggestionItem);
         suggestionItem.id = `_x_extension_suggestion_item_${index}_2024_unique_`;
         const isLastItem = index === totalItems - 1;
-        suggestionItem.style.cssText = `
-          all: unset !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: space-between !important;
-          padding: 12px 16px !important;
-          background: transparent !important;
-          border: 1px solid transparent !important;
-          border-radius: 16px !important;
-          cursor: pointer !important;
-          transition: background-color 0.2s ease !important;
-          box-sizing: border-box !important;
-          margin: 0 0 ${isLastItem ? '0' : '4px'} 0 !important;
-          line-height: 1.5 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          color: inherit !important;
-          font-size: 100% !important;
-          font: inherit !important;
-          vertical-align: baseline !important;
-        `;
+        suggestionItem.className = 'x-ov-suggestion-item';
+        suggestionItem.setAttribute('data-last', isLastItem ? 'true' : 'false');
         suggestionItem._xIsSearchSuggestion = false;
 
         // Store reference to suggestion item
@@ -4619,26 +4469,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         // Create left side with icon and title
         const leftSide = document.createElement('div');
         leftSide.id = `_x_extension_left_side_${index}_2024_unique_`;
-        leftSide.style.cssText = `
-          all: unset !important;
-          display: flex !important;
-          align-items: center !important;
-          gap: 12px !important;
-          flex: 1 !important;
-          min-width: 0 !important;
-          box-sizing: border-box !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          line-height: 1 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          background: transparent !important;
-          color: inherit !important;
-          font-size: 100% !important;
-          font: inherit !important;
-          vertical-align: baseline !important;
-        `;
+        leftSide.className = 'x-ov-suggestion-left';
 
         // Create favicon
         let favicon = null;
@@ -4679,30 +4510,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           isFaviconIcon = true;
         }
         const iconSlot = document.createElement('span');
-        iconSlot.style.cssText = `
-          all: unset !important;
-          width: 24px !important;
-          height: 24px !important;
-          flex: 0 0 24px !important;
-          flex-shrink: 0 !important;
-          border-radius: 8px !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-          box-sizing: border-box !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          line-height: 1 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          background: transparent !important;
-          transition: background-color 0.2s ease !important;
-          color: var(--x-ov-subtext, #9CA3AF) !important;
-          font-size: 100% !important;
-          font: inherit !important;
-          vertical-align: baseline !important;
-        `;
+        iconSlot.className = 'x-ov-suggestion-icon-slot';
         iconSlot.appendChild(iconNode);
         suggestionItem._xIconWrap = iconSlot;
         suggestionItem._xIconIsFavicon = isFaviconIcon;
@@ -4712,26 +4520,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         applyNoTranslate(title);
         title.id = `_x_extension_title_${index}_2024_unique_`;
         setProtectedPlainText(title, tab.title || t('untitled', '无标题'));
-        title.style.cssText = `
-          all: unset !important;
-          color: var(--x-ov-text, #111827) !important;
-          font-size: 14px !important;
-          font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-          white-space: nowrap !important;
-          overflow: hidden !important;
-          text-overflow: ellipsis !important;
-          max-width: 100% !important;
-          box-sizing: border-box !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          line-height: 1.5 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          background: transparent !important;
-          display: inline-block !important;
-          vertical-align: baseline !important;
-        `;
+        title.className = 'x-ov-suggestion-title';
         suggestionItem._xTitle = title;
 
         // Create switch button
@@ -4783,25 +4572,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         suggestionItem._xSwitchButton = switchButton;
 
         const actionTags = document.createElement('div');
-        actionTags.style.cssText = `
-          all: unset !important;
-          display: none !important;
-          align-items: center !important;
-          gap: 6px !important;
-          box-sizing: border-box !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          line-height: 1 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          background: transparent !important;
-          color: inherit !important;
-          font-size: 100% !important;
-          font: inherit !important;
-          vertical-align: baseline !important;
-          flex-shrink: 0 !important;
-        `;
+        actionTags.className = 'x-ov-suggestion-action-tags';
+        setSuggestionActionTagsVisible(actionTags, false);
         actionTags.appendChild(createActionTag(t('action_switch', '切换'), 'Enter'));
         suggestionItem._xTagContainer = actionTags;
         suggestionItem._xHasActionTags = actionTags.childNodes.length > 0;
@@ -4817,11 +4589,9 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             const theme = this._xTheme;
             if (theme && theme._xIsBrand) {
               const hover = getHoverColors(theme);
-              this.style.setProperty('background-color', hover.bg, 'important');
-              this.style.setProperty('border', `1px solid ${hover.border}`, 'important');
+              setSuggestionRowColors(this, hover.bg, hover.border);
             } else {
-              this.style.setProperty('background-color', 'var(--x-ov-hover-bg)', 'important');
-              this.style.setProperty('border', '1px solid transparent', 'important');
+              setSuggestionRowColors(this, 'var(--x-ov-hover-bg)', 'transparent');
             }
           }
         });
@@ -4880,25 +4650,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           leftSide.appendChild(rankDebug);
         }
         const rightSide = document.createElement('div');
-        rightSide.style.cssText = `
-          all: unset !important;
-          display: inline-flex !important;
-          align-items: center !important;
-          gap: 8px !important;
-          flex-shrink: 0 !important;
-          box-sizing: border-box !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          line-height: 1 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          background: transparent !important;
-          color: inherit !important;
-          font-size: 100% !important;
-          font: inherit !important;
-          vertical-align: baseline !important;
-        `;
+        rightSide.className = 'x-ov-suggestion-right';
         rightSide.appendChild(actionTags);
         rightSide.appendChild(switchButton);
         suggestionItem.appendChild(leftSide);
@@ -5528,29 +5280,11 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             }
           }
           const initialHighlight = isPrimaryHighlight ? getHighlightColors(immediateTheme) : null;
-          suggestionItem.style.cssText = `
-            all: unset !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: space-between !important;
-            padding: 12px 16px !important;
-            background: ${isPrimaryHighlight ? initialHighlight.bg : 'transparent'} !important;
-            border: ${isPrimaryHighlight ? `1px solid ${initialHighlight.border}` : '1px solid transparent'} !important;
-            border-radius: 16px !important;
-            margin-bottom: ${isLastItem ? '0' : '4px'} !important;
-            cursor: pointer !important;
-            transition: background-color 0.2s ease !important;
-            box-sizing: border-box !important;
-            margin: 0 0 ${isLastItem ? '0' : '4px'} 0 !important;
-            line-height: 1.5 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            color: inherit !important;
-            font-size: 100% !important;
-            font: inherit !important;
-            vertical-align: baseline !important;
-          `;
+          suggestionItem.className = 'x-ov-suggestion-item';
+          suggestionItem.setAttribute('data-last', isLastItem ? 'true' : 'false');
+          if (isPrimaryHighlight) {
+            setSuggestionRowColors(suggestionItem, initialHighlight.bg, initialHighlight.border);
+          }
 
           suggestionItems.push(suggestionItem);
           suggestionItem._xIsSearchSuggestion = true;
@@ -5560,27 +5294,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
 
           // Create left side with icon and title
           const leftSide = document.createElement('div');
-          leftSide.style.cssText = `
-            all: unset !important;
-            display: flex !important;
-            align-items: center !important;
-            gap: 12px !important;
-            flex: 1 !important;
-            min-width: 0 !important;
-            box-sizing: border-box !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            line-height: 1 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            background: transparent !important;
-            color: inherit !important;
-            font-size: 100% !important;
-            font: inherit !important;
-            vertical-align: baseline !important;
-            transition: gap 160ms ease, transform 160ms ease !important;
-          `;
+          leftSide.className = 'x-ov-suggestion-left';
+          leftSide.setAttribute('data-motion', 'true');
 
           let iconNode = null;
           let iconWrapper = null;
@@ -5728,30 +5443,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           if (iconNode) {
             const isFaviconIcon = iconNode.tagName === 'IMG';
             const iconSlot = document.createElement('span');
-            iconSlot.style.cssText = `
-              all: unset !important;
-              width: 24px !important;
-              height: 24px !important;
-              flex: 0 0 24px !important;
-              flex-shrink: 0 !important;
-              border-radius: 8px !important;
-              display: flex !important;
-              align-items: center !important;
-              justify-content: center !important;
-              box-sizing: border-box !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              line-height: 1 !important;
-              text-decoration: none !important;
-              list-style: none !important;
-              outline: none !important;
-              background: transparent !important;
-              transition: background-color 0.2s ease !important;
-              color: var(--x-ov-subtext, #9CA3AF) !important;
-              font-size: 100% !important;
-              font: inherit !important;
-              vertical-align: baseline !important;
-            `;
+            iconSlot.className = 'x-ov-suggestion-icon-slot';
             iconSlot._xIsFavicon = isFaviconIcon;
             iconSlot.appendChild(iconNode);
             iconNode = iconSlot;
@@ -5764,27 +5456,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
 
           // Create text wrapper for title and tag
           const textWrapper = document.createElement('div');
-          textWrapper.style.cssText = `
-            all: unset !important;
-            display: flex !important;
-            align-items: center !important;
-            gap: 6px !important;
-            flex: 1 !important;
-            min-width: 0 !important;
-            overflow: visible !important;
-            box-sizing: border-box !important;
-            margin: 0 !important;
-            padding: 0 8px 0 0 !important;
-            line-height: 1 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            background: transparent !important;
-            color: inherit !important;
-            font-size: 100% !important;
-            font: inherit !important;
-            vertical-align: baseline !important;
-          `;
+          textWrapper.className = 'x-ov-suggestion-text';
 
           // Create title with highlighted query
           const title = document.createElement('span');
@@ -5808,27 +5480,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             background: 'var(--x-ext-mark-bg, #CFE8FF)',
             color: 'var(--x-ext-mark-text, #1E3A8A)'
           });
-          title.style.cssText = `
-            all: unset !important;
-            color: var(--x-ov-text, #111827) !important;
-            font-size: 14px !important;
-            font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-            font-weight: 400 !important;
-            white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
-            max-width: 100% !important;
-            box-sizing: border-box !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            line-height: 1.5 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            background: transparent !important;
-            display: inline-block !important;
-            vertical-align: baseline !important;
-          `;
+          title.className = 'x-ov-suggestion-title';
           suggestionItem._xTitle = title;
 
           textWrapper.appendChild(title);
@@ -5838,19 +5490,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           if (overlayTabScoreDebugEnabled && reasonText) {
             const reasonLine = document.createElement('span');
             setProtectedPlainText(reasonLine, reasonText);
-            reasonLine.style.cssText = `
-              all: unset !important;
-              color: var(--x-ov-subtext, #6B7280) !important;
-              font-size: 11px !important;
-              font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-              line-height: 1.2 !important;
-              white-space: nowrap !important;
-              overflow: hidden !important;
-              text-overflow: ellipsis !important;
-              max-width: 100% !important;
-              display: inline-block !important;
-              vertical-align: middle !important;
-            `;
+            reasonLine.className = 'x-ov-suggestion-reason';
             textWrapper.appendChild(reasonLine);
           }
 
@@ -5927,23 +5567,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             if (suggestion.path) {
               const bookmarkPath = document.createElement('span');
               setProtectedPlainText(bookmarkPath, suggestion.path);
-              bookmarkPath.style.cssText = `
-                all: unset !important;
-                color: var(--x-ov-link, #2563EB) !important;
-                font-size: 12px !important;
-                font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-                text-decoration: none !important;
-                white-space: nowrap !important;
-                overflow: hidden !important;
-                text-overflow: ellipsis !important;
-                max-width: 100% !important;
-                box-sizing: border-box !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                line-height: 1.2 !important;
-                display: inline-block !important;
-                vertical-align: middle !important;
-              `;
+              bookmarkPath.className = 'x-ov-suggestion-bookmark-path';
               textWrapper.appendChild(bookmarkPath);
             }
           const bookmarkTag = document.createElement('span');
@@ -6003,46 +5627,11 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           }
 
           const rightSide = document.createElement('div');
-          rightSide.style.cssText = `
-            all: unset !important;
-            display: inline-flex !important;
-            align-items: center !important;
-            gap: 8px !important;
-            flex-shrink: 0 !important;
-            box-sizing: border-box !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            line-height: 1 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            background: transparent !important;
-            color: inherit !important;
-            font-size: 100% !important;
-            font: inherit !important;
-            vertical-align: baseline !important;
-          `;
+          rightSide.className = 'x-ov-suggestion-right';
 
           const actionTags = document.createElement('div');
-          actionTags.style.cssText = `
-            all: unset !important;
-            display: none !important;
-            align-items: center !important;
-            gap: 6px !important;
-            box-sizing: border-box !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            line-height: 1 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            background: transparent !important;
-            color: inherit !important;
-            font-size: 100% !important;
-            font: inherit !important;
-            vertical-align: baseline !important;
-            flex-shrink: 0 !important;
-          `;
+          actionTags.className = 'x-ov-suggestion-action-tags';
+          setSuggestionActionTagsVisible(actionTags, false);
 
           const isDirectHighlight = isPrimaryHighlight &&
             (suggestion.type === 'directUrl' || suggestion.type === 'browserPage');
