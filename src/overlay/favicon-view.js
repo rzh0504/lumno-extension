@@ -42,6 +42,32 @@
         : (doc && typeof doc.createElement === 'function' ? doc.createElement('img') : {});
     }
 
+    function setFaviconLoadState(img, state) {
+      if (!img) {
+        return;
+      }
+      if (state) {
+        img.setAttribute('data-favicon-load-state', state);
+      } else {
+        img.removeAttribute('data-favicon-load-state');
+      }
+    }
+
+    function setFaviconVisibility(img, visibility) {
+      if (!img) {
+        return;
+      }
+      if (visibility) {
+        img.setAttribute('data-favicon-visibility', visibility);
+      } else {
+        img.removeAttribute('data-favicon-visibility');
+      }
+    }
+
+    function isFaviconHidden(img) {
+      return Boolean(img && img.getAttribute('data-favicon-visibility') === 'hidden');
+    }
+
     function applyFaviconOpticalShift(img) {
       if (!img) {
         return;
@@ -50,7 +76,7 @@
       const visualCenter = (targetSize - 1) / 2;
       try {
         if (!(img.complete && img.naturalWidth > 0 && img.naturalHeight > 0)) {
-          img.style.setProperty('transform', 'none', 'important');
+          img.style.setProperty('transform', 'none');
           return;
         }
         const canvas = doc.createElement('canvas');
@@ -58,7 +84,7 @@
         canvas.height = targetSize;
         const context = canvas.getContext('2d', { willReadFrequently: true });
         if (!context) {
-          img.style.setProperty('transform', 'none', 'important');
+          img.style.setProperty('transform', 'none');
           return;
         }
         context.clearRect(0, 0, targetSize, targetSize);
@@ -79,7 +105,7 @@
           }
         }
         if (sumAlpha <= 0) {
-          img.style.setProperty('transform', 'none', 'important');
+          img.style.setProperty('transform', 'none');
           return;
         }
         const contentCenterX = weightedX / sumAlpha;
@@ -93,9 +119,9 @@
         if (Math.abs(offsetY) < 0.4) {
           offsetY = 0;
         }
-        img.style.setProperty('transform', `translate(${offsetX}px, ${offsetY}px)`, 'important');
+        img.style.setProperty('transform', `translate(${offsetX}px, ${offsetY}px)`);
       } catch (e) {
-        img.style.setProperty('transform', 'none', 'important');
+        img.style.setProperty('transform', 'none');
       }
     }
 
@@ -103,8 +129,8 @@
       if (!img) {
         return;
       }
-      img.style.setProperty('object-fit', 'contain', 'important');
-      img.style.setProperty('object-position', 'center center', 'important');
+      img.style.setProperty('object-fit', 'contain');
+      img.style.setProperty('object-position', 'center center');
       applyFaviconOpticalShift(img);
     }
 
@@ -267,21 +293,18 @@
         img.setAttribute('data-favicon-has-appeared', 'true');
         applyFaviconOpticalShift(img);
         if (!shouldAnimate) {
-          img.style.setProperty('filter', 'none', 'important');
-          img.style.setProperty('opacity', '1', 'important');
-          img.style.setProperty('transition', 'none', 'important');
+          setFaviconLoadState(img, '');
+          img.style.setProperty('filter', 'none');
+          img.style.setProperty('opacity', '1');
+          img.style.setProperty('transition', 'none');
           return;
         }
-        img.style.setProperty('transition', 'none', 'important');
-        img.style.setProperty('filter', 'blur(4px)', 'important');
-        img.style.setProperty('opacity', '0.72', 'important');
+        setFaviconLoadState(img, 'priming');
         requestFrame(() => {
           if (!img || token !== img._xFaviconLoadToken) {
             return;
           }
-          img.style.setProperty('transition', 'filter 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 240ms cubic-bezier(0.22, 1, 0.36, 1)', 'important');
-          img.style.setProperty('filter', 'blur(0)', 'important');
-          img.style.setProperty('opacity', '1', 'important');
+          setFaviconLoadState(img, 'loaded');
         });
       };
       img.addEventListener('load', finalize, { once: true });
@@ -450,7 +473,7 @@
       if (!applied && !reused) {
         return false;
       }
-      img.style.setProperty('visibility', 'visible', 'important');
+      setFaviconVisibility(img, 'visible');
       if (!isChromeMonogramFaviconUrl(nextUrl) && state.cacheKey) {
         if (!isFaviconProxyUrl(nextUrl)) {
           resolvedFaviconUrlCache.set(state.cacheKey, nextUrl);
@@ -517,7 +540,7 @@
             return;
           }
           setFaviconSrcWithAnimation(img, candidate);
-          img.style.setProperty('visibility', 'visible', 'important');
+          setFaviconVisibility(img, 'visible');
           if (state.cacheKey && !isFaviconProxyUrl(candidate)) {
             resolvedFaviconUrlCache.set(state.cacheKey, candidate);
           }
@@ -532,7 +555,7 @@
     }
 
     function finalizeOverlayThemeAwareFaviconFailure(img, state) {
-      img.style.removeProperty('visibility');
+      setFaviconVisibility(img, '');
       restoreWorkingFaviconOrFail(img, state.previousWorkingSrc, state.handleFailed);
     }
 
@@ -577,7 +600,7 @@
           return;
         }
         if (!resolvedCandidatesLoaded) {
-          img.style.setProperty('visibility', 'hidden', 'important');
+          setFaviconVisibility(img, 'hidden');
           return;
         }
         finalizeOverlayThemeAwareFaviconFailure(img, state);
@@ -602,7 +625,7 @@
           resolvedCandidates = resolved;
           resolvedCandidatesLoaded = true;
 
-          if (!appliedInitial || img.style.visibility === 'hidden') {
+          if (!appliedInitial || isFaviconHidden(img)) {
             if (!tryNextAvailableCandidate()) {
               finalizeOverlayThemeAwareFaviconFailure(img, state);
             }
@@ -619,7 +642,7 @@
           if (!state.isSessionCurrent()) {
             return;
           }
-          if (!appliedInitial || img.style.visibility === 'hidden') {
+          if (!appliedInitial || isFaviconHidden(img)) {
             finalizeOverlayThemeAwareFaviconFailure(img, state);
           }
         });

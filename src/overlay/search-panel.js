@@ -2586,9 +2586,12 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       image.src = dataUrl;
     }
 
-    function createSearchIcon() {
+    function createSearchIcon(tone) {
       const icon = document.createElement('span');
       icon.className = 'x-ov-suggestion-inline-icon';
+      if (tone) {
+        icon.setAttribute('data-tone', tone);
+      }
       icon.innerHTML = getRiSvg('ri-search-line', 'ri-size-16');
       return icon;
     }
@@ -4653,31 +4656,13 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         } else {
           favicon = document.createElement('img');
           favicon.id = `_x_extension_favicon_${index}_2024_unique_`;
+          favicon.className = 'x-ov-suggestion-favicon';
           favicon.decoding = 'async';
           favicon.loading = 'eager';
           favicon.referrerPolicy = 'no-referrer';
           if (index < 4) {
             favicon.fetchPriority = 'high';
           }
-          favicon.style.cssText = `
-            all: unset !important;
-            width: 16px !important;
-            height: 16px !important;
-            border-radius: 2px !important;
-            box-sizing: border-box !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            line-height: 1 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            background: transparent !important;
-            color: inherit !important;
-            font-size: 100% !important;
-            font: inherit !important;
-            vertical-align: baseline !important;
-            display: block !important;
-          `;
           applyFaviconOpticalAlignment(favicon);
           attachResolvedFaviconWithFallbacks(
             favicon,
@@ -5681,45 +5666,24 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             iconNode = gearIcon;
           } else if (suggestion.type === 'modeSwitch' && suggestion.favicon) {
             const favicon = document.createElement('img');
+            favicon.className = 'x-ov-suggestion-favicon';
             favicon.decoding = 'async';
             favicon.loading = 'eager';
             favicon.referrerPolicy = 'no-referrer';
             if (index < 4) {
               favicon.fetchPriority = 'high';
             }
-            favicon.style.cssText = `
-              all: unset !important;
-              width: 16px !important;
-              height: 16px !important;
-              border-radius: 2px !important;
-              box-sizing: border-box !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              line-height: 1 !important;
-              text-decoration: none !important;
-              list-style: none !important;
-              outline: none !important;
-              background: transparent !important;
-              color: inherit !important;
-              font-size: 100% !important;
-              font: inherit !important;
-              vertical-align: baseline !important;
-              display: block !important;
-            `;
             applyFaviconOpticalAlignment(favicon);
             favicon.src = suggestion.favicon || '';
             favicon.onerror = function() {
-              const fallbackDiv = createSearchIcon();
-              fallbackDiv.style.setProperty('color', 'var(--x-ov-subtext, #9CA3AF)', 'important');
+              const fallbackDiv = createSearchIcon('subtext');
               if (favicon.parentNode) {
                 favicon.parentNode.replaceChild(fallbackDiv, favicon);
               }
             };
             iconNode = favicon;
           } else if (suggestion.type === 'newtab' || suggestion.type === 'googleSuggest') {
-            const searchIcon = createSearchIcon();
-            searchIcon.style.setProperty('color', 'var(--x-ov-subtext, #9CA3AF)', 'important');
-            iconNode = searchIcon;
+            iconNode = createSearchIcon('subtext');
           } else {
             const suggestionHost = suggestion.url ? getHostFromUrl(suggestion.url) : '';
             if (suggestionHost && shouldBlockFaviconForHost(suggestionHost)) {
@@ -5727,6 +5691,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             } else if (suggestion.favicon) {
               // Create icon for suggestions - always use img for all types
               const favicon = document.createElement('img');
+              favicon.className = 'x-ov-suggestion-favicon';
               favicon.decoding = 'async';
               favicon.loading = 'eager';
               favicon.referrerPolicy = 'no-referrer';
@@ -5740,26 +5705,6 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
                   suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : ''
                 );
               }
-              favicon.style.cssText = `
-                all: unset !important;
-                width: 16px !important;
-                height: 16px !important;
-                border-radius: 2px !important;
-                box-sizing: border-box !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                line-height: 1 !important;
-                text-decoration: none !important;
-                list-style: none !important;
-                outline: none !important;
-                background: transparent !important;
-                color: inherit !important;
-                font-size: 100% !important;
-                font: inherit !important;
-                vertical-align: baseline !important;
-                display: block !important;
-                object-fit: contain !important;
-              `;
               applyFaviconOpticalAlignment(favicon);
               const replaceWithFallbackIcon = function() {
                 const fallbackDiv = createLinkIcon();
@@ -5776,9 +5721,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
               );
               iconNode = favicon;
             } else {
-              const searchIcon = createSearchIcon();
-              searchIcon.style.setProperty('color', 'var(--x-ov-subtext, #9CA3AF)', 'important');
-              iconNode = searchIcon;
+              iconNode = createSearchIcon('subtext');
             }
           }
 

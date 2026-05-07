@@ -130,6 +130,52 @@
   vertical-align: baseline;
 }
 
+#_x_extension_overlay_2024_unique_ .x-ov-suggestion-inline-icon[data-tone="subtext"] {
+  color: var(--x-ov-subtext, #9CA3AF);
+}
+
+#_x_extension_overlay_2024_unique_ .x-ov-suggestion-favicon {
+  all: unset;
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  line-height: 1;
+  text-decoration: none;
+  list-style: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font-size: 100%;
+  font: inherit;
+  vertical-align: baseline;
+  display: block;
+  object-fit: contain;
+  object-position: center center;
+}
+
+#_x_extension_overlay_2024_unique_ .x-ov-suggestion-favicon[data-favicon-visibility="hidden"] {
+  visibility: hidden;
+}
+
+#_x_extension_overlay_2024_unique_ .x-ov-suggestion-favicon[data-favicon-visibility="visible"] {
+  visibility: visible;
+}
+
+#_x_extension_overlay_2024_unique_ .x-ov-suggestion-favicon[data-favicon-load-state="priming"] {
+  transition: none;
+  filter: blur(4px);
+  opacity: 0.72;
+}
+
+#_x_extension_overlay_2024_unique_ .x-ov-suggestion-favicon[data-favicon-load-state="loaded"] {
+  transition: filter 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  filter: blur(0);
+  opacity: 1;
+}
+
 #_x_extension_overlay_2024_unique_ .x-ov-action-tag {
   all: unset;
   display: inline-flex;

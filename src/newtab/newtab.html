@@ -514,6 +514,37 @@
         opacity: 0;
         pointer-events: none;
       }
+      .x-nt-favicon-fallback {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--x-nt-favicon-fallback-width, 25px);
+        height: var(--x-nt-favicon-fallback-height, 25px);
+        border-radius: var(--x-nt-favicon-fallback-radius, 6px);
+        background: var(--x-nt-favicon-fallback-bg, var(--x-nt-tag-bg, #F3F4F6));
+        color: var(--x-nt-favicon-fallback-color, var(--x-nt-tag-text, #6B7280));
+        box-sizing: border-box;
+        padding: var(--x-nt-favicon-fallback-padding, 3px);
+        margin: 0;
+        flex-shrink: 0;
+        line-height: 1;
+      }
+      .x-nt-favicon-fallback[data-visible="false"] {
+        display: none;
+      }
+      img[data-fallback-icon="true"] {
+        display: none;
+      }
+      img[data-favicon-load-state="priming"] {
+        transition: none;
+        filter: blur(4px);
+        opacity: 0.72;
+      }
+      img[data-favicon-load-state="loaded"] {
+        transition: filter 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 240ms cubic-bezier(0.22, 1, 0.36, 1);
+        filter: blur(0);
+        opacity: 1;
+      }
       .x-nt-bookmark-title {
         min-width: 0;
         flex: 1 1 auto;
@@ -561,6 +592,9 @@
         margin-left: 0;
       }
       .x-nt-folder-preview-favicon--fallback {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         color: #7892bd;
       }
       body[data-theme="dark"] .x-nt-folder-preview-favicon {

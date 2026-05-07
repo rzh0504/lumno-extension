@@ -59,6 +59,24 @@
       return typeof ImageCtor === 'function' ? new ImageCtor() : doc.createElement('img');
     }
 
+    function setFallbackNodeVisible(node, visible) {
+      if (!node) {
+        return;
+      }
+      node.setAttribute('data-visible', visible ? 'true' : 'false');
+    }
+
+    function setFaviconLoadState(img, state) {
+      if (!img) {
+        return;
+      }
+      if (state) {
+        img.setAttribute('data-favicon-load-state', state);
+      } else {
+        img.removeAttribute('data-favicon-load-state');
+      }
+    }
+
     function applyFaviconOpticalShift(img) {
       if (!img) {
         return;
@@ -67,7 +85,7 @@
       const visualCenter = (targetSize - 1) / 2;
       try {
         if (!(img.complete && img.naturalWidth > 0 && img.naturalHeight > 0)) {
-          img.style.setProperty('transform', 'none', 'important');
+          img.style.setProperty('transform', 'none');
           return;
         }
         const canvas = doc.createElement('canvas');
@@ -75,7 +93,7 @@
         canvas.height = targetSize;
         const context = canvas.getContext('2d', { willReadFrequently: true });
         if (!context) {
-          img.style.setProperty('transform', 'none', 'important');
+          img.style.setProperty('transform', 'none');
           return;
         }
         context.clearRect(0, 0, targetSize, targetSize);
@@ -96,7 +114,7 @@
           }
         }
         if (sumAlpha <= 0) {
-          img.style.setProperty('transform', 'none', 'important');
+          img.style.setProperty('transform', 'none');
           return;
         }
         const contentCenterX = weightedX / sumAlpha;
@@ -110,9 +128,9 @@
         if (Math.abs(offsetY) < 0.4) {
           offsetY = 0;
         }
-        img.style.setProperty('transform', `translate(${offsetX}px, ${offsetY}px)`, 'important');
+        img.style.setProperty('transform', `translate(${offsetX}px, ${offsetY}px)`);
       } catch (e) {
-        img.style.setProperty('transform', 'none', 'important');
+        img.style.setProperty('transform', 'none');
       }
     }
 
@@ -120,8 +138,8 @@
       if (!img) {
         return;
       }
-      img.style.setProperty('object-fit', 'contain', 'important');
-      img.style.setProperty('object-position', 'center center', 'important');
+      img.style.setProperty('object-fit', 'contain');
+      img.style.setProperty('object-position', 'center center');
       applyFaviconOpticalShift(img);
     }
 
@@ -200,11 +218,7 @@
       );
       if (isFolderPreview) {
         node.className = 'x-nt-folder-preview-favicon x-nt-folder-preview-favicon--fallback _x_extension_favicon_fallback_2024_unique_';
-        node.style.cssText = `
-          display: inline-flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-        `;
+        setFallbackNodeVisible(node, true);
         node.innerHTML = getRiSvg('ri-link', 'ri-size-12');
         img.parentElement.insertBefore(node, img);
         node._xFallbackForImage = img;
@@ -217,22 +231,17 @@
       const fallbackBackground = isBookmarkLeadingIcon
         ? 'var(--x-nt-bookmark-icon-color, var(--x-nt-bookmark-icon-bg, rgba(241, 245, 249, 0.92)))'
         : (isSearchSuggestionIcon ? 'transparent' : 'var(--x-nt-tag-bg, #F3F4F6)');
-      node.className = '_x_extension_favicon_fallback_2024_unique_';
-      node.style.cssText = `
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        width: ${fallbackWidth}px !important;
-        height: ${fallbackHeight}px !important;
-        border-radius: ${isSearchSuggestionIcon ? 2 : 6}px !important;
-        background: ${fallbackBackground} !important;
-        color: ${isSearchSuggestionIcon ? 'var(--x-nt-subtext, #6B7280)' : 'var(--x-nt-tag-text, #6B7280)'} !important;
-        box-sizing: border-box !important;
-        padding: ${isSearchSuggestionIcon ? 0 : 3}px !important;
-        margin: 0 !important;
-        flex-shrink: 0 !important;
-        line-height: 1 !important;
-      `;
+      node.className = 'x-nt-favicon-fallback _x_extension_favicon_fallback_2024_unique_';
+      node.style.setProperty('--x-nt-favicon-fallback-width', `${fallbackWidth}px`);
+      node.style.setProperty('--x-nt-favicon-fallback-height', `${fallbackHeight}px`);
+      node.style.setProperty('--x-nt-favicon-fallback-radius', `${isSearchSuggestionIcon ? 2 : 6}px`);
+      node.style.setProperty('--x-nt-favicon-fallback-bg', fallbackBackground);
+      node.style.setProperty(
+        '--x-nt-favicon-fallback-color',
+        isSearchSuggestionIcon ? 'var(--x-nt-subtext, #6B7280)' : 'var(--x-nt-tag-text, #6B7280)'
+      );
+      node.style.setProperty('--x-nt-favicon-fallback-padding', `${isSearchSuggestionIcon ? 0 : 3}px`);
+      setFallbackNodeVisible(node, true);
       node.innerHTML = getRiSvg('ri-link', 'ri-size-16');
       img.parentElement.insertBefore(node, img.nextSibling);
       node._xFallbackForImage = img;
@@ -269,10 +278,10 @@
       }
       const fallbackNode = findFallbackIconNode(img);
       if (fallbackNode) {
-        fallbackNode.style.setProperty('display', 'none', 'important');
+        setFallbackNodeVisible(fallbackNode, false);
       }
       img.removeAttribute('data-fallback-icon');
-      img.style.setProperty('display', 'block', 'important');
+      img.style.setProperty('display', 'block');
     }
 
     function applyFallbackIcon(img) {
@@ -281,9 +290,9 @@
       }
       const node = ensureFallbackIconNode(img);
       img.setAttribute('data-fallback-icon', 'true');
-      img.style.setProperty('display', 'none', 'important');
+      img.style.removeProperty('display');
       if (node) {
-        node.style.setProperty('display', 'inline-flex', 'important');
+        setFallbackNodeVisible(node, true);
         return;
       }
       setTimer(() => {
@@ -295,7 +304,7 @@
         }
         const delayedNode = ensureFallbackIconNode(img);
         if (delayedNode) {
-          delayedNode.style.setProperty('display', 'inline-flex', 'important');
+          setFallbackNodeVisible(delayedNode, true);
         }
       }, 0);
     }
@@ -304,9 +313,10 @@
       doc.querySelectorAll('img[data-fallback-icon="true"]').forEach((img) => {
         const node = ensureFallbackIconNode(img);
         if (node) {
-          node.style.setProperty('display', 'inline-flex', 'important');
+          setFallbackNodeVisible(node, true);
         }
-        img.style.setProperty('display', 'none', 'important');
+        img.setAttribute('data-fallback-icon', 'true');
+        img.style.removeProperty('display');
       });
     }
 
@@ -369,21 +379,18 @@
           }
         }
         if (!shouldAnimate) {
-          img.style.setProperty('filter', 'none', 'important');
-          img.style.setProperty('opacity', '1', 'important');
-          img.style.setProperty('transition', 'none', 'important');
+          setFaviconLoadState(img, '');
+          img.style.setProperty('filter', 'none');
+          img.style.setProperty('opacity', '1');
+          img.style.setProperty('transition', 'none');
           return;
         }
-        img.style.setProperty('transition', 'none', 'important');
-        img.style.setProperty('filter', 'blur(4px)', 'important');
-        img.style.setProperty('opacity', '0.72', 'important');
+        setFaviconLoadState(img, 'priming');
         requestFrame(() => {
           if (!img || token !== img._xFaviconLoadToken) {
             return;
           }
-          img.style.setProperty('transition', 'filter 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 240ms cubic-bezier(0.22, 1, 0.36, 1)', 'important');
-          img.style.setProperty('filter', 'blur(0)', 'important');
-          img.style.setProperty('opacity', '1', 'important');
+          setFaviconLoadState(img, 'loaded');
         });
       };
       img.addEventListener('load', finalize, { once: true });
