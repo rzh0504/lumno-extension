@@ -6080,10 +6080,6 @@ function toggleBlackRectangle(tabs, overlayContext) {
     stopOverlayViewportSizeSync();
     stopOverlayAntiTranslateObserver();
     if (overlayElement) {
-      if (typeof overlayElement._lumnoAiModeEffectsCleanup === 'function') {
-        overlayElement._lumnoAiModeEffectsCleanup();
-        overlayElement._lumnoAiModeEffectsCleanup = null;
-      }
       const mountHost = overlayElement._lumnoOverlayHost || overlayElement;
       mountHost.remove();
     }
@@ -6217,14 +6213,6 @@ function toggleBlackRectangle(tabs, overlayContext) {
     let siteSearchTriggerState = null;
     let siteSearchState = null;
     let openTabsSearchModeActive = false;
-    let aiModeFrame = null;
-    let aiModeDecorFrame = null;
-    let aiModeSweepFrame = null;
-    let aiModeDecor = null;
-    let aiModeSweep = null;
-    let aiModeEffectsActive = false;
-    let aiModeExpandedSweepPlayed = false;
-    const AI_MODE_SWEEP_DURATION_MS = 1800;
     let isComposing = false;
     let selectedIndex = -1; // -1 means input is focused, 0+ means suggestion is selected
     const suggestionItems = [];
@@ -6243,7 +6231,6 @@ function toggleBlackRectangle(tabs, overlayContext) {
       });
       updateSelection();
       updateModeBadge(searchInput ? searchInput.value : '');
-      refreshAiModeBeamTheme();
       if (previousResolvedTheme !== nextResolvedTheme) {
         refreshOverlayThemeAwareFavicons();
       }
@@ -6529,19 +6516,19 @@ function toggleBlackRectangle(tabs, overlayContext) {
       display: none !important;
       align-items: center !important;
       justify-content: center !important;
-      gap: 8px !important;
+      gap: 7px !important;
       max-width: min(300px, 52%) !important;
       min-width: 0 !important;
-      height: 32px !important;
+      height: 28px !important;
       padding: 0 !important;
       border: none !important;
       background: transparent !important;
       color: var(--x-ov-tag-text, #6B7280) !important;
       box-sizing: border-box !important;
-      font-size: 14px !important;
+      font-size: 13px !important;
       font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
       font-weight: 700 !important;
-      line-height: 20px !important;
+      line-height: 18px !important;
       letter-spacing: 0 !important;
       white-space: nowrap !important;
       pointer-events: none !important;
@@ -6577,198 +6564,6 @@ function toggleBlackRectangle(tabs, overlayContext) {
       vertical-align: baseline !important;
     `;
 
-    function createAiModeEffectFrame(id, overflow) {
-      const frame = document.createElement('div');
-      applyNoTranslate(frame);
-      frame.id = id;
-      frame.setAttribute('aria-hidden', 'true');
-      frame.style.cssText = `
-        all: unset !important;
-        position: absolute !important;
-        inset: 0 !important;
-        display: block !important;
-        box-sizing: border-box !important;
-        border-radius: inherit !important;
-        pointer-events: none !important;
-        overflow: ${overflow} !important;
-      `;
-      return frame;
-    }
-
-    function ensureAiModeFrames() {
-      if (aiModeFrame && aiModeDecorFrame && aiModeSweepFrame) {
-        return aiModeFrame;
-      }
-      if (!aiModeFrame) {
-        aiModeFrame = createAiModeEffectFrame('_x_extension_ai_mode_effect_frame_2026_unique_', 'visible');
-        aiModeFrame.style.setProperty('z-index', '1', 'important');
-      }
-      if (!aiModeDecorFrame) {
-        aiModeDecorFrame = createAiModeEffectFrame('_x_extension_ai_mode_decor_frame_2026_unique_', 'visible');
-      }
-      if (!aiModeSweepFrame) {
-        aiModeSweepFrame = createAiModeEffectFrame('_x_extension_ai_mode_sweep_frame_2026_unique_', 'hidden');
-      }
-      if (aiModeDecorFrame.parentNode !== aiModeFrame) {
-        aiModeFrame.appendChild(aiModeDecorFrame);
-      }
-      if (aiModeSweepFrame.parentNode !== aiModeFrame) {
-        aiModeFrame.appendChild(aiModeSweepFrame);
-      }
-      if (aiModeFrame.parentNode !== overlay) {
-        overlay.insertBefore(aiModeFrame, overlay.firstChild || null);
-      }
-      inputContainer.style.setProperty('position', 'relative', 'important');
-      inputContainer.style.setProperty('z-index', '2', 'important');
-      suggestionsContainer.style.setProperty('position', 'relative', 'important');
-      suggestionsContainer.style.setProperty('z-index', '2', 'important');
-      return aiModeFrame;
-    }
-
-    function getAiModeBeamThemeName() {
-      return isOverlayDarkMode() ? 'dark' : 'light';
-    }
-
-    function syncAiModeDecorAppearance() {
-      if (!aiModeDecor || !aiModeDecor.beam) {
-        return;
-      }
-      const resolvedTheme = getAiModeBeamThemeName();
-      const strength = resolvedTheme === 'light' ? 0.64 : 0.82;
-      aiModeDecor.beam.style.setProperty('--beam-strength', String(strength), 'important');
-      aiModeDecor.setTheme(resolvedTheme);
-    }
-
-    function ensureAiModeDecor() {
-      if (aiModeDecor) {
-        return aiModeDecor;
-      }
-      ensureAiModeFrames();
-      if (
-        !aiModeDecorFrame ||
-        typeof window._x_extension_createBorderBeamEffect_2026_unique_ !== 'function'
-      ) {
-        return null;
-      }
-      aiModeDecor = window._x_extension_createBorderBeamEffect_2026_unique_({
-        target: aiModeDecorFrame,
-        themeTarget: overlay,
-        borderRadius: 28,
-        borderWidth: 1,
-        edgeOffset: 0,
-        zIndex: 0,
-        spread: 6,
-        duration: 2.4,
-        hueRange: 13,
-        strength: getAiModeBeamThemeName() === 'light' ? 0.64 : 0.82,
-        theme: 'auto',
-        active: false
-      });
-      return aiModeDecor;
-    }
-
-    function ensureAiModeSweep() {
-      if (aiModeSweep) {
-        return aiModeSweep;
-      }
-      ensureAiModeFrames();
-      if (
-        !aiModeSweepFrame ||
-        typeof window._x_extension_createAiSweepEffect_2026_unique_ !== 'function'
-      ) {
-        return null;
-      }
-      aiModeSweep = window._x_extension_createAiSweepEffect_2026_unique_({
-        target: aiModeSweepFrame,
-        themeTarget: overlay,
-        borderRadius: 28,
-        zIndex: 0,
-        duration: AI_MODE_SWEEP_DURATION_MS,
-        maxDisplacement: 24
-      });
-      return aiModeSweep;
-    }
-
-    function playAiModeSweep() {
-      const sweep = ensureAiModeSweep();
-      if (!sweep) {
-        return;
-      }
-      sweep.setTheme('auto');
-      sweep.play();
-    }
-
-    function setAiModeBeamActive(provider, options) {
-      const nextActive = Boolean(provider && isAiSiteSearchProvider(provider));
-      if (!nextActive) {
-        if (aiModeDecor) {
-          aiModeDecor.setActive(false);
-        }
-        aiModeEffectsActive = false;
-        aiModeExpandedSweepPlayed = false;
-        return;
-      }
-      const decor = ensureAiModeDecor();
-      if (decor) {
-        syncAiModeDecorAppearance();
-        decor.setActive(true);
-      }
-      if (!aiModeEffectsActive || Boolean(options && options.animate)) {
-        aiModeExpandedSweepPlayed = false;
-        playAiModeSweep();
-      }
-      aiModeEffectsActive = true;
-    }
-
-    function refreshAiModeBeamTheme() {
-      if (!siteSearchState || !isAiSiteSearchProvider(siteSearchState)) {
-        return;
-      }
-      if (aiModeDecor) {
-        syncAiModeDecorAppearance();
-      }
-      if (aiModeSweep && typeof aiModeSweep.setTheme === 'function') {
-        aiModeSweep.setTheme('auto');
-      }
-    }
-
-    function clearAiModeBeamEffects() {
-      if (aiModeDecor) {
-        aiModeDecor.setActive(false);
-      }
-      aiModeEffectsActive = false;
-      aiModeExpandedSweepPlayed = false;
-    }
-
-    function playAiModeExpandedSweepIfNeeded() {
-      if (
-        !siteSearchState ||
-        !isAiSiteSearchProvider(siteSearchState) ||
-        !aiModeEffectsActive ||
-        aiModeExpandedSweepPlayed
-      ) {
-        return;
-      }
-      aiModeExpandedSweepPlayed = true;
-      playAiModeSweep();
-    }
-
-    overlay._lumnoAiModeEffectsCleanup = () => {
-      if (aiModeDecor && typeof aiModeDecor.destroy === 'function') {
-        aiModeDecor.destroy();
-      }
-      if (aiModeSweep && typeof aiModeSweep.destroy === 'function') {
-        aiModeSweep.destroy();
-      }
-      aiModeDecor = null;
-      aiModeSweep = null;
-      aiModeFrame = null;
-      aiModeDecorFrame = null;
-      aiModeSweepFrame = null;
-      aiModeEffectsActive = false;
-      aiModeExpandedSweepPlayed = false;
-    };
-
     function updateInputRightPadding() {
       if (!searchInput) {
         return;
@@ -6801,10 +6596,10 @@ function toggleBlackRectangle(tabs, overlayContext) {
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        min-width: 34px !important;
-        height: 26px !important;
-        padding: 0 7px !important;
-        border-radius: 8px !important;
+        min-width: 32px !important;
+        height: 22px !important;
+        padding: 0 6px !important;
+        border-radius: 7px !important;
         border: 1px solid var(--x-ov-border, rgba(0, 0, 0, 0.08)) !important;
         background: var(--x-ov-tag-bg, #F3F4F6) !important;
         color: var(--x-ov-tag-text, #6B7280) !important;
@@ -6812,7 +6607,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
         font-size: 11px !important;
         font-family: inherit !important;
         font-weight: 700 !important;
-        line-height: 16px !important;
+        line-height: 14px !important;
         letter-spacing: 0 !important;
         white-space: nowrap !important;
         flex: 0 0 auto !important;
@@ -6832,7 +6627,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
         font-size: 13px !important;
         font-family: inherit !important;
         font-weight: 400 !important;
-        line-height: 20px !important;
+        line-height: 18px !important;
         letter-spacing: 0 !important;
         flex: 1 1 auto !important;
       `;
@@ -7199,6 +6994,8 @@ function toggleBlackRectangle(tabs, overlayContext) {
     const prefixGap = 8;
     const inputModePrefixTransition = 'opacity 220ms cubic-bezier(0.22, 1, 0.36, 1), transform 300ms cubic-bezier(0.22, 1, 0.36, 1), filter 260ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms ease, box-shadow 180ms ease';
     let inputModePrefixAnimationFrame = null;
+    let inputModeElasticAnimationFrame = null;
+    let inputModeElasticAnimation = null;
 
     function mixColor(color, target, amount) {
       return [
@@ -8602,6 +8399,74 @@ function toggleBlackRectangle(tabs, overlayContext) {
       });
     }
 
+    function getInputModeElasticTarget() {
+      return inputContainer || overlay;
+    }
+
+    function appendTransformWillChange(value) {
+      const currentValue = String(value || '').trim();
+      if (!currentValue || currentValue === 'auto') {
+        return 'transform';
+      }
+      const parts = currentValue.split(',').map((part) => part.trim()).filter(Boolean);
+      if (parts.includes('transform')) {
+        return currentValue;
+      }
+      return `${currentValue}, transform`;
+    }
+
+    function playInputModeElasticAnimation() {
+      const target = getInputModeElasticTarget();
+      if (inputModeElasticAnimationFrame !== null) {
+        cancelAnimationFrame(inputModeElasticAnimationFrame);
+        inputModeElasticAnimationFrame = null;
+      }
+      if (inputModeElasticAnimation && typeof inputModeElasticAnimation.cancel === 'function') {
+        inputModeElasticAnimation.cancel();
+      }
+      if (!target || shouldReduceInputModeMotion() || typeof target.animate !== 'function') {
+        return;
+      }
+      inputModeElasticAnimationFrame = requestAnimationFrame(() => {
+        inputModeElasticAnimationFrame = null;
+        if (!target.isConnected) {
+          return;
+        }
+        const previousWillChange = target.style.getPropertyValue('will-change');
+        const previousWillChangePriority = target.style.getPropertyPriority('will-change');
+        target.style.setProperty(
+          'will-change',
+          appendTransformWillChange(previousWillChange),
+          previousWillChangePriority || 'important'
+        );
+        const animation = target.animate([
+          { transform: 'scale3d(1, 1, 1)', transformOrigin: 'center center', offset: 0 },
+          { transform: 'scale3d(1.016, 0.986, 1)', transformOrigin: 'center center', offset: 0.36 },
+          { transform: 'scale3d(0.997, 1.006, 1)', transformOrigin: 'center center', offset: 0.68 },
+          { transform: 'scale3d(1.002, 0.999, 1)', transformOrigin: 'center center', offset: 0.84 },
+          { transform: 'scale3d(1, 1, 1)', transformOrigin: 'center center', offset: 1 }
+        ], {
+          duration: 380,
+          easing: 'cubic-bezier(0.18, 1.18, 0.2, 1)',
+          fill: 'none'
+        });
+        inputModeElasticAnimation = animation;
+        const cleanup = () => {
+          if (inputModeElasticAnimation !== animation) {
+            return;
+          }
+          inputModeElasticAnimation = null;
+          if (previousWillChange) {
+            target.style.setProperty('will-change', previousWillChange, previousWillChangePriority);
+          } else {
+            target.style.removeProperty('will-change');
+          }
+        };
+        animation.onfinish = cleanup;
+        animation.oncancel = cleanup;
+      });
+    }
+
     function getBaseInputPaddingLeft() {
       if (baseInputPaddingLeft === null) {
         const computed = parseFloat(window.getComputedStyle(searchInput).paddingLeft);
@@ -8635,6 +8500,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
       updateSiteSearchPrefixLayout();
       if (shouldAnimate) {
         playInputModePrefixEnterAnimation();
+        playInputModeElasticAnimation();
       }
     }
 
@@ -8650,7 +8516,6 @@ function toggleBlackRectangle(tabs, overlayContext) {
     function setSiteSearchPrefix(provider, theme, options) {
       const prefixText = getSiteSearchPrefixText(provider);
       const isAi = isAiSiteSearchProvider(provider);
-      setAiModeBeamActive(provider, options);
       setInputModePrefix(prefixText, theme, {
         ...(options || {}),
         iconUrl: isAi ? getProviderIcon(provider) : '',
@@ -8669,7 +8534,6 @@ function toggleBlackRectangle(tabs, overlayContext) {
 
     function clearSiteSearchPrefix() {
       clearInputModePrefix();
-      clearAiModeBeamEffects();
     }
 
     window.addEventListener('resize', updateSiteSearchPrefixLayout);
@@ -12449,10 +12313,6 @@ function toggleBlackRectangle(tabs, overlayContext) {
         if (shouldAnimateGrowth) {
           animateSuggestionsGrowth(suggestionsContainer, previousHeight);
         }
-        if (allSuggestions.length > 0) {
-          requestAnimationFrame(playAiModeExpandedSweepIfNeeded);
-        }
-
       // Update keyboard navigation
       if (!canAppend) {
         selectedIndex = -1;

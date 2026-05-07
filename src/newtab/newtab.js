@@ -1,8 +1,6 @@
 (function() {
   const root = document.getElementById('_x_extension_newtab_root_2024_unique_');
   const createSearchInput = window._x_extension_createSearchInput_2024_unique_;
-  const createBorderBeamEffect = window._x_extension_createBorderBeamEffect_2026_unique_;
-  const createAiSweepEffect = window._x_extension_createAiSweepEffect_2026_unique_;
   if (!root || typeof createSearchInput !== 'function') {
     return;
   }
@@ -95,14 +93,6 @@
   let currentBookmarkColumns = 4;
   let tabRankScoreDebugEnabled = false;
   let searchLayer = null;
-  const AI_MODE_SWEEP_DURATION_MS = 1800;
-  let aiModeFrame = null;
-  let aiModeDecorFrame = null;
-  let aiModeSweepFrame = null;
-  let aiModeDecor = null;
-  let aiModeSweep = null;
-  let aiModeEffectsActive = false;
-  let aiModeExpandedSweepPlayed = false;
   let wordmarkContainer = null;
   let wordmarkImageEl = null;
   let pageNoticeBanner = null;
@@ -1702,7 +1692,6 @@
     applyLanguageStrings();
     updateSelection();
     updateModeBadge(inputParts && inputParts.input ? inputParts.input.value : '');
-    refreshAiModeBeamTheme();
     refreshFallbackIcons();
     if (didResolvedThemeChange) {
       refreshThemeAwareFavicons();
@@ -4696,219 +4685,6 @@
     }, 2200);
   }
 
-  function getAiModeBeamThemeName() {
-    return isNewtabDarkMode() ? 'dark' : 'light';
-  }
-
-  function createAiModeFrameElement(id, overflow) {
-    const frame = document.createElement('div');
-    frame.id = id;
-    frame.setAttribute('aria-hidden', 'true');
-    frame.style.cssText = `
-      all: unset;
-      position: absolute;
-      inset: 0;
-      display: block;
-      box-sizing: border-box;
-      border-radius: inherit;
-      pointer-events: none;
-      overflow: ${overflow};
-    `;
-    return frame;
-  }
-
-  function ensureAiModeFrames() {
-    if (!aiModeFrame) {
-      aiModeFrame = document.createElement('div');
-      aiModeFrame.id = '_x_extension_newtab_ai_mode_effect_frame_2026_unique_';
-      aiModeFrame.setAttribute('aria-hidden', 'true');
-      aiModeFrame.style.cssText = `
-        all: unset;
-        position: fixed;
-        left: 0;
-        top: 0;
-        width: 0;
-        height: 0;
-        display: block;
-        box-sizing: border-box;
-        border-radius: 28px;
-        pointer-events: none;
-        overflow: visible;
-        z-index: 25;
-      `;
-    }
-    if (!aiModeDecorFrame) {
-      aiModeDecorFrame = createAiModeFrameElement(
-        '_x_extension_newtab_ai_mode_decor_frame_2026_unique_',
-        'visible'
-      );
-    }
-    if (!aiModeSweepFrame) {
-      aiModeSweepFrame = createAiModeFrameElement(
-        '_x_extension_newtab_ai_mode_sweep_frame_2026_unique_',
-        'hidden'
-      );
-    }
-    if (aiModeDecorFrame.parentNode !== aiModeFrame) {
-      aiModeFrame.appendChild(aiModeDecorFrame);
-    }
-    if (aiModeSweepFrame.parentNode !== aiModeFrame) {
-      aiModeFrame.appendChild(aiModeSweepFrame);
-    }
-    if (aiModeFrame.parentNode !== document.body) {
-      document.body.appendChild(aiModeFrame);
-    }
-    updateAiModeFrameLayout();
-    return aiModeFrame;
-  }
-
-  function getAiModeFrameRect() {
-    const suggestionsVisible = suggestionsContainer &&
-      suggestionsContainer.getAttribute('data-visible') === 'true';
-    if (suggestionsVisible && suggestionsSurface) {
-      const surfaceRect = suggestionsSurface.getBoundingClientRect();
-      if (surfaceRect.width > 0 && surfaceRect.height > 0) {
-        return surfaceRect;
-      }
-    }
-    const anchor = root || searchLayer || (inputParts && inputParts.container);
-    return anchor ? anchor.getBoundingClientRect() : null;
-  }
-
-  function updateAiModeFrameLayout() {
-    if (!aiModeFrame) {
-      return;
-    }
-    const rect = getAiModeFrameRect();
-    if (!rect) {
-      return;
-    }
-    const left = Math.round(rect.left);
-    const top = Math.round(rect.top);
-    const width = Math.max(0, Math.round(rect.width));
-    const height = Math.max(0, Math.round(rect.height));
-    aiModeFrame.style.setProperty('left', `${left}px`);
-    aiModeFrame.style.setProperty('top', `${top}px`);
-    aiModeFrame.style.setProperty('width', `${width}px`);
-    aiModeFrame.style.setProperty('height', `${height}px`);
-    aiModeFrame.style.setProperty('border-radius', '28px');
-  }
-
-  function syncAiModeDecorAppearance() {
-    if (!aiModeDecor || !aiModeDecor.beam) {
-      return;
-    }
-    const resolvedTheme = getAiModeBeamThemeName();
-    const strength = resolvedTheme === 'light' ? 0.64 : 0.82;
-    aiModeDecor.beam.style.setProperty('--beam-strength', String(strength), 'important');
-    aiModeDecor.setTheme(resolvedTheme);
-  }
-
-  function ensureAiModeDecor() {
-    if (aiModeDecor) {
-      return aiModeDecor;
-    }
-    ensureAiModeFrames();
-    if (!aiModeDecorFrame || typeof createBorderBeamEffect !== 'function') {
-      return null;
-    }
-    aiModeDecor = createBorderBeamEffect({
-      target: aiModeDecorFrame,
-      themeTarget: document.body || root,
-      borderRadius: 28,
-      borderWidth: 1,
-      edgeOffset: 0,
-      zIndex: 0,
-      spread: 6,
-      duration: 2.4,
-      hueRange: 13,
-      strength: getAiModeBeamThemeName() === 'light' ? 0.64 : 0.82,
-      theme: 'auto',
-      active: false
-    });
-    return aiModeDecor;
-  }
-
-  function ensureAiModeSweep() {
-    if (aiModeSweep) {
-      return aiModeSweep;
-    }
-    ensureAiModeFrames();
-    if (!aiModeSweepFrame || typeof createAiSweepEffect !== 'function') {
-      return null;
-    }
-    aiModeSweep = createAiSweepEffect({
-      target: aiModeSweepFrame,
-      themeTarget: document.body || root,
-      borderRadius: 28,
-      zIndex: 0,
-      duration: AI_MODE_SWEEP_DURATION_MS,
-      maxDisplacement: 24
-    });
-    return aiModeSweep;
-  }
-
-  function playAiModeSweep() {
-    updateAiModeFrameLayout();
-    const sweep = ensureAiModeSweep();
-    if (!sweep) {
-      return;
-    }
-    sweep.setTheme('auto');
-    sweep.play();
-  }
-
-  function setAiModeBeamActive(provider, options) {
-    const nextActive = Boolean(provider && isAiSiteSearchProvider(provider));
-    if (!nextActive) {
-      clearAiModeBeamEffects();
-      return;
-    }
-    updateAiModeFrameLayout();
-    const decor = ensureAiModeDecor();
-    if (decor) {
-      syncAiModeDecorAppearance();
-      decor.setActive(true);
-    }
-    if (!aiModeEffectsActive || Boolean(options && options.animate)) {
-      aiModeExpandedSweepPlayed = false;
-      playAiModeSweep();
-    }
-    aiModeEffectsActive = true;
-  }
-
-  function refreshAiModeBeamTheme() {
-    if (!siteSearchState || !isAiSiteSearchProvider(siteSearchState)) {
-      return;
-    }
-    updateAiModeFrameLayout();
-    syncAiModeDecorAppearance();
-    if (aiModeSweep && typeof aiModeSweep.setTheme === 'function') {
-      aiModeSweep.setTheme('auto');
-    }
-  }
-
-  function playAiModeExpandedSweepIfNeeded() {
-    if (
-      !siteSearchState ||
-      !isAiSiteSearchProvider(siteSearchState) ||
-      !aiModeEffectsActive ||
-      aiModeExpandedSweepPlayed
-    ) {
-      return;
-    }
-    aiModeExpandedSweepPlayed = true;
-    playAiModeSweep();
-  }
-
-  function clearAiModeBeamEffects() {
-    if (aiModeDecor) {
-      aiModeDecor.setActive(false);
-    }
-    aiModeEffectsActive = false;
-    aiModeExpandedSweepPlayed = false;
-  }
-
   function setSuggestionsVisible(visible) {
     const shouldShow = Boolean(visible);
     const wasVisible = suggestionsContainer.getAttribute('data-visible') === 'true';
@@ -4964,14 +4740,8 @@
     if (suggestionsOutline) {
       suggestionsOutline.setAttribute('data-visible', shouldShow ? 'true' : 'false');
     }
-    if (aiModeFrame) {
-      requestAnimationFrame(updateAiModeFrameLayout);
-    }
     if (shouldShow) {
       requestAnimationFrame(updateSuggestionsFloatingLayout);
-      if (!wasVisible) {
-        requestAnimationFrame(playAiModeExpandedSweepIfNeeded);
-      }
     }
   }
 
@@ -5014,7 +4784,6 @@
         suggestionsOutline.style.setProperty('height', `${surfaceHeight}px`);
       }
     }
-    updateAiModeFrameLayout();
   }
 
   function isEnglishQuery(query) {
@@ -9515,19 +9284,19 @@
     display: none;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 7px;
     max-width: min(300px, 52%);
     min-width: 0;
-    height: 32px;
+    height: 28px;
     padding: 0;
     border: none;
     background: transparent;
     color: var(--x-nt-tag-text, #6B7280);
     box-sizing: border-box;
-    font-size: 14px;
+    font-size: 13px;
     font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     font-weight: 700;
-    line-height: 20px;
+    line-height: 18px;
     letter-spacing: 0;
     white-space: nowrap;
     pointer-events: none;
@@ -9654,10 +9423,10 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-width: 34px;
-      height: 26px;
-      padding: 0 7px;
-      border-radius: 8px;
+      min-width: 32px;
+      height: 22px;
+      padding: 0 6px;
+      border-radius: 7px;
       border: 1px solid var(--x-nt-panel-border, rgba(0, 0, 0, 0.08));
       background: var(--x-nt-tag-bg, #F3F4F6);
       color: var(--x-nt-tag-text, #6B7280);
@@ -9665,7 +9434,7 @@
       font-size: 11px;
       font-family: inherit;
       font-weight: 700;
-      line-height: 16px;
+      line-height: 14px;
       letter-spacing: 0;
       white-space: nowrap;
       flex: 0 0 auto;
@@ -9684,7 +9453,7 @@
       font-size: 13px;
       font-family: inherit;
       font-weight: 400;
-      line-height: 20px;
+      line-height: 18px;
       letter-spacing: 0;
       flex: 1 1 auto;
     `;
@@ -9724,6 +9493,8 @@
   const prefixGap = 8;
   const inputModePrefixTransition = 'opacity 220ms cubic-bezier(0.22, 1, 0.36, 1), transform 300ms cubic-bezier(0.22, 1, 0.36, 1), filter 260ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms ease, box-shadow 180ms ease';
   let inputModePrefixAnimationFrame = null;
+  let inputModeElasticAnimationFrame = null;
+  let inputModeElasticAnimation = null;
 
   const siteSearchPrefix = document.createElement('span');
   siteSearchPrefix.id = '_x_extension_newtab_site_search_prefix_2024_unique_';
@@ -9881,6 +9652,74 @@
     });
   }
 
+  function getInputModeElasticTarget() {
+    return root || searchLayer || inputContainer;
+  }
+
+  function appendTransformWillChange(value) {
+    const currentValue = String(value || '').trim();
+    if (!currentValue || currentValue === 'auto') {
+      return 'transform';
+    }
+    const parts = currentValue.split(',').map((part) => part.trim()).filter(Boolean);
+    if (parts.includes('transform')) {
+      return currentValue;
+    }
+    return `${currentValue}, transform`;
+  }
+
+  function playInputModeElasticAnimation() {
+    const target = getInputModeElasticTarget();
+    if (inputModeElasticAnimationFrame !== null) {
+      cancelAnimationFrame(inputModeElasticAnimationFrame);
+      inputModeElasticAnimationFrame = null;
+    }
+    if (inputModeElasticAnimation && typeof inputModeElasticAnimation.cancel === 'function') {
+      inputModeElasticAnimation.cancel();
+    }
+    if (!target || shouldReduceInputModeMotion() || typeof target.animate !== 'function') {
+      return;
+    }
+    inputModeElasticAnimationFrame = requestAnimationFrame(() => {
+      inputModeElasticAnimationFrame = null;
+      if (!target.isConnected) {
+        return;
+      }
+      const previousWillChange = target.style.getPropertyValue('will-change');
+      const previousWillChangePriority = target.style.getPropertyPriority('will-change');
+      target.style.setProperty(
+        'will-change',
+        appendTransformWillChange(previousWillChange),
+        previousWillChangePriority
+      );
+      const animation = target.animate([
+        { transform: 'scale3d(1, 1, 1)', transformOrigin: 'center center', offset: 0 },
+        { transform: 'scale3d(1.02, 0.982, 1)', transformOrigin: 'center center', offset: 0.36 },
+        { transform: 'scale3d(0.996, 1.008, 1)', transformOrigin: 'center center', offset: 0.68 },
+        { transform: 'scale3d(1.002, 0.999, 1)', transformOrigin: 'center center', offset: 0.84 },
+        { transform: 'scale3d(1, 1, 1)', transformOrigin: 'center center', offset: 1 }
+      ], {
+        duration: 400,
+        easing: 'cubic-bezier(0.18, 1.18, 0.2, 1)',
+        fill: 'none'
+      });
+      inputModeElasticAnimation = animation;
+      const cleanup = () => {
+        if (inputModeElasticAnimation !== animation) {
+          return;
+        }
+        inputModeElasticAnimation = null;
+        if (previousWillChange) {
+          target.style.setProperty('will-change', previousWillChange, previousWillChangePriority);
+        } else {
+          target.style.removeProperty('will-change');
+        }
+      };
+      animation.onfinish = cleanup;
+      animation.oncancel = cleanup;
+    });
+  }
+
   function getBaseInputPaddingLeft() {
     if (baseInputPaddingLeft === null) {
       const computed = parseFloat(window.getComputedStyle(searchInput).paddingLeft);
@@ -9905,7 +9744,6 @@
     const prefixText = getSiteSearchPrefixText(provider);
     const shouldAnimate = Boolean(options && options.animate);
     const isAi = isAiSiteSearchProvider(provider);
-    setAiModeBeamActive(provider, options);
     const prefixOptions = {
       ...(options || {}),
       iconUrl: isAi ? getProviderIcon(provider) : '',
@@ -9923,6 +9761,7 @@
     updateSiteSearchPrefixLayout();
     if (shouldAnimate) {
       playInputModePrefixEnterAnimation();
+      playInputModeElasticAnimation();
     }
   }
 
@@ -9933,7 +9772,6 @@
     searchInput.placeholder = defaultPlaceholder;
     searchInput.style.setProperty('caret-color', defaultCaretColor);
     updateSiteSearchPrefixLayout();
-    clearAiModeBeamEffects();
   }
 
   window.addEventListener('resize', () => {
