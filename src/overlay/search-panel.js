@@ -149,6 +149,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   const RI_CSS_URL = overlayRuntime.getRuntimeUrl(chrome, 'assets/remixicon/fonts/remixicon.css');
   const OPEN_SANS_CSS_URL = overlayRuntime.getRuntimeUrl(chrome, 'assets/fonts/open-sans/open-sans.css');
   const SEARCH_INPUT_CSS_URL = overlayRuntime.getRuntimeUrl(chrome, 'src/shared/search-input.css');
+  const OVERLAY_SUGGESTIONS_CSS_URL = overlayRuntime.getRuntimeUrl(chrome, 'src/overlay/suggestions-view.css');
   const overlayMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
   let overlayThemeMode = 'system';
   let overlaySearchResultPriorityMode = 'autocomplete';
@@ -372,22 +373,12 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     }
     container.textContent = '';
     const label = document.createElement('span');
+    label.className = 'x-ov-inline-label';
     setProtectedPlainText(label, labelText);
-    label.style.cssText = `
-      all: unset !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      line-height: 1 !important;
-    `;
     const icon = document.createElement('span');
+    icon.className = 'x-ov-inline-icon';
     applyNoTranslate(icon);
     icon.innerHTML = iconHtml;
-    icon.style.cssText = `
-      all: unset !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      line-height: 1 !important;
-    `;
     container.appendChild(label);
     container.appendChild(icon);
   }
@@ -913,7 +904,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       maxHeightVh: initialOverlaySizePreset.maxHeightVh,
       openSansCssUrl: OPEN_SANS_CSS_URL,
       remixIconCssUrl: RI_CSS_URL,
-      searchInputCssUrl: SEARCH_INPUT_CSS_URL
+      searchInputCssUrl: SEARCH_INPUT_CSS_URL,
+      overlaySuggestionsCssUrl: OVERLAY_SUGGESTIONS_CSS_URL
     });
     overlay = overlayMount && overlayMount.panel ? overlayMount.panel : null;
     const overlayHost = overlayMount && overlayMount.host ? overlayMount.host : overlay;
@@ -989,7 +981,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       root: overlayStyleRoot,
       openSansCssUrl: OPEN_SANS_CSS_URL,
       remixIconCssUrl: RI_CSS_URL,
-      searchInputCssUrl: SEARCH_INPUT_CSS_URL
+      searchInputCssUrl: SEARCH_INPUT_CSS_URL,
+      overlaySuggestionsCssUrl: OVERLAY_SUGGESTIONS_CSS_URL
     });
 
 
@@ -1048,35 +1041,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     const topActionTooltip = document.createElement('div');
     applyNoTranslate(topActionTooltip);
     topActionTooltip.id = '_x_extension_top_action_tooltip_2026_unique_';
-    topActionTooltip.style.cssText = `
-      all: unset !important;
-      position: absolute !important;
-      left: 8px !important;
-      top: 8px !important;
-      display: block !important;
-      visibility: hidden !important;
-      width: max-content !important;
-      max-width: 420px !important;
-      padding: 8px 12px !important;
-      border-radius: 10px !important;
-      background: #0F172A !important;
-      color: #F9FAFB !important;
-      border: 1px solid rgba(15, 23, 42, 0.12) !important;
-      font-size: 12px !important;
-      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-      font-weight: 500 !important;
-      line-height: 1.35 !important;
-      white-space: normal !important;
-      overflow-wrap: break-word !important;
-      text-align: left !important;
-      box-sizing: border-box !important;
-      pointer-events: none !important;
-      z-index: 4 !important;
-      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18) !important;
-      opacity: 0 !important;
-      transform: translateY(4px) !important;
-      transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease !important;
-    `;
+    topActionTooltip.className = 'x-ov-top-action-tooltip';
     overlay.appendChild(topActionTooltip);
     let topActionTooltipHideTimer = null;
     const showTopActionTooltip = (button, text) => {
@@ -1089,27 +1054,22 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       }
       topActionTooltip.textContent = text;
       const isDark = overlay && overlay.getAttribute('data-theme') === 'dark';
-      topActionTooltip.style.setProperty('background', isDark ? '#020617' : '#0F172A', 'important');
-      topActionTooltip.style.setProperty('color', '#F8FAFC', 'important');
+      topActionTooltip.style.setProperty('--x-ov-tooltip-bg', isDark ? '#020617' : '#0F172A');
+      topActionTooltip.style.setProperty('--x-ov-tooltip-text', '#F8FAFC');
       topActionTooltip.style.setProperty(
-        'border',
-        isDark ? '1px solid rgba(255, 255, 255, 0.2)' : '1px solid rgba(15, 23, 42, 0.12)',
-        'important'
+        '--x-ov-tooltip-border',
+        isDark ? '1px solid rgba(255, 255, 255, 0.2)' : '1px solid rgba(15, 23, 42, 0.12)'
       );
       topActionTooltip.style.setProperty(
-        'box-shadow',
-        isDark ? '0 14px 30px rgba(0, 0, 0, 0.45)' : '0 10px 22px rgba(0, 0, 0, 0.18)',
-        'important'
+        '--x-ov-tooltip-shadow',
+        isDark ? '0 14px 30px rgba(0, 0, 0, 0.45)' : '0 10px 22px rgba(0, 0, 0, 0.18)'
       );
       const overlayRect = overlay.getBoundingClientRect();
       const buttonRect = button.getBoundingClientRect();
       const availableWidth = Math.max(180, Math.floor(overlayRect.width - 16));
       const resolvedMaxWidth = Math.min(420, availableWidth);
-      topActionTooltip.style.setProperty('max-width', `${resolvedMaxWidth}px`, 'important');
-      topActionTooltip.style.setProperty('width', 'max-content', 'important');
-      topActionTooltip.style.setProperty('visibility', 'hidden', 'important');
-      topActionTooltip.style.setProperty('opacity', '0', 'important');
-      topActionTooltip.style.setProperty('transform', 'translateY(4px)', 'important');
+      topActionTooltip.style.setProperty('--x-ov-tooltip-max-width', `${resolvedMaxWidth}px`);
+      topActionTooltip.removeAttribute('data-visible');
       const tooltipRect = topActionTooltip.getBoundingClientRect();
       const spacing = 10;
       let tooltipTop = Math.round(buttonRect.top - overlayRect.top - tooltipRect.height - spacing);
@@ -1122,79 +1082,37 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       const minLeft = 8;
       const maxLeft = Math.max(minLeft, Math.round(overlayRect.width - tooltipRect.width - 8));
       tooltipLeft = Math.max(minLeft, Math.min(maxLeft, tooltipLeft));
-      topActionTooltip.style.setProperty('top', `${tooltipTop}px`, 'important');
-      topActionTooltip.style.setProperty('left', `${tooltipLeft}px`, 'important');
-      topActionTooltip.style.setProperty('visibility', 'visible', 'important');
+      topActionTooltip.style.setProperty('--x-ov-tooltip-top', `${tooltipTop}px`);
+      topActionTooltip.style.setProperty('--x-ov-tooltip-left', `${tooltipLeft}px`);
       requestAnimationFrame(() => {
-        topActionTooltip.style.setProperty('opacity', '1', 'important');
-        topActionTooltip.style.setProperty('transform', 'translateY(0)', 'important');
+        topActionTooltip.setAttribute('data-visible', 'true');
       });
     };
     const hideTopActionTooltip = () => {
       if (!topActionTooltip) {
         return;
       }
-      topActionTooltip.style.setProperty('opacity', '0', 'important');
-      topActionTooltip.style.setProperty('transform', 'translateY(4px)', 'important');
+      topActionTooltip.removeAttribute('data-visible');
       if (topActionTooltipHideTimer) {
         clearTimeout(topActionTooltipHideTimer);
       }
       topActionTooltipHideTimer = setTimeout(() => {
-        topActionTooltip.style.setProperty('visibility', 'hidden', 'important');
+        topActionTooltip.removeAttribute('data-visible');
       }, 120);
     };
     const closeOtherTabsButton = document.createElement('button');
     applyNoTranslate(closeOtherTabsButton);
     closeOtherTabsButton.id = '_x_extension_search_close_other_tabs_2026_unique_';
+    closeOtherTabsButton.className = 'x-ov-close-other-tabs';
     closeOtherTabsButton.type = 'button';
     closeOtherTabsButton.innerHTML = getRiSvg('ri-brush-2-line', 'ri-size-16');
     closeOtherTabsButton.setAttribute('aria-label', t('overlay_close_other_tabs_tooltip', '清理本页外的其他标签页（除置顶与群组）'));
-    closeOtherTabsButton.style.cssText = `
-      all: unset !important;
-      position: absolute !important;
-      right: 14px !important;
-      top: 50% !important;
-      transform: translateY(-50%) !important;
-      width: 30px !important;
-      height: 30px !important;
-      border-radius: 8px !important;
-      z-index: 2 !important;
-      box-sizing: border-box !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      line-height: 1 !important;
-      text-decoration: none !important;
-      list-style: none !important;
-      outline: none !important;
-      background: transparent !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      font-size: 0 !important;
-      color: var(--x-ext-input-icon, #9CA3AF) !important;
-      cursor: pointer !important;
-      transition: background-color 140ms ease, color 140ms ease, transform 160ms ease !important;
-    `;
-    const closeOtherTabsIcon = closeOtherTabsButton.querySelector('.ri-icon');
-    if (closeOtherTabsIcon) {
-      closeOtherTabsIcon.style.setProperty('display', 'inline-flex', 'important');
-      closeOtherTabsIcon.style.setProperty('align-items', 'center', 'important');
-      closeOtherTabsIcon.style.setProperty('justify-content', 'center', 'important');
-      closeOtherTabsIcon.style.setProperty('line-height', '1', 'important');
-      closeOtherTabsIcon.style.setProperty('transform', 'none', 'important');
-      closeOtherTabsIcon.style.setProperty('pointer-events', 'none', 'important');
-      closeOtherTabsIcon.style.setProperty('cursor', 'pointer', 'important');
-    }
     const resetCloseOtherTabsButtonVisualState = () => {
-      closeOtherTabsButton.style.setProperty('background', 'transparent', 'important');
-      closeOtherTabsButton.style.setProperty('color', 'var(--x-ext-input-icon, #9CA3AF)', 'important');
-      closeOtherTabsButton.style.setProperty('transform', 'translateY(-50%)', 'important');
+      closeOtherTabsButton.removeAttribute('data-hover-active');
     };
     resetCloseOtherTabsButtonVisualState();
     closeOtherTabsButton.addEventListener('mouseenter', () => {
-      closeOtherTabsButton.style.setProperty('background', 'var(--x-ext-input-icon-hover-bg, rgba(148, 163, 184, 0.16))', 'important');
-      closeOtherTabsButton.style.setProperty('color', 'var(--x-ext-input-icon-hover, #4B5563)', 'important');
-      closeOtherTabsButton.style.setProperty('transform', 'translateY(-50%) scale(1.06)', 'important');
+      closeOtherTabsButton.setAttribute('data-hover-active', 'true');
     });
     closeOtherTabsButton.addEventListener('mouseleave', resetCloseOtherTabsButtonVisualState);
     closeOtherTabsButton.addEventListener('blur', resetCloseOtherTabsButtonVisualState);
@@ -1235,29 +1153,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     const suggestionsContainer = document.createElement('div');
     applyNoTranslate(suggestionsContainer);
     suggestionsContainer.id = '_x_extension_suggestions_container_2024_unique_';
-    suggestionsContainer.style.cssText = `
-      all: unset !important;
-      width: 100% !important;
-      flex: 1 1 auto !important;
-      min-height: 0 !important;
-      max-height: 50vh !important;
-      overflow-y: auto !important;
-      scrollbar-width: none !important;
-      -ms-overflow-style: none !important;
-      background: transparent !important;
-      border-radius: 0 0 28px 28px !important;
-      padding: 12px !important;
-      box-sizing: border-box !important;
-      display: block !important;
-      line-height: 1 !important;
-      text-decoration: none !important;
-      list-style: none !important;
-      outline: none !important;
-      color: inherit !important;
-      font-size: 100% !important;
-      font: inherit !important;
-      vertical-align: baseline !important;
-    `;
+    suggestionsContainer.className = 'x-ov-suggestions-container';
 
     function updateInputRightPadding() {
       if (inputModeController) {
@@ -2691,54 +2587,16 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     }
 
     function createSearchIcon() {
-    const icon = document.createElement('span');
-    icon.innerHTML = getRiSvg('ri-search-line', 'ri-size-16');
-      icon.style.cssText = `
-        all: unset !important;
-        width: 16px !important;
-        height: 16px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        box-sizing: border-box !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        line-height: 1 !important;
-        text-decoration: none !important;
-        list-style: none !important;
-        outline: none !important;
-        background: transparent !important;
-        color: inherit !important;
-        font-size: 100% !important;
-        font: inherit !important;
-        vertical-align: baseline !important;
-      `;
+      const icon = document.createElement('span');
+      icon.className = 'x-ov-suggestion-inline-icon';
+      icon.innerHTML = getRiSvg('ri-search-line', 'ri-size-16');
       return icon;
     }
 
     function createLinkIcon() {
       const icon = document.createElement('span');
+      icon.className = 'x-ov-suggestion-inline-icon';
       icon.innerHTML = getRiSvg('ri-link', 'ri-size-16');
-      icon.style.cssText = `
-        all: unset !important;
-        width: 16px !important;
-        height: 16px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        box-sizing: border-box !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        line-height: 1 !important;
-        text-decoration: none !important;
-        list-style: none !important;
-        outline: none !important;
-        background: transparent !important;
-        color: inherit !important;
-        font-size: 100% !important;
-        font: inherit !important;
-        vertical-align: baseline !important;
-      `;
       return icon;
     }
 
@@ -2780,53 +2638,16 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
 
     function createActionTag(labelText, keyLabel) {
       const tag = document.createElement('span');
+      tag.className = 'x-ov-action-tag';
       applyNoTranslate(tag);
-      tag.style.cssText = `
-        all: unset !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        gap: 6px !important;
-        background: var(--x-ext-tag-bg, #EEF6FF) !important;
-        color: var(--x-ext-tag-text, #1E3A8A) !important;
-        border: 1px solid var(--x-ext-tag-border, #BFDBFE) !important;
-        padding: 4px 10px 4px 8px !important;
-        border-radius: 999px !important;
-        font-size: 11px !important;
-        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-        line-height: 1 !important;
-        text-decoration: none !important;
-        list-style: none !important;
-        outline: none !important;
-        box-sizing: border-box !important;
-        vertical-align: middle !important;
-        white-space: nowrap !important;
-      `;
 
       const label = document.createElement('span');
+      label.className = 'x-ov-action-tag__label';
       setProtectedPlainText(label, labelText);
-      label.style.cssText = `
-        all: unset !important;
-        font-weight: 500 !important;
-        line-height: 1 !important;
-      `;
 
       const keycap = document.createElement('span');
+      keycap.className = 'x-ov-action-tag__key';
       setProtectedPlainText(keycap, keyLabel);
-      keycap.style.cssText = `
-        all: unset !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        padding: 2px 7px !important;
-        border-radius: 6px !important;
-        background: var(--x-ext-key-bg, #FFFFFF) !important;
-        color: var(--x-ext-key-text, #1E3A8A) !important;
-        border: 1px solid var(--x-ext-key-border, #BFDBFE) !important;
-        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12) !important;
-        font-size: 10px !important;
-        font-weight: 500 !important;
-        line-height: 1 !important;
-      `;
 
       tag.appendChild(label);
       tag.appendChild(keycap);

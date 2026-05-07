@@ -24,6 +24,7 @@ const injectedScriptFiles = [
   'src/newtab/suggestions-view.js',
   'src/overlay/runtime.js',
   'src/overlay/favicon-view.js',
+  'src/overlay/suggestions-view.css',
   'src/overlay/shell.js',
   'src/overlay/lifecycle.js',
   'src/overlay/search-panel.js',
