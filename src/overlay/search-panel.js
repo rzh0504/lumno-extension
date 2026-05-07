@@ -4069,6 +4069,51 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       title.style.setProperty('--x-ov-suggestion-title-weight', active ? '600' : '400');
     }
 
+    function setSuggestionSourceTagVisible(tag, visible) {
+      if (!tag) {
+        return;
+      }
+      tag.setAttribute('data-visible', visible ? 'true' : 'false');
+    }
+
+    function setSuggestionSourceTagPalette(tag, bg, text, border) {
+      if (!tag) {
+        return;
+      }
+      tag.style.setProperty('--x-ov-suggestion-source-tag-bg', bg || 'var(--x-ov-tag-bg, #F3F4F6)');
+      tag.style.setProperty('--x-ov-suggestion-source-tag-text', text || 'var(--x-ov-tag-text, #6B7280)');
+      tag.style.setProperty('--x-ov-suggestion-source-tag-border', border || 'transparent');
+    }
+
+    function applySuggestionSourceTagState(tag, visible, active, resolvedTheme) {
+      if (!tag) {
+        return;
+      }
+      setSuggestionSourceTagVisible(tag, visible);
+      if (active) {
+        setSuggestionSourceTagPalette(tag, resolvedTheme.tagBg, resolvedTheme.tagText, resolvedTheme.tagBorder);
+      } else {
+        setSuggestionSourceTagPalette(
+          tag,
+          tag._xDefaultBg || 'var(--x-ov-tag-bg, #F3F4F6)',
+          tag._xDefaultText || 'var(--x-ov-tag-text, #6B7280)',
+          tag._xDefaultBorder || 'transparent'
+        );
+      }
+    }
+
+    function createSuggestionSourceTag(label, defaults) {
+      const tag = document.createElement('span');
+      setProtectedPlainText(tag, label);
+      tag.className = 'x-ov-suggestion-source-tag';
+      tag._xDefaultBg = defaults && defaults.bg ? defaults.bg : 'var(--x-ov-tag-bg, #F3F4F6)';
+      tag._xDefaultText = defaults && defaults.text ? defaults.text : 'var(--x-ov-tag-text, #6B7280)';
+      tag._xDefaultBorder = defaults && defaults.border ? defaults.border : 'transparent';
+      setSuggestionSourceTagPalette(tag, tag._xDefaultBg, tag._xDefaultText, tag._xDefaultBorder);
+      setSuggestionSourceTagVisible(tag, true);
+      return tag;
+    }
+
     function applySearchSuggestionHighlight(item, theme) {
       const highlight = getHighlightColors(theme);
       setSuggestionRowColors(item, highlight.bg, highlight.border);
@@ -4138,52 +4183,16 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         }
       }
       if (item._xHistoryTag) {
-        item._xHistoryTag.style.setProperty('display', shouldHideSourceTags ? 'none' : 'inline-flex', 'important');
-        if (isActive) {
-          item._xHistoryTag.style.setProperty('background', resolvedTheme.tagBg, 'important');
-          item._xHistoryTag.style.setProperty('color', resolvedTheme.tagText, 'important');
-          item._xHistoryTag.style.setProperty('border', `1px solid ${resolvedTheme.tagBorder}`, 'important');
-        } else {
-          item._xHistoryTag.style.setProperty('background', item._xHistoryTag._xDefaultBg || 'var(--x-ov-tag-bg, #F3F4F6)', 'important');
-          item._xHistoryTag.style.setProperty('color', item._xHistoryTag._xDefaultText || 'var(--x-ov-tag-text, #6B7280)', 'important');
-          item._xHistoryTag.style.setProperty('border', `1px solid ${item._xHistoryTag._xDefaultBorder || 'transparent'}`, 'important');
-        }
+        applySuggestionSourceTagState(item._xHistoryTag, !shouldHideSourceTags, isActive, resolvedTheme);
       }
       if (item._xBookmarkTag) {
-        item._xBookmarkTag.style.setProperty('display', shouldHideSourceTags ? 'none' : 'inline-flex', 'important');
-        if (isActive) {
-          item._xBookmarkTag.style.setProperty('background', resolvedTheme.tagBg, 'important');
-          item._xBookmarkTag.style.setProperty('color', resolvedTheme.tagText, 'important');
-          item._xBookmarkTag.style.setProperty('border', `1px solid ${resolvedTheme.tagBorder}`, 'important');
-        } else {
-          item._xBookmarkTag.style.setProperty('background', item._xBookmarkTag._xDefaultBg || 'var(--x-ov-bookmark-tag-bg, #FEF3C7)', 'important');
-          item._xBookmarkTag.style.setProperty('color', item._xBookmarkTag._xDefaultText || 'var(--x-ov-bookmark-tag-text, #D97706)', 'important');
-          item._xBookmarkTag.style.setProperty('border', `1px solid ${item._xBookmarkTag._xDefaultBorder || 'transparent'}`, 'important');
-        }
+        applySuggestionSourceTagState(item._xBookmarkTag, !shouldHideSourceTags, isActive, resolvedTheme);
       }
       if (item._xTopSiteTag) {
-        item._xTopSiteTag.style.setProperty('display', shouldHideSourceTags ? 'none' : 'inline-flex', 'important');
-        if (isActive) {
-          item._xTopSiteTag.style.setProperty('background', resolvedTheme.tagBg, 'important');
-          item._xTopSiteTag.style.setProperty('color', resolvedTheme.tagText, 'important');
-          item._xTopSiteTag.style.setProperty('border', `1px solid ${resolvedTheme.tagBorder}`, 'important');
-        } else {
-          item._xTopSiteTag.style.setProperty('background', item._xTopSiteTag._xDefaultBg || 'var(--x-ov-tag-bg, #F3F4F6)', 'important');
-          item._xTopSiteTag.style.setProperty('color', item._xTopSiteTag._xDefaultText || 'var(--x-ov-tag-text, #6B7280)', 'important');
-          item._xTopSiteTag.style.setProperty('border', `1px solid ${item._xTopSiteTag._xDefaultBorder || 'transparent'}`, 'important');
-        }
+        applySuggestionSourceTagState(item._xTopSiteTag, !shouldHideSourceTags, isActive, resolvedTheme);
       }
       if (item._xOpenTabTag) {
-        item._xOpenTabTag.style.setProperty('display', item._xHasSwitchAction ? 'inline-flex' : 'none', 'important');
-        if (isActive) {
-          item._xOpenTabTag.style.setProperty('background', resolvedTheme.tagBg, 'important');
-          item._xOpenTabTag.style.setProperty('color', resolvedTheme.tagText, 'important');
-          item._xOpenTabTag.style.setProperty('border', `1px solid ${resolvedTheme.tagBorder}`, 'important');
-        } else {
-          item._xOpenTabTag.style.setProperty('background', item._xOpenTabTag._xDefaultBg || 'var(--x-ov-tag-bg, #F3F4F6)', 'important');
-          item._xOpenTabTag.style.setProperty('color', item._xOpenTabTag._xDefaultText || 'var(--x-ov-tag-text, #6B7280)', 'important');
-          item._xOpenTabTag.style.setProperty('border', `1px solid ${item._xOpenTabTag._xDefaultBorder || 'transparent'}`, 'important');
-        }
+        applySuggestionSourceTagState(item._xOpenTabTag, Boolean(item._xHasSwitchAction), isActive, resolvedTheme);
       }
       if (item._xTagContainer) {
         const shouldShow = isActive && item._xHasActionTags;
@@ -5500,30 +5509,11 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             if (urlLine) {
               textWrapper.appendChild(urlLine);
             }
-            const historyTag = document.createElement('span');
-            setProtectedPlainText(historyTag, t('search_tag_history', '历史'));
-            historyTag._xDefaultBg = 'var(--x-ov-tag-bg, #F3F4F6)';
-            historyTag._xDefaultText = 'var(--x-ov-tag-text, #6B7280)';
-            historyTag._xDefaultBorder = 'transparent';
-            historyTag.style.cssText = `
-              all: unset !important;
-              background: var(--x-ov-tag-bg, #F3F4F6) !important;
-              color: var(--x-ov-tag-text, #6B7280) !important;
-              font-size: 10px !important;
-              font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-              padding: 4px 6px !important;
-              border-radius: 8px !important;
-              box-sizing: border-box !important;
-              line-height: 1.2 !important;
-              text-decoration: none !important;
-              list-style: none !important;
-              outline: none !important;
-              border: 1px solid transparent !important;
-              display: inline-flex !important;
-              align-items: center !important;
-              vertical-align: middle !important;
-              flex-shrink: 0 !important;
-            `;
+            const historyTag = createSuggestionSourceTag(t('search_tag_history', '历史'), {
+              bg: 'var(--x-ov-tag-bg, #F3F4F6)',
+              text: 'var(--x-ov-tag-text, #6B7280)',
+              border: 'transparent'
+            });
             textWrapper.appendChild(historyTag);
             suggestionItem._xHistoryTag = historyTag;
           }
@@ -5534,30 +5524,11 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             if (urlLine) {
               textWrapper.appendChild(urlLine);
             }
-            const topSiteTag = document.createElement('span');
-            setProtectedPlainText(topSiteTag, t('search_tag_top_site', '常用'));
-            topSiteTag._xDefaultBg = 'var(--x-ov-tag-bg, #F3F4F6)';
-            topSiteTag._xDefaultText = 'var(--x-ov-tag-text, #6B7280)';
-            topSiteTag._xDefaultBorder = 'transparent';
-            topSiteTag.style.cssText = `
-              all: unset !important;
-              background: var(--x-ov-tag-bg, #F3F4F6) !important;
-              color: var(--x-ov-tag-text, #6B7280) !important;
-              font-size: 10px !important;
-              font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-              padding: 4px 6px !important;
-              border-radius: 8px !important;
-              box-sizing: border-box !important;
-              line-height: 1.2 !important;
-              text-decoration: none !important;
-              list-style: none !important;
-              outline: none !important;
-              border: 1px solid transparent !important;
-              display: inline-flex !important;
-              align-items: center !important;
-              vertical-align: middle !important;
-              flex-shrink: 0 !important;
-            `;
+            const topSiteTag = createSuggestionSourceTag(t('search_tag_top_site', '常用'), {
+              bg: 'var(--x-ov-tag-bg, #F3F4F6)',
+              text: 'var(--x-ov-tag-text, #6B7280)',
+              border: 'transparent'
+            });
             textWrapper.appendChild(topSiteTag);
             suggestionItem._xTopSiteTag = topSiteTag;
           }
@@ -5570,58 +5541,20 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
               bookmarkPath.className = 'x-ov-suggestion-bookmark-path';
               textWrapper.appendChild(bookmarkPath);
             }
-          const bookmarkTag = document.createElement('span');
-          setProtectedPlainText(bookmarkTag, t('search_tag_bookmark', '书签'));
-          bookmarkTag._xDefaultBg = 'var(--x-ov-bookmark-tag-bg, #FEF3C7)';
-          bookmarkTag._xDefaultText = 'var(--x-ov-bookmark-tag-text, #D97706)';
-          bookmarkTag._xDefaultBorder = 'transparent';
-          bookmarkTag.style.cssText = `
-            all: unset !important;
-            background: var(--x-ov-bookmark-tag-bg, #FEF3C7) !important;
-            color: var(--x-ov-bookmark-tag-text, #D97706) !important;
-            font-size: 10px !important;
-              font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-              padding: 4px 6px !important;
-              border-radius: 8px !important;
-              box-sizing: border-box !important;
-              line-height: 1.2 !important;
-              text-decoration: none !important;
-              list-style: none !important;
-              outline: none !important;
-              border: 1px solid transparent !important;
-              display: inline-flex !important;
-              align-items: center !important;
-              vertical-align: middle !important;
-              flex-shrink: 0 !important;
-            `;
+            const bookmarkTag = createSuggestionSourceTag(t('search_tag_bookmark', '书签'), {
+              bg: 'var(--x-ov-bookmark-tag-bg, #FEF3C7)',
+              text: 'var(--x-ov-bookmark-tag-text, #D97706)',
+              border: 'transparent'
+            });
             textWrapper.appendChild(bookmarkTag);
             suggestionItem._xBookmarkTag = bookmarkTag;
           }
           if (shouldSwitchMatchedTab) {
-            const openTabTag = document.createElement('span');
-            setProtectedPlainText(openTabTag, t('search_tag_open_tab', '已打开'));
-            openTabTag._xDefaultBg = 'var(--x-ov-tag-bg, #F3F4F6)';
-            openTabTag._xDefaultText = 'var(--x-ov-tag-text, #6B7280)';
-            openTabTag._xDefaultBorder = 'transparent';
-            openTabTag.style.cssText = `
-              all: unset !important;
-              background: var(--x-ov-tag-bg, #F3F4F6) !important;
-              color: var(--x-ov-tag-text, #6B7280) !important;
-              font-size: 10px !important;
-              font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-              padding: 4px 6px !important;
-              border-radius: 8px !important;
-              box-sizing: border-box !important;
-              line-height: 1.2 !important;
-              text-decoration: none !important;
-              list-style: none !important;
-              outline: none !important;
-              border: 1px solid transparent !important;
-              display: inline-flex !important;
-              align-items: center !important;
-              vertical-align: middle !important;
-              flex-shrink: 0 !important;
-            `;
+            const openTabTag = createSuggestionSourceTag(t('search_tag_open_tab', '已打开'), {
+              bg: 'var(--x-ov-tag-bg, #F3F4F6)',
+              text: 'var(--x-ov-tag-text, #6B7280)',
+              border: 'transparent'
+            });
             textWrapper.appendChild(openTabTag);
             suggestionItem._xOpenTabTag = openTabTag;
           }

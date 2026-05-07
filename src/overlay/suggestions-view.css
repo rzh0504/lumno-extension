@@ -369,6 +369,30 @@
   vertical-align: middle;
 }
 
+#_x_extension_overlay_2024_unique_ .x-ov-suggestion-source-tag {
+  all: unset;
+  background: var(--x-ov-suggestion-source-tag-bg, var(--x-ov-tag-bg, #F3F4F6));
+  color: var(--x-ov-suggestion-source-tag-text, var(--x-ov-tag-text, #6B7280));
+  font-size: 10px;
+  font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  padding: 4px 6px;
+  border-radius: 8px;
+  box-sizing: border-box;
+  line-height: 1.2;
+  text-decoration: none;
+  list-style: none;
+  outline: none;
+  border: 1px solid var(--x-ov-suggestion-source-tag-border, transparent);
+  display: none;
+  align-items: center;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+#_x_extension_overlay_2024_unique_ .x-ov-suggestion-source-tag[data-visible="true"] {
+  display: inline-flex;
+}
+
 #_x_extension_overlay_2024_unique_ .x-ov-suggestion-right {
   all: unset;
   display: inline-flex;
