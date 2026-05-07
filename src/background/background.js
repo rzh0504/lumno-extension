@@ -12,6 +12,12 @@ try {
 }
 
 try {
+  importScripts(chrome.runtime.getURL('src/shared/extension-routes.js'));
+} catch (error) {
+  console.warn('Lumno: failed to load extension routes.', error);
+}
+
+try {
   importScripts(chrome.runtime.getURL('src/shared/settings.js'));
 } catch (error) {
   console.warn('Lumno: failed to load settings utils.', error);
@@ -78,6 +84,7 @@ const openOnboardingPage = BACKGROUND_PAGES.openOnboardingPage;
 const openReleasePage = BACKGROUND_PAGES.openReleasePage;
 const openBookmarkManagerPage = BACKGROUND_PAGES.openBookmarkManagerPage;
 const openExtensionShortcutsPage = BACKGROUND_PAGES.openExtensionShortcutsPage;
+const EXTENSION_ROUTES = globalThis.LumnoExtensionRoutes || {};
 const BACKGROUND_NEWTAB_FALLBACK = globalThis.LumnoBackgroundNewtabFallback || {};
 const isLocalFileLikeTargetUrl = BACKGROUND_NEWTAB_FALLBACK.isLocalFileLikeTargetUrl;
 const checkFileSchemeAccess = BACKGROUND_NEWTAB_FALLBACK.checkFileSchemeAccess;
@@ -251,7 +258,9 @@ function isLumnoNewtabUrl(url) {
   if (!value || !chrome || !chrome.runtime || typeof chrome.runtime.getURL !== 'function') {
     return false;
   }
-  const lumnoNewtabPrefix = chrome.runtime.getURL('src/newtab/newtab.html');
+  const lumnoNewtabPrefix = typeof EXTENSION_ROUTES.buildNewtabUrl === 'function'
+    ? EXTENSION_ROUTES.buildNewtabUrl(chrome)
+    : chrome.runtime.getURL('src/newtab/newtab.html');
   return value === lumnoNewtabPrefix || value.startsWith(`${lumnoNewtabPrefix}?`);
 }
 
@@ -1301,14 +1310,14 @@ function openOverlayOnTab(activeTab, tabs, source) {
     openNewtabFallbackForUrl(activeUrl);
     return;
   }
-  logHotkeyDebug('inject-start', { tabId: activeTab.id, file: 'src/shared/settings.js,src/shared/search-utils.js,src/shared/site-search-store.js,src/shared/suggestion-navigation.js,src/overlay/runtime.js,src/overlay/favicon-view.js,src/overlay/input-ui.js,src/overlay/shell.js,src/overlay/lifecycle.js', source: source || '' });
+  logHotkeyDebug('inject-start', { tabId: activeTab.id, file: 'src/shared/settings.js,src/shared/search-utils.js,src/shared/site-search-store.js,src/shared/suggestion-navigation.js,src/shared/search-input-ui.js,src/shared/search-input-mode.js,src/overlay/runtime.js,src/overlay/favicon-view.js,src/overlay/shell.js,src/overlay/lifecycle.js', source: source || '' });
   chrome.scripting.executeScript({
     target: {tabId: activeTab.id},
-    files: ['src/shared/settings.js', 'src/shared/search-utils.js', 'src/shared/site-search-store.js', 'src/shared/suggestion-navigation.js', 'src/overlay/runtime.js', 'src/overlay/favicon-view.js', 'src/overlay/input-ui.js', 'src/overlay/shell.js', 'src/overlay/lifecycle.js']
+    files: ['src/shared/settings.js', 'src/shared/search-utils.js', 'src/shared/site-search-store.js', 'src/shared/suggestion-navigation.js', 'src/shared/search-input-ui.js', 'src/shared/search-input-mode.js', 'src/overlay/runtime.js', 'src/overlay/favicon-view.js', 'src/overlay/shell.js', 'src/overlay/lifecycle.js']
   }, function() {
     if (chrome.runtime.lastError) {
       logHotkeyDebug('inject-failed', {
-        step: 'src/shared/settings.js,src/shared/search-utils.js,src/shared/site-search-store.js,src/shared/suggestion-navigation.js,src/overlay/runtime.js,src/overlay/favicon-view.js,src/overlay/input-ui.js,src/overlay/shell.js,src/overlay/lifecycle.js',
+        step: 'src/shared/settings.js,src/shared/search-utils.js,src/shared/site-search-store.js,src/shared/suggestion-navigation.js,src/shared/search-input-ui.js,src/shared/search-input-mode.js,src/overlay/runtime.js,src/overlay/favicon-view.js,src/overlay/shell.js,src/overlay/lifecycle.js',
         tabId: activeTab.id,
         error: chrome.runtime.lastError.message || 'unknown',
         source: source || ''
@@ -2419,7 +2428,9 @@ function handleExtensionPageMessage(request, sender, sendResponse) {
       return true;
     }
     case 'openNewTab': {
-      const newtabUrl = chrome.runtime.getURL('src/newtab/newtab.html?focus=1');
+      const newtabUrl = typeof EXTENSION_ROUTES.buildNewtabUrl === 'function'
+        ? EXTENSION_ROUTES.buildNewtabUrl(chrome, { focus: true })
+        : chrome.runtime.getURL('src/newtab/newtab.html?focus=1');
       chrome.tabs.create({ url: newtabUrl }, () => {
         sendResponse({ ok: !(chrome.runtime && chrome.runtime.lastError) });
       });
@@ -5308,6 +5319,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
   const SEARCH_UTILS = window.LumnoSearchUtils || {};
   const SITE_SEARCH_STORE = window.LumnoSiteSearchStore || {};
   const SUGGESTION_NAVIGATION = window.LumnoSuggestionNavigation || {};
+  const SEARCH_INPUT_MODE = window.LumnoSearchInputMode || {};
   const overlayRuntime = window.LumnoOverlayRuntime;
   const overlayLifecycle = window.LumnoOverlayLifecycle;
   const overlayFaviconView = window.LumnoOverlayFaviconView;
@@ -5327,6 +5339,10 @@ function toggleBlackRectangle(tabs, overlayContext) {
   }
   if (typeof SUGGESTION_NAVIGATION.scrollItemIntoView !== 'function') {
     console.warn('Lumno: suggestion navigation helper not available.');
+    return;
+  }
+  if (typeof SEARCH_INPUT_MODE.createInputModeController !== 'function') {
+    console.warn('Lumno: search input mode helper not available.');
     return;
   }
   if (!overlayLifecycle ||
@@ -5427,6 +5443,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
   const storageAreaName = storageRuntime.name;
   const RI_CSS_URL = overlayRuntime.getRuntimeUrl(chrome, 'assets/remixicon/fonts/remixicon.css');
   const OPEN_SANS_CSS_URL = overlayRuntime.getRuntimeUrl(chrome, 'assets/fonts/open-sans/open-sans.css');
+  const SEARCH_INPUT_CSS_URL = overlayRuntime.getRuntimeUrl(chrome, 'src/shared/search-input.css');
   const overlayMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
   let overlayThemeMode = 'system';
   let overlaySearchResultPriorityMode = 'autocomplete';
@@ -5675,6 +5692,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
   }
 
   let modeBadge = null;
+  let inputModeController = null;
   let overlayLanguageMode = 'system';
   let overlayTabQuickSwitchEnabled = true;
   let overlayTabScoreDebugEnabled = false;
@@ -6155,7 +6173,10 @@ function toggleBlackRectangle(tabs, overlayContext) {
       chrome.storage.onChanged.removeListener(siteSearchStorageListener);
       siteSearchStorageListener = null;
     }
-    window.removeEventListener('resize', updateSiteSearchPrefixLayout);
+    if (inputModeController) {
+      inputModeController.destroy();
+      inputModeController = null;
+    }
   }
 
   const overlayShell = window.LumnoOverlayShell;
@@ -6186,7 +6207,8 @@ function toggleBlackRectangle(tabs, overlayContext) {
       width: initialOverlaySizePreset.width,
       maxHeightVh: initialOverlaySizePreset.maxHeightVh,
       openSansCssUrl: OPEN_SANS_CSS_URL,
-      remixIconCssUrl: RI_CSS_URL
+      remixIconCssUrl: RI_CSS_URL,
+      searchInputCssUrl: SEARCH_INPUT_CSS_URL
     });
     overlay = overlayMount && overlayMount.panel ? overlayMount.panel : null;
     const overlayHost = overlayMount && overlayMount.host ? overlayMount.host : overlay;
@@ -6261,7 +6283,8 @@ function toggleBlackRectangle(tabs, overlayContext) {
     overlayShell.appendOverlayStyleNodes(document, {
       root: overlayStyleRoot,
       openSansCssUrl: OPEN_SANS_CSS_URL,
-      remixIconCssUrl: RI_CSS_URL
+      remixIconCssUrl: RI_CSS_URL,
+      searchInputCssUrl: SEARCH_INPUT_CSS_URL
     });
 
 
@@ -6277,6 +6300,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
     const inputParts = window._x_extension_createSearchInput_2024_unique_({
       styleRoot: overlayStyleRoot,
       useIsolatedStyles: inputUsesIsolatedStyles,
+      useInlineBaseStyles: !inputUsesIsolatedStyles,
       placeholder: t('overlay_search_placeholder', t('search_placeholder', defaultPlaceholderText)),
       inputId: '_x_extension_search_input_2024_unique_',
       iconId: '_x_extension_search_icon_2024_unique_',
@@ -6502,41 +6526,6 @@ function toggleBlackRectangle(tabs, overlayContext) {
     `;
     inputContainer.appendChild(modeBadge);
 
-    const siteSearchTabHint = document.createElement('span');
-    applyNoTranslate(siteSearchTabHint);
-    siteSearchTabHint.id = '_x_extension_site_search_tab_hint_2026_unique_';
-    siteSearchTabHint.setAttribute('aria-hidden', 'true');
-    siteSearchTabHint.textContent = '';
-    siteSearchTabHint.style.cssText = `
-      all: unset !important;
-      position: absolute !important;
-      right: 86px !important;
-      top: 50% !important;
-      transform: translateY(-50%) !important;
-      display: none !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: 7px !important;
-      max-width: min(300px, 52%) !important;
-      min-width: 0 !important;
-      height: 28px !important;
-      padding: 0 !important;
-      border: none !important;
-      background: transparent !important;
-      color: var(--x-ov-tag-text, #6B7280) !important;
-      box-sizing: border-box !important;
-      font-size: 13px !important;
-      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-      font-weight: 700 !important;
-      line-height: 18px !important;
-      letter-spacing: 0 !important;
-      white-space: nowrap !important;
-      pointer-events: none !important;
-      user-select: none !important;
-      z-index: 1 !important;
-    `;
-    inputContainer.appendChild(siteSearchTabHint);
-
     const suggestionsContainer = document.createElement('div');
     applyNoTranslate(suggestionsContainer);
     suggestionsContainer.id = '_x_extension_suggestions_container_2024_unique_';
@@ -6565,90 +6554,21 @@ function toggleBlackRectangle(tabs, overlayContext) {
     `;
 
     function updateInputRightPadding() {
-      if (!searchInput) {
-        return;
+      if (inputModeController) {
+        inputModeController.updateLayout();
       }
-      const baseRightReserve = 92;
-      let totalReserve = baseRightReserve;
-      if (modeBadge && modeBadge.style.getPropertyValue('display') !== 'none') {
-        const badgeWidth = Math.ceil(modeBadge.getBoundingClientRect().width || 0);
-        totalReserve = Math.max(totalReserve, 86 + badgeWidth + 12);
-      }
-      if (siteSearchTabHint && siteSearchTabHint.style.getPropertyValue('display') !== 'none') {
-        const hintWidth = Math.ceil(siteSearchTabHint.getBoundingClientRect().width || 0);
-        totalReserve = Math.max(totalReserve, 86 + hintWidth + 12);
-      }
-      setInputScopedStyle(searchInput, 'padding-right', `${totalReserve}px`);
     }
 
     function setSiteSearchTabHint(provider) {
-      if (!siteSearchTabHint || siteSearchState || openTabsSearchModeActive) {
-        return;
+      if (inputModeController) {
+        inputModeController.setTabHintVisible(true, provider);
       }
-      const site = getSiteSearchDisplayName(provider);
-      const label = formatMessage('site_search_tab_hint', '使用 {site} 搜索', { site });
-      siteSearchTabHint.textContent = '';
-      const keyLabel = document.createElement('span');
-      applyNoTranslate(keyLabel);
-      keyLabel.textContent = 'Tab';
-      keyLabel.style.cssText = `
-        all: unset !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        min-width: 32px !important;
-        height: 22px !important;
-        padding: 0 6px !important;
-        border-radius: 7px !important;
-        border: 1px solid var(--x-ov-border, rgba(0, 0, 0, 0.08)) !important;
-        background: var(--x-ov-tag-bg, #F3F4F6) !important;
-        color: var(--x-ov-tag-text, #6B7280) !important;
-        box-sizing: border-box !important;
-        font-size: 11px !important;
-        font-family: inherit !important;
-        font-weight: 700 !important;
-        line-height: 14px !important;
-        letter-spacing: 0 !important;
-        white-space: nowrap !important;
-        flex: 0 0 auto !important;
-      `;
-      const textLabel = document.createElement('span');
-      applyNoTranslate(textLabel);
-      textLabel.textContent = label;
-      textLabel.style.cssText = `
-        all: unset !important;
-        display: inline-block !important;
-        min-width: 0 !important;
-        max-width: 220px !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-        color: var(--x-ov-tag-text, #6B7280) !important;
-        font-size: 13px !important;
-        font-family: inherit !important;
-        font-weight: 400 !important;
-        line-height: 18px !important;
-        letter-spacing: 0 !important;
-        flex: 1 1 auto !important;
-      `;
-      siteSearchTabHint.appendChild(keyLabel);
-      siteSearchTabHint.appendChild(textLabel);
-      if (provider) {
-        siteSearchTabHint.setAttribute('title', label);
-      } else {
-        siteSearchTabHint.removeAttribute('title');
-      }
-      siteSearchTabHint.style.setProperty('display', 'inline-flex', 'important');
-      updateInputRightPadding();
     }
 
     function clearSiteSearchTabHint() {
-      if (!siteSearchTabHint) {
-        return;
+      if (inputModeController) {
+        inputModeController.setTabHintVisible(false);
       }
-      siteSearchTabHint.style.setProperty('display', 'none', 'important');
-      siteSearchTabHint.removeAttribute('title');
-      updateInputRightPadding();
     }
 
 
@@ -6990,12 +6910,7 @@ function toggleBlackRectangle(tabs, overlayContext) {
     const preloadIcon = overlayFaviconRuntime.preloadIcon;
     const warmIconCache = overlayFaviconRuntime.warmIconCache;
     const defaultCaretColor = searchInput.style.caretColor || 'var(--x-ext-input-caret, #7DB7FF)';
-    let baseInputPaddingLeft = null;
-    const prefixGap = 8;
     const inputModePrefixTransition = 'opacity 220ms cubic-bezier(0.22, 1, 0.36, 1), transform 300ms cubic-bezier(0.22, 1, 0.36, 1), filter 260ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms ease, box-shadow 180ms ease';
-    let inputModePrefixAnimationFrame = null;
-    let inputModeElasticAnimationFrame = null;
-    let inputModeElasticAnimation = null;
 
     function mixColor(color, target, amount) {
       return [
@@ -8243,300 +8158,61 @@ function toggleBlackRectangle(tabs, overlayContext) {
       return `https://${hostname}/favicon.ico`;
     }
 
-    const siteSearchPrefix = document.createElement('span');
-    siteSearchPrefix.id = '_x_extension_site_search_prefix_2024_unique_';
-    siteSearchPrefix.style.cssText = `
-      all: unset !important;
-      position: absolute !important;
-      top: 50% !important;
-      transform: translateY(-50%) !important;
-      left: 50px !important;
-      display: none !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: 6px !important;
-      max-width: min(220px, 48%) !important;
-      min-width: 0 !important;
-      height: 26px !important;
-      padding: 0 10px !important;
-      white-space: nowrap !important;
-      overflow: hidden !important;
-      text-overflow: ellipsis !important;
-      box-sizing: border-box !important;
-      font-size: 13px !important;
-      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-      font-weight: 700 !important;
-      line-height: 1 !important;
-      letter-spacing: 0 !important;
-      color: #F8FAFC !important;
-      background: #3B82F6 !important;
-      border: 1px solid transparent !important;
-      border-radius: 9px !important;
-      box-shadow: 0 7px 16px rgba(59, 130, 246, 0.24) !important;
-      opacity: 1 !important;
-      filter: blur(0px) !important;
-      transition: ${inputModePrefixTransition} !important;
-      will-change: transform, opacity, filter !important;
-      pointer-events: none !important;
-      z-index: 1 !important;
-      user-select: none !important;
-    `;
-    inputContainer.appendChild(siteSearchPrefix);
-
-    function shouldReduceInputModeMotion() {
-      return Boolean(
-        window.matchMedia &&
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      );
-    }
-
-    function getInputModePrefixVisual(theme, options) {
-      const resolvedTheme = theme ? getThemeForMode(theme) : defaultTheme;
-      const accentRgb = (resolvedTheme && (resolvedTheme.accentRgb || parseCssColor(resolvedTheme.accent))) ||
-        defaultAccentColor;
-      const isAi = Boolean(options && options.isAi);
-      if (isAi) {
-        const alpha = isOverlayDarkMode() ? 0.18 : 0.1;
-        return {
-          background: `rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, ${alpha})`,
-          border: `1px solid rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, ${isOverlayDarkMode() ? 0.3 : 0.2})`,
-          shadow: `0 6px 14px rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, ${isOverlayDarkMode() ? 0.2 : 0.1})`,
-          color: isOverlayDarkMode() ? '#F8FAFC' : '#334155',
-          caretColor: resolvedTheme && resolvedTheme.placeholderText
-            ? resolvedTheme.placeholderText
-            : rgbToCss(accentRgb)
-        };
-      }
-      return {
-        background: rgbToCss(accentRgb),
-        border: '1px solid transparent',
-        shadow: `0 7px 16px rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, ${isOverlayDarkMode() ? 0.34 : 0.24})`,
-        color: '#F8FAFC',
-        caretColor: resolvedTheme && resolvedTheme.placeholderText
-          ? resolvedTheme.placeholderText
-          : rgbToCss(accentRgb)
-      };
-    }
-
-    function applyInputModePrefixVisual(theme, options) {
-      const visual = getInputModePrefixVisual(theme, options);
-      siteSearchPrefix.style.setProperty('background', visual.background, 'important');
-      siteSearchPrefix.style.setProperty('border', visual.border, 'important');
-      siteSearchPrefix.style.setProperty('box-shadow', visual.shadow, 'important');
-      siteSearchPrefix.style.setProperty('color', visual.color, 'important');
-      return visual;
-    }
-
-    function setInputModePrefixContent(prefixText, options) {
-      siteSearchPrefix.textContent = '';
-      const iconUrl = options && options.iconUrl ? String(options.iconUrl || '').trim() : '';
-      if (iconUrl) {
-        const icon = document.createElement('img');
-        icon.alt = '';
-        icon.decoding = 'async';
-        icon.referrerPolicy = 'no-referrer';
-        icon.style.cssText = `
-          all: unset !important;
-          width: 15px !important;
-          height: 15px !important;
-          border-radius: 4px !important;
-          object-fit: contain !important;
-          flex: 0 0 auto !important;
-          display: block !important;
-        `;
-        icon.addEventListener('error', () => {
-          icon.remove();
-          updateSiteSearchPrefixLayout();
-        }, { once: true });
-        const iconHost = options && options.iconHost ? String(options.iconHost || '').trim() : '';
-        if (typeof attachFaviconData === 'function') {
-          icon.src = iconUrl;
-          attachFaviconData(icon, iconUrl, iconHost);
-        } else {
-          icon.src = iconUrl;
-        }
-        siteSearchPrefix.appendChild(icon);
-      }
-      const text = document.createElement('span');
-      text.textContent = prefixText;
-      text.style.cssText = `
-        all: unset !important;
-        min-width: 0 !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-      `;
-      siteSearchPrefix.appendChild(text);
-    }
-
-    function setInputModePrefixRestState() {
-      siteSearchPrefix.style.setProperty('opacity', '1', 'important');
-      siteSearchPrefix.style.setProperty('filter', 'blur(0px)', 'important');
-      siteSearchPrefix.style.setProperty('transform', 'translateY(-50%)', 'important');
-      siteSearchPrefix.style.setProperty('transition', inputModePrefixTransition, 'important');
-    }
-
-    function playInputModePrefixEnterAnimation() {
-      if (inputModePrefixAnimationFrame !== null) {
-        cancelAnimationFrame(inputModePrefixAnimationFrame);
-        inputModePrefixAnimationFrame = null;
-      }
-      if (shouldReduceInputModeMotion()) {
-        setInputModePrefixRestState();
-        return;
-      }
-      siteSearchPrefix.style.setProperty('transition', 'none', 'important');
-      siteSearchPrefix.style.setProperty('opacity', '0', 'important');
-      siteSearchPrefix.style.setProperty('filter', 'blur(4px)', 'important');
-      siteSearchPrefix.style.setProperty('transform', 'translateY(-50%) translateX(-14px) scale(0.78)', 'important');
-      void siteSearchPrefix.offsetWidth;
-      inputModePrefixAnimationFrame = requestAnimationFrame(() => {
-        inputModePrefixAnimationFrame = null;
-        siteSearchPrefix.style.setProperty('transition', inputModePrefixTransition, 'important');
-        siteSearchPrefix.style.setProperty('opacity', '1', 'important');
-        siteSearchPrefix.style.setProperty('filter', 'blur(0px)', 'important');
-        siteSearchPrefix.style.setProperty('transform', 'translateY(-50%) translateX(0) scale(1)', 'important');
-      });
-    }
-
-    function getInputModeElasticTarget() {
-      return inputContainer || overlay;
-    }
-
-    function appendTransformWillChange(value) {
-      const currentValue = String(value || '').trim();
-      if (!currentValue || currentValue === 'auto') {
-        return 'transform';
-      }
-      const parts = currentValue.split(',').map((part) => part.trim()).filter(Boolean);
-      if (parts.includes('transform')) {
-        return currentValue;
-      }
-      return `${currentValue}, transform`;
-    }
-
-    function playInputModeElasticAnimation() {
-      const target = getInputModeElasticTarget();
-      if (inputModeElasticAnimationFrame !== null) {
-        cancelAnimationFrame(inputModeElasticAnimationFrame);
-        inputModeElasticAnimationFrame = null;
-      }
-      if (inputModeElasticAnimation && typeof inputModeElasticAnimation.cancel === 'function') {
-        inputModeElasticAnimation.cancel();
-      }
-      if (!target || shouldReduceInputModeMotion() || typeof target.animate !== 'function') {
-        return;
-      }
-      inputModeElasticAnimationFrame = requestAnimationFrame(() => {
-        inputModeElasticAnimationFrame = null;
-        if (!target.isConnected) {
-          return;
-        }
-        const previousWillChange = target.style.getPropertyValue('will-change');
-        const previousWillChangePriority = target.style.getPropertyPriority('will-change');
-        target.style.setProperty(
-          'will-change',
-          appendTransformWillChange(previousWillChange),
-          previousWillChangePriority || 'important'
-        );
-        const animation = target.animate([
-          { transform: 'scale3d(1, 1, 1)', transformOrigin: 'center center', offset: 0 },
-          { transform: 'scale3d(1.016, 0.986, 1)', transformOrigin: 'center center', offset: 0.36 },
-          { transform: 'scale3d(0.997, 1.006, 1)', transformOrigin: 'center center', offset: 0.68 },
-          { transform: 'scale3d(1.002, 0.999, 1)', transformOrigin: 'center center', offset: 0.84 },
-          { transform: 'scale3d(1, 1, 1)', transformOrigin: 'center center', offset: 1 }
-        ], {
-          duration: 380,
-          easing: 'cubic-bezier(0.18, 1.18, 0.2, 1)',
-          fill: 'none'
-        });
-        inputModeElasticAnimation = animation;
-        const cleanup = () => {
-          if (inputModeElasticAnimation !== animation) {
-            return;
-          }
-          inputModeElasticAnimation = null;
-          if (previousWillChange) {
-            target.style.setProperty('will-change', previousWillChange, previousWillChangePriority);
-          } else {
-            target.style.removeProperty('will-change');
-          }
-        };
-        animation.onfinish = cleanup;
-        animation.oncancel = cleanup;
-      });
-    }
-
-    function getBaseInputPaddingLeft() {
-      if (baseInputPaddingLeft === null) {
-        const computed = parseFloat(window.getComputedStyle(searchInput).paddingLeft);
-        baseInputPaddingLeft = Number.isFinite(computed) ? computed : 50;
-      }
-      return baseInputPaddingLeft;
-    }
+    inputModeController = SEARCH_INPUT_MODE.createInputModeController(inputParts, {
+      surface: 'overlay',
+      useImportantStyles: !inputUsesIsolatedStyles,
+      prefixTransition: inputModePrefixTransition,
+      defaultPlaceholder: defaultPlaceholderText || defaultPlaceholder,
+      getDefaultPlaceholder: () => defaultPlaceholderText || defaultPlaceholder,
+      defaultCaretColor,
+      modeBadgeElement: modeBadge,
+      rightReserveBase: 92,
+      rightAnchorOffset: 86,
+      setInputStyle: setInputScopedStyle,
+      applyNoTranslate,
+      getThemeForMode,
+      defaultTheme,
+      defaultAccentColor,
+      parseCssColor,
+      rgbToCss,
+      isDarkMode: isOverlayDarkMode,
+      getProviderIcon,
+      getProviderThemeHost,
+      getSiteSearchPrefixText,
+      getSiteSearchDisplayName,
+      isAiSiteSearchProvider,
+      attachFaviconData,
+      formatMessage,
+      isTabHintSuppressed: () => Boolean(siteSearchState || openTabsSearchModeActive)
+    });
 
     function updateSiteSearchPrefixLayout() {
-      const basePadding = getBaseInputPaddingLeft();
-      siteSearchPrefix.style.setProperty('left', `${basePadding}px`, 'important');
-      if (siteSearchPrefix.style.display === 'none') {
-        setInputScopedStyle(searchInput, 'padding-left', `${basePadding}px`);
-        return;
+      if (inputModeController) {
+        inputModeController.updateLayout();
       }
-      const prefixWidth = Math.ceil(siteSearchPrefix.offsetWidth || siteSearchPrefix.getBoundingClientRect().width || 0);
-      const paddedLeft = Math.max(basePadding + prefixWidth + prefixGap, basePadding);
-      setInputScopedStyle(searchInput, 'padding-left', `${paddedLeft}px`);
-    }
-
-    function setInputModePrefix(prefixText, theme, options) {
-      const shouldAnimate = Boolean(options && options.animate);
-      setInputModePrefixContent(prefixText, options);
-      const visual = applyInputModePrefixVisual(theme, options);
-      siteSearchPrefix.style.setProperty('display', 'inline-flex', 'important');
-      if (!shouldAnimate) {
-        setInputModePrefixRestState();
-      }
-      searchInput.placeholder = '';
-      setInputScopedStyle(searchInput, 'caret-color', visual.caretColor);
-      updateSiteSearchPrefixLayout();
-      if (shouldAnimate) {
-        playInputModePrefixEnterAnimation();
-        playInputModeElasticAnimation();
-      }
-    }
-
-    function clearInputModePrefix() {
-      siteSearchPrefix.textContent = '';
-      setInputModePrefixRestState();
-      siteSearchPrefix.style.setProperty('display', 'none', 'important');
-      searchInput.placeholder = defaultPlaceholderText || defaultPlaceholder;
-      setInputScopedStyle(searchInput, 'caret-color', defaultCaretColor);
-      updateSiteSearchPrefixLayout();
     }
 
     function setSiteSearchPrefix(provider, theme, options) {
-      const prefixText = getSiteSearchPrefixText(provider);
-      const isAi = isAiSiteSearchProvider(provider);
-      setInputModePrefix(prefixText, theme, {
-        ...(options || {}),
-        iconUrl: isAi ? getProviderIcon(provider) : '',
-        iconHost: isAi ? getProviderThemeHost(provider) : '',
-        isAi
-      });
+      if (inputModeController) {
+        inputModeController.setProviderPrefix(provider, theme, options);
+      }
     }
 
     function setOpenTabsSearchPrefix(theme) {
-      setInputModePrefix(
-        t('search_open_tabs_only_entry', '搜索已打开标签页'),
-        theme,
-        { animate: true }
-      );
+      if (inputModeController) {
+        inputModeController.setPrefixText(
+          t('search_open_tabs_only_entry', '搜索已打开标签页'),
+          theme,
+          { animate: true }
+        );
+      }
     }
 
     function clearSiteSearchPrefix() {
-      clearInputModePrefix();
+      if (inputModeController) {
+        inputModeController.clearProviderPrefix();
+      }
     }
-
-    window.addEventListener('resize', updateSiteSearchPrefixLayout);
 
     function isEnglishQuery(query) {
       if (!query) {

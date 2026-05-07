@@ -1,0 +1,232 @@
+const fs = require('fs');
+const path = require('path');
+
+const LOCALE_ROOT = '_locales';
+const SOURCE_ROOTS = ['src'];
+const INCLUDED_EXTENSIONS = new Set(['.js', '.html']);
+const IGNORED_DIRS = new Set(['node_modules', 'dist', '.git']);
+const MAX_HITS_PER_FILE = 30;
+const HAN_RE = /\p{Script=Han}/u;
+const STRING_RE = /(['"`])((?:\\.|(?!\1)[\s\S])*?)\1/g;
+
+const ALLOWLIST = [
+  'brand/provider names in assets/data/site-search.json and provider defaults',
+  'AI provider remote page selector probes in src/background/ai-provider-submit.js',
+  'browser built-in bookmark folder aliases used only for folder detection',
+  'debug-only score reason strings when the debug flag is disabled by default'
+];
+
+function walk(root) {
+  if (!fs.existsSync(root)) {
+    return [];
+  }
+  const stat = fs.statSync(root);
+  if (stat.isFile()) {
+    return INCLUDED_EXTENSIONS.has(path.extname(root)) ? [root] : [];
+  }
+  const entries = fs.readdirSync(root, { withFileTypes: true });
+  const files = [];
+  entries.forEach((entry) => {
+    if (IGNORED_DIRS.has(entry.name)) {
+      return;
+    }
+    const fullPath = path.join(root, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...walk(fullPath));
+      return;
+    }
+    if (entry.isFile() && INCLUDED_EXTENSIONS.has(path.extname(entry.name))) {
+      files.push(fullPath);
+    }
+  });
+  return files;
+}
+
+function readJson(file) {
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (error) {
+    console.error(`Failed to parse ${file}: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+function auditLocales() {
+  const localeNames = fs.readdirSync(LOCALE_ROOT)
+    .filter((name) => fs.existsSync(path.join(LOCALE_ROOT, name, 'messages.json')))
+    .sort();
+  const localeMaps = {};
+  localeNames.forEach((locale) => {
+    localeMaps[locale] = readJson(path.join(LOCALE_ROOT, locale, 'messages.json'));
+  });
+  const allKeys = Array.from(new Set(
+    Object.values(localeMaps).flatMap((messages) => Object.keys(messages))
+  )).sort();
+
+  const rows = localeNames.map((locale) => {
+    const messages = localeMaps[locale];
+    const missing = allKeys.filter((key) => !Object.prototype.hasOwnProperty.call(messages, key));
+    const empty = Object.keys(messages)
+      .filter((key) => !String(messages[key] && messages[key].message || '').trim())
+      .sort();
+    return { locale, keyCount: Object.keys(messages).length, missing, empty };
+  });
+
+  console.log('Locale key parity:');
+  rows.forEach((row) => {
+    console.log(
+      `${row.locale} keys=${row.keyCount}` +
+      ` missing=${row.missing.length}` +
+      ` empty=${row.empty.length}`
+    );
+    if (row.missing.length > 0) {
+      console.log(`  missing: ${row.missing.slice(0, 20).join(', ')}`);
+    }
+    if (row.empty.length > 0) {
+      console.log(`  empty: ${row.empty.slice(0, 20).join(', ')}`);
+    }
+  });
+  return rows;
+}
+
+function stripHtmlTags(value) {
+  return value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function isAllowlistedLine(file, line) {
+  if (file === 'src/background/ai-provider-submit.js') {
+    return true;
+  }
+  if (/title === 'bookmarks bar'/.test(line)) {
+    return true;
+  }
+  if (/name:\s*['"`]/.test(line) && /site-search|provider|engine|search/i.test(file + line)) {
+    return true;
+  }
+  if (/debug|score|reason/i.test(line) && !/textContent|placeholder|aria-label|title/.test(line)) {
+    return true;
+  }
+  return false;
+}
+
+function hasI18nCall(line) {
+  return /(?:^|[^\w])(?:t|getMessage|formatMessage)\s*\(/.test(line) ||
+    /chrome\.i18n\.getMessage/.test(line) ||
+    /data-i18n/.test(line) ||
+    /__MSG_/.test(line);
+}
+
+function scanJsLine(file, line, lineNumber) {
+  if (isAllowlistedLine(file, line)) {
+    return [];
+  }
+  const hits = [];
+  const sinkPatterns = [
+    { type: 'textContent', regex: /\.(?:textContent|innerText)\s*=\s*(['"`])([\s\S]*?)\1/g },
+    { type: 'placeholder', regex: /\.placeholder\s*=\s*(['"`])([\s\S]*?)\1/g },
+    { type: 'title', regex: /\.title\s*=\s*(['"`])([\s\S]*?)\1/g },
+    { type: 'setAttribute', regex: /\.setAttribute\s*\(\s*['"`](?:title|aria-label)['"`]\s*,\s*(['"`])([\s\S]*?)\1/g },
+    { type: 'dialog', regex: /\b(?:confirm|alert|prompt)\s*\(\s*(['"`])([\s\S]*?)\1/g },
+    { type: 'fallback', regex: /\b(?:labelFallback|placeholderFallback|descriptionFallback)\s*:\s*(['"`])([\s\S]*?)\1/g }
+  ];
+
+  sinkPatterns.forEach((pattern) => {
+    let match = null;
+    while ((match = pattern.regex.exec(line))) {
+      const value = match[2];
+      if (value && HAN_RE.test(value) && !hasI18nCall(line)) {
+        hits.push({ file, lineNumber, type: pattern.type, text: line.trim() });
+      }
+    }
+  });
+
+  if (hits.length === 0 && HAN_RE.test(line) && !hasI18nCall(line)) {
+    const strings = Array.from(line.matchAll(STRING_RE))
+      .map((match) => match[2])
+      .filter((value) => HAN_RE.test(value));
+    if (strings.length > 0) {
+      hits.push({ file, lineNumber, type: 'han-literal', text: line.trim() });
+    }
+  }
+  return hits;
+}
+
+function scanHtmlLine(file, line, lineNumber, state) {
+  const trimmed = line.trim();
+  if (/<style\b/i.test(trimmed)) {
+    state.inStyle = true;
+  }
+  if (/<script\b/i.test(trimmed)) {
+    state.inScript = true;
+  }
+  const shouldSkip = state.inStyle || state.inScript || hasI18nCall(trimmed);
+  const hits = [];
+  if (!shouldSkip && HAN_RE.test(trimmed)) {
+    const text = stripHtmlTags(trimmed);
+    if (text && HAN_RE.test(text)) {
+      hits.push({ file, lineNumber, type: 'html-text', text: trimmed });
+    }
+  }
+  if (/<\/style>/i.test(trimmed)) {
+    state.inStyle = false;
+  }
+  if (/<\/script>/i.test(trimmed)) {
+    state.inScript = false;
+  }
+  return hits;
+}
+
+function auditSources() {
+  const files = SOURCE_ROOTS
+    .flatMap(walk)
+    .map((file) => path.normalize(file))
+    .sort();
+  const hits = [];
+  files.forEach((file) => {
+    const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
+    const htmlState = { inStyle: false, inScript: false };
+    lines.forEach((line, index) => {
+      const lineNumber = index + 1;
+      if (file.endsWith('.html')) {
+        hits.push(...scanHtmlLine(file, line, lineNumber, htmlState));
+        return;
+      }
+      hits.push(...scanJsLine(file, line, lineNumber));
+    });
+  });
+  return hits;
+}
+
+function printSourceHits(hits) {
+  console.log('');
+  console.log('Unreviewed hardcoded user-facing string candidates:');
+  if (hits.length === 0) {
+    console.log('none');
+    return;
+  }
+  const byFile = new Map();
+  hits.forEach((hit) => {
+    if (!byFile.has(hit.file)) {
+      byFile.set(hit.file, []);
+    }
+    byFile.get(hit.file).push(hit);
+  });
+  Array.from(byFile.keys()).sort().forEach((file) => {
+    const fileHits = byFile.get(file);
+    console.log(`${file} hits=${fileHits.length}`);
+    fileHits.slice(0, MAX_HITS_PER_FILE).forEach((hit) => {
+      console.log(`  ${hit.lineNumber} ${hit.type}: ${hit.text.slice(0, 180)}`);
+    });
+    if (fileHits.length > MAX_HITS_PER_FILE) {
+      console.log(`  ... ${fileHits.length - MAX_HITS_PER_FILE} more`);
+    }
+  });
+}
+
+console.log('I18n audit allowlist categories:');
+ALLOWLIST.forEach((item) => console.log(`- ${item}`));
+auditLocales();
+const sourceHits = auditSources();
+printSourceHits(sourceHits);
+console.log('');
+console.log(`i18n audit candidate count=${sourceHits.length}`);

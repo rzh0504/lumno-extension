@@ -12,6 +12,12 @@
     return typeof chrome !== 'undefined' ? chrome : null;
   }
 
+  function getRoutesApi() {
+    return typeof globalThis !== 'undefined' && globalThis.LumnoExtensionRoutes
+      ? globalThis.LumnoExtensionRoutes
+      : null;
+  }
+
   function getExtensionDetailsUrl() {
     const chromeApi = getChromeApi();
     if (!chromeApi || !chromeApi.runtime || !chromeApi.runtime.id) {
@@ -24,7 +30,11 @@
     const chromeApi = getChromeApi();
     const done = typeof callback === 'function' ? callback : () => {};
     const fallbackOpen = () => {
-      chromeApi.tabs.create({ url: chromeApi.runtime.getURL('src/options/options.html') }, () => {
+      const routes = getRoutesApi();
+      const optionsUrl = routes && typeof routes.buildOptionsUrl === 'function'
+        ? routes.buildOptionsUrl(chromeApi)
+        : chromeApi.runtime.getURL('src/options/options.html');
+      chromeApi.tabs.create({ url: optionsUrl }, () => {
         done(!(chromeApi.runtime && chromeApi.runtime.lastError));
       });
     };

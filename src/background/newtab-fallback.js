@@ -9,6 +9,12 @@
     return typeof chrome !== 'undefined' ? chrome : null;
   }
 
+  function getRoutesApi() {
+    return typeof globalThis !== 'undefined' && globalThis.LumnoExtensionRoutes
+      ? globalThis.LumnoExtensionRoutes
+      : null;
+  }
+
   function isLocalFileLikeTargetUrl(url) {
     if (!url) {
       return false;
@@ -77,6 +83,13 @@
 
   function buildNewtabFallbackUrl(options) {
     const chromeApi = getChromeApi();
+    const routes = getRoutesApi();
+    if (routes && typeof routes.buildNewtabUrl === 'function') {
+      return routes.buildNewtabUrl(chromeApi, {
+        focus: true,
+        notice: options && options.notice === 'file-access' ? 'file-access' : null
+      });
+    }
     const baseUrl = chromeApi && chromeApi.runtime && typeof chromeApi.runtime.getURL === 'function'
       ? chromeApi.runtime.getURL('src/newtab/newtab.html')
       : 'src/newtab/newtab.html';

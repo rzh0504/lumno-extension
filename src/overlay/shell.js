@@ -91,6 +91,7 @@
 
     appendStylesheet(doc, styleRoot, '_x_extension_open_sans_shadow_css_2026_unique_', settings.openSansCssUrl);
     appendStylesheet(doc, styleRoot, '_x_extension_remixicon_shadow_css_2026_unique_', settings.remixIconCssUrl);
+    appendStylesheet(doc, styleRoot, '_x_extension_input_component_style_2026_unique_', settings.searchInputCssUrl);
 
     if (findById(styleRoot, '_x_extension_scrollbar_style_2024_unique_') ||
         findById(styleRoot, '_x_extension_overlay_theme_style_2024_unique_')) {
@@ -228,7 +229,8 @@
     appendOverlayStyleNodes(doc, {
       root: shadowRoot,
       openSansCssUrl: settings.openSansCssUrl,
-      remixIconCssUrl: settings.remixIconCssUrl
+      remixIconCssUrl: settings.remixIconCssUrl,
+      searchInputCssUrl: settings.searchInputCssUrl
     });
     const panel = createOverlayElement(doc, settings);
     panel.setAttribute('data-lumno-overlay-panel', 'true');

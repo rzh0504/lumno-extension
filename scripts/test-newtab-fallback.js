@@ -1,4 +1,5 @@
 const assert = require('assert');
+require('../src/shared/extension-routes.js');
 const fallback = require('../src/background/newtab-fallback.js');
 
 assert.strictEqual(

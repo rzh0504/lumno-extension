@@ -32,16 +32,19 @@
   const SEARCH_BLACKLIST_STORAGE_KEY = '_x_extension_search_blacklist_2026_unique_';
   const BLACKLIST_UTILS = globalThis.LumnoBlacklistUtils || {};
   const SETTINGS = globalThis.LumnoSettings || {};
+  const EXTENSION_ROUTES = globalThis.LumnoExtensionRoutes || {};
   const SEARCH_UTILS = globalThis.LumnoSearchUtils || {};
   const SITE_SEARCH_STORE = globalThis.LumnoSiteSearchStore || {};
   const SUGGESTION_NAVIGATION = globalThis.LumnoSuggestionNavigation || {};
+  const SEARCH_INPUT_MODE = globalThis.LumnoSearchInputMode || {};
   const NEWTAB_FAVICON_CACHE = globalThis.LumnoNewtabFaviconCache || {};
   const NEWTAB_FAVICON_THEME = globalThis.LumnoNewtabFaviconTheme || {};
   const NEWTAB_FAVICON_VIEW = globalThis.LumnoNewtabFaviconView || {};
   if (typeof NEWTAB_FAVICON_CACHE.createFaviconCache !== 'function' ||
       typeof NEWTAB_FAVICON_THEME.buildTheme !== 'function' ||
-      typeof NEWTAB_FAVICON_VIEW.createFaviconViewRuntime !== 'function') {
-    console.warn('Lumno: newtab favicon helpers not available.');
+      typeof NEWTAB_FAVICON_VIEW.createFaviconViewRuntime !== 'function' ||
+      typeof SEARCH_INPUT_MODE.createInputModeController !== 'function') {
+    console.warn('Lumno: newtab helpers not available.');
     return;
   }
   const TAB_RANK_SCORE_DEBUG_STORAGE_KEY = '_x_extension_tab_rank_score_debug_2026_unique_';
@@ -75,6 +78,7 @@
   });
   let modeBadge = null;
   let siteSearchTabHint = null;
+  let inputModeController = null;
   const recentCards = [];
   const bookmarkCards = [];
   const bookmarkCardElementCache = new Map();
@@ -4840,6 +4844,15 @@
       return '';
     }
     try {
+      const routeType = typeof EXTENSION_ROUTES.classifyExtensionUrl === 'function'
+        ? EXTENSION_ROUTES.classifyExtensionUrl(url)
+        : '';
+      if (routeType === 'newtab') {
+        return t('newtab_page_label', '新标签页');
+      }
+      if (routeType === 'options') {
+        return t('settings_title', '设置');
+      }
       const parsed = new URL(url);
       const path = String(parsed.pathname || '').toLowerCase();
       if (path.endsWith('/newtab.html') || path === '/newtab.html') {
@@ -8633,6 +8646,7 @@
 
   const inputParts = createSearchInput({
     useImportantStyles: false,
+    useInlineBaseStyles: false,
     containerId: '_x_extension_newtab_input_container_2024_unique_',
     inputId: '_x_extension_newtab_search_input_2024_unique_',
     iconId: '_x_extension_newtab_search_icon_2024_unique_',
@@ -9271,39 +9285,6 @@
     z-index: 1;
   `;
   inputParts.container.appendChild(modeBadge);
-  siteSearchTabHint = document.createElement('span');
-  siteSearchTabHint.id = '_x_extension_newtab_site_search_tab_hint_2026_unique_';
-  siteSearchTabHint.setAttribute('aria-hidden', 'true');
-  siteSearchTabHint.textContent = '';
-  siteSearchTabHint.style.cssText = `
-    all: unset;
-    position: absolute;
-    right: 52px;
-    top: 50%;
-    transform: translateY(-50%);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    max-width: min(300px, 52%);
-    min-width: 0;
-    height: 28px;
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: var(--x-nt-tag-text, #6B7280);
-    box-sizing: border-box;
-    font-size: 13px;
-    font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    font-weight: 700;
-    line-height: 18px;
-    letter-spacing: 0;
-    white-space: nowrap;
-    pointer-events: none;
-    user-select: none;
-    z-index: 1;
-  `;
-  inputParts.container.appendChild(siteSearchTabHint);
   const searchInput = inputParts.input;
   searchInputRef = searchInput;
   const inputContainer = inputParts.container;
@@ -9338,7 +9319,9 @@
   wordmarkButton.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const optionsUrl = chrome.runtime.getURL('src/options/options.html#appearance');
+    const optionsUrl = typeof EXTENSION_ROUTES.buildOptionsUrl === 'function'
+      ? EXTENSION_ROUTES.buildOptionsUrl(chrome, 'appearance')
+      : chrome.runtime.getURL('src/options/options.html#appearance');
     window.open(optionsUrl, '_blank');
   });
   wordmarkImageEl = document.createElement('img');
@@ -9388,93 +9371,29 @@
         chrome.runtime.openOptionsPage();
         return;
       }
-      window.open(chrome.runtime.getURL('src/options/options.html'), '_blank');
+      const optionsUrl = typeof EXTENSION_ROUTES.buildOptionsUrl === 'function'
+        ? EXTENSION_ROUTES.buildOptionsUrl(chrome)
+        : chrome.runtime.getURL('src/options/options.html');
+      window.open(optionsUrl, '_blank');
     });
   }
 
   function updateInputRightPadding() {
-    if (!searchInput) {
-      return;
+    if (inputModeController) {
+      inputModeController.updateLayout();
     }
-    const baseRightReserve = 96;
-    let totalReserve = baseRightReserve;
-    if (modeBadge && modeBadge.style.getPropertyValue('display') !== 'none') {
-      const badgeWidth = Math.ceil(modeBadge.getBoundingClientRect().width || 0);
-      totalReserve = Math.max(totalReserve, 52 + badgeWidth + 12);
-    }
-    if (siteSearchTabHint && siteSearchTabHint.style.getPropertyValue('display') !== 'none') {
-      const hintWidth = Math.ceil(siteSearchTabHint.getBoundingClientRect().width || 0);
-      totalReserve = Math.max(totalReserve, 52 + hintWidth + 12);
-    }
-    searchInput.style.setProperty('padding-right', `${totalReserve}px`);
   }
 
   function setSiteSearchTabHint(provider) {
-    if (!siteSearchTabHint || siteSearchState) {
-      return;
+    if (inputModeController) {
+      inputModeController.setTabHintVisible(true, provider);
     }
-    const site = getSiteSearchDisplayName(provider);
-    const label = formatMessage('site_search_tab_hint', '使用 {site} 搜索', { site });
-    siteSearchTabHint.textContent = '';
-    const keyLabel = document.createElement('span');
-    keyLabel.textContent = 'Tab';
-    keyLabel.style.cssText = `
-      all: unset;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 32px;
-      height: 22px;
-      padding: 0 6px;
-      border-radius: 7px;
-      border: 1px solid var(--x-nt-panel-border, rgba(0, 0, 0, 0.08));
-      background: var(--x-nt-tag-bg, #F3F4F6);
-      color: var(--x-nt-tag-text, #6B7280);
-      box-sizing: border-box;
-      font-size: 11px;
-      font-family: inherit;
-      font-weight: 700;
-      line-height: 14px;
-      letter-spacing: 0;
-      white-space: nowrap;
-      flex: 0 0 auto;
-    `;
-    const textLabel = document.createElement('span');
-    textLabel.textContent = label;
-    textLabel.style.cssText = `
-      all: unset;
-      display: inline-block;
-      min-width: 0;
-      max-width: 220px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      color: var(--x-nt-tag-text, #6B7280);
-      font-size: 13px;
-      font-family: inherit;
-      font-weight: 400;
-      line-height: 18px;
-      letter-spacing: 0;
-      flex: 1 1 auto;
-    `;
-    siteSearchTabHint.appendChild(keyLabel);
-    siteSearchTabHint.appendChild(textLabel);
-    if (provider) {
-      siteSearchTabHint.setAttribute('title', label);
-    } else {
-      siteSearchTabHint.removeAttribute('title');
-    }
-    siteSearchTabHint.style.setProperty('display', 'inline-flex');
-    updateInputRightPadding();
   }
 
   function clearSiteSearchTabHint() {
-    if (!siteSearchTabHint) {
-      return;
+    if (inputModeController) {
+      inputModeController.setTabHintVisible(false);
     }
-    siteSearchTabHint.style.setProperty('display', 'none');
-    siteSearchTabHint.removeAttribute('title');
-    updateInputRightPadding();
   }
 
   if (storageArea) {
@@ -9489,289 +9408,49 @@
   }
   const defaultPlaceholder = searchInput.placeholder;
   const defaultCaretColor = searchInput.style.caretColor || '#7DB7FF';
-  let baseInputPaddingLeft = null;
-  const prefixGap = 8;
   const inputModePrefixTransition = 'opacity 220ms cubic-bezier(0.22, 1, 0.36, 1), transform 300ms cubic-bezier(0.22, 1, 0.36, 1), filter 260ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms ease, box-shadow 180ms ease';
-  let inputModePrefixAnimationFrame = null;
-  let inputModeElasticAnimationFrame = null;
-  let inputModeElasticAnimation = null;
-
-  const siteSearchPrefix = document.createElement('span');
-  siteSearchPrefix.id = '_x_extension_newtab_site_search_prefix_2024_unique_';
-  siteSearchPrefix.style.cssText = `
-    all: unset;
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    left: 50px;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    max-width: min(220px, 48%);
-    min-width: 0;
-    height: 26px;
-    padding: 0 10px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    box-sizing: border-box;
-    font-size: 13px;
-    font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    font-weight: 700;
-    line-height: 1;
-    letter-spacing: 0;
-    color: #F8FAFC;
-    background: #3B82F6;
-    border: 1px solid transparent;
-    border-radius: 9px;
-    box-shadow: 0 7px 16px rgba(59, 130, 246, 0.24);
-    opacity: 1;
-    filter: blur(0px);
-    transition: ${inputModePrefixTransition};
-    will-change: transform, opacity, filter;
-    pointer-events: none;
-    z-index: 1;
-    user-select: none;
-  `;
-  inputContainer.appendChild(siteSearchPrefix);
-
-  function shouldReduceInputModeMotion() {
-    return Boolean(
-      window.matchMedia &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    );
-  }
-
-  function getInputModePrefixVisual(theme, options) {
-    const resolvedTheme = theme ? getThemeForMode(theme) : defaultTheme;
-    const accentRgb = (resolvedTheme && (resolvedTheme.accentRgb || parseCssColor(resolvedTheme.accent))) ||
-      defaultAccentColor;
-    const isAi = Boolean(options && options.isAi);
-    if (isAi) {
-      const alpha = isNewtabDarkMode() ? 0.18 : 0.1;
-      return {
-        background: `rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, ${alpha})`,
-        border: `1px solid rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, ${isNewtabDarkMode() ? 0.3 : 0.2})`,
-        shadow: `0 6px 14px rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, ${isNewtabDarkMode() ? 0.2 : 0.1})`,
-        color: isNewtabDarkMode() ? '#F8FAFC' : '#334155',
-        caretColor: resolvedTheme && resolvedTheme.placeholderText
-          ? resolvedTheme.placeholderText
-          : rgbToCss(accentRgb)
-      };
-    }
-    return {
-      background: rgbToCss(accentRgb),
-      border: '1px solid transparent',
-      shadow: `0 7px 16px rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, ${isNewtabDarkMode() ? 0.34 : 0.24})`,
-      color: '#F8FAFC',
-      caretColor: resolvedTheme && resolvedTheme.placeholderText
-        ? resolvedTheme.placeholderText
-        : rgbToCss(accentRgb)
-    };
-  }
-
-  function applyInputModePrefixVisual(theme, options) {
-    const visual = getInputModePrefixVisual(theme, options);
-    siteSearchPrefix.style.setProperty('background', visual.background);
-    siteSearchPrefix.style.setProperty('border', visual.border);
-    siteSearchPrefix.style.setProperty('box-shadow', visual.shadow);
-    siteSearchPrefix.style.setProperty('color', visual.color);
-    return visual;
-  }
-
-  function setInputModePrefixContent(prefixText, options) {
-    siteSearchPrefix.textContent = '';
-    const iconUrl = options && options.iconUrl ? String(options.iconUrl || '').trim() : '';
-    if (iconUrl) {
-      const icon = document.createElement('img');
-      icon.alt = '';
-      icon.decoding = 'async';
-      icon.referrerPolicy = 'no-referrer';
-      icon.style.cssText = `
-        all: unset;
-        width: 15px;
-        height: 15px;
-        border-radius: 4px;
-        object-fit: contain;
-        flex: 0 0 auto;
-        display: block;
-      `;
-      icon.addEventListener('error', () => {
-        icon.remove();
-        updateSiteSearchPrefixLayout();
-      }, { once: true });
-      const iconHost = options && options.iconHost ? String(options.iconHost || '').trim() : '';
-      if (typeof attachFaviconData === 'function') {
-        icon.src = iconUrl;
-        attachFaviconData(icon, iconUrl, iconHost);
-      } else {
-        icon.src = iconUrl;
-      }
-      siteSearchPrefix.appendChild(icon);
-    }
-    const text = document.createElement('span');
-    text.textContent = prefixText;
-    text.style.cssText = `
-      all: unset;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    `;
-    siteSearchPrefix.appendChild(text);
-  }
-
-  function setInputModePrefixRestState() {
-    siteSearchPrefix.style.setProperty('opacity', '1');
-    siteSearchPrefix.style.setProperty('filter', 'blur(0px)');
-    siteSearchPrefix.style.setProperty('transform', 'translateY(-50%)');
-    siteSearchPrefix.style.setProperty('transition', inputModePrefixTransition);
-  }
-
-  function playInputModePrefixEnterAnimation() {
-    if (inputModePrefixAnimationFrame !== null) {
-      cancelAnimationFrame(inputModePrefixAnimationFrame);
-      inputModePrefixAnimationFrame = null;
-    }
-    if (shouldReduceInputModeMotion()) {
-      setInputModePrefixRestState();
-      return;
-    }
-    siteSearchPrefix.style.setProperty('transition', 'none');
-    siteSearchPrefix.style.setProperty('opacity', '0');
-    siteSearchPrefix.style.setProperty('filter', 'blur(4px)');
-    siteSearchPrefix.style.setProperty('transform', 'translateY(-50%) translateX(-14px) scale(0.78)');
-    void siteSearchPrefix.offsetWidth;
-    inputModePrefixAnimationFrame = requestAnimationFrame(() => {
-      inputModePrefixAnimationFrame = null;
-      siteSearchPrefix.style.setProperty('transition', inputModePrefixTransition);
-      siteSearchPrefix.style.setProperty('opacity', '1');
-      siteSearchPrefix.style.setProperty('filter', 'blur(0px)');
-      siteSearchPrefix.style.setProperty('transform', 'translateY(-50%) translateX(0) scale(1)');
-    });
-  }
-
-  function getInputModeElasticTarget() {
-    return root || searchLayer || inputContainer;
-  }
-
-  function appendTransformWillChange(value) {
-    const currentValue = String(value || '').trim();
-    if (!currentValue || currentValue === 'auto') {
-      return 'transform';
-    }
-    const parts = currentValue.split(',').map((part) => part.trim()).filter(Boolean);
-    if (parts.includes('transform')) {
-      return currentValue;
-    }
-    return `${currentValue}, transform`;
-  }
-
-  function playInputModeElasticAnimation() {
-    const target = getInputModeElasticTarget();
-    if (inputModeElasticAnimationFrame !== null) {
-      cancelAnimationFrame(inputModeElasticAnimationFrame);
-      inputModeElasticAnimationFrame = null;
-    }
-    if (inputModeElasticAnimation && typeof inputModeElasticAnimation.cancel === 'function') {
-      inputModeElasticAnimation.cancel();
-    }
-    if (!target || shouldReduceInputModeMotion() || typeof target.animate !== 'function') {
-      return;
-    }
-    inputModeElasticAnimationFrame = requestAnimationFrame(() => {
-      inputModeElasticAnimationFrame = null;
-      if (!target.isConnected) {
-        return;
-      }
-      const previousWillChange = target.style.getPropertyValue('will-change');
-      const previousWillChangePriority = target.style.getPropertyPriority('will-change');
-      target.style.setProperty(
-        'will-change',
-        appendTransformWillChange(previousWillChange),
-        previousWillChangePriority
-      );
-      const animation = target.animate([
-        { transform: 'scale3d(1, 1, 1)', transformOrigin: 'center center', offset: 0 },
-        { transform: 'scale3d(1.02, 0.982, 1)', transformOrigin: 'center center', offset: 0.36 },
-        { transform: 'scale3d(0.996, 1.008, 1)', transformOrigin: 'center center', offset: 0.68 },
-        { transform: 'scale3d(1.002, 0.999, 1)', transformOrigin: 'center center', offset: 0.84 },
-        { transform: 'scale3d(1, 1, 1)', transformOrigin: 'center center', offset: 1 }
-      ], {
-        duration: 400,
-        easing: 'cubic-bezier(0.18, 1.18, 0.2, 1)',
-        fill: 'none'
-      });
-      inputModeElasticAnimation = animation;
-      const cleanup = () => {
-        if (inputModeElasticAnimation !== animation) {
-          return;
-        }
-        inputModeElasticAnimation = null;
-        if (previousWillChange) {
-          target.style.setProperty('will-change', previousWillChange, previousWillChangePriority);
-        } else {
-          target.style.removeProperty('will-change');
-        }
-      };
-      animation.onfinish = cleanup;
-      animation.oncancel = cleanup;
-    });
-  }
-
-  function getBaseInputPaddingLeft() {
-    if (baseInputPaddingLeft === null) {
-      const computed = parseFloat(window.getComputedStyle(searchInput).paddingLeft);
-      baseInputPaddingLeft = Number.isFinite(computed) ? computed : 50;
-    }
-    return baseInputPaddingLeft;
-  }
+  inputModeController = SEARCH_INPUT_MODE.createInputModeController(inputParts, {
+    surface: 'newtab',
+    useImportantStyles: false,
+    prefixTransition: inputModePrefixTransition,
+    defaultPlaceholder,
+    defaultCaretColor,
+    modeBadgeElement: modeBadge,
+    rightReserveBase: 96,
+    rightAnchorOffset: 52,
+    getThemeForMode,
+    defaultTheme,
+    defaultAccentColor,
+    parseCssColor,
+    rgbToCss,
+    isDarkMode: isNewtabDarkMode,
+    getProviderIcon,
+    getProviderThemeHost,
+    getSiteSearchPrefixText,
+    getSiteSearchDisplayName,
+    isAiSiteSearchProvider,
+    attachFaviconData,
+    formatMessage,
+    isTabHintSuppressed: () => Boolean(siteSearchState)
+  });
+  siteSearchTabHint = inputModeController.tabHintElement;
 
   function updateSiteSearchPrefixLayout() {
-    const basePadding = getBaseInputPaddingLeft();
-    siteSearchPrefix.style.setProperty('left', `${basePadding}px`);
-    if (siteSearchPrefix.style.display === 'none') {
-      searchInput.style.setProperty('padding-left', `${basePadding}px`);
-      return;
+    if (inputModeController) {
+      inputModeController.updateLayout();
     }
-    const prefixWidth = Math.ceil(siteSearchPrefix.offsetWidth || siteSearchPrefix.getBoundingClientRect().width || 0);
-    const paddedLeft = Math.max(basePadding + prefixWidth + prefixGap, basePadding);
-    searchInput.style.setProperty('padding-left', `${paddedLeft}px`);
   }
 
   function setSiteSearchPrefix(provider, theme, options) {
-    const prefixText = getSiteSearchPrefixText(provider);
-    const shouldAnimate = Boolean(options && options.animate);
-    const isAi = isAiSiteSearchProvider(provider);
-    const prefixOptions = {
-      ...(options || {}),
-      iconUrl: isAi ? getProviderIcon(provider) : '',
-      iconHost: isAi ? getProviderThemeHost(provider) : '',
-      isAi
-    };
-    setInputModePrefixContent(prefixText, prefixOptions);
-    const visual = applyInputModePrefixVisual(theme, prefixOptions);
-    siteSearchPrefix.style.setProperty('display', 'inline-flex');
-    if (!shouldAnimate) {
-      setInputModePrefixRestState();
-    }
-    searchInput.placeholder = '';
-    searchInput.style.setProperty('caret-color', visual.caretColor);
-    updateSiteSearchPrefixLayout();
-    if (shouldAnimate) {
-      playInputModePrefixEnterAnimation();
-      playInputModeElasticAnimation();
+    if (inputModeController) {
+      inputModeController.setProviderPrefix(provider, theme, options);
     }
   }
 
   function clearSiteSearchPrefix() {
-    siteSearchPrefix.textContent = '';
-    setInputModePrefixRestState();
-    siteSearchPrefix.style.setProperty('display', 'none');
-    searchInput.placeholder = defaultPlaceholder;
-    searchInput.style.setProperty('caret-color', defaultCaretColor);
-    updateSiteSearchPrefixLayout();
+    if (inputModeController) {
+      inputModeController.clearProviderPrefix();
+    }
   }
 
   window.addEventListener('resize', () => {
