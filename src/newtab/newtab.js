@@ -7135,27 +7135,7 @@
         applyThemeVariables(suggestionItem, immediateTheme);
 
         const leftSide = document.createElement('div');
-        leftSide.style.cssText = `
-          all: unset !important;
-          display: flex !important;
-          align-items: center !important;
-          gap: 12px !important;
-          flex: 1 !important;
-          min-width: 0 !important;
-          box-sizing: border-box !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          line-height: 1 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          background: transparent !important;
-          color: inherit !important;
-          font-size: 100% !important;
-          font: inherit !important;
-          vertical-align: baseline !important;
-          transition: gap 160ms ease, transform 160ms ease !important;
-        `;
+        leftSide.className = 'x-nt-suggestion-left';
 
         let iconNode = null;
         let iconWrapper = null;
@@ -7303,30 +7283,7 @@
         if (iconNode) {
           const isFaviconIcon = iconNode.tagName === 'IMG';
           const iconSlot = document.createElement('span');
-          iconSlot.style.cssText = `
-            all: unset !important;
-            width: 24px !important;
-            height: 24px !important;
-            flex: 0 0 24px !important;
-            flex-shrink: 0 !important;
-            border-radius: 8px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            box-sizing: border-box !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            line-height: 1 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            background: transparent !important;
-            transition: background-color 0.2s ease !important;
-            color: var(--x-nt-subtext, #6B7280) !important;
-            font-size: 100% !important;
-            font: inherit !important;
-            vertical-align: baseline !important;
-          `;
+          iconSlot.className = 'x-nt-suggestion-icon-slot';
           iconSlot._xIsFavicon = isFaviconIcon;
           iconSlot.appendChild(iconNode);
           iconNode = iconSlot;
@@ -7338,28 +7295,7 @@
         }
 
         const textWrapper = document.createElement('div');
-        textWrapper.style.cssText = `
-          all: unset !important;
-          display: flex !important;
-          align-items: center !important;
-          gap: 6px !important;
-          flex: 1 !important;
-          min-width: 0 !important;
-          overflow: visible !important;
-          box-sizing: border-box !important;
-          margin: 0 !important;
-          padding: 0 8px 0 0 !important;
-          line-height: 1 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          background: transparent !important;
-          color: inherit !important;
-          font-size: 100% !important;
-          font: inherit !important;
-          vertical-align: baseline !important;
-          transition: gap 160ms ease, transform 160ms ease !important;
-        `;
+        textWrapper.className = 'x-nt-suggestion-text';
 
         const title = document.createElement('span');
         const baseTitle = suggestion.title || '';
@@ -7494,25 +7430,7 @@
         }
 
         const rightSide = document.createElement('div');
-        rightSide.style.cssText = `
-          all: unset !important;
-          display: inline-flex !important;
-          align-items: center !important;
-          gap: 6px !important;
-          flex-shrink: 0 !important;
-          box-sizing: border-box !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          line-height: 1 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          background: transparent !important;
-          color: inherit !important;
-          font-size: 100% !important;
-          font: inherit !important;
-          vertical-align: baseline !important;
-        `;
+        rightSide.className = 'x-nt-suggestion-right';
 
         const actionTags = document.createElement('div');
         actionTags.className = 'x-nt-suggestion-action-tags';
