@@ -6487,9 +6487,6 @@
         item._xHistoryDeleteButton.style.setProperty('--x-nt-history-delete-color', 'var(--x-nt-subtext, #6B7280)');
       }
     }
-    if (item._xTitle) {
-      item._xTitle.style.setProperty('font-weight', isActive ? '600' : '400', 'important');
-    }
   }
 
   function updateSelection() {
@@ -7317,27 +7314,7 @@
           background: 'var(--x-ext-mark-bg, #CFE8FF)',
           color: 'var(--x-ext-mark-text, #1E3A8A)'
         });
-        title.style.cssText = `
-          all: unset !important;
-          color: var(--x-nt-text, #111827) !important;
-          font-size: 14px !important;
-          font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-          font-weight: 400 !important;
-          white-space: nowrap !important;
-          overflow: hidden !important;
-          text-overflow: ellipsis !important;
-          max-width: 100% !important;
-          box-sizing: border-box !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          line-height: 1.5 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          background: transparent !important;
-          display: inline-block !important;
-          vertical-align: baseline !important;
-        `;
+        title.className = 'x-nt-suggestion-title';
         suggestionItem._xTitle = title;
 
         textWrapper.appendChild(title);
@@ -7347,19 +7324,7 @@
         if (tabRankScoreDebugEnabled && reasonText) {
           const reasonLine = document.createElement('span');
           reasonLine.textContent = reasonText;
-          reasonLine.style.cssText = `
-            all: unset !important;
-            color: var(--x-nt-subtext, #6B7280) !important;
-            font-size: 11px !important;
-            font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-            line-height: 1.2 !important;
-            white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
-            max-width: 100% !important;
-            display: inline-block !important;
-            vertical-align: middle !important;
-          `;
+          reasonLine.className = 'x-nt-suggestion-reason';
           textWrapper.appendChild(reasonLine);
         }
 
@@ -7399,23 +7364,7 @@
           if (suggestion.path) {
             const bookmarkPath = document.createElement('span');
             bookmarkPath.textContent = suggestion.path;
-            bookmarkPath.style.cssText = `
-              all: unset !important;
-              color: var(--x-nt-link, #2563EB) !important;
-              font-size: 12px !important;
-              font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-              text-decoration: none !important;
-              white-space: nowrap !important;
-              overflow: hidden !important;
-              text-overflow: ellipsis !important;
-              max-width: 100% !important;
-              box-sizing: border-box !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              line-height: 1.2 !important;
-              display: inline-block !important;
-              vertical-align: middle !important;
-            `;
+            bookmarkPath.className = 'x-nt-suggestion-bookmark-path';
             textWrapper.appendChild(bookmarkPath);
           }
           const bookmarkTag = document.createElement('span');
