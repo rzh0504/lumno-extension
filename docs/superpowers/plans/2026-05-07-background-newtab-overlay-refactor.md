@@ -695,6 +695,8 @@ git diff --check
 
 Commit message: `Reduce verified inline important styles`
 
+Implementation note: Task 9 newtab bottom-dock slice completed on 2026-05-07. Moved the fixed `bottomDock`, `bottomDockScroller`, and `sectionSafeCorridor` styles from `newtab.js` `style.cssText` blocks into static `newtab.html` CSS without reintroducing `!important` in the stylesheet. JS still owns dynamic `display` and `max-height` through the layout controller. Removed now-unused section spacing constants from `newtab.js`. Style audit changed from `TOTAL important=1533 cssText=115 styleWrites=726` after the layout extraction to `TOTAL important=1496 cssText=112 styleWrites=723`; `src/newtab/newtab.js` moved from `important=530 cssText=39 styleWrites=219` to `important=493 cssText=36 styleWrites=216`. Verified with `node --check src/newtab/newtab.js`, `npm run audit:style`, `npm run check`, `npm run test:newtab-stores`, `git diff --check`, and `npm run package:store`. Browser validation used the existing Chrome Dev window after reload; the newtab rendered without a blank page and bottom dock bookmarks/recent cards stayed aligned. Screenshot saved at `dist/.checks/refactor-after-task-9/newtab-bottom-dock-static-css.png`.
+
 ---
 
 ### Task 10: Complete I18n Coverage

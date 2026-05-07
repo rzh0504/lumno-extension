@@ -137,10 +137,6 @@
   let recentMouseInsideSection = false;
   let recentMouseLeftAt = 0;
   const BOOKMARK_WHEEL_SWITCH_COOLDOWN_MS = 220;
-  const BOOKMARK_GAP_ABOVE_RECENT_PX = 100;
-  const BOOKMARK_FALLBACK_BOTTOM_PX = 340;
-  const SECTION_VERTICAL_GAP_PX = 32;
-  const SECTION_SAFE_CORRIDOR_PX = 16;
   const BOOKMARK_HOVER_DELAY_FROM_RECENT_MS = 56;
   const BOOKMARK_HOVER_RECENT_TRANSFER_WINDOW_MS = 220;
   const SEARCH_LAYOUT_MIN_TOP_PX = 28;
@@ -3471,53 +3467,10 @@
   let recentLoadedOnce = false;
   const bottomDock = document.createElement('div');
   bottomDock.id = '_x_extension_newtab_bottom_dock_2024_unique_';
-  bottomDock.style.cssText = `
-    all: unset !important;
-    position: fixed !important;
-    left: 50% !important;
-    bottom: 0 !important;
-    transform: translateX(-50%) !important;
-    width: min(96vw, var(--x-nt-content-max-width, 1040px)) !important;
-    max-height: calc(100vh - 240px) !important;
-    display: none !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    box-sizing: border-box !important;
-    z-index: 2 !important;
-    pointer-events: auto !important;
-    overflow: visible !important;
-  `;
   const bottomDockScroller = document.createElement('div');
   bottomDockScroller.id = '_x_extension_newtab_bottom_dock_scroller_2024_unique_';
-  bottomDockScroller.style.cssText = `
-    all: unset !important;
-    width: calc(100% + 24px) !important;
-    max-height: 100% !important;
-    margin: -24px -12px 0 !important;
-    padding: 24px 12px 60px 12px !important;
-    box-sizing: border-box !important;
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: ${SECTION_VERTICAL_GAP_PX}px !important;
-    pointer-events: auto !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    overscroll-behavior: contain !important;
-  `;
   const sectionSafeCorridor = document.createElement('div');
   sectionSafeCorridor.id = '_x_extension_newtab_section_safe_corridor_2026_unique_';
-  sectionSafeCorridor.style.cssText = `
-    all: unset !important;
-    width: 100% !important;
-    height: ${SECTION_SAFE_CORRIDOR_PX}px !important;
-    min-height: ${SECTION_SAFE_CORRIDOR_PX}px !important;
-    flex: 0 0 ${SECTION_SAFE_CORRIDOR_PX}px !important;
-    display: none !important;
-    pointer-events: auto !important;
-    box-sizing: border-box !important;
-    user-select: none !important;
-  `;
   layoutController = NEWTAB_LAYOUT.createLayoutController({
     documentObj: document,
     windowObj: window,
