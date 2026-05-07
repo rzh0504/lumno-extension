@@ -441,7 +441,7 @@ Implementation note: Task 5 completed on 2026-05-07. Extracted the 6,762-line pa
 - Modify: `src/newtab/newtab.js`
 - Modify: `package.json`
 
-- [ ] Extract recent-site data logic into `LumnoNewtabRecentSitesStore`.
+- [x] Extract recent-site data logic into `LumnoNewtabRecentSitesStore`.
 
 Required API:
 
@@ -457,7 +457,7 @@ globalThis.LumnoNewtabRecentSitesStore = {
 };
 ```
 
-- [ ] Extract bookmark tree/cache logic into `LumnoNewtabBookmarksStore`.
+- [x] Extract bookmark tree/cache logic into `LumnoNewtabBookmarksStore`.
 
 Required API:
 
@@ -471,15 +471,15 @@ globalThis.LumnoNewtabBookmarksStore = {
 };
 ```
 
-- [ ] Keep rendering functions in `newtab.js` for this task. Only move plain object/tree logic.
+- [x] Keep rendering functions in `newtab.js` for this task. Only move plain object/tree logic.
 
-- [ ] Add Node tests for pure store helpers if the functions can run without Chrome APIs:
+- [x] Add Node tests for pure store helpers if the functions can run without Chrome APIs:
 
 ```bash
 node scripts/test-newtab-stores.js
 ```
 
-- [ ] Validate newtab:
+- [x] Validate newtab:
   - recent sites still respect hidden/pinned/max 3 behavior;
   - bookmarks still find the bookmarks bar in English and Chinese browser folder names;
   - folder navigation and pagination unchanged.
@@ -495,6 +495,8 @@ git diff --check
 ```
 
 Commit message: `Extract newtab data stores`
+
+Implementation note: Task 6 completed on 2026-05-07. Added `src/newtab/recent-sites-store.js` for recent count normalization, pinned/hidden persistence normalization, recent-site identity checks, source merging, and pinned merge behavior; added `src/newtab/bookmarks-store.js` for bookmarks-bar detection, bookmark node/folder caches, folder paths, and pagination. `newtab.js` now delegates those pure data paths while keeping DOM rendering and interaction wiring in place for the next view/layout split. Size effect: `src/newtab/newtab.js` is now 9,264 lines, with `recent-sites-store.js` at 395 lines and `bookmarks-store.js` at 260 lines. Verified with `node --check src/newtab/recent-sites-store.js`, `node --check src/newtab/bookmarks-store.js`, `node --check src/newtab/newtab.js`, `node --check scripts/test-newtab-stores.js`, `npm run test:newtab-stores`, `npm run test:settings`, `npm run test:search`, `npm run check`, `npm run audit:style`, `npm run audit:i18n`, `git diff --check`, and `npm run package:store`. Browser validation used the existing Chrome Dev session: after clearing old extension errors, the newtab rendered the shared search input, bookmarks, and recent sites; typing `gm` showed suggestions and the Tab hint, pressing Tab entered Gemini mode, typing `hello` rendered the AI suggestion, and no `ReferenceError`/initialization errors reappeared. Screenshot saved at `dist/.checks/refactor-after-task-6/newtab-gemini-hello-clean-errors.png`. A separate pre-existing/newly reproducible CloudFront CSP noise remains visible on the extension errors page and should be investigated separately from this data-store extraction.
 
 ---
 

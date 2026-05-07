@@ -40,13 +40,18 @@
   const NEWTAB_FAVICON_CACHE = globalThis.LumnoNewtabFaviconCache || {};
   const NEWTAB_FAVICON_THEME = globalThis.LumnoNewtabFaviconTheme || {};
   const NEWTAB_FAVICON_VIEW = globalThis.LumnoNewtabFaviconView || {};
+  const NEWTAB_RECENT_STORE = globalThis.LumnoNewtabRecentSitesStore || {};
+  const NEWTAB_BOOKMARKS_STORE = globalThis.LumnoNewtabBookmarksStore || {};
   if (typeof NEWTAB_FAVICON_CACHE.createFaviconCache !== 'function' ||
       typeof NEWTAB_FAVICON_THEME.buildTheme !== 'function' ||
       typeof NEWTAB_FAVICON_VIEW.createFaviconViewRuntime !== 'function' ||
-      typeof SEARCH_INPUT_MODE.createInputModeController !== 'function') {
+      typeof SEARCH_INPUT_MODE.createInputModeController !== 'function' ||
+      typeof NEWTAB_RECENT_STORE.normalizeRecentSiteItem !== 'function' ||
+      typeof NEWTAB_BOOKMARKS_STORE.buildBookmarkFolderCache !== 'function') {
     console.warn('Lumno: newtab helpers not available.');
     return;
   }
+  const normalizeHost = NEWTAB_FAVICON_THEME.normalizeHost;
   const TAB_RANK_SCORE_DEBUG_STORAGE_KEY = '_x_extension_tab_rank_score_debug_2026_unique_';
   const NEWTAB_OPEN_TAB_SUGGESTION_LIMIT = 8;
   const FAVICON_REVALIDATE_INTERVAL_MS = 1000 * 60 * 60 * 12;
@@ -108,8 +113,8 @@
   let bookmarkFolderPath = [];
   let bookmarkRootTotalCount = 0;
   let bookmarkRootVisibleCount = 0;
-  const bookmarkNodeMap = new Map();
-  const bookmarkFolderItemsCache = new Map();
+  let bookmarkNodeMap = new Map();
+  let bookmarkFolderItemsCache = new Map();
   let bookmarkTreeCacheReady = false;
   let bookmarkTreeCacheDirty = true;
   let bookmarkTreeCacheLoadingPromise = null;
@@ -159,11 +164,7 @@
   toastElement = document.getElementById('_x_extension_toast_2024_unique_');
 
   function normalizeRecentCount(value) {
-    const parsed = Number.parseInt(value, 10);
-    if (parsed === 0 || parsed === 4 || parsed === 8) {
-      return parsed;
-    }
-    return 4;
+    return NEWTAB_RECENT_STORE.normalizeRecentCount(value);
   }
 
   function normalizeNewtabWidthMode(value) {
@@ -2262,7 +2263,6 @@
       const accent = rgb && rgb.length === 3 ? rgb : defaultAccentColor;
       return `${theme && theme._xThemeSource ? theme._xThemeSource : 'unknown'}:${accent.join(',')}`;
     });
-  const normalizeHost = NEWTAB_FAVICON_THEME.normalizeHost;
   const normalizeFaviconHost = NEWTAB_FAVICON_THEME.normalizeFaviconHost;
   const hasThemeTokenInUrl = NEWTAB_FAVICON_THEME.hasThemeTokenInUrl;
   const shouldSkipThemeUpgradeCandidate = NEWTAB_FAVICON_THEME.shouldSkipThemeUpgradeCandidate;
@@ -3656,9 +3656,11 @@
     }
     const pageCount = getBookmarkPageCount();
     bookmarkCurrentPage = Math.min(Math.max(0, bookmarkCurrentPage), pageCount - 1);
-    const pageLimit = getBookmarkLimit();
-    const start = bookmarkCurrentPage * pageLimit;
-    return bookmarkAllItems.slice(start, start + pageLimit);
+    return NEWTAB_BOOKMARKS_STORE.getBookmarkPageItems(
+      bookmarkAllItems,
+      bookmarkCurrentPage,
+      getBookmarkLimit()
+    );
   }
 
   function updateBookmarkPagerState() {
@@ -4339,94 +4341,48 @@
     loadBookmarks();
   }
 
-  function getRecentSiteUrlKey(item) {
-    if (!item || !item.url) {
-      return '';
-    }
-    return String(item.url).trim();
-  }
-
-  function normalizeHiddenRecentSiteEntry(item) {
-    if (!item) {
-      return null;
-    }
-    const url = typeof item === 'string'
-      ? String(item).trim()
-      : String(item.url || '').trim();
-    if (!url) {
-      return null;
-    }
-    const lastVisitTime = typeof item === 'string'
-      ? 0
-      : Math.max(0, Number(item.lastVisitTime) || 0);
+  function getRecentStoreOptions(extraOptions) {
     return {
-      url,
-      lastVisitTime,
-      hiddenAt: Math.max(0, Number(item.hiddenAt) || Date.now())
+      normalizeHost,
+      getHostFromUrl,
+      sanitizeDisplayText,
+      getSiteDisplayName,
+      shouldExcludeUrl: shouldExcludeFromRecentSites,
+      maxPinned: MAX_PINNED_RECENT_SITES,
+      maxHidden: MAX_HIDDEN_RECENT_SITES,
+      ...(extraOptions || {})
     };
   }
 
+  function getRecentSiteUrlKey(item) {
+    return NEWTAB_RECENT_STORE.getRecentSiteUrlKey(item);
+  }
+
+  function normalizeHiddenRecentSiteEntry(item) {
+    return NEWTAB_RECENT_STORE.normalizeHiddenRecentSiteEntry(item);
+  }
+
   function normalizeHiddenRecentSites(items) {
-    if (!Array.isArray(items)) {
-      return [];
-    }
-    const normalized = [];
-    for (let i = 0; i < items.length; i += 1) {
-      const entry = normalizeHiddenRecentSiteEntry(items[i]);
-      if (!entry) {
-        continue;
-      }
-      const duplicatedIndex = normalized.findIndex((existingItem) => existingItem.url === entry.url);
-      if (duplicatedIndex >= 0) {
-        normalized[duplicatedIndex] = entry.lastVisitTime >= normalized[duplicatedIndex].lastVisitTime
-          ? entry
-          : normalized[duplicatedIndex];
-        continue;
-      }
-      normalized.push(entry);
-      if (normalized.length >= MAX_HIDDEN_RECENT_SITES) {
-        break;
-      }
-    }
-    return normalized;
+    return NEWTAB_RECENT_STORE.normalizeHiddenRecentSites(items, getRecentStoreOptions());
   }
 
   function readHiddenRecentSites() {
-    return new Promise((resolve) => {
-      if (!localStorageArea) {
-        resolve([]);
-        return;
-      }
-      localStorageArea.get([HIDDEN_RECENT_SITES_STORAGE_KEY], (result) => {
-        resolve(normalizeHiddenRecentSites(result && result[HIDDEN_RECENT_SITES_STORAGE_KEY]));
-      });
-    });
+    return NEWTAB_RECENT_STORE.loadHiddenRecentSites(localStorageArea, getRecentStoreOptions({
+      key: HIDDEN_RECENT_SITES_STORAGE_KEY
+    }));
   }
 
   function writeHiddenRecentSites(items) {
-    const normalized = normalizeHiddenRecentSites(items);
-    hiddenRecentSites = normalized;
-    if (!localStorageArea) {
-      return Promise.resolve(normalized);
-    }
-    return new Promise((resolve) => {
-      localStorageArea.set({ [HIDDEN_RECENT_SITES_STORAGE_KEY]: normalized }, () => {
-        resolve(normalized);
-      });
+    return NEWTAB_RECENT_STORE.saveHiddenRecentSites(localStorageArea, items, getRecentStoreOptions({
+      key: HIDDEN_RECENT_SITES_STORAGE_KEY
+    })).then((normalized) => {
+      hiddenRecentSites = normalized;
+      return normalized;
     });
   }
 
   function isRecentSiteHidden(item) {
-    const key = getRecentSiteUrlKey(item);
-    if (!key) {
-      return false;
-    }
-    const entry = hiddenRecentSites.find((candidate) => candidate && candidate.url === key);
-    if (!entry) {
-      return false;
-    }
-    const lastVisitTime = Math.max(0, Number(item && item.lastVisitTime) || 0);
-    return lastVisitTime <= entry.lastVisitTime;
+    return NEWTAB_RECENT_STORE.isRecentSiteHidden(item, hiddenRecentSites);
   }
 
   function hideRecentSiteTemporarily(item) {
@@ -4472,92 +4428,33 @@
   }
 
   function getRecentSiteHostKey(item) {
-    if (!item) {
-      return '';
-    }
-    const rawHost = item.host || getHostFromUrl(item.url || '');
-    return normalizeHost(rawHost || '');
+    return NEWTAB_RECENT_STORE.getRecentSiteHostKey(item, getRecentStoreOptions());
   }
 
   function normalizeRecentSiteRecord(item, options) {
-    const opts = options && typeof options === 'object' ? options : {};
-    const ignoreBlacklist = opts.ignoreBlacklist === true;
-    if (!item || !item.url) {
-      return null;
-    }
-    const url = String(item.url).trim();
-    if (!url || (!ignoreBlacklist && shouldExcludeFromRecentSites(url))) {
-      return null;
-    }
-    const host = getRecentSiteHostKey(item);
-    const title = sanitizeDisplayText(item.title || item.siteName || host || url);
-    const siteName = sanitizeDisplayText(item.siteName || getSiteDisplayName(host, title) || host || title || url);
-    return {
-      title,
-      url,
-      host,
-      siteName,
-      lastVisitTime: Number(item.lastVisitTime) || 0,
-      visitCount: Number(item.visitCount) || 0,
-      pinnedAt: Number(item.pinnedAt) || 0
-    };
+    return NEWTAB_RECENT_STORE.normalizeRecentSiteItem(item, getRecentStoreOptions(options));
   }
 
   function isSameRecentSite(a, b) {
-    const aUrlKey = getRecentSiteUrlKey(a);
-    const bUrlKey = getRecentSiteUrlKey(b);
-    if (aUrlKey && bUrlKey && aUrlKey === bUrlKey) {
-      return true;
-    }
-    const aHostKey = getRecentSiteHostKey(a);
-    const bHostKey = getRecentSiteHostKey(b);
-    return Boolean(aHostKey && bHostKey && aHostKey === bHostKey);
+    return NEWTAB_RECENT_STORE.isSameRecentSite(a, b, getRecentStoreOptions());
   }
 
   function normalizePinnedRecentSites(items) {
-    if (!Array.isArray(items)) {
-      return [];
-    }
-    const normalized = [];
-    for (let i = 0; i < items.length; i += 1) {
-      const nextItem = normalizeRecentSiteRecord(items[i], { ignoreBlacklist: true });
-      if (!nextItem) {
-        continue;
-      }
-      const duplicated = normalized.some((existingItem) => isSameRecentSite(existingItem, nextItem));
-      if (duplicated) {
-        continue;
-      }
-      normalized.push(nextItem);
-      if (normalized.length >= MAX_PINNED_RECENT_SITES) {
-        break;
-      }
-    }
-    return normalized;
+    return NEWTAB_RECENT_STORE.normalizePinnedRecentSites(items, getRecentStoreOptions());
   }
 
   function readPinnedRecentSites() {
-    return new Promise((resolve) => {
-      if (!localStorageArea) {
-        resolve([]);
-        return;
-      }
-      localStorageArea.get([PINNED_RECENT_SITES_STORAGE_KEY], (result) => {
-        resolve(normalizePinnedRecentSites(result && result[PINNED_RECENT_SITES_STORAGE_KEY]));
-      });
-    });
+    return NEWTAB_RECENT_STORE.loadPinnedRecentSites(localStorageArea, getRecentStoreOptions({
+      key: PINNED_RECENT_SITES_STORAGE_KEY
+    }));
   }
 
   function writePinnedRecentSites(items) {
-    const normalized = normalizePinnedRecentSites(items);
-    pinnedRecentSites = normalized;
-    if (!localStorageArea) {
-      return Promise.resolve(normalized);
-    }
-    return new Promise((resolve) => {
-      localStorageArea.set({ [PINNED_RECENT_SITES_STORAGE_KEY]: normalized }, () => {
-        resolve(normalized);
-      });
+    return NEWTAB_RECENT_STORE.savePinnedRecentSites(localStorageArea, items, getRecentStoreOptions({
+      key: PINNED_RECENT_SITES_STORAGE_KEY
+    })).then((normalized) => {
+      pinnedRecentSites = normalized;
+      return normalized;
     });
   }
 
@@ -4566,26 +4463,13 @@
   }
 
   function mergeRecentSitesWithPinned(items, limit) {
-    const maxItems = Math.max(0, Number(limit) || 0);
-    if (maxItems <= 0) {
-      return [];
-    }
-    const merged = [];
-    const appendUnique = (item, isPinned) => {
-      const normalized = normalizeRecentSiteRecord(item, { ignoreBlacklist: Boolean(isPinned) });
-      if (!normalized || isRecentSiteHidden(normalized)) {
-        return;
-      }
-      const duplicated = merged.some((existingItem) => isSameRecentSite(existingItem, normalized));
-      if (duplicated) {
-        return;
-      }
-      normalized._xPinned = Boolean(isPinned);
-      merged.push(normalized);
-    };
-    pinnedRecentSites.forEach((item) => appendUnique(item, true));
-    (Array.isArray(items) ? items : []).forEach((item) => appendUnique(item, false));
-    return merged.slice(0, maxItems);
+    return NEWTAB_RECENT_STORE.mergeRecentSitesWithPinned(
+      items,
+      pinnedRecentSites,
+      hiddenRecentSites,
+      limit,
+      getRecentStoreOptions()
+    );
   }
 
   function togglePinnedRecentSite(item) {
@@ -5123,193 +5007,96 @@
   }
 
   function getRecentSites(limit, mode) {
-    return new Promise((resolve) => {
-      function appendOpenTabs(results, seenHosts) {
-        if (!Array.isArray(results)) {
-          resolve([]);
-          return;
-        }
-        if (results.length >= limit || !chrome.tabs || !chrome.tabs.query) {
-          resolve(results.slice(0, limit));
-          return;
-        }
-        chrome.tabs.query({}, (tabs) => {
-          if (chrome.runtime.lastError || !Array.isArray(tabs)) {
-            resolve(results.slice(0, limit));
-            return;
-          }
-          const candidates = tabs
-            .filter((tab) => tab && tab.incognito !== true)
-            .map((tab) => {
-              const tabUrl = tab && tab.url ? String(tab.url) : '';
-              if (!tabUrl || shouldExcludeFromRecentSites(tabUrl)) {
-                return null;
-              }
-              try {
-                const host = normalizeHost(new URL(tabUrl).hostname);
-                if (!host || seenHosts.has(host)) {
-                  return null;
-                }
-                return {
-                  title: tab.title || host,
-                  url: tabUrl,
-                  host: host,
-                  lastVisitTime: Number(tab.lastAccessed) || 0
-                };
-              } catch (e) {
-                return null;
-              }
-            })
-            .filter(Boolean)
-            .sort((a, b) => (Number(b.lastVisitTime) || 0) - (Number(a.lastVisitTime) || 0));
-          for (let i = 0; i < candidates.length; i += 1) {
-            const item = candidates[i];
-            if (!item || !item.host || seenHosts.has(item.host)) {
-              continue;
-            }
-            seenHosts.add(item.host);
-            results.push(item);
-            if (results.length >= limit) {
-              break;
-            }
-          }
-          resolve(results.slice(0, limit));
-        });
-      }
+    const safeLimit = Math.max(0, Number(limit) || 0);
+    const viewMode = mode === 'most' ? 'most' : 'latest';
+    if (safeLimit <= 0) {
+      return Promise.resolve([]);
+    }
 
-      function loadLatestRecentSites() {
-        if (!chrome.history || !chrome.history.search) {
-          resolve([]);
-          return;
-        }
-        chrome.history.search({
-          text: '',
-          maxResults: 60,
-          startTime: Date.now() - 1000 * 60 * 60 * 24 * 30
-        }, (items) => {
-          if (chrome.runtime.lastError || !Array.isArray(items)) {
-            resolve([]);
-            return;
-          }
-          const results = [];
-          const seenHosts = new Set();
-          for (let i = 0; i < items.length; i += 1) {
-            const item = items[i];
-            const url = item && item.url ? String(item.url) : '';
-            if (!url || shouldExcludeFromRecentSites(url)) {
-              continue;
-            }
-            let host = '';
-            try {
-              host = normalizeHost(new URL(url).hostname);
-            } catch (e) {
-              continue;
-            }
-            if (!host || seenHosts.has(host)) {
-              continue;
-            }
-            seenHosts.add(host);
-            results.push({
-              title: item.title || host,
-              url: url,
-              host: host,
-              lastVisitTime: item.lastVisitTime || 0
-            });
-            if (results.length >= limit) {
-              break;
-            }
-          }
-          if (results.length >= limit || !chrome.topSites || !chrome.topSites.get) {
-            appendOpenTabs(results, seenHosts);
-            return;
-          }
-          chrome.topSites.get((topSites) => {
-            if (!Array.isArray(topSites)) {
-              appendOpenTabs(results, seenHosts);
-              return;
-            }
-            for (let i = 0; i < topSites.length; i += 1) {
-              const item = topSites[i];
-              const url = item && item.url ? String(item.url) : '';
-              if (!url || shouldExcludeFromRecentSites(url)) {
-                continue;
-              }
-              let host = '';
-              try {
-                host = normalizeHost(new URL(url).hostname);
-              } catch (e) {
-                continue;
-              }
-              if (!host || seenHosts.has(host)) {
-                continue;
-              }
-              seenHosts.add(host);
-              results.push({
-                title: item.title || host,
-                url: url,
-                host: host,
-                lastVisitTime: 0
-              });
-              if (results.length >= limit) {
-                break;
-              }
-            }
-            appendOpenTabs(results, seenHosts);
-          });
-        });
-      }
+    const mergeSources = (sources, mergeMode) => NEWTAB_RECENT_STORE.mergeRecentSiteSources({
+      ...getRecentStoreOptions(),
+      ...(sources || {}),
+      mode: mergeMode || viewMode,
+      limit: safeLimit,
+      candidateLimit: safeLimit,
+      pinned: [],
+      hidden: []
+    });
 
-      const viewMode = mode === 'most' ? 'most' : 'latest';
-      if (viewMode === 'most') {
-        if (!chrome.topSites || !chrome.topSites.get) {
-          loadLatestRecentSites();
-          return;
-        }
-        chrome.topSites.get((topSites) => {
-          if (!Array.isArray(topSites)) {
-            loadLatestRecentSites();
-            return;
-          }
-          const results = [];
-          const seenHosts = new Set();
-          for (let i = 0; i < topSites.length; i += 1) {
-            const item = topSites[i];
-            const url = item && item.url ? String(item.url) : '';
-            if (!url || shouldExcludeFromRecentSites(url)) {
-              continue;
-            }
-            let host = '';
-            try {
-              host = normalizeHost(new URL(url).hostname);
-            } catch (e) {
-              continue;
-            }
-            if (!host || seenHosts.has(host)) {
-              continue;
-            }
-            seenHosts.add(host);
-            results.push({
-              title: item.title || host,
-              url: url,
-              host: host,
-              lastVisitTime: 0,
-              visitCount: 0
-            });
-            if (results.length >= limit) {
-              break;
-            }
-          }
-          if (results.length === 0) {
-            loadLatestRecentSites();
-            return;
-          }
-          appendOpenTabs(results, seenHosts);
-        });
+    const readOpenTabs = () => new Promise((resolve) => {
+      if (!chrome.tabs || !chrome.tabs.query) {
+        resolve([]);
         return;
       }
-
-      loadLatestRecentSites();
+      chrome.tabs.query({}, (tabs) => {
+        resolve(chrome.runtime.lastError || !Array.isArray(tabs) ? [] : tabs);
+      });
     });
+
+    const readTopSites = () => new Promise((resolve) => {
+      if (!chrome.topSites || !chrome.topSites.get) {
+        resolve(null);
+        return;
+      }
+      chrome.topSites.get((items) => {
+        resolve(chrome.runtime.lastError || !Array.isArray(items) ? null : items);
+      });
+    });
+
+    const readHistoryItems = () => new Promise((resolve) => {
+      if (!chrome.history || !chrome.history.search) {
+        resolve(null);
+        return;
+      }
+      chrome.history.search({
+        text: '',
+        maxResults: 60,
+        startTime: Date.now() - 1000 * 60 * 60 * 24 * 30
+      }, (items) => {
+        resolve(chrome.runtime.lastError || !Array.isArray(items) ? null : items);
+      });
+    });
+
+    const mergeWithTabsIfNeeded = (sources, mergeMode) => {
+      const withoutTabs = mergeSources(sources, mergeMode);
+      if (withoutTabs.length >= safeLimit) {
+        return Promise.resolve(withoutTabs);
+      }
+      return readOpenTabs().then((tabs) => mergeSources({
+        ...(sources || {}),
+        tabs
+      }, mergeMode));
+    };
+
+    const loadLatestRecentSites = () => readHistoryItems().then((historyItems) => {
+      if (!Array.isArray(historyItems)) {
+        return [];
+      }
+      const historyOnly = mergeSources({ historyItems }, 'latest');
+      if (historyOnly.length >= safeLimit) {
+        return historyOnly;
+      }
+      return readTopSites().then((topSites) => mergeWithTabsIfNeeded({
+        historyItems,
+        topSites: Array.isArray(topSites) ? topSites : []
+      }, 'latest'));
+    });
+
+    if (viewMode === 'most') {
+      return readTopSites().then((topSites) => {
+        const topSiteItems = Array.isArray(topSites) ? topSites : [];
+        const topOnly = mergeSources({ topSites: topSiteItems }, 'most');
+        if (topOnly.length === 0) {
+          return loadLatestRecentSites();
+        }
+        if (topOnly.length >= safeLimit) {
+          return topOnly;
+        }
+        return mergeWithTabsIfNeeded({ topSites: topSiteItems }, 'most');
+      });
+    }
+
+    return loadLatestRecentSites();
   }
 
   // Kick off favicon cache warmup early; theme tint work flushes when storage is ready.
@@ -5317,179 +5104,16 @@
     scheduleThemeResolutionFlush(0);
   });
 
-  function findBookmarksBarNode(treeNodes) {
-    if (!Array.isArray(treeNodes)) {
-      return null;
-    }
-    for (let i = 0; i < treeNodes.length; i += 1) {
-      const root = treeNodes[i];
-      const rootChildren = Array.isArray(root && root.children) ? root.children : [];
-      const directMatch = rootChildren.find((child) => String(child && child.id || '') === '1');
-      if (directMatch) {
-        return directMatch;
-      }
-      for (let j = 0; j < rootChildren.length; j += 1) {
-        const child = rootChildren[j];
-        const title = String(child && child.title || '').toLowerCase();
-        if (title === 'bookmarks bar' || title === '书签栏' || title === '書籤列') {
-          return child;
-        }
-      }
-    }
-    return null;
-  }
-
-  function findFirstUrlInFolder(node) {
-    if (!node) {
-      return '';
-    }
-    const directUrl = node && node.url ? String(node.url) : '';
-    if (directUrl) {
-      return directUrl;
-    }
-    const children = Array.isArray(node.children) ? node.children : [];
-    for (let i = 0; i < children.length; i += 1) {
-      const nested = findFirstUrlInFolder(children[i]);
-      if (nested) {
-        return nested;
-      }
-    }
-    return '';
-  }
-
-  function collectFolderUrls(node, limit, collected, seen) {
-    if (!node || collected.length >= limit) {
-      return;
-    }
-    const nodeUrl = node && node.url ? String(node.url) : '';
-    if (nodeUrl && !seen.has(nodeUrl)) {
-      seen.add(nodeUrl);
-      collected.push(nodeUrl);
-      if (collected.length >= limit) {
-        return;
-      }
-    }
-    const children = Array.isArray(node.children) ? node.children : [];
-    for (let i = 0; i < children.length; i += 1) {
-      collectFolderUrls(children[i], limit, collected, seen);
-      if (collected.length >= limit) {
-        break;
-      }
-    }
-  }
-
-  function buildBookmarkNodeMap(nodes) {
-    bookmarkNodeMap.clear();
-    const walk = (node, parentId) => {
-      if (!node) {
-        return;
-      }
-      const nodeId = String(node.id || '');
-      if (nodeId) {
-        node.parentId = node.parentId || parentId || '';
-        bookmarkNodeMap.set(nodeId, node);
-      }
-      const children = Array.isArray(node.children) ? node.children : [];
-      for (let i = 0; i < children.length; i += 1) {
-        walk(children[i], nodeId);
-      }
-    };
-    const rootNodes = Array.isArray(nodes) ? nodes : [];
-    for (let i = 0; i < rootNodes.length; i += 1) {
-      walk(rootNodes[i], '');
-    }
-  }
-
-  function buildBookmarkItemsFromChildren(children) {
-    const items = Array.isArray(children) ? children : [];
-    const results = [];
-    const seenUrls = new Set();
-    for (let index = 0; index < items.length; index += 1) {
-      const item = items[index];
-      if (!item) {
-        continue;
-      }
-      const title = String(item.title || '').trim();
-      const url = item.url ? String(item.url) : '';
-      const itemChildren = Array.isArray(item.children) ? item.children : [];
-      if (url) {
-        if (seenUrls.has(url)) {
-          continue;
-        }
-        let host = '';
-        try {
-          host = normalizeHost(new URL(url).hostname);
-        } catch (error) {
-          host = '';
-        }
-        seenUrls.add(url);
-        results.push({
-          id: String(item.id || ''),
-          type: 'bookmark',
-          title: title,
-          url: url,
-          host: host,
-          themeUrl: url
-        });
-        continue;
-      }
-      const themeUrl = findFirstUrlInFolder(item);
-      const previewUrls = [];
-      collectFolderUrls(item, 4, previewUrls, new Set());
-      let host = '';
-      if (themeUrl) {
-        try {
-          host = normalizeHost(new URL(themeUrl).hostname);
-        } catch (error) {
-          host = '';
-        }
-      }
-      results.push({
-        id: String(item.id || ''),
-        type: 'folder',
-        title: title,
-        url: '',
-        host: host,
-        childCount: itemChildren.length,
-        themeUrl: themeUrl,
-        previewUrls: previewUrls
-      });
-    }
-    return results;
-  }
-
-  function cacheBookmarkFolderItems(node) {
-    if (!node) {
-      return;
-    }
-    const nodeId = String(node.id || '');
-    const children = Array.isArray(node.children) ? node.children : [];
-    if (nodeId) {
-      bookmarkFolderItemsCache.set(nodeId, buildBookmarkItemsFromChildren(children));
-    }
-    for (let i = 0; i < children.length; i += 1) {
-      const child = children[i];
-      if (!child) {
-        continue;
-      }
-      const childChildren = Array.isArray(child.children) ? child.children : [];
-      if (childChildren.length > 0) {
-        cacheBookmarkFolderItems(child);
-      }
-    }
-  }
-
   function rebuildBookmarkTreeCache(nodes) {
-    buildBookmarkNodeMap(nodes);
-    const barNode = findBookmarksBarNode(nodes);
+    const cache = NEWTAB_BOOKMARKS_STORE.buildBookmarkFolderCache(nodes, { normalizeHost });
+    bookmarkNodeMap = cache.nodeMap || new Map();
+    bookmarkFolderItemsCache = cache.folderItemsCache || new Map();
+    const barNode = cache.rootNode || null;
     if (!barNode) {
-      bookmarkFolderItemsCache.clear();
       bookmarkTreeCacheReady = false;
       return false;
     }
-    bookmarkRootFolderId = String(barNode.id || '1');
-    bookmarkFolderItemsCache.clear();
-    cacheBookmarkFolderItems(barNode);
+    bookmarkRootFolderId = String(cache.rootFolderId || barNode.id || '1');
     bookmarkTreeCacheReady = true;
     bookmarkTreeCacheDirty = false;
     return true;
@@ -5526,31 +5150,11 @@
   }
 
   function buildBookmarkFolderPath(folderId) {
-    const rootLabel = t('bookmarks_heading', '书签');
-    const rootId = String(bookmarkRootFolderId || '1');
-    const targetId = String(folderId || rootId);
-    const path = [{ id: rootId, title: rootLabel }];
-    if (targetId === rootId) {
-      return path;
-    }
-    const chain = [];
-    let cursor = bookmarkNodeMap.get(targetId);
-    let guard = 0;
-    while (cursor && guard < 64) {
-      const cursorId = String(cursor.id || '');
-      if (!cursorId || cursorId === rootId) {
-        break;
-      }
-      chain.push({
-        id: cursorId,
-        title: String(cursor.title || '').trim() || rootLabel
-      });
-      const parentId = String(cursor.parentId || '');
-      cursor = parentId ? bookmarkNodeMap.get(parentId) : null;
-      guard += 1;
-    }
-    chain.reverse().forEach((item) => path.push(item));
-    return path;
+    return NEWTAB_BOOKMARKS_STORE.buildBookmarkFolderPath(folderId, {
+      nodeMap: bookmarkNodeMap,
+      rootId: bookmarkRootFolderId,
+      rootTitle: t('bookmarks_heading', '书签')
+    });
   }
 
   function getTopBookmarks(limit, folderId) {
