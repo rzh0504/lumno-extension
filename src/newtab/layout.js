@@ -91,6 +91,22 @@
       return Math.max(0, rect.height + marginTop + marginBottom);
     }
 
+    function isSectionVisible(section) {
+      if (!section) {
+        return false;
+      }
+      const visibleAttr = typeof section.getAttribute === 'function'
+        ? section.getAttribute('data-visible')
+        : '';
+      if (visibleAttr === 'true') {
+        return true;
+      }
+      if (visibleAttr === 'false') {
+        return false;
+      }
+      return section.style.getPropertyValue('display') !== 'none';
+    }
+
     function getCssPixelValue(style, property) {
       if (!style || !property) {
         return 0;
@@ -175,14 +191,8 @@
       const searchBlockHeight = wordmarkOuterHeight + getSearchEntryBlockHeight();
       const bookmarkSection = getBookmarkSection();
       const recentSection = getRecentSection();
-      const bookmarkVisible = Boolean(
-        bookmarkSection &&
-        bookmarkSection.style.getPropertyValue('display') !== 'none'
-      );
-      const recentVisible = Boolean(
-        recentSection &&
-        recentSection.style.getPropertyValue('display') !== 'none'
-      );
+      const bookmarkVisible = isSectionVisible(bookmarkSection);
+      const recentVisible = isSectionVisible(recentSection);
       const extraUpshift = (!bookmarkVisible && !recentVisible)
         ? emptySectionsExtraUpshiftPx
         : contentSectionsExtraUpshiftPx;
@@ -209,8 +219,8 @@
         return;
       }
       const bottomDockMaxHeight = Math.max(0, windowObj.innerHeight - 240);
-      const bookmarkVisible = bookmarkSection.style.getPropertyValue('display') !== 'none';
-      const recentVisible = recentSection.style.getPropertyValue('display') !== 'none';
+      const bookmarkVisible = isSectionVisible(bookmarkSection);
+      const recentVisible = isSectionVisible(recentSection);
       if (!recentVisible && callbacks && typeof callbacks.onRecentHidden === 'function') {
         callbacks.onRecentHidden();
       }

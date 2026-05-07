@@ -3365,12 +3365,20 @@
     }, 120);
   }
 
+  function setContentSectionVisible(section, visible) {
+    if (!section) {
+      return;
+    }
+    section.setAttribute('data-visible', visible ? 'true' : 'false');
+  }
+
+  function isContentSectionVisible(section) {
+    return Boolean(section && section.getAttribute('data-visible') === 'true');
+  }
+
   const bookmarkSection = document.createElement('section');
   bookmarkSection.id = '_x_extension_newtab_bookmarks_2024_unique_';
-  bookmarkSection.style.setProperty('display', 'none', 'important');
-  bookmarkSection.style.setProperty('margin', '0', 'important');
-  bookmarkSection.style.setProperty('width', '100%', 'important');
-  bookmarkSection.style.setProperty('pointer-events', 'auto', 'important');
+  setContentSectionVisible(bookmarkSection, false);
   const bookmarkHeader = document.createElement('div');
   bookmarkHeader.className = 'x-nt-bookmarks-header';
   bookmarkTitleWrap = document.createElement('div');
@@ -3432,10 +3440,7 @@
 
   const recentSection = document.createElement('section');
   recentSection.id = '_x_extension_newtab_recent_sites_2024_unique_';
-  recentSection.style.setProperty('display', 'none', 'important');
-  recentSection.style.setProperty('margin', '0', 'important');
-  recentSection.style.setProperty('width', '100%', 'important');
-  recentSection.style.setProperty('pointer-events', 'auto', 'important');
+  setContentSectionVisible(recentSection, false);
   recentSection.addEventListener('pointerenter', (event) => {
     if (!event || event.pointerType !== 'mouse') {
       return;
@@ -3520,7 +3525,7 @@
     if (!event) {
       return;
     }
-    if (bookmarkSection.style.getPropertyValue('display') === 'none') {
+    if (!isContentSectionVisible(bookmarkSection)) {
       return;
     }
     const pageCount = getBookmarkPageCount();
@@ -3812,14 +3817,14 @@
     if (nextSignature === bookmarkRenderSignature) {
       if (normalizedItems.length === 0) {
         if (isAtRoot) {
-          bookmarkSection.style.setProperty('display', 'none', 'important');
+          setContentSectionVisible(bookmarkSection, false);
         } else {
-          bookmarkSection.style.setProperty('display', 'flex', 'important');
+          setContentSectionVisible(bookmarkSection, true);
           bookmarkGrid.innerHTML = '';
           appendEmptyFolderState();
         }
       } else {
-        bookmarkSection.style.setProperty('display', 'flex', 'important');
+        setContentSectionVisible(bookmarkSection, true);
         updateBookmarkGridHeightLock();
         updateBookmarkSectionPosition();
       }
@@ -3831,9 +3836,9 @@
     bookmarkCards.length = 0;
     if (normalizedItems.length === 0) {
       if (isAtRoot) {
-        bookmarkSection.style.setProperty('display', 'none', 'important');
+        setContentSectionVisible(bookmarkSection, false);
       } else {
-        bookmarkSection.style.setProperty('display', 'flex', 'important');
+        setContentSectionVisible(bookmarkSection, true);
         appendEmptyFolderState();
       }
       updateBookmarkGridHeightLock();
@@ -3856,7 +3861,7 @@
         bookmarkGrid.appendChild(card);
       }
     });
-    bookmarkSection.style.setProperty('display', 'flex', 'important');
+    setContentSectionVisible(bookmarkSection, true);
     updateBookmarkPagerState();
     updateBookmarkGridHeightLock();
     updateBookmarkSectionPosition();
@@ -3911,9 +3916,9 @@
     const nextSignature = getRecentSitesSignature(mergedItems);
     if (nextSignature === recentRenderSignature) {
       if (mergedItems.length === 0) {
-        recentSection.style.setProperty('display', 'none', 'important');
+        setContentSectionVisible(recentSection, false);
       } else {
-        recentSection.style.setProperty('display', 'flex', 'important');
+        setContentSectionVisible(recentSection, true);
       }
       updateBookmarkSectionPosition();
       return;
@@ -3922,7 +3927,7 @@
     recentGrid.innerHTML = '';
     recentCards.length = 0;
     if (mergedItems.length === 0) {
-      recentSection.style.setProperty('display', 'none', 'important');
+      setContentSectionVisible(recentSection, false);
       updateBookmarkSectionPosition();
       return;
     }
@@ -3932,7 +3937,7 @@
         recentGrid.appendChild(card);
       }
     });
-    recentSection.style.setProperty('display', 'flex', 'important');
+    setContentSectionVisible(recentSection, true);
     updateBookmarkSectionPosition();
   }
 
@@ -4056,7 +4061,7 @@
       bookmarkRenderSignature = '';
       bookmarkGrid.innerHTML = '';
       bookmarkCards.length = 0;
-      bookmarkSection.style.setProperty('display', 'none', 'important');
+      setContentSectionVisible(bookmarkSection, false);
       bookmarkDataDirty = false;
       bookmarkLoadedOnce = true;
       updateBookmarkSectionPosition();
@@ -4074,7 +4079,7 @@
         bookmarkRenderSignature = '';
         bookmarkGrid.innerHTML = '';
         bookmarkCards.length = 0;
-        bookmarkSection.style.setProperty('display', 'none', 'important');
+        setContentSectionVisible(bookmarkSection, false);
         bookmarkDataDirty = false;
         bookmarkLoadedOnce = true;
         updateBookmarkSectionPosition();
@@ -4131,7 +4136,7 @@
       recentSourceItems = [];
       recentCards.length = 0;
       recentGrid.innerHTML = '';
-      recentSection.style.setProperty('display', 'none', 'important');
+      setContentSectionVisible(recentSection, false);
       recentDataDirty = false;
       recentLoadedOnce = true;
       updateBookmarkSectionPosition();
