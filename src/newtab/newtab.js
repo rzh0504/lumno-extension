@@ -6409,6 +6409,8 @@
 
   function applySearchActionStyles(item, theme, isActive) {
     const resolvedTheme = getThemeForMode(theme);
+    item.setAttribute('data-active', isActive ? 'true' : 'false');
+    item.setAttribute('data-has-action-tags', item._xHasActionTags ? 'true' : 'false');
     applyMarkVariables(item, isActive ? resolvedTheme : defaultTheme);
     if (item._xHistoryTag) {
       if (isActive) {
@@ -6444,50 +6446,28 @@
       }
     }
     if (item._xTagContainer) {
-      if (item._xHasActionTags) {
-        item._xTagContainer.style.setProperty('display', 'inline-flex', 'important');
-        item._xTagContainer.style.setProperty('visibility', isActive ? 'visible' : 'hidden', 'important');
-      } else {
-        item._xTagContainer.style.setProperty('display', 'none', 'important');
-        item._xTagContainer.style.setProperty('visibility', 'hidden', 'important');
-      }
+      item._xTagContainer.setAttribute('data-active', isActive ? 'true' : 'false');
     }
     if (item._xHistoryDeleteButton) {
       const shouldShowHistoryDelete = Boolean(item._xHasHistoryDeleteButton && item._xIsHovering);
-      if (item._xHistoryDeleteSlot) {
-        item._xHistoryDeleteSlot.style.setProperty('width', shouldShowHistoryDelete ? '28px' : '0px', 'important');
-        item._xHistoryDeleteSlot.style.setProperty('margin-left', shouldShowHistoryDelete ? '6px' : '0px', 'important');
-        item._xHistoryDeleteSlot.style.setProperty('opacity', shouldShowHistoryDelete ? '1' : '0', 'important');
-        item._xHistoryDeleteSlot.style.setProperty('pointer-events', shouldShowHistoryDelete ? 'auto' : 'none', 'important');
-      }
-      item._xHistoryDeleteButton.style.setProperty('visibility', shouldShowHistoryDelete ? 'visible' : 'hidden', 'important');
-      item._xHistoryDeleteButton.style.setProperty('pointer-events', shouldShowHistoryDelete ? 'auto' : 'none', 'important');
-      item._xHistoryDeleteButton.style.setProperty('opacity', shouldShowHistoryDelete ? '1' : '0', 'important');
-      item._xHistoryDeleteButton.style.setProperty(
-        'transform',
-        shouldShowHistoryDelete ? 'translateX(0)' : 'translateX(4px)',
-        'important'
-      );
+      item.setAttribute('data-history-delete-visible', shouldShowHistoryDelete ? 'true' : 'false');
       if (shouldShowHistoryDelete) {
         item._xHistoryDeleteButton.style.setProperty(
-          'color',
-          isActive ? resolvedTheme.buttonText : 'var(--x-nt-subtext, #6B7280)',
-          'important'
+          '--x-nt-history-delete-color',
+          isActive ? resolvedTheme.buttonText : 'var(--x-nt-subtext, #6B7280)'
         );
         item._xHistoryDeleteButton.style.setProperty(
-          'background',
-          isActive ? resolvedTheme.buttonBg : 'transparent',
-          'important'
+          '--x-nt-history-delete-bg',
+          isActive ? resolvedTheme.buttonBg : 'transparent'
         );
         item._xHistoryDeleteButton.style.setProperty(
-          'border',
-          isActive ? `1px solid ${resolvedTheme.buttonBorder}` : '1px solid transparent',
-          'important'
+          '--x-nt-history-delete-border',
+          isActive ? resolvedTheme.buttonBorder : 'transparent'
         );
       } else {
-        item._xHistoryDeleteButton.style.setProperty('background', 'transparent', 'important');
-        item._xHistoryDeleteButton.style.setProperty('border', '1px solid transparent', 'important');
-        item._xHistoryDeleteButton.style.setProperty('color', 'var(--x-nt-subtext, #6B7280)', 'important');
+        item._xHistoryDeleteButton.style.setProperty('--x-nt-history-delete-bg', 'transparent');
+        item._xHistoryDeleteButton.style.setProperty('--x-nt-history-delete-border', 'transparent');
+        item._xHistoryDeleteButton.style.setProperty('--x-nt-history-delete-color', 'var(--x-nt-subtext, #6B7280)');
       }
     }
     if (item._xTitle) {
@@ -7109,6 +7089,7 @@
         }
         const suggestionItem = document.createElement('div');
         suggestionItem.id = `_x_extension_newtab_suggestion_item_${index}_2024_unique_`;
+        suggestionItem.className = 'x-nt-suggestion-item';
         const isLastItem = index === allSuggestions.length - 1;
         const isPrimaryHighlight = index === primaryHighlightIndex;
         const isPrimarySearchSuggest = isPrimaryHighlight && suggestion.type === 'googleSuggest';
@@ -7659,25 +7640,7 @@
         `;
 
         const actionTags = document.createElement('div');
-        actionTags.style.cssText = `
-          all: unset !important;
-          display: none !important;
-          align-items: center !important;
-          gap: 6px !important;
-          box-sizing: border-box !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          line-height: 1 !important;
-          text-decoration: none !important;
-          list-style: none !important;
-          outline: none !important;
-          background: transparent !important;
-          color: inherit !important;
-          font-size: 100% !important;
-          font: inherit !important;
-          vertical-align: baseline !important;
-          flex-shrink: 0 !important;
-        `;
+        actionTags.className = 'x-nt-suggestion-action-tags';
 
         const isDirectHighlight = isPrimaryHighlight &&
           (suggestion.type === 'directUrl' || suggestion.type === 'browserPage');
@@ -7756,69 +7719,13 @@
         let historyDeleteSlot = null;
         if (suggestion.type === 'history' && !suggestion.isTopSite) {
           historyDeleteSlot = document.createElement('div');
-          historyDeleteSlot.style.cssText = `
-            all: unset !important;
-            width: 0 !important;
-            height: 28px !important;
-            flex: 0 0 auto !important;
-            display: inline-flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            box-sizing: border-box !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            overflow: visible !important;
-            line-height: 1 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            background: transparent !important;
-            vertical-align: baseline !important;
-            opacity: 0 !important;
-            transition: width 180ms ease, margin-left 180ms ease, opacity 160ms ease !important;
-          `;
+          historyDeleteSlot.className = 'x-nt-history-delete-slot';
           historyDeleteButton = document.createElement('button');
           historyDeleteButton.type = 'button';
+          historyDeleteButton.className = 'x-nt-history-delete-button';
           const removeHistoryTooltipText = t('search_remove_history_tooltip', '移除该历史');
           historyDeleteButton.innerHTML = getRiSvg('ri-delete-bin-6-line', 'ri-size-14');
           historyDeleteButton.setAttribute('aria-label', removeHistoryTooltipText);
-          historyDeleteButton.style.cssText = `
-            all: unset !important;
-            width: 24px !important;
-            height: 24px !important;
-            flex: 0 0 24px !important;
-            border-radius: 8px !important;
-            box-sizing: border-box !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            line-height: 1 !important;
-            text-decoration: none !important;
-            list-style: none !important;
-            outline: none !important;
-            background: transparent !important;
-            color: var(--x-nt-subtext, #6B7280) !important;
-            display: inline-flex !important;
-            visibility: hidden !important;
-            pointer-events: none !important;
-            opacity: 0 !important;
-            align-items: center !important;
-            justify-content: center !important;
-            font-size: 0 !important;
-            cursor: pointer !important;
-            transform: translateX(4px) !important;
-            transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 160ms ease, opacity 160ms ease, visibility 160ms ease !important;
-            vertical-align: baseline !important;
-          `;
-          const historyDeleteIcon = historyDeleteButton.querySelector('.ri-icon');
-          if (historyDeleteIcon) {
-            historyDeleteIcon.style.setProperty('display', 'inline-flex', 'important');
-            historyDeleteIcon.style.setProperty('align-items', 'center', 'important');
-            historyDeleteIcon.style.setProperty('justify-content', 'center', 'important');
-            historyDeleteIcon.style.setProperty('line-height', '1', 'important');
-            historyDeleteIcon.style.setProperty('transform', 'none', 'important');
-            historyDeleteIcon.style.setProperty('pointer-events', 'none', 'important');
-            historyDeleteIcon.style.setProperty('cursor', 'pointer', 'important');
-          }
           historyDeleteButton.addEventListener('mouseenter', function() {
             const itemIndex = suggestionItems.indexOf(suggestionItem);
             const isSelected = itemIndex === selectedIndex;
@@ -7830,43 +7737,39 @@
               ? getHoverColors(buttonThemeSource)
               : getNeutralHoverActionColors();
             showTopActionTooltip(historyDeleteButton, removeHistoryTooltipText);
+            historyDeleteButton.style.removeProperty('transform');
             historyDeleteButton.style.setProperty(
-              'background',
-              hoverColors.bg,
-              'important'
+              '--x-nt-history-delete-hover-bg',
+              hoverColors.bg
             );
             historyDeleteButton.style.setProperty(
-              'border',
-              `1px solid ${hoverColors.border}`,
-              'important'
+              '--x-nt-history-delete-hover-border',
+              hoverColors.border
             );
             historyDeleteButton.style.setProperty(
-              'color',
-              shouldUseThemeHover ? resolvedTheme.buttonText : hoverColors.text,
-              'important'
+              '--x-nt-history-delete-hover-color',
+              shouldUseThemeHover ? resolvedTheme.buttonText : hoverColors.text
             );
-            historyDeleteButton.style.setProperty('transform', 'scale(1.06)', 'important');
+            historyDeleteButton.setAttribute('data-hover', 'true');
           });
           historyDeleteButton.addEventListener('mouseleave', function() {
             hideTopActionTooltip();
-            historyDeleteButton.style.setProperty('background', 'transparent', 'important');
-            historyDeleteButton.style.setProperty('border', '1px solid transparent', 'important');
-            historyDeleteButton.style.setProperty('transform', 'none', 'important');
+            historyDeleteButton.removeAttribute('data-hover');
+            historyDeleteButton.style.removeProperty('transform');
           });
           historyDeleteButton.addEventListener('focus', function() {
             showTopActionTooltip(historyDeleteButton, removeHistoryTooltipText);
           });
           historyDeleteButton.addEventListener('blur', function() {
             hideTopActionTooltip();
-            historyDeleteButton.style.setProperty('background', 'transparent', 'important');
-            historyDeleteButton.style.setProperty('border', '1px solid transparent', 'important');
-            historyDeleteButton.style.setProperty('transform', 'none', 'important');
+            historyDeleteButton.removeAttribute('data-hover');
+            historyDeleteButton.style.removeProperty('transform');
           });
           historyDeleteButton.addEventListener('pointerup', function() {
-            historyDeleteButton.style.setProperty('transform', 'none', 'important');
+            historyDeleteButton.style.setProperty('transform', 'none');
           });
           historyDeleteButton.addEventListener('pointercancel', function() {
-            historyDeleteButton.style.setProperty('transform', 'none', 'important');
+            historyDeleteButton.style.setProperty('transform', 'none');
           });
           historyDeleteButton.addEventListener('click', function(event) {
             event.preventDefault();

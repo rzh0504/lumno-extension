@@ -1120,6 +1120,108 @@
         font: inherit;
         vertical-align: baseline;
       }
+      .x-nt-suggestion-action-tags {
+        all: unset;
+        display: none;
+        align-items: center;
+        gap: 6px;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        line-height: 1;
+        text-decoration: none;
+        list-style: none;
+        outline: none;
+        background: transparent;
+        color: inherit;
+        font-size: 100%;
+        font: inherit;
+        vertical-align: baseline;
+        flex-shrink: 0;
+        visibility: hidden;
+      }
+      .x-nt-suggestion-item[data-has-action-tags="true"] .x-nt-suggestion-action-tags {
+        display: inline-flex;
+      }
+      .x-nt-suggestion-item[data-active="true"][data-has-action-tags="true"] .x-nt-suggestion-action-tags {
+        visibility: visible;
+      }
+      .x-nt-history-delete-slot {
+        all: unset;
+        width: 0;
+        height: 28px;
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        overflow: visible;
+        line-height: 1;
+        text-decoration: none;
+        list-style: none;
+        outline: none;
+        background: transparent;
+        vertical-align: baseline;
+        opacity: 0;
+        pointer-events: none;
+        transition: width 180ms ease, margin-left 180ms ease, opacity 160ms ease;
+      }
+      .x-nt-suggestion-item[data-history-delete-visible="true"] .x-nt-history-delete-slot {
+        width: 28px;
+        margin-left: 6px;
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .x-nt-history-delete-button {
+        all: unset;
+        width: 24px;
+        height: 24px;
+        flex: 0 0 24px;
+        border-radius: 8px;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        line-height: 1;
+        text-decoration: none;
+        list-style: none;
+        outline: none;
+        background: transparent;
+        color: var(--x-nt-subtext, #6B7280);
+        display: inline-flex;
+        visibility: hidden;
+        pointer-events: none;
+        opacity: 0;
+        align-items: center;
+        justify-content: center;
+        font-size: 0;
+        cursor: pointer;
+        transform: translateX(4px);
+        transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 160ms ease, opacity 160ms ease, visibility 160ms ease;
+        vertical-align: baseline;
+        border: 1px solid transparent;
+      }
+      .x-nt-suggestion-item[data-history-delete-visible="true"] .x-nt-history-delete-button {
+        visibility: visible;
+        pointer-events: auto;
+        opacity: 1;
+        transform: translateX(0);
+        color: var(--x-nt-history-delete-color, var(--x-nt-subtext, #6B7280));
+        background: var(--x-nt-history-delete-bg, transparent);
+        border-color: var(--x-nt-history-delete-border, transparent);
+      }
+      .x-nt-history-delete-button[data-hover="true"] {
+        color: var(--x-nt-history-delete-hover-color, var(--x-nt-subtext, #6B7280));
+        background: var(--x-nt-history-delete-hover-bg, transparent);
+        border-color: var(--x-nt-history-delete-hover-border, transparent);
+        transform: scale(1.06);
+      }
+      .x-nt-history-delete-button .ri-icon {
+        pointer-events: none;
+        cursor: pointer;
+        transform: none;
+      }
       .x-nt-recent-card:hover .x-nt-recent-action {
         max-width: 64px;
         padding-left: 6px;
