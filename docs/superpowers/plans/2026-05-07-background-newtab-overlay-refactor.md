@@ -267,7 +267,7 @@ Required class vocabulary:
   - overlay injection: include `src/shared/search-input-ui.js`; overlay shadow root links `src/shared/search-input.css`.
   - `manifest.json`: add `src/shared/search-input.css` to `web_accessible_resources` because the injected overlay shadow root loads it by runtime URL.
 
-- [ ] Browser-check only the input shell before touching mode prefix or suggestions:
+- [x] Browser-check only the input shell before touching mode prefix or suggestions:
   - newtab input size, icon position, right settings icon, placeholder, underline visibility;
   - overlay input size, icon position, settings icon hover, placeholder, underline visibility;
   - hostile CSS overlay case.
@@ -679,7 +679,7 @@ Implementation note: Task 8 completed on 2026-05-07. Added `src/newtab/suggestio
   - bookmark/recent section visibility to classes;
   - bottom dock static CSS to HTML stylesheet, JS only sets CSS variables.
 
-- [ ] Overlay first pass:
+- [x] Overlay first pass:
   - move shadow-root suggestion row, tag, tooltip, and visit/delete button styles into `src/overlay/suggestions-view.css`;
   - JS sets `data-selected`, `data-hover`, `data-action-visible`, and CSS variables;
   - preserve external shell protections.
@@ -687,7 +687,7 @@ Implementation note: Task 8 completed on 2026-05-07. Added `src/newtab/suggestio
 - [x] Favicon pass:
   - replace display/filter/opacity state writes with classes where both overlay and newtab visual transitions match screenshots.
 
-- [ ] Run audits after each group and record before/after counts in `docs/0.9.9-background-newtab-refactor-audit.md`.
+- [x] Run audits after each group and record before/after counts in `docs/0.9.9-background-newtab-refactor-audit.md`.
 
 Run:
 
@@ -843,7 +843,7 @@ Implementation note: Task 11 completed on 2026-05-07. Added `src/background/mess
 **Files:**
 - Modify: `docs/0.9.9-background-newtab-refactor-audit.md`
 
-- [ ] Update the audit doc with:
+- [x] Update the audit doc with:
   - final line counts;
   - final `!important` counts;
   - extracted module map;
@@ -851,7 +851,7 @@ Implementation note: Task 11 completed on 2026-05-07. Added `src/background/mess
   - route helper coverage;
   - browser validation notes.
 
-- [ ] Run the full automatic suite:
+- [x] Run the full automatic suite:
 
 ```bash
 npm run check
@@ -867,16 +867,39 @@ npm run package:store
 git diff --check
 ```
 
-- [ ] Browser validation:
+- [x] Browser validation:
   - newtab baseline matrix;
   - overlay baseline matrix;
   - hostile CSS overlay case;
   - extension errors page after repro;
   - packaged zip loads unpacked if package membership changed substantially.
 
-- [ ] Stop if a visual mismatch appears. Fix the mismatch before doing further cleanup, because otherwise later file movement will hide the cause.
+- [x] Stop if a visual mismatch appears. Fix the mismatch before doing further cleanup, because otherwise later file movement will hide the cause.
 
 Commit message: `Document refactor verification`
+
+Implementation note: Task 12 completed on 2026-05-08. Updated
+`docs/0.9.9-background-newtab-refactor-audit.md` with the final line counts,
+module map, style audit, i18n audit, route/message-router coverage, automatic
+suite, packaging result, browser screenshots, and the extension-error-page
+finding. The final automatic suite passed: `npm run check`,
+`npm run audit:style`, `npm run audit:i18n`, `npm run test:search`,
+`npm run test:site-search-store`, `npm run test:settings`,
+`npm run test:shortcut-rules`, `npm run test:url-guards`,
+`npm run test:newtab-fallback`, `npm run test:extension-routes`,
+`npm run test:message-router`, `npm run test:newtab-stores`,
+`npm run test:ai-provider-submit`, `npm run test:blacklist`,
+`npm run test:pip-main-world`, `npm run package:store`, and
+`git diff --check`. Browser validation used the existing Chrome Dev profile:
+newtab `lumno`, newtab `gm` + Tab + `hello`, overlay `lumno`, overlay `gm` +
+Tab + `hello`, Escape close, and hostile CSS overlay isolation all preserved
+the expected visual and interaction contract. Screenshots are saved in
+`dist/.checks/refactor-final/`. Extension error-page validation found
+reproducible CSP-blocked third-party script injection noise in the
+`chrome://newtab/` context after clearing errors and reopening a fresh newtab;
+repo search found no matching Lumno source references or external script
+insertion path, so this is recorded as browser-profile/other-extension noise
+rather than a Lumno runtime exception.
 
 ---
 
