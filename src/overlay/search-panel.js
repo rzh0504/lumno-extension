@@ -2563,21 +2563,22 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       image.src = dataUrl;
     }
 
-    function createSearchIcon(tone) {
+    function createSuggestionInlineIcon(iconName, tone) {
       const icon = document.createElement('span');
       icon.className = 'x-ov-suggestion-inline-icon';
       if (tone) {
         icon.setAttribute('data-tone', tone);
       }
-      icon.innerHTML = getRiSvg('ri-search-line', 'ri-size-16');
+      icon.innerHTML = getRiSvg(iconName, 'ri-size-16');
       return icon;
     }
 
+    function createSearchIcon(tone) {
+      return createSuggestionInlineIcon('ri-search-line', tone);
+    }
+
     function createLinkIcon() {
-      const icon = document.createElement('span');
-      icon.className = 'x-ov-suggestion-inline-icon';
-      icon.innerHTML = getRiSvg('ri-link', 'ri-size-16');
-      return icon;
+      return createSuggestionInlineIcon('ri-link');
     }
 
     function getNonFaviconIconBg() {
@@ -5258,29 +5259,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           let iconNode = null;
           let iconWrapper = null;
           if (suggestion.type === 'browserPage') {
-            const themedIcon = document.createElement('span');
-            themedIcon.innerHTML = getRiSvg('ri-link', 'ri-size-16');
-            themedIcon.style.cssText = `
-              all: unset !important;
-              width: 16px !important;
-              height: 16px !important;
-              display: flex !important;
-              align-items: center !important;
-              justify-content: center !important;
-              box-sizing: border-box !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              line-height: 1 !important;
-              text-decoration: none !important;
-              list-style: none !important;
-              outline: none !important;
-              background: transparent !important;
-              color: inherit !important;
-              font-size: 100% !important;
-              font: inherit !important;
-              vertical-align: baseline !important;
-            `;
-            iconNode = themedIcon;
+            iconNode = createLinkIcon();
           } else if (suggestion.type === 'directUrl') {
             const directUrlHost = suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : '';
             const isLocalDirectUrl = Boolean(
@@ -5290,53 +5269,9 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
               ? createLinkIcon()
               : createSearchIcon();
           } else if (suggestion.type === 'commandNewTab') {
-            const plusIcon = document.createElement('span');
-            plusIcon.innerHTML = getRiSvg('ri-add-line', 'ri-size-16');
-            plusIcon.style.cssText = `
-              all: unset !important;
-              width: 16px !important;
-              height: 16px !important;
-              display: flex !important;
-              align-items: center !important;
-              justify-content: center !important;
-              box-sizing: border-box !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              line-height: 1 !important;
-              text-decoration: none !important;
-              list-style: none !important;
-              outline: none !important;
-              background: transparent !important;
-              color: var(--x-ov-subtext, #9CA3AF) !important;
-              font-size: 100% !important;
-              font: inherit !important;
-              vertical-align: baseline !important;
-            `;
-            iconNode = plusIcon;
+            iconNode = createSuggestionInlineIcon('ri-add-line', 'subtext');
           } else if (suggestion.type === 'commandSettings') {
-            const gearIcon = document.createElement('span');
-            gearIcon.innerHTML = getRiSvg('ri-settings-3-line', 'ri-size-16');
-            gearIcon.style.cssText = `
-              all: unset !important;
-              width: 16px !important;
-              height: 16px !important;
-              display: flex !important;
-              align-items: center !important;
-              justify-content: center !important;
-              box-sizing: border-box !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              line-height: 1 !important;
-              text-decoration: none !important;
-              list-style: none !important;
-              outline: none !important;
-              background: transparent !important;
-              color: var(--x-ov-subtext, #9CA3AF) !important;
-              font-size: 100% !important;
-              font: inherit !important;
-              vertical-align: baseline !important;
-            `;
-            iconNode = gearIcon;
+            iconNode = createSuggestionInlineIcon('ri-settings-3-line', 'subtext');
           } else if (suggestion.type === 'modeSwitch' && suggestion.favicon) {
             const favicon = document.createElement('img');
             favicon.className = 'x-ov-suggestion-favicon';
