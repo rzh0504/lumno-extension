@@ -1888,28 +1888,28 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       const resolved = resolveOverlayTheme(mode);
       const tokens = overlayThemeTokens[resolved] || overlayThemeTokens.light;
       target.setAttribute('data-theme', resolved);
-      target.style.setProperty('--x-ov-bg', tokens.bg, 'important');
-      target.style.setProperty('--x-ov-border', tokens.border, 'important');
-      target.style.setProperty('--x-ov-shadow', tokens.shadow, 'important');
-      target.style.setProperty('--x-ov-text', tokens.text, 'important');
-      target.style.setProperty('--x-ov-subtext', tokens.subtext, 'important');
-      target.style.setProperty('--x-ov-link', tokens.link, 'important');
-      target.style.setProperty('--x-ov-placeholder', tokens.placeholder, 'important');
-      target.style.setProperty('--x-ov-hover-bg', tokens.hoverBg, 'important');
-      target.style.setProperty('--x-ov-tag-bg', tokens.tagBg, 'important');
-      target.style.setProperty('--x-ov-tag-text', tokens.tagText, 'important');
-      target.style.setProperty('--x-ov-bookmark-tag-bg', tokens.bookmarkTagBg, 'important');
-      target.style.setProperty('--x-ov-bookmark-tag-text', tokens.bookmarkTagText, 'important');
-      target.style.setProperty('--x-ov-blur', tokens.blur, 'important');
-      target.style.setProperty('--x-ov-saturate', tokens.saturate, 'important');
-      target.style.setProperty('--x-ext-input-text', tokens.text, 'important');
-      target.style.setProperty('--x-ext-input-caret', tokens.link, 'important');
-      target.style.setProperty('--x-ext-input-icon', tokens.subtext, 'important');
-      target.style.setProperty('--x-ext-input-icon-hover-bg', tokens.hoverBg, 'important');
-      target.style.setProperty('--x-ext-input-icon-hover', tokens.text, 'important');
-      target.style.setProperty('--x-ext-input-underline', tokens.underline, 'important');
-      target.style.setProperty('--x-ext-input-divider-inset', tokens.dividerInset, 'important');
-      target.style.setProperty('--x-ext-input-divider-opacity', tokens.dividerOpacity, 'important');
+      target.style.setProperty('--x-ov-bg', tokens.bg);
+      target.style.setProperty('--x-ov-border', tokens.border);
+      target.style.setProperty('--x-ov-shadow', tokens.shadow);
+      target.style.setProperty('--x-ov-text', tokens.text);
+      target.style.setProperty('--x-ov-subtext', tokens.subtext);
+      target.style.setProperty('--x-ov-link', tokens.link);
+      target.style.setProperty('--x-ov-placeholder', tokens.placeholder);
+      target.style.setProperty('--x-ov-hover-bg', tokens.hoverBg);
+      target.style.setProperty('--x-ov-tag-bg', tokens.tagBg);
+      target.style.setProperty('--x-ov-tag-text', tokens.tagText);
+      target.style.setProperty('--x-ov-bookmark-tag-bg', tokens.bookmarkTagBg);
+      target.style.setProperty('--x-ov-bookmark-tag-text', tokens.bookmarkTagText);
+      target.style.setProperty('--x-ov-blur', tokens.blur);
+      target.style.setProperty('--x-ov-saturate', tokens.saturate);
+      target.style.setProperty('--x-ext-input-text', tokens.text);
+      target.style.setProperty('--x-ext-input-caret', tokens.link);
+      target.style.setProperty('--x-ext-input-icon', tokens.subtext);
+      target.style.setProperty('--x-ext-input-icon-hover-bg', tokens.hoverBg);
+      target.style.setProperty('--x-ext-input-icon-hover', tokens.text);
+      target.style.setProperty('--x-ext-input-underline', tokens.underline);
+      target.style.setProperty('--x-ext-input-divider-inset', tokens.dividerInset);
+      target.style.setProperty('--x-ext-input-divider-opacity', tokens.dividerOpacity);
     }
 
     function refreshOverlaySuggestionsFromLastResponse() {
@@ -2514,15 +2514,15 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         return;
       }
       const resolvedTheme = getThemeForMode(theme);
-      target.style.setProperty('--x-ext-mark-bg', resolvedTheme.markBg, 'important');
-      target.style.setProperty('--x-ext-mark-text', resolvedTheme.markText, 'important');
-      target.style.setProperty('--x-ext-tag-bg', resolvedTheme.tagBg, 'important');
-      target.style.setProperty('--x-ext-tag-text', resolvedTheme.tagText, 'important');
-      target.style.setProperty('--x-ext-tag-border', resolvedTheme.tagBorder, 'important');
-      target.style.setProperty('--x-ext-key-bg', resolvedTheme.keyBg, 'important');
-      target.style.setProperty('--x-ext-key-text', resolvedTheme.keyText, 'important');
-      target.style.setProperty('--x-ext-key-border', resolvedTheme.keyBorder, 'important');
-      target.style.setProperty('--x-ext-icon-color', resolvedTheme.accent, 'important');
+      target.style.setProperty('--x-ext-mark-bg', resolvedTheme.markBg);
+      target.style.setProperty('--x-ext-mark-text', resolvedTheme.markText);
+      target.style.setProperty('--x-ext-tag-bg', resolvedTheme.tagBg);
+      target.style.setProperty('--x-ext-tag-text', resolvedTheme.tagText);
+      target.style.setProperty('--x-ext-tag-border', resolvedTheme.tagBorder);
+      target.style.setProperty('--x-ext-key-bg', resolvedTheme.keyBg);
+      target.style.setProperty('--x-ext-key-text', resolvedTheme.keyText);
+      target.style.setProperty('--x-ext-key-border', resolvedTheme.keyBorder);
+      target.style.setProperty('--x-ext-icon-color', resolvedTheme.accent);
     }
 
     function applyMarkVariables(target, theme) {
@@ -2530,8 +2530,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         return;
       }
       const resolvedTheme = getThemeForMode(theme);
-      target.style.setProperty('--x-ext-mark-bg', resolvedTheme.markBg, 'important');
-      target.style.setProperty('--x-ext-mark-text', resolvedTheme.markText, 'important');
+      target.style.setProperty('--x-ext-mark-bg', resolvedTheme.markBg);
+      target.style.setProperty('--x-ext-mark-text', resolvedTheme.markText);
     }
 
     function preloadThemeFromFavicon(url, dataUrl, hostOverride) {
@@ -4274,12 +4274,12 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           applySearchSuggestionHighlight(item, highlightTheme);
           if (item._xEntryActionTag) {
             const palette = getOverlayActionTagPalette();
-            item._xEntryActionTag.style.setProperty('--x-ext-tag-bg', palette.tagBg, 'important');
-            item._xEntryActionTag.style.setProperty('--x-ext-tag-text', palette.tagText, 'important');
-            item._xEntryActionTag.style.setProperty('--x-ext-tag-border', palette.tagBorder, 'important');
-            item._xEntryActionTag.style.setProperty('--x-ext-key-bg', palette.keyBg, 'important');
-            item._xEntryActionTag.style.setProperty('--x-ext-key-text', palette.keyText, 'important');
-            item._xEntryActionTag.style.setProperty('--x-ext-key-border', palette.keyBorder, 'important');
+            item._xEntryActionTag.style.setProperty('--x-ext-tag-bg', palette.tagBg);
+            item._xEntryActionTag.style.setProperty('--x-ext-tag-text', palette.tagText);
+            item._xEntryActionTag.style.setProperty('--x-ext-tag-border', palette.tagBorder);
+            item._xEntryActionTag.style.setProperty('--x-ext-key-bg', palette.keyBg);
+            item._xEntryActionTag.style.setProperty('--x-ext-key-text', palette.keyText);
+            item._xEntryActionTag.style.setProperty('--x-ext-key-border', palette.keyBorder);
           }
           if (item._xSwitchButton) {
             const shouldShowTags = Boolean(item._xTagContainer && item._xHasActionTags);
@@ -4412,12 +4412,12 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         const entryActionTag = createActionTag(t('action_search', '搜索'), 'Tab');
         entryActionTag.style.setProperty('cursor', 'pointer', 'important');
         const entryTagPalette = getOverlayActionTagPalette();
-        entryActionTag.style.setProperty('--x-ext-tag-bg', entryTagPalette.tagBg, 'important');
-        entryActionTag.style.setProperty('--x-ext-tag-text', entryTagPalette.tagText, 'important');
-        entryActionTag.style.setProperty('--x-ext-tag-border', entryTagPalette.tagBorder, 'important');
-        entryActionTag.style.setProperty('--x-ext-key-bg', entryTagPalette.keyBg, 'important');
-        entryActionTag.style.setProperty('--x-ext-key-text', entryTagPalette.keyText, 'important');
-        entryActionTag.style.setProperty('--x-ext-key-border', entryTagPalette.keyBorder, 'important');
+        entryActionTag.style.setProperty('--x-ext-tag-bg', entryTagPalette.tagBg);
+        entryActionTag.style.setProperty('--x-ext-tag-text', entryTagPalette.tagText);
+        entryActionTag.style.setProperty('--x-ext-tag-border', entryTagPalette.tagBorder);
+        entryActionTag.style.setProperty('--x-ext-key-bg', entryTagPalette.keyBg);
+        entryActionTag.style.setProperty('--x-ext-key-text', entryTagPalette.keyText);
+        entryActionTag.style.setProperty('--x-ext-key-border', entryTagPalette.keyBorder);
         entryItem._xEntryActionTag = entryActionTag;
         entryActionTags.appendChild(entryActionTag);
         entryItem._xTagContainer = entryActionTags;
