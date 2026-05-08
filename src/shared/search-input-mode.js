@@ -40,8 +40,19 @@
   }
 
   function isElementVisible(element) {
+    if (!element) {
+      return false;
+    }
+    if (typeof element.getAttribute === 'function') {
+      const visibleState = element.getAttribute('data-visible');
+      if (visibleState === 'true') {
+        return true;
+      }
+      if (visibleState === 'false') {
+        return false;
+      }
+    }
     return Boolean(
-      element &&
       element.style &&
       element.style.getPropertyValue('display') !== 'none'
     );

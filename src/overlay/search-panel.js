@@ -1122,32 +1122,9 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     modeBadge = document.createElement('div');
     modeBadge.id = '_x_extension_mode_badge_2024_unique_';
     applyNoTranslate(modeBadge);
-    modeBadge.style.cssText = `
-      all: unset !important;
-      position: absolute !important;
-      right: 86px !important;
-      top: 50% !important;
-      transform: translateY(-50%) !important;
-      display: none !important;
-      align-items: center !important;
-      gap: 6px !important;
-      background: var(--x-ov-tag-bg, #F3F4F6) !important;
-      color: var(--x-ov-tag-text, #6B7280) !important;
-      border: 1px solid var(--x-ov-border, rgba(0, 0, 0, 0.08)) !important;
-      border-radius: 999px !important;
-      padding: 4px 8px !important;
-      font-size: 11px !important;
-      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-      font-weight: 500 !important;
-      line-height: 1 !important;
-      white-space: nowrap !important;
-      max-width: 180px !important;
-      overflow: hidden !important;
-      text-overflow: ellipsis !important;
-      box-sizing: border-box !important;
-      pointer-events: none !important;
-      z-index: 1 !important;
-    `;
+    modeBadge.className = 'x-lumno-search-input-mode__badge';
+    modeBadge.setAttribute('data-surface', 'overlay');
+    modeBadge.setAttribute('data-visible', 'false');
     inputContainer.appendChild(modeBadge);
 
     const suggestionsContainer = document.createElement('div');
@@ -1309,7 +1286,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       }
       const shouldShow = isModeCommand(rawValue || '');
       if (!shouldShow) {
-        modeBadge.style.setProperty('display', 'none', 'important');
+        modeBadge.setAttribute('data-visible', 'false');
         updateInputRightPadding();
         return;
       }
@@ -1330,7 +1307,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           mode: getThemeModeLabel(overlayThemeMode)
         });
       }
-      modeBadge.style.setProperty('display', 'inline-flex', 'important');
+      modeBadge.setAttribute('data-visible', 'true');
       updateInputRightPadding();
     }
 

@@ -2038,14 +2038,14 @@
     }
     const shouldShow = isModeCommand(rawValue || '');
     if (!shouldShow) {
-      modeBadge.style.setProperty('display', 'none');
+      modeBadge.setAttribute('data-visible', 'false');
       updateInputRightPadding();
       return;
     }
     modeBadge.textContent = formatMessage('mode_badge', '模式：{mode}', {
       mode: getThemeModeLabel(currentThemeMode)
     });
-    modeBadge.style.setProperty('display', 'inline-flex');
+    modeBadge.setAttribute('data-visible', 'true');
     updateInputRightPadding();
   }
 
@@ -6843,32 +6843,9 @@
   }, true);
   modeBadge = document.createElement('div');
   modeBadge.id = '_x_extension_newtab_mode_badge_2024_unique_';
-  modeBadge.style.cssText = `
-    all: unset;
-    position: absolute;
-    right: 52px;
-    top: 50%;
-    transform: translateY(-50%);
-    display: none;
-    align-items: center;
-    gap: 6px;
-    background: var(--x-nt-tag-bg, #F3F4F6);
-    color: var(--x-nt-tag-text, #6B7280);
-    border: 1px solid var(--x-nt-panel-border, rgba(0, 0, 0, 0.08));
-    border-radius: 999px;
-    padding: 4px 8px;
-    font-size: 11px;
-    font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    font-weight: 500;
-    line-height: 1;
-    white-space: nowrap;
-    max-width: 180px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    box-sizing: border-box;
-    pointer-events: none;
-    z-index: 1;
-  `;
+  modeBadge.className = 'x-lumno-search-input-mode__badge';
+  modeBadge.setAttribute('data-surface', 'newtab');
+  modeBadge.setAttribute('data-visible', 'false');
   inputParts.container.appendChild(modeBadge);
   const searchInput = inputParts.input;
   searchInputRef = searchInput;
