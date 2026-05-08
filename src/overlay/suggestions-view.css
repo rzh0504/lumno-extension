@@ -91,6 +91,12 @@
   transform: translateY(-50%) scale(1.06);
 }
 
+#_x_extension_overlay_2024_unique_ .ri-icon {
+  font-style: normal;
+  font-variant: normal;
+  text-transform: none;
+}
+
 #_x_extension_overlay_2024_unique_ .x-ov-close-other-tabs .ri-icon {
   display: inline-flex;
   align-items: center;
@@ -491,6 +497,10 @@
   box-sizing: border-box;
   vertical-align: middle;
   white-space: nowrap;
+}
+
+#_x_extension_overlay_2024_unique_ .x-ov-action-tag[data-clickable="true"] {
+  cursor: pointer;
 }
 
 #_x_extension_overlay_2024_unique_ .x-ov-action-tag__label {

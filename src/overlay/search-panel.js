@@ -549,8 +549,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   function getRiSvg(id, sizeClass, extraClass) {
     const size = sizeClass || 'ri-size-16';
     const extra = extraClass ? ` ${extraClass}` : '';
-    return '<i class="ri-icon ' + size + extra + ' ' + id + '" aria-hidden="true" ' +
-      'style="font-style: normal !important; font-variant: normal !important; text-transform: none !important;"></i>';
+    return '<i class="ri-icon ' + size + extra + ' ' + id + '" aria-hidden="true"></i>';
   }
 
   function buildSearchUrlFromTemplate(template, query) {
@@ -2612,8 +2611,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       }
       item._xIconWrap.style.setProperty(
         'background-color',
-        isActive ? getNonFaviconIconBg() : 'transparent',
-        'important'
+        isActive ? getNonFaviconIconBg() : 'transparent'
       );
     }
 
@@ -4260,8 +4258,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             const resolvedTheme = getThemeForMode(theme || defaultTheme);
             item._xDirectIconWrap.style.setProperty(
               'color',
-              shouldShow ? resolvedTheme.accent : 'var(--x-ov-subtext, #9CA3AF)',
-              'important'
+              shouldShow ? resolvedTheme.accent : 'var(--x-ov-subtext, #9CA3AF)'
             );
           }
           return;
@@ -4410,7 +4407,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         entryActionTags.className = 'x-ov-suggestion-action-tags';
         setSuggestionActionTagsVisible(entryActionTags, false);
         const entryActionTag = createActionTag(t('action_search', '搜索'), 'Tab');
-        entryActionTag.style.setProperty('cursor', 'pointer', 'important');
+        entryActionTag.dataset.clickable = 'true';
         const entryTagPalette = getOverlayActionTagPalette();
         entryActionTag.style.setProperty('--x-ext-tag-bg', entryTagPalette.tagBg);
         entryActionTag.style.setProperty('--x-ext-tag-text', entryTagPalette.tagText);
@@ -5608,8 +5605,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
               if (selectedIndex === -1 && this._xIsAutocompleteTop) {
                 return;
               }
-              this.style.setProperty('background', 'var(--x-ov-hover-bg)', 'important');
-              this.style.setProperty('border', '1px solid transparent', 'important');
+              setSuggestionRowColors(this, 'var(--x-ov-hover-bg)', 'transparent');
             }
           });
 
