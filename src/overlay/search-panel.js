@@ -4619,23 +4619,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           const rankDebug = document.createElement('span');
           applyNoTranslate(rankDebug);
           setProtectedPlainText(rankDebug, formatTabRankDebugText(tab));
-          rankDebug.style.cssText = `
-            all: unset !important;
-            display: inline-flex !important;
-            align-items: center !important;
-            margin-left: 8px !important;
-            padding: 1px 6px !important;
-            border-radius: 999px !important;
-            color: var(--x-ov-subtext, #6B7280) !important;
-            background: color-mix(in srgb, var(--x-ov-bg, #FFFFFF) 70%, #94A3B8 30%) !important;
-            border: 1px solid color-mix(in srgb, var(--x-ov-border, rgba(0, 0, 0, 0.08)) 75%, #94A3B8 25%) !important;
-            font-size: 10px !important;
-            font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-            line-height: 1.2 !important;
-            white-space: nowrap !important;
-            vertical-align: baseline !important;
-            flex-shrink: 0 !important;
-          `;
+          rankDebug.className = 'x-ov-tab-rank-debug';
           leftSide.appendChild(rankDebug);
         }
         const rightSide = document.createElement('div');
@@ -4970,22 +4954,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         }
         const urlLine = document.createElement('span');
         setProtectedPlainText(urlLine, url);
-        urlLine.style.cssText = `
-          all: unset !important;
-          color: var(--x-ov-link, #2563EB) !important;
-          font-size: 12px !important;
-          font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-          text-decoration: none !important;
-          display: inline-block !important;
-          max-width: 60% !important;
-          line-height: 1.4 !important;
-          white-space: nowrap !important;
-          overflow: hidden !important;
-          text-overflow: ellipsis !important;
-          box-sizing: border-box !important;
-          margin: 0 !important;
-          padding: 0 !important;
-        `;
+        urlLine.className = 'x-ov-suggestion-url-line';
         return urlLine;
       }
 
