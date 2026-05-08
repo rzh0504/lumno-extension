@@ -516,3 +516,82 @@
   height: 26px;
   padding: 0 12px;
 }
+
+#_x_extension_overlay_2024_unique_ .x-ov-history-delete-slot {
+  all: unset;
+  width: 0;
+  height: 28px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  line-height: 1;
+  text-decoration: none;
+  list-style: none;
+  outline: none;
+  background: transparent;
+  vertical-align: baseline;
+  opacity: 0;
+  pointer-events: none;
+  transition: width 180ms ease, margin-left 180ms ease, opacity 160ms ease;
+}
+
+#_x_extension_overlay_2024_unique_ .x-ov-history-delete-slot[data-visible="true"] {
+  width: 28px;
+  margin-left: 8px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#_x_extension_overlay_2024_unique_ .x-ov-history-delete-button {
+  all: unset;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 8px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  line-height: 1;
+  text-decoration: none;
+  list-style: none;
+  outline: none;
+  background: var(--x-ov-history-delete-bg, transparent);
+  color: var(--x-ov-history-delete-text, var(--x-ext-input-icon, #9CA3AF));
+  border: 1px solid var(--x-ov-history-delete-border, transparent);
+  display: inline-flex;
+  visibility: hidden;
+  pointer-events: none;
+  opacity: 0;
+  align-items: center;
+  justify-content: center;
+  font-size: 0;
+  cursor: pointer;
+  transform: translateX(4px);
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 160ms ease, opacity 160ms ease, visibility 160ms ease;
+}
+
+#_x_extension_overlay_2024_unique_ .x-ov-history-delete-button[data-visible="true"] {
+  visibility: visible;
+  pointer-events: auto;
+  opacity: 1;
+  transform: translateX(0);
+}
+
+#_x_extension_overlay_2024_unique_ .x-ov-history-delete-button[data-hover-active="true"] {
+  transform: scale(1.06);
+}
+
+#_x_extension_overlay_2024_unique_ .x-ov-history-delete-button .ri-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transform: none;
+  pointer-events: none;
+  cursor: pointer;
+}
