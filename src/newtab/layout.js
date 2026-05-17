@@ -23,6 +23,7 @@
     const upshiftMaxPx = getOptionNumber(constants, 'upshiftMaxPx', 80);
     const contentSectionsExtraUpshiftPx = getOptionNumber(constants, 'contentSectionsExtraUpshiftPx', 20);
     const emptySectionsExtraUpshiftPx = getOptionNumber(constants, 'emptySectionsExtraUpshiftPx', 96);
+    const suggestionsBottomInsetPx = getOptionNumber(constants, 'suggestionsBottomInsetPx', 14);
 
     function getRoot() {
       return resolveElement(options.root);
@@ -327,8 +328,13 @@
       const left = Math.round(anchorRect.left);
       const top = Math.round(dropdownTopViewport);
       const width = Math.max(0, Math.round(anchorRect.width));
-      const available = Math.max(0, viewportBottom - dropdownTopViewport - 14);
-      const maxHeight = Math.floor(available);
+      const availableWithoutInset = Math.max(0, viewportBottom - dropdownTopViewport);
+      const available = Math.max(0, availableWithoutInset - suggestionsBottomInsetPx);
+      const availableFitHeight = Math.ceil(availableWithoutInset);
+      const contentHeight = Math.ceil(Math.max(0, Number(suggestionsContainer.scrollHeight) || 0));
+      const maxHeight = contentHeight > 0 && contentHeight <= availableFitHeight
+        ? contentHeight
+        : Math.floor(available);
       suggestionsContainer.style.setProperty('left', `${left}px`);
       suggestionsContainer.style.setProperty('top', `${top}px`);
       suggestionsContainer.style.setProperty('width', `${width}px`);

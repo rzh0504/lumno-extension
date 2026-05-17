@@ -28,6 +28,20 @@
     runtimeMessageHandlerBound: false
   };
 
+  function applyNoTranslate(element) {
+    if (!element || typeof element.setAttribute !== 'function') {
+      return element;
+    }
+    element.setAttribute('translate', 'no');
+    element.setAttribute('lang', 'zxx');
+    element.setAttribute('notranslate', '');
+    element.setAttribute('data-no-translate', 'true');
+    if (element.classList) {
+      element.classList.add('notranslate');
+    }
+    return element;
+  }
+
   function getStorageArea() {
     if (!chrome || !chrome.storage) {
       return null;
@@ -643,6 +657,7 @@
     const root = document.createElement('div');
     root.id = ROOT_ID;
     root.setAttribute('aria-hidden', 'true');
+    applyNoTranslate(root);
     root.style.cssText = [
       'position: fixed',
       'inset: 0',
@@ -653,6 +668,7 @@
 
     const highlight = document.createElement('div');
     highlight.id = HIGHLIGHT_ID;
+    applyNoTranslate(highlight);
     highlight.style.cssText = [
       'position: fixed',
       'left: 0',
@@ -670,6 +686,7 @@
 
     const toast = document.createElement('div');
     toast.id = TOAST_ID;
+    applyNoTranslate(toast);
     toast.style.cssText = [
       'position: fixed',
       'left: 50%',
@@ -1025,6 +1042,7 @@
       : (computed.borderRadius && computed.borderRadius !== '0px' ? computed.borderRadius : '16px');
 
     placeholder.setAttribute(PLACEHOLDER_ATTR, '1');
+    applyNoTranslate(placeholder);
     placeholder.style.width = `${Math.max(1, Math.round(rect.width))}px`;
     placeholder.style.height = `${Math.max(1, Math.round(rect.height))}px`;
     placeholder.style.display = computed.display === 'inline' ? 'inline-block' : computed.display;
@@ -1068,6 +1086,7 @@
     }
 
     badge.textContent = getMessage('document_pip_picker_badge', 'Opened in PiP');
+    applyNoTranslate(badge);
     badge.style.cssText = [
       'position: absolute',
       'top: 10px',
@@ -1231,6 +1250,7 @@
     const { pipWindow, pipDocument, shell, visualTheme } = pipContext;
     const dock = pipDocument.createElement('div');
     dock.setAttribute('data-lumno-pip-dock', '1');
+    applyNoTranslate(dock);
     dock.style.cssText = [
       'position: fixed',
       'left: 50%',
@@ -1255,6 +1275,7 @@
       const button = pipDocument.createElement('button');
       button.type = 'button';
       button.className = 'lumno-pip-dock-btn';
+      applyNoTranslate(button);
       button.style.cssText = [
         `background: ${visualTheme.buttonBackground}`,
         `color: ${visualTheme.buttonText}`,
@@ -1262,9 +1283,11 @@
       ].join(';');
       const icon = pipDocument.createElement('i');
       icon.className = `ri-icon ${iconClass}`;
+      applyNoTranslate(icon);
       const text = pipDocument.createElement('span');
       text.className = 'lumno-pip-dock-label';
       text.textContent = label;
+      applyNoTranslate(text);
       button.appendChild(icon);
       button.appendChild(text);
       return button;

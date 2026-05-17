@@ -250,6 +250,7 @@
     }
     element.setAttribute('translate', 'no');
     element.setAttribute('lang', 'zxx');
+    element.setAttribute('notranslate', '');
     element.setAttribute('data-no-translate', 'true');
     if (element.classList) {
       element.classList.add('notranslate');

@@ -154,6 +154,27 @@
       return config.defaultTheme || {};
     }
 
+    function getUrlFallbackTheme(fallbackTheme) {
+      return config.urlHighlightTheme || fallbackTheme || getDefaultTheme();
+    }
+
+    function isLocalUrlSuggestion(suggestion) {
+      const url = suggestion && suggestion.url ? String(suggestion.url) : '';
+      if (!url) {
+        return false;
+      }
+      try {
+        const parsed = new URL(url);
+        if (String(parsed.protocol || '').toLowerCase() === 'file:') {
+          return true;
+        }
+      } catch (e) {
+        // Fall back to host-based checks below for partially typed URLs.
+      }
+      const host = getHostFromUrl(url);
+      return Boolean(host && shouldBlockFaviconForHost(host));
+    }
+
     function createSuggestionInlineIcon(iconName, tone) {
       const icon = documentRef.createElement('span');
       icon.innerHTML = getRiSvg(iconName, 'ri-size-16');
@@ -457,6 +478,8 @@
         switchButton.className = 'x-nt-tab-switch-button';
         switchButton.innerHTML = `${t('switch_to_tab', '切换到标签页')} ${getRiSvg('ri-arrow-right-line', 'ri-size-12')}`;
         suggestionItem._xSwitchButton = switchButton;
+        const rightSide = documentRef.createElement('div');
+        rightSide.className = 'x-nt-suggestion-right';
 
         suggestionItem.addEventListener('mouseenter', function() {
           if (items.indexOf(this) !== getSelectedIndex()) {
@@ -492,7 +515,8 @@
         });
 
         suggestionItem.appendChild(leftSide);
-        suggestionItem.appendChild(switchButton);
+        rightSide.appendChild(switchButton);
+        suggestionItem.appendChild(rightSide);
         container.appendChild(suggestionItem);
 
         const themeSourceSuggestion = {
@@ -500,17 +524,22 @@
           favicon: tab.favIconUrl || ''
         };
         const themeHost = getThemeHostForSuggestion(themeSourceSuggestion);
-        const immediateTheme = getImmediateThemeForSuggestion(themeSourceSuggestion) || getDefaultTheme();
+        const shouldUseLocalUrlFallbackTheme = isLocalUrlSuggestion(themeSourceSuggestion);
+        const immediateTheme = shouldUseLocalUrlFallbackTheme
+          ? getUrlFallbackTheme(getImmediateThemeForSuggestion(themeSourceSuggestion) || getDefaultTheme())
+          : (getImmediateThemeForSuggestion(themeSourceSuggestion) || getDefaultTheme());
         suggestionItem._xTheme = immediateTheme;
         suggestionItem._xThemeHost = themeHost;
         applyThemeVariables(suggestionItem, immediateTheme);
-        getThemeForSuggestion(themeSourceSuggestion).then((theme) => {
-          if (!suggestionItem.isConnected) {
-            return;
-          }
-          suggestionItem._xTheme = theme;
-          updateSelection(getSelectedIndex());
-        });
+        if (!shouldUseLocalUrlFallbackTheme) {
+          getThemeForSuggestion(themeSourceSuggestion).then((theme) => {
+            if (!suggestionItem.isConnected) {
+              return;
+            }
+            suggestionItem._xTheme = theme;
+            updateSelection(getSelectedIndex());
+          });
+        }
       });
 
       onSetSelectedIndex(-1);
@@ -557,9 +586,14 @@
         suggestionItem.setAttribute('data-last', index === suggestions.length - 1 ? 'true' : 'false');
         const isPrimaryHighlight = index === primaryHighlightIndex;
         const isPrimarySearchSuggest = isPrimaryHighlight && suggestion.type === 'googleSuggest';
+        const shouldUseLocalUrlFallbackTheme = isLocalUrlSuggestion(suggestion);
         let immediateTheme = getImmediateThemeForSuggestion(suggestion) || getDefaultTheme();
-        if (suggestion.type === 'directUrl' || suggestion.type === 'browserPage') {
-          immediateTheme = config.urlHighlightTheme || immediateTheme;
+        if (
+          suggestion.type === 'directUrl' ||
+          suggestion.type === 'browserPage' ||
+          shouldUseLocalUrlFallbackTheme
+        ) {
+          immediateTheme = getUrlFallbackTheme(immediateTheme);
         }
         const shouldUseSearchEngineTheme = isPrimarySearchSuggest ||
           (onlyKeywordSuggestions && isPrimaryHighlight && suggestion.type === 'newtab');
@@ -843,7 +877,8 @@
         if (!shouldUseSearchEngineTheme &&
             !(onlyKeywordSuggestions && suggestion.type === 'newtab') &&
             suggestion.type !== 'directUrl' &&
-            suggestion.type !== 'browserPage') {
+            suggestion.type !== 'browserPage' &&
+            !shouldUseLocalUrlFallbackTheme) {
           getThemeForSuggestion(suggestion).then((theme) => {
             if (!suggestionItem.isConnected) {
               return;

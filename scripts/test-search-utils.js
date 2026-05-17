@@ -100,6 +100,22 @@ assert.strictEqual(
   'strong navigation promotion should respect query-specific selection boost'
 );
 
+const displaySuggestionItems = Array.from({ length: 12 }, (_, index) => ({
+  type: 'history',
+  title: `Result ${index + 1}`,
+  url: `https://example.com/${index + 1}`
+}));
+assert.strictEqual(
+  search.limitSearchSuggestionsForDisplay(displaySuggestionItems).length,
+  10,
+  'display suggestions should default to the shared visible-result cap'
+);
+assert.deepStrictEqual(
+  search.limitSearchSuggestionsForDisplay(displaySuggestionItems, { limit: 3 }).map((item) => item.title),
+  ['Result 1', 'Result 2', 'Result 3'],
+  'display suggestion limiting should preserve ranking order'
+);
+
 const navList = [
   { type: 'history', title: 'Example Blog Detail', url: 'https://example.com/blog/detail' },
   { type: 'history', title: 'Example Home', url: 'https://example.com/' }

@@ -4588,6 +4588,16 @@
     return list.filter((suggestion) => !isSuggestionBlockedBySearchBlacklist(suggestion));
   }
 
+  function limitSuggestionsForDisplay(list) {
+    if (typeof SEARCH_UTILS.limitSearchSuggestionsForDisplay === 'function') {
+      return SEARCH_UTILS.limitSearchSuggestionsForDisplay(list);
+    }
+    const suggestions = Array.isArray(list) ? list : [];
+    const policy = SEARCH_UTILS.SEARCH_POLICY || {};
+    const limit = Number(policy.displaySuggestionLimit) || 10;
+    return suggestions.slice(0, limit);
+  }
+
   function shouldExcludeFromRecentSites(url) {
     if (!url) {
       return true;
@@ -6150,9 +6160,10 @@
         primaryHighlightIndex = 0;
         primaryHighlightReason = 'command';
       }
-    if (hasCommand) {
-      applyAutocomplete(allSuggestions, primarySuggestion, primaryHighlightReason);
-    }
+      if (hasCommand) {
+        applyAutocomplete(allSuggestions, primarySuggestion, primaryHighlightReason);
+      }
+      allSuggestions = limitSuggestionsForDisplay(allSuggestions);
 
       const canAppend = query === lastRenderedQuery &&
         isSuggestionPrefix(currentSuggestions, allSuggestions);

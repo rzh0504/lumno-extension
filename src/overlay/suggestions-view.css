@@ -1,9 +1,12 @@
 #_x_extension_overlay_2024_unique_ .x-ov-suggestions-container {
   all: unset;
+  --x-ov-suggestion-row-height: 52px;
+  --x-ov-suggestion-row-gap: 4px;
+  --x-ov-suggestions-max-height: 580px;
   width: 100%;
   flex: 1 1 auto;
   min-height: 0;
-  max-height: 50vh;
+  max-height: var(--x-ov-suggestions-max-height, 580px);
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -224,17 +227,22 @@
 
 #_x_extension_overlay_2024_unique_ .x-ov-suggestion-item {
   all: unset;
+  --x-ov-suggestion-action-height: 26px;
+  --x-ov-suggestion-key-height: 18px;
+  --x-ov-suggestion-action-button-start: 10px;
+  --x-ov-suggestion-action-icon-end: 7px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
+  min-height: var(--x-ov-suggestion-row-height, 52px);
   background: var(--x-ov-suggestion-row-bg, transparent);
   border: 1px solid var(--x-ov-suggestion-row-border, transparent);
   border-radius: 16px;
   cursor: pointer;
   transition: background-color 0.2s ease;
   box-sizing: border-box;
-  margin: 0 0 4px 0;
+  margin: 0 0 var(--x-ov-suggestion-row-gap, 4px) 0;
   line-height: 1.5;
   text-decoration: none;
   list-style: none;
@@ -438,8 +446,9 @@
   all: unset;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
+  min-height: var(--x-ov-suggestion-action-height, 26px);
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -459,6 +468,7 @@
   display: none;
   align-items: center;
   gap: 6px;
+  min-height: var(--x-ov-suggestion-action-height, 26px);
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -486,7 +496,8 @@
   background: var(--x-ext-tag-bg, #EEF6FF);
   color: var(--x-ext-tag-text, #1E3A8A);
   border: 1px solid var(--x-ext-tag-border, #BFDBFE);
-  padding: 4px 10px 4px 8px;
+  height: var(--x-ov-suggestion-action-height, 26px);
+  padding: 0 4px 0 8px;
   border-radius: 999px;
   font-size: 11px;
   font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -514,7 +525,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 2px 7px;
+  height: var(--x-ov-suggestion-key-height, 18px);
+  padding: 0 7px;
   border-radius: 6px;
   background: var(--x-ext-key-bg, #FFFFFF);
   color: var(--x-ext-key-text, #1E3A8A);
@@ -523,6 +535,7 @@
   font-size: 10px;
   font-weight: 500;
   line-height: 1;
+  box-sizing: border-box;
 }
 
 #_x_extension_overlay_2024_unique_ .x-ov-suggestion-action-button {
@@ -552,20 +565,21 @@
 #_x_extension_overlay_2024_unique_ .x-ov-suggestion-visit-button {
   border: 1px solid var(--x-ov-suggestion-action-button-border, transparent);
   border-radius: 16px;
-  padding: 6px 12px;
+  height: var(--x-ov-suggestion-action-height, 26px);
+  padding: 0 var(--x-ov-suggestion-action-icon-end, 7px) 0 var(--x-ov-suggestion-action-button-start, 10px);
 }
 
 #_x_extension_overlay_2024_unique_ .x-ov-suggestion-switch-button {
   border: none;
   border-radius: 6px;
-  height: 26px;
-  padding: 0 12px;
+  height: var(--x-ov-suggestion-action-height, 26px);
+  padding: 0 var(--x-ov-suggestion-action-icon-end, 7px) 0 var(--x-ov-suggestion-action-button-start, 10px);
 }
 
 #_x_extension_overlay_2024_unique_ .x-ov-history-delete-slot {
   all: unset;
   width: 0;
-  height: 28px;
+  height: var(--x-ov-suggestion-action-height, 26px);
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -586,8 +600,8 @@
 }
 
 #_x_extension_overlay_2024_unique_ .x-ov-history-delete-slot[data-visible="true"] {
-  width: 28px;
-  margin-left: 8px;
+  width: var(--x-ov-suggestion-action-height, 26px);
+  margin-left: 0;
   opacity: 1;
   pointer-events: auto;
 }

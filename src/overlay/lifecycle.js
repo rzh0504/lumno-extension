@@ -404,7 +404,7 @@
             observer.disconnect();
           }
           noTranslateRoots.forEach((node) => {
-            applyNoTranslate(node);
+            applyNoTranslateDeep(node);
           });
           protectedNodes.forEach((node) => {
             restoreProtectedNode(node);

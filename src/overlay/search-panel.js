@@ -196,6 +196,16 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     return list.filter((suggestion) => !isOverlaySuggestionBlockedBySearchBlacklist(suggestion, queryForProvider));
   }
 
+  function limitOverlaySuggestionsForDisplay(list) {
+    if (typeof SEARCH_UTILS.limitSearchSuggestionsForDisplay === 'function') {
+      return SEARCH_UTILS.limitSearchSuggestionsForDisplay(list);
+    }
+    const suggestions = Array.isArray(list) ? list : [];
+    const policy = SEARCH_UTILS.SEARCH_POLICY || {};
+    const limit = Number(policy.displaySuggestionLimit) || 10;
+    return suggestions.slice(0, limit);
+  }
+
   function loadOverlaySearchBlacklistItems(onReload) {
     if (!storageArea) {
       overlaySearchBlacklistItems = [];
@@ -282,6 +292,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     }
     element.setAttribute('translate', 'no');
     element.setAttribute('lang', 'zxx');
+    element.setAttribute('notranslate', '');
     element.setAttribute('data-no-translate', 'true');
     if (element.classList) {
       element.classList.add('notranslate');
@@ -5186,6 +5197,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         if (hasCommand) {
           applyAutocomplete(allSuggestions, primarySuggestion, primaryHighlightReason);
         }
+        allSuggestions = limitOverlaySuggestionsForDisplay(allSuggestions);
         const canAppend = query === lastRenderedQuery &&
           isSuggestionPrefix(currentSuggestions, allSuggestions);
         const startIndex = canAppend ? currentSuggestions.length : 0;

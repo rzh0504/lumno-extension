@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="notranslate" translate="no" notranslate data-no-translate="true">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -1041,6 +1041,9 @@
       }
       #_x_extension_newtab_suggestions_container_2024_unique_ {
         all: unset;
+        --x-nt-suggestion-row-height: 52px;
+        --x-nt-suggestion-row-gap: 6px;
+        --x-nt-suggestions-max-height: 594px;
         width: min(90vw, var(--x-nt-search-max-width, 720px));
         margin-top: 0;
         position: fixed;
@@ -1056,7 +1059,7 @@
         padding: 8px 8px 12px;
         box-sizing: border-box;
         display: block;
-        max-height: calc(100vh - 220px);
+        max-height: min(calc(100vh - 220px), var(--x-nt-suggestions-max-height, 594px));
         overflow-y: auto;
         overscroll-behavior: contain;
         overflow-anchor: none;
@@ -1103,7 +1106,7 @@
         text-align: left;
         box-sizing: border-box;
         pointer-events: none;
-        z-index: 4;
+        z-index: 40;
         box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
         opacity: 0;
         transform: translateY(4px);
@@ -1136,18 +1139,22 @@
       .ri-size-24 { --ri-size: 24px; }
       .x-nt-suggestion-item {
         all: unset;
+        --x-nt-suggestion-action-height: 26px;
+        --x-nt-suggestion-key-height: 18px;
+        --x-nt-suggestion-action-button-start: 10px;
+        --x-nt-suggestion-action-icon-end: 7px;
         display: flex;
         align-items: center;
         justify-content: space-between;
         padding: 12px 16px;
-        min-height: 44px;
+        min-height: var(--x-nt-suggestion-row-height, 52px);
         background: transparent;
         border: 1px solid transparent;
         border-radius: 16px;
         cursor: pointer;
         transition: background-color 0.2s ease;
         box-sizing: border-box;
-        margin: 0 0 6px 0;
+        margin: 0 0 var(--x-nt-suggestion-row-gap, 6px) 0;
         line-height: 1.5;
         text-decoration: none;
         list-style: none;
@@ -1319,6 +1326,7 @@
         align-items: center;
         gap: 6px;
         flex-shrink: 0;
+        min-height: var(--x-nt-suggestion-action-height, 26px);
         box-sizing: border-box;
         margin: 0;
         padding: 0;
@@ -1392,6 +1400,7 @@
         display: none;
         align-items: center;
         gap: 6px;
+        min-height: var(--x-nt-suggestion-action-height, 26px);
         box-sizing: border-box;
         margin: 0;
         padding: 0;
@@ -1421,7 +1430,8 @@
         background: var(--x-ext-tag-bg, #EEF6FF);
         color: var(--x-ext-tag-text, #1E3A8A);
         border: 1px solid var(--x-ext-tag-border, #BFDBFE);
-        padding: 4px 10px 4px 8px;
+        height: var(--x-nt-suggestion-action-height, 26px);
+        padding: 0 4px 0 8px;
         border-radius: 999px;
         font-size: 11px;
         font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -1443,7 +1453,8 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 2px 7px;
+        height: var(--x-nt-suggestion-key-height, 18px);
+        padding: 0 7px;
         border-radius: 6px;
         background: var(--x-ext-key-bg, #FFFFFF);
         color: var(--x-ext-key-text, #1E3A8A);
@@ -1452,6 +1463,7 @@
         font-size: 10px;
         font-weight: 500;
         line-height: 1;
+        box-sizing: border-box;
       }
       .x-nt-suggestion-tag {
         all: unset;
@@ -1479,7 +1491,7 @@
       .x-nt-history-delete-slot {
         all: unset;
         width: 0;
-        height: 28px;
+        height: var(--x-nt-suggestion-action-height, 26px);
         flex: 0 0 auto;
         display: inline-flex;
         align-items: center;
@@ -1499,8 +1511,8 @@
         transition: width 180ms ease, margin-left 180ms ease, opacity 160ms ease;
       }
       .x-nt-suggestion-item[data-history-delete-visible="true"] .x-nt-history-delete-slot {
-        width: 28px;
-        margin-left: 6px;
+        width: var(--x-nt-suggestion-action-height, 26px);
+        margin-left: 0;
         opacity: 1;
         pointer-events: auto;
       }
@@ -1541,7 +1553,7 @@
         background: var(--x-nt-history-delete-bg, transparent);
         border-color: var(--x-nt-history-delete-border, transparent);
       }
-      .x-nt-history-delete-button[data-hover="true"] {
+      .x-nt-suggestion-item[data-history-delete-visible="true"] .x-nt-history-delete-button[data-hover="true"] {
         color: var(--x-nt-history-delete-hover-color, var(--x-nt-subtext, #6B7280));
         background: var(--x-nt-history-delete-hover-bg, transparent);
         border-color: var(--x-nt-history-delete-hover-border, transparent);
@@ -1562,10 +1574,11 @@
         font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         cursor: pointer;
         transition: background-color 0.2s ease, color 0.2s ease;
-        padding: 6px 12px;
+        height: var(--x-nt-suggestion-action-height, 26px);
+        padding: 0 var(--x-nt-suggestion-action-icon-end, 7px) 0 var(--x-nt-suggestion-action-button-start, 10px);
         box-sizing: border-box;
         margin: 0;
-        line-height: 1.5;
+        line-height: 1;
         text-decoration: none;
         list-style: none;
         outline: none;
@@ -1668,7 +1681,7 @@
       }
     </style>
   </head>
-  <body>
+  <body class="notranslate" translate="no" notranslate data-no-translate="true">
     <div id="_x_extension_newtab_root_2024_unique_"></div>
     <div id="_x_extension_toast_2024_unique_" class="_x_extension_toast_2024_unique_" data-show="false"></div>
     <script src="../shared/search-input-ui.js"></script>

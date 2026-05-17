@@ -25,6 +25,20 @@
   let currentMessages = null;
   let currentLanguageMode = 'system';
 
+  function applyNoTranslate(element) {
+    if (!element || typeof element.setAttribute !== 'function') {
+      return element;
+    }
+    element.setAttribute('translate', 'no');
+    element.setAttribute('lang', 'zxx');
+    element.setAttribute('notranslate', '');
+    element.setAttribute('data-no-translate', 'true');
+    if (element.classList) {
+      element.classList.add('notranslate');
+    }
+    return element;
+  }
+
   function getMessage(key, fallback) {
     if (currentMessages && currentMessages[key] && currentMessages[key].message) {
       return currentMessages[key].message;
@@ -280,6 +294,7 @@
       toast.setAttribute('aria-live', 'polite');
       toast.setAttribute('role', 'status');
       toast.setAttribute('data-show', 'false');
+      applyNoTranslate(toast);
       root.appendChild(toast);
     }
     return toast;
@@ -303,6 +318,8 @@
       icon.setAttribute('aria-hidden', 'true');
       text = document.createElement('span');
       text.className = '_x_extension_page_toast_text_2026_unique_';
+      applyNoTranslate(icon);
+      applyNoTranslate(text);
       toast.appendChild(icon);
       toast.appendChild(text);
     }

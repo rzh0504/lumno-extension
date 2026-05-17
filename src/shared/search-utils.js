@@ -13,6 +13,7 @@
     maxEngineSuggestions: 5,
     candidatePoolLimit: 20,
     finalSuggestionLimit: 12,
+    displaySuggestionLimit: 10,
     fallbackTopSiteLimit: 5,
     topSiteRepresentativeHostLimit: 1,
     topSiteRepresentativeClusterLimit: 1,
@@ -1597,6 +1598,17 @@
     return selected.slice(0, SEARCH_POLICY.finalSuggestionLimit);
   }
 
+  function limitSearchSuggestionsForDisplay(list, options) {
+    const suggestions = Array.isArray(list) ? list : [];
+    const settings = options && typeof options === 'object' ? options : {};
+    const rawLimit = Number(settings.limit);
+    const fallbackLimit = Number(SEARCH_POLICY.displaySuggestionLimit) || 10;
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0
+      ? Math.floor(rawLimit)
+      : fallbackLimit;
+    return suggestions.slice(0, limit);
+  }
+
   function getTitlePinyinMatchResult(item, context, options) {
     const settings = options && typeof options === 'object' ? options : {};
     if (!context || !context.useTitlePinyinMatch || !item || !item.title ||
@@ -2254,6 +2266,7 @@
     isSearchLikelyDirectNavigationQuery,
     isShortAsciiSearchTerm,
     isSiteSearchProviderTokenEligible,
+    limitSearchSuggestionsForDisplay,
     findProviderForSiteSearchSuggestion,
     findSiteSearchProvider,
     findSiteSearchProviderByInput,
