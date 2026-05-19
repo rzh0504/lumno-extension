@@ -3046,7 +3046,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     }
 
     function dismissAutocompletePreviewOnNonTabKey(event) {
-      if (!event || event.key === 'Tab') {
+      if (!event || event.key === 'Tab' || event.key === 'Enter') {
         return false;
       }
       const isModifierOnly = event.key === 'Shift' || event.key === 'Control' || event.key === 'Alt' || event.key === 'Meta';
@@ -3218,6 +3218,24 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         url: siteUrl
       });
       return true;
+    }
+
+    function recordSearchSuggestionSelectionFromSuggestion(suggestion, query, source) {
+      if (!suggestion || suggestion.forceSearch || suggestion.provider || !suggestion.url) {
+        return;
+      }
+      try {
+        chrome.runtime.sendMessage({
+          action: 'recordSearchSuggestionSelection',
+          query: String(query || '').trim(),
+          url: suggestion.url,
+          title: suggestion.title || '',
+          type: suggestion.type || 'history',
+          source: source || 'overlay'
+        });
+      } catch (e) {
+        // Selection ranking is best-effort; never block opening the target.
+      }
     }
 
     function getProviderIcon(provider) {
@@ -3703,11 +3721,6 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       if (!e.metaKey && !e.ctrlKey && !e.altKey) {
         e.stopPropagation();
       }
-      dismissAutocompletePreviewOnNonTabKey(e);
-      if (e.key !== 'Backspace' && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        latestRawInputValue = searchInput.value;
-        latestOverlayQuery = searchInput.value.trim();
-      }
       if (e.key === 'Escape' && siteSearchState) {
         e.preventDefault();
         e.stopPropagation();
@@ -3733,6 +3746,16 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       }
       if (e.key === 'Tab') {
         handleTabKey(e);
+        return;
+      }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
+        keydownHandler(e);
+        return;
+      }
+      dismissAutocompletePreviewOnNonTabKey(e);
+      if (e.key !== 'Backspace' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        latestRawInputValue = searchInput.value;
+        latestOverlayQuery = searchInput.value.trim();
       }
     });
     searchInput.addEventListener('keypress', function(e) {

@@ -65,4 +65,18 @@ assert.strictEqual(htmlIconCandidates[0].score, 88);
 assert.ok(htmlIconCandidates.some((candidate) => candidate.url === 'https://example.com/favicon-dark.svg' && candidate.score === 102));
 assert.ok(htmlIconCandidates.some((candidate) => candidate.url === 'https://example.com/assets/favicon-dark.svg'));
 
+assert.strictEqual(utils.parseCssThemeColor('#0f8').join(','), '0,255,136');
+assert.strictEqual(utils.parseCssThemeColor('rgba(10, 20, 30, 0.5)').join(','), '10,20,30');
+assert.strictEqual(utils.parseCssThemeColor('transparent'), null);
+
+const themeColorCandidates = utils.parseHtmlThemeColorCandidates(`
+  <meta name="theme-color" content="#112233" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <link rel="manifest" href="/site.webmanifest">
+`, 'https://example.com/docs/page', 'dark');
+assert.strictEqual(themeColorCandidates[0].accentRgb.join(','), '17,34,51');
+assert.strictEqual(themeColorCandidates[0].score, 108);
+assert.ok(themeColorCandidates.some((candidate) => candidate.manifestUrl === 'https://example.com/site.webmanifest'));
+assert.strictEqual(utils.pickBestThemeColorCandidate(themeColorCandidates).accentRgb.join(','), '17,34,51');
+
 console.log('favicon utils ok');
