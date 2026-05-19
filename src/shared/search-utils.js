@@ -216,6 +216,30 @@
     return String(hostname || '').toLowerCase().replace(/^www\./, '');
   }
 
+  function getSearchSiteConfig(hostname) {
+    const host = normalizeHost(hostname);
+    return host ? (SEARCH_SITE_CONFIG[host] || null) : null;
+  }
+
+  function getSearchDirectNavigationUrl(hostname) {
+    const host = normalizeHost(hostname);
+    if (!host) {
+      return '';
+    }
+    const siteConfig = getSearchSiteConfig(host);
+    return siteConfig && siteConfig.directNavigationUrl
+      ? siteConfig.directNavigationUrl
+      : `https://${host}/`;
+  }
+
+  function getSearchDirectNavigationTitle(hostname, fallbackTitle) {
+    const siteConfig = getSearchSiteConfig(hostname);
+    const title = siteConfig && siteConfig.directNavigationTitle
+      ? siteConfig.directNavigationTitle
+      : fallbackTitle;
+    return String(title || '').trim();
+  }
+
   function splitSearchTerms(value) {
     return Array.from(new Set(
       String(value || '')
@@ -401,7 +425,7 @@
         : '/';
       parsed.pathname = normalizedPathname;
       const normalizedHost = normalizeHost(parsed.hostname);
-      const siteConfig = SEARCH_SITE_CONFIG[normalizedHost] || null;
+      const siteConfig = getSearchSiteConfig(normalizedHost);
       const ignoreAllSearchParamsPaths = siteConfig && siteConfig.ignoreAllSearchParamsPaths
         ? siteConfig.ignoreAllSearchParamsPaths
         : null;
@@ -427,6 +451,31 @@
     } catch (e) {
       return String(url).trim().toLowerCase();
     }
+  }
+
+  function getStableDirectNavigationTitleForUrl(url, sourceType) {
+    if (sourceType === 'bookmark') {
+      return '';
+    }
+    try {
+      const parsed = new URL(String(url || '').trim());
+      const directTitle = getSearchDirectNavigationTitle(parsed.hostname);
+      if (!directTitle) {
+        return '';
+      }
+      return buildSearchDedupUrlKey(url) === buildSearchDedupUrlKey(getSearchDirectNavigationUrl(parsed.hostname))
+        ? directTitle
+        : '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function getSearchSuggestionDisplayTitle(item, sourceType) {
+    return getStableDirectNavigationTitleForUrl(item && item.url, sourceType) ||
+      (item && item.title) ||
+      (item && item.url) ||
+      '';
   }
 
   function shouldReplaceDedupedSearchItem(candidate, existing) {
@@ -776,7 +825,7 @@
       const second = segments[1] || '';
       const third = segments[2] || '';
 
-      const siteConfig = SEARCH_SITE_CONFIG[host] || null;
+      const siteConfig = getSearchSiteConfig(host);
       if (host === 'github.com' && segments.length >= 2) {
         const repoBase = `${host}/${segments[0]}/${segments[1]}`;
         if (segments.length === 2) {
@@ -1423,7 +1472,7 @@
   function createSearchSuggestion(item, sourceType, score, extras) {
     return {
       type: sourceType,
-      title: item.title || item.url,
+      title: getSearchSuggestionDisplayTitle(item, sourceType),
       url: item.url,
       favicon: extras && extras.favicon ? extras.favicon : '',
       score,
@@ -1495,13 +1544,11 @@
       return null;
     }
 
-    const siteConfig = SEARCH_SITE_CONFIG[bestGroup.host] || null;
-    const directUrl = siteConfig && siteConfig.directNavigationUrl
-      ? siteConfig.directNavigationUrl
-      : `https://${bestGroup.host}/`;
-    const directTitle = siteConfig && siteConfig.directNavigationTitle
-      ? siteConfig.directNavigationTitle
-      : (bestGroup.sourceSuggestion.title || bestGroup.host);
+    const directUrl = getSearchDirectNavigationUrl(bestGroup.host);
+    const directTitle = getSearchDirectNavigationTitle(
+      bestGroup.host,
+      bestGroup.sourceSuggestion.title || bestGroup.host
+    );
     const sourceType = bestGroup.sourceSuggestion.type === 'bookmark'
       ? 'bookmark'
       : ((bestGroup.sourceSuggestion.type === 'topSite' || bestGroup.sourceSuggestion.isTopSite) ? 'topSite' : 'history');

@@ -173,6 +173,12 @@
   visibility: visible;
 }
 
+#_x_extension_overlay_2024_unique_ .x-ov-suggestion-favicon-fallback[data-visible="false"],
+#_x_extension_overlay_2024_unique_ img[data-fallback-icon="true"],
+#_x_extension_overlay_2024_unique_ img[data-favicon-placeholder="true"] {
+  display: none;
+}
+
 #_x_extension_overlay_2024_unique_ .x-ov-suggestion-favicon[data-favicon-load-state="priming"] {
   transition: none;
   filter: blur(4px);

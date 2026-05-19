@@ -5784,6 +5784,7 @@
     applyFaviconOpticalAlignment,
     applyFaviconOpticalShift,
     applyFallbackIcon,
+    setFaviconSrcWithAnimation,
     attachFaviconWithFallbacks,
     reportMissingIcon,
     preloadIcon,

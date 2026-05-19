@@ -1328,6 +1328,7 @@ function openOverlayOnTab(activeTab, tabs, source) {
     'src/overlay/favicon-view.js',
     'src/overlay/shell.js',
     'src/overlay/lifecycle.js',
+    'src/overlay/site-fixes.js',
     'src/overlay/search-panel.js'
   ];
   logHotkeyDebug('inject-start', { tabId: activeTab.id, file: overlayInjectionFiles.join(','), source: source || '' });
@@ -2495,7 +2496,8 @@ function handleFaviconMessage(request, sender, sendResponse) {
       const fallbackUrl = request.fallbackUrl || '';
       const preferredTheme = request.preferredTheme || '';
       const options = {
-        includeChromeFallback: request.excludeChromeFallback ? false : true
+        includeChromeFallback: request.excludeChromeFallback ? false : true,
+        forceFresh: request.forceFresh === true
       };
       resolveFaviconCandidates(targetUrl, hostOverride, fallbackUrl, preferredTheme, options).then((urls) => {
         sendResponse({ urls: Array.isArray(urls) ? urls : [] });
@@ -3976,6 +3978,7 @@ function dedupeAndSortFaviconCandidates(candidates) {
 
 function resolveFaviconCandidates(targetUrl, hostOverride, fallbackUrl, preferredTheme, options) {
   const includeChromeFallback = !options || options.includeChromeFallback !== false;
+  const forceFresh = Boolean(options && options.forceFresh);
   const inputUrl = String(targetUrl || '').trim();
   if (!inputUrl) {
     return Promise.resolve([]);
@@ -4003,10 +4006,10 @@ function resolveFaviconCandidates(targetUrl, hostOverride, fallbackUrl, preferre
       ...extra
     ]);
   };
-  if (faviconResolveCache.has(cacheKey)) {
+  if (!forceFresh && faviconResolveCache.has(cacheKey)) {
     return Promise.resolve(buildResolvedWithExtra(faviconResolveCache.get(cacheKey), 80));
   }
-  if (faviconResolvePending.has(cacheKey)) {
+  if (!forceFresh && faviconResolvePending.has(cacheKey)) {
     return faviconResolvePending.get(cacheKey);
   }
   const resolveFreshCandidates = () => {
@@ -4017,7 +4020,7 @@ function resolveFaviconCandidates(targetUrl, hostOverride, fallbackUrl, preferre
       setPersistedFaviconResolveUrls(cacheKey, resolved);
       return Promise.resolve(resolved);
     }
-    return fetch(inputUrl, { cache: 'force-cache' })
+    return fetch(inputUrl, { cache: forceFresh ? 'reload' : 'force-cache' })
       .then((response) => {
         if (!response || !response.ok) {
           return '';
@@ -4040,7 +4043,7 @@ function resolveFaviconCandidates(targetUrl, hostOverride, fallbackUrl, preferre
         return resolved;
       });
   };
-  const promise = getPersistedFaviconResolveUrls(cacheKey)
+  const promise = (forceFresh ? Promise.resolve([]) : getPersistedFaviconResolveUrls(cacheKey))
     .then((persistedUrls) => {
       if (persistedUrls.length > 0) {
         faviconResolveCache.set(cacheKey, persistedUrls.slice(0, 8));
@@ -4049,14 +4052,20 @@ function resolveFaviconCandidates(targetUrl, hostOverride, fallbackUrl, preferre
       return resolveFreshCandidates();
     })
     .then((resolved) => {
-      faviconResolvePending.delete(cacheKey);
+      if (!forceFresh) {
+        faviconResolvePending.delete(cacheKey);
+      }
       return resolved;
     })
     .catch(() => {
-      faviconResolvePending.delete(cacheKey);
+      if (!forceFresh) {
+        faviconResolvePending.delete(cacheKey);
+      }
       return resolveFreshCandidates();
     });
-  faviconResolvePending.set(cacheKey, promise);
+  if (!forceFresh) {
+    faviconResolvePending.set(cacheKey, promise);
+  }
   return promise;
 }
 

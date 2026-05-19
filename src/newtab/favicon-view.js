@@ -281,7 +281,34 @@
         setFallbackNodeVisible(fallbackNode, false);
       }
       img.removeAttribute('data-fallback-icon');
+      img.removeAttribute('data-favicon-placeholder');
       img.style.setProperty('display', 'block');
+    }
+
+    function showPendingFallbackIcon(img) {
+      if (!img) {
+        return;
+      }
+      const node = ensureFallbackIconNode(img);
+      img.removeAttribute('data-fallback-icon');
+      img.setAttribute('data-favicon-placeholder', 'true');
+      img.style.removeProperty('display');
+      if (node) {
+        setFallbackNodeVisible(node, true);
+        return;
+      }
+      setTimer(() => {
+        if (!img || !img.isConnected) {
+          return;
+        }
+        if (img.getAttribute('data-favicon-placeholder') !== 'true') {
+          return;
+        }
+        const delayedNode = ensureFallbackIconNode(img);
+        if (delayedNode) {
+          setFallbackNodeVisible(delayedNode, true);
+        }
+      }, 0);
     }
 
     function applyFallbackIcon(img) {
@@ -289,6 +316,7 @@
         return;
       }
       const node = ensureFallbackIconNode(img);
+      img.removeAttribute('data-favicon-placeholder');
       img.setAttribute('data-fallback-icon', 'true');
       img.style.removeProperty('display');
       if (node) {
@@ -355,11 +383,26 @@
       }
       const shouldPersist = !(optionsArg && optionsArg.persist === false);
       const currentSrc = img.getAttribute('data-favicon-current-src') || '';
+      const isFallbackVisible = img.getAttribute('data-fallback-icon') === 'true';
+      const isPlaceholderVisible = img.getAttribute('data-favicon-placeholder') === 'true';
+      const currentRenderedSrc = String(img.getAttribute('src') || img.src || '');
+      const shouldRestartSameSource = (isFallbackVisible || isPlaceholderVisible) &&
+        currentRenderedSrc === nextSrc &&
+        currentSrc !== nextSrc;
       if (currentSrc === nextSrc) {
-        return false;
+        if ((isFallbackVisible || isPlaceholderVisible) && img.complete && img.naturalWidth > 0) {
+          showResolvedFavicon(img);
+          return false;
+        }
+        if (!isFallbackVisible && !isPlaceholderVisible) {
+          return false;
+        }
       }
       const hasAppeared = img.getAttribute('data-favicon-has-appeared') === 'true';
       const shouldAnimate = !hasAppeared;
+      if (shouldAnimate || isFallbackVisible || isPlaceholderVisible) {
+        showPendingFallbackIcon(img);
+      }
       img._xFaviconLoadToken = (img._xFaviconLoadToken || 0) + 1;
       const token = img._xFaviconLoadToken;
       const finalize = () => {
@@ -394,6 +437,9 @@
         });
       };
       img.addEventListener('load', finalize, { once: true });
+      if (shouldRestartSameSource) {
+        img.removeAttribute('src');
+      }
       img.src = nextSrc;
       if (img.complete && img.naturalWidth > 0) {
         finalize();
@@ -410,7 +456,8 @@
         return false;
       }
       const isFallback = img.getAttribute('data-fallback-icon') === 'true';
-      if (isFallback) {
+      const isPlaceholder = img.getAttribute('data-favicon-placeholder') === 'true';
+      if (isFallback || isPlaceholder) {
         return false;
       }
       const currentResolved = img.getAttribute('data-favicon-current-src') || '';
@@ -587,10 +634,12 @@
       const persistedAge = persistedEntry && Number.isFinite(persistedEntry.updatedAt)
         ? (now - persistedEntry.updatedAt)
         : Number.POSITIVE_INFINITY;
+      const persistedFaviconIsStale = Number.isFinite(persistedAge) &&
+        persistedAge > faviconRevalidateIntervalMs;
       let shouldRevalidatePersisted = forceRevalidate || isVisitDirty ||
         !persistedFavicon ||
         !Number.isFinite(persistedAge) ||
-        persistedAge > faviconRevalidateIntervalMs;
+        persistedFaviconIsStale;
       if (shouldForceThemeRevalidate) {
         shouldRevalidatePersistedData = true;
         shouldRevalidatePersisted = true;
@@ -613,6 +662,7 @@
         shouldRevalidatePersisted,
         shouldRevalidatePersistedData,
         persistedDataIsStale,
+        persistedFaviconIsStale,
         hasExplicitDarkFavicon,
         shouldPreferDarkTokenUpgrades: preferredTheme === 'dark' &&
           (knownHasPreferredVariant || hasExplicitDarkFavicon),
@@ -762,7 +812,7 @@
       }, faviconSoftRevalidateDelayMs);
     }
 
-    function requestResolvedThemeAwareFaviconCandidates(state) {
+    function requestResolvedThemeAwareFaviconCandidates(state, optionsArg) {
       return new Promise((resolve) => {
         if (!chromeApi.runtime || typeof chromeApi.runtime.sendMessage !== 'function') {
           resolve([]);
@@ -774,7 +824,13 @@
             url: state.url,
             host: state.hostKey,
             fallbackUrl: '',
-            preferredTheme: state.preferredTheme
+            preferredTheme: state.preferredTheme,
+            forceFresh: Boolean(
+              (optionsArg && optionsArg.forceFreshResolvedCandidates) ||
+              state.isVisitDirty ||
+              state.persistedDataIsStale ||
+              state.persistedFaviconIsStale
+            )
           },
           (response) => {
             const resolved = response && Array.isArray(response.urls) ? response.urls : [];
@@ -906,7 +962,7 @@
           return;
         }
         if (!resolvedCandidatesLoaded) {
-          applyFallbackIcon(img);
+          showPendingFallbackIcon(img);
           return;
         }
         finalizeFailure();
@@ -920,7 +976,11 @@
         appliedInitial = tryNextAvailableCandidate();
       }
       if (!appliedInitial) {
-        applyFallbackIcon(img);
+        if (shouldRequestResolvedCandidates) {
+          showPendingFallbackIcon(img);
+        } else {
+          applyFallbackIcon(img);
+        }
         if (!shouldRequestResolvedCandidates) {
           finalizeFailure('');
         }
@@ -929,7 +989,7 @@
         return;
       }
 
-      requestResolvedThemeAwareFaviconCandidates(state)
+      requestResolvedThemeAwareFaviconCandidates(state, optionsArg)
         .then((resolved) => {
           if (!state.isSessionCurrent()) {
             return;
@@ -940,7 +1000,11 @@
           resolvedCandidates = resolved;
           resolvedCandidatesLoaded = true;
 
-          if (!appliedInitial || img.getAttribute('data-fallback-icon') === 'true') {
+          if (
+            !appliedInitial ||
+            img.getAttribute('data-fallback-icon') === 'true' ||
+            img.getAttribute('data-favicon-placeholder') === 'true'
+          ) {
             if (!tryNextAvailableCandidate()) {
               finalizeFailure('');
             }
@@ -957,7 +1021,10 @@
           if (!state.isSessionCurrent()) {
             return;
           }
-          if (img.getAttribute('data-fallback-icon') === 'true') {
+          if (
+            img.getAttribute('data-fallback-icon') === 'true' ||
+            img.getAttribute('data-favicon-placeholder') === 'true'
+          ) {
             finalizeFailure('');
           }
         });
@@ -978,7 +1045,10 @@
     }
 
     function rescueThemeAwareFallbackFavicons() {
-      doc.querySelectorAll('img[data-x-nt-theme-favicon="1"][data-fallback-icon="true"]').forEach((img) => {
+      doc.querySelectorAll(
+        'img[data-x-nt-theme-favicon="1"][data-fallback-icon="true"], ' +
+        'img[data-x-nt-theme-favicon="1"][data-favicon-placeholder="true"]'
+      ).forEach((img) => {
         if (!img || !img.isConnected) {
           return;
         }
@@ -987,7 +1057,12 @@
           return;
         }
         const host = img.getAttribute('data-x-nt-favicon-host') || '';
-        attachFaviconWithFallbacks(img, pageUrl, host);
+        attachFaviconWithFallbacks(img, pageUrl, host, {
+          forceRevalidate: true,
+          forceFreshResolvedCandidates: true,
+          skipPersistedDataPrime: true,
+          deferRevalidate: false
+        });
       });
     }
 

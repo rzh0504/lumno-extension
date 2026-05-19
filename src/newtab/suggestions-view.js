@@ -95,6 +95,15 @@
     const applyFaviconOpticalShift = typeof config.applyFaviconOpticalShift === 'function'
       ? config.applyFaviconOpticalShift
       : noop;
+    const setFaviconSrcWithAnimation = typeof config.setFaviconSrcWithAnimation === 'function'
+      ? config.setFaviconSrcWithAnimation
+      : function(img, src) {
+        if (!img || !src) {
+          return false;
+        }
+        img.src = src;
+        return true;
+      };
     const applyFallbackIcon = typeof config.applyFallbackIcon === 'function'
       ? config.applyFallbackIcon
       : noop;
@@ -443,7 +452,7 @@
         if (useFallback) {
           applyFallbackIcon(favicon);
         } else {
-          favicon.src = tab.favIconUrl;
+          setFaviconSrcWithAnimation(favicon, tab.favIconUrl);
           favicon.addEventListener('load', function() {
             applyFaviconOpticalShift(favicon);
           });

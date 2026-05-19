@@ -124,6 +124,24 @@ const promoted = search.promoteStrongNavigationMatch(navList, 'example');
 assert.strictEqual(promoted.title, 'Example Home', 'strong navigation promotion should choose representative pages');
 assert.strictEqual(navList[0].title, 'Example Home', 'strong navigation promotion should mutate the list consistently');
 
+const xRootSuggestion = search.createSearchSuggestion({
+  title: '(1) نوف | Nouf (@Nouf0633) / X',
+  url: 'https://x.com/'
+}, 'history', 100);
+assert.strictEqual(xRootSuggestion.title, 'X', 'configured site roots should use stable direct titles');
+
+const xProfileSuggestion = search.createSearchSuggestion({
+  title: '(1) نوف | Nouf (@Nouf0633) / X',
+  url: 'https://x.com/Nouf0633'
+}, 'history', 100);
+assert.strictEqual(xProfileSuggestion.title, '(1) نوف | Nouf (@Nouf0633) / X', 'configured titles should not replace profile paths');
+
+const xBookmarkSuggestion = search.createSearchSuggestion({
+  title: 'My X bookmark',
+  url: 'https://x.com/'
+}, 'bookmark', 100);
+assert.strictEqual(xBookmarkSuggestion.title, 'My X bookmark', 'bookmark titles should remain user controlled');
+
 const dedupUrl = search.buildSearchDedupUrlKey('https://www.example.com/docs/?utm_source=x&ref=abc&keep=1#section');
 assert.strictEqual(dedupUrl, 'https://example.com/docs?keep=1', 'dedupe URL should drop tracking params and hashes');
 

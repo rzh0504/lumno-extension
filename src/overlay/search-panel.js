@@ -18,6 +18,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   let overlayKeyCaptureHandler = null;
   let clickOutsideHandler = null;
   let overlayScrollPauseHandler = null;
+  let overlayRevealGate = null;
   const OVERLAY_HOST_ID = '_x_extension_overlay_host_2026_unique_';
   const OVERLAY_PANEL_ID = '_x_extension_overlay_2024_unique_';
   const SETTINGS = window.LumnoSettings || {};
@@ -28,6 +29,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   const overlayRuntime = window.LumnoOverlayRuntime;
   const overlayLifecycle = window.LumnoOverlayLifecycle;
   const overlayFaviconView = window.LumnoOverlayFaviconView;
+  const overlaySiteFixes = window.LumnoOverlaySiteFixes;
   if (!overlayRuntime ||
       !overlayRuntime.STORAGE_KEYS ||
       typeof overlayRuntime.getRuntimeUrl !== 'function' ||
@@ -801,6 +803,10 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   // Helper function to remove overlay and clean up styles
   function removeOverlay(overlayElement) {
     clearOverlayEnterAnimationFrames();
+    if (overlayRevealGate && typeof overlayRevealGate.cancel === 'function') {
+      overlayRevealGate.cancel();
+      overlayRevealGate = null;
+    }
     stopOverlayViewportSizeSync();
     stopOverlayAntiTranslateObserver();
     if (overlayElement) {
@@ -995,6 +1001,12 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       overlaySuggestionsCssUrl: OVERLAY_SUGGESTIONS_CSS_URL
     });
 
+    overlayRevealGate = overlaySiteFixes && typeof overlaySiteFixes.createOverlayRevealGate === 'function'
+      ? overlaySiteFixes.createOverlayRevealGate(window, {
+        overlay,
+        styleRoot: overlayStyleRoot || document.head || document.documentElement
+      })
+      : null;
 
     if (typeof window._x_extension_createSearchInput_2024_unique_ !== 'function') {
       console.warn('Lumno: input UI helper not available.');
@@ -5818,21 +5830,34 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     document.body.appendChild(overlayHost);
     startOverlayViewportSizeSync(overlay);
     startOverlayAntiTranslateObserver(overlay);
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduceMotion) {
-      overlay.style.setProperty('opacity', '1', 'important');
-      overlay.style.setProperty('transform', 'translateX(-50%) translateY(0) scale(1)', 'important');
-      overlay.style.setProperty('filter', 'blur(0)', 'important');
-    } else {
-      clearOverlayEnterAnimationFrames();
-      // Flush initial style state before starting transition to avoid skipped enter animations.
-      void overlay.offsetHeight;
-      overlayFrameTracker.runEnterAnimation(overlay, () => {
+
+    const revealOverlay = () => {
+      if (!overlay || !overlay.isConnected) {
+        return;
+      }
+      if (overlayRevealGate && typeof overlayRevealGate.release === 'function') {
+        overlayRevealGate.release();
+      }
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduceMotion) {
         overlay.style.setProperty('opacity', '1', 'important');
         overlay.style.setProperty('transform', 'translateX(-50%) translateY(0) scale(1)', 'important');
         overlay.style.setProperty('filter', 'blur(0)', 'important');
-      });
-    }
+      } else {
+        clearOverlayEnterAnimationFrames();
+        // Flush initial style state before starting transition to avoid skipped enter animations.
+        void overlay.offsetHeight;
+        overlayFrameTracker.runEnterAnimation(overlay, () => {
+          overlay.style.setProperty('opacity', '1', 'important');
+          overlay.style.setProperty('transform', 'translateX(-50%) translateY(0) scale(1)', 'important');
+          overlay.style.setProperty('filter', 'blur(0)', 'important');
+        });
+      }
+    };
+    const revealReady = overlayRevealGate && typeof overlayRevealGate.waitUntilReady === 'function'
+      ? overlayRevealGate.waitUntilReady()
+      : Promise.resolve({ ok: true, reason: 'no-site-fix' });
+    Promise.resolve(revealReady).then(revealOverlay).catch(revealOverlay);
     // Let the container paint first so the enter transition is visible on busy pages.
     const queueInitialOverlayRender = () => {
       if (!overlay.isConnected) {

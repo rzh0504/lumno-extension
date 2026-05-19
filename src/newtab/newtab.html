@@ -532,7 +532,8 @@
       .x-nt-favicon-fallback[data-visible="false"] {
         display: none;
       }
-      img[data-fallback-icon="true"] {
+      img[data-fallback-icon="true"],
+      img[data-favicon-placeholder="true"] {
         display: none;
       }
       img[data-favicon-load-state="priming"] {
@@ -596,6 +597,9 @@
         align-items: center;
         justify-content: center;
         color: #7892bd;
+      }
+      .x-nt-folder-preview-favicon--fallback[data-visible="false"] {
+        display: none;
       }
       body[data-theme="dark"] .x-nt-folder-preview-favicon {
         background: #1f2937;
