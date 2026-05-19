@@ -5,6 +5,7 @@
   }
   root.LumnoNewtabFaviconTheme = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function(root) {
+  const faviconUtils = root.LumnoFaviconUtils || {};
   const defaultAccentColor = [59, 130, 246];
   const brandAccentMap = {
     'github.com': [36, 41, 46],
@@ -213,6 +214,9 @@
   }
 
   function normalizeFaviconHost(hostname) {
+    if (typeof faviconUtils.normalizeFaviconHost === 'function') {
+      return faviconUtils.normalizeFaviconHost(hostname);
+    }
     if (!hostname) {
       return '';
     }
@@ -263,11 +267,17 @@
   }
 
   function hasThemeTokenInUrl(url, token) {
+    if (typeof faviconUtils.hasThemeTokenInUrl === 'function') {
+      return faviconUtils.hasThemeTokenInUrl(url, token);
+    }
     const lower = String(url || '').toLowerCase();
     return new RegExp(`(^|[._/-])${token}([._/-]|$)`).test(lower);
   }
 
   function shouldSkipThemeUpgradeCandidate(candidateUrl, preferredTheme, currentUrl) {
+    if (typeof faviconUtils.shouldSkipThemeUpgradeCandidate === 'function') {
+      return faviconUtils.shouldSkipThemeUpgradeCandidate(candidateUrl, preferredTheme, currentUrl);
+    }
     const mode = preferredTheme === 'dark' ? 'dark' : (preferredTheme === 'light' ? 'light' : '');
     if (!mode) {
       return false;
@@ -285,6 +295,16 @@
   }
 
   function getKnownThemedFaviconCandidates(hostname, preferredTheme) {
+    if (typeof faviconUtils.getKnownThemedFaviconCandidateUrls === 'function') {
+      return faviconUtils.getKnownThemedFaviconCandidateUrls(hostname, preferredTheme, {
+        getRuntimeUrl: (path) => {
+          const chromeApi = root.chrome;
+          return chromeApi && chromeApi.runtime && typeof chromeApi.runtime.getURL === 'function'
+            ? chromeApi.runtime.getURL(path)
+            : '';
+        }
+      });
+    }
     const host = normalizeFaviconHost(hostname);
     if (!host) {
       return [];
@@ -316,6 +336,9 @@
   }
 
   function hostHasExplicitDarkFavicon(hostname) {
+    if (typeof faviconUtils.hostHasExplicitDarkFavicon === 'function') {
+      return faviconUtils.hostHasExplicitDarkFavicon(hostname);
+    }
     const host = normalizeFaviconHost(hostname);
     if (!host) {
       return false;
@@ -324,6 +347,9 @@
   }
 
   function isFaviconProxyUrl(url) {
+    if (typeof faviconUtils.isFaviconProxyUrl === 'function') {
+      return faviconUtils.isFaviconProxyUrl(url);
+    }
     if (!url) {
       return false;
     }

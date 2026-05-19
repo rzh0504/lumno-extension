@@ -26,6 +26,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   const SITE_SEARCH_STORE = window.LumnoSiteSearchStore || {};
   const SUGGESTION_NAVIGATION = window.LumnoSuggestionNavigation || {};
   const SEARCH_INPUT_MODE = window.LumnoSearchInputMode || {};
+  const FAVICON_UTILS = window.LumnoFaviconUtils || {};
   const overlayRuntime = window.LumnoOverlayRuntime;
   const overlayLifecycle = window.LumnoOverlayLifecycle;
   const overlayFaviconView = window.LumnoOverlayFaviconView;
@@ -639,98 +640,21 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
 
 
   function isLocalNetworkHost(hostname) {
-    const host = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
-    if (!host) {
-      return false;
-    }
-    if (
-      host === 'localhost' ||
-      host.endsWith('.localhost') ||
-      host.endsWith('.local') ||
-      host === 'host.docker.internal'
-    ) {
-      return true;
-    }
-    if (/^\d{1,3}(?:\.\d{1,3}){0,2}$/.test(host)) {
-      const shortParts = host.split('.').map((part) => Number(part));
-      if (shortParts.every((part) => Number.isInteger(part) && part >= 0 && part <= 255)) {
-        return true;
-      }
-    }
-    if (/^(\d{1,3}\.){3}\d{1,3}$/.test(host)) {
-      const parts = host.split('.').map((part) => Number(part));
-      if (parts.some((part) => Number.isNaN(part) || part < 0 || part > 255)) {
-        return false;
-      }
-      if (
-        parts[0] === 0 ||
-        parts[0] === 10 ||
-        parts[0] === 127 ||
-        (parts[0] === 169 && parts[1] === 254)
-      ) {
-        return true;
-      }
-      if (parts[0] === 192 && parts[1] === 168) {
-        return true;
-      }
-      if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) {
-        return true;
-      }
-      if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) {
-        return true;
-      }
-    }
-    const ipv6 = host.split('%')[0];
-    if (
-      ipv6 === '::1' ||
-      ipv6 === '0:0:0:0:0:0:0:1' ||
-      ipv6 === '::' ||
-      /^fe[89ab][0-9a-f]*:/i.test(ipv6) ||
-      /^[fd][0-9a-f]{1,3}:/i.test(ipv6)
-    ) {
-      return true;
-    }
-    const mappedIpv4 = ipv6.match(/::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i);
-    if (mappedIpv4 && mappedIpv4[1]) {
-      return isLocalNetworkHost(mappedIpv4[1]);
-    }
-    return false;
+    return typeof FAVICON_UTILS.isLocalNetworkHost === 'function'
+      ? FAVICON_UTILS.isLocalNetworkHost(hostname)
+      : false;
   }
 
   function isSuspiciousLocalFaviconHost(hostname) {
-    const host = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
-    if (!host) {
-      return false;
-    }
-    const ipv6 = host.split('%')[0];
-    if (host.includes(':') || ipv6.includes(':')) {
-      return false;
-    }
-    if (/^\d{1,3}(?:\.\d{1,3}){0,3}$/.test(host)) {
-      return false;
-    }
-    if (!host.includes('.')) {
-      return /^[a-z0-9-]+$/i.test(host);
-    }
-    const labels = host.split('.').filter(Boolean);
-    if (labels.length < 2) {
-      return false;
-    }
-    const suffix = labels[labels.length - 1];
-    return [
-      'internal',
-      'intern',
-      'test',
-      'localdev',
-      'lan',
-      'home',
-      'corp',
-      'localdomain'
-    ].includes(suffix);
+    return typeof FAVICON_UTILS.isSuspiciousLocalFaviconHost === 'function'
+      ? FAVICON_UTILS.isSuspiciousLocalFaviconHost(hostname)
+      : false;
   }
 
   function shouldBlockFaviconForHost(hostname) {
-    return isLocalNetworkHost(hostname) || isSuspiciousLocalFaviconHost(hostname);
+    return typeof FAVICON_UTILS.shouldBlockFaviconForHost === 'function'
+      ? FAVICON_UTILS.shouldBlockFaviconForHost(hostname)
+      : false;
   }
 
   function normalizeOverlayThemePreference(theme) {
@@ -739,23 +663,10 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       : '';
   }
 
-  function hasOverlayThemeTokenInUrl(url, token) {
-    const lower = String(url || '').toLowerCase();
-    return new RegExp(`(^|[._/-])${token}([._/-]|$)`).test(lower);
-  }
-
   function shouldSkipOverlayThemeUpgradeCandidate(candidateUrl, preferredTheme, currentUrl) {
-    const mode = normalizeOverlayThemePreference(preferredTheme);
-    if (!mode) {
-      return false;
-    }
-    const opposite = mode === 'dark' ? 'light' : 'dark';
-    if (hasOverlayThemeTokenInUrl(candidateUrl, opposite)) {
-      return true;
-    }
-    const currentHasPreferredToken = hasOverlayThemeTokenInUrl(currentUrl, mode);
-    const candidateHasPreferredToken = hasOverlayThemeTokenInUrl(candidateUrl, mode);
-    return currentHasPreferredToken && !candidateHasPreferredToken;
+    return typeof FAVICON_UTILS.shouldSkipThemeUpgradeCandidate === 'function'
+      ? FAVICON_UTILS.shouldSkipThemeUpgradeCandidate(candidateUrl, normalizeOverlayThemePreference(preferredTheme), currentUrl)
+      : false;
   }
 
   function isLocalNetworkInput(input) {
@@ -1478,8 +1389,57 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     const themeHostCache = window._x_extension_theme_host_cache_2024_unique_ || new Map();
     window._x_extension_theme_host_cache_2024_unique_ = themeHostCache;
 
-    const faviconDataCache = new Map();
-    const faviconDataPending = new Map();
+    const overlayFaviconCacheApi = window.LumnoFaviconCache || window.LumnoNewtabFaviconCache;
+    let overlayFaviconCacheRuntime = window._x_extension_overlay_favicon_cache_runtime_2026_unique_ || null;
+    if (!overlayFaviconCacheRuntime &&
+        overlayFaviconCacheApi &&
+        typeof overlayFaviconCacheApi.createFaviconCache === 'function') {
+      overlayFaviconCacheRuntime = overlayFaviconCacheApi.createFaviconCache({
+        storageArea: (chrome && chrome.storage && chrome.storage.local) ? chrome.storage.local : null,
+        windowObj: window,
+        normalizeFaviconHost,
+        isBlockedLocalFaviconUrl: isBlockedLocalFaviconCacheUrl
+      });
+      window._x_extension_overlay_favicon_cache_runtime_2026_unique_ = overlayFaviconCacheRuntime;
+    }
+    if (overlayFaviconCacheRuntime && typeof overlayFaviconCacheRuntime.ensureCachesReady === 'function') {
+      overlayFaviconCacheRuntime.ensureCachesReady().then(() => {
+        refreshOverlayThemeAwareFavicons();
+      });
+    }
+
+    function getPersistedOverlayFaviconEntry(cacheKey) {
+      return overlayFaviconCacheRuntime &&
+        typeof overlayFaviconCacheRuntime.getPersistedEntry === 'function'
+        ? overlayFaviconCacheRuntime.getPersistedEntry(cacheKey)
+        : null;
+    }
+
+    function setPersistedOverlayFaviconUrl(cacheKey, url) {
+      if (overlayFaviconCacheRuntime && typeof overlayFaviconCacheRuntime.setPersistedUrl === 'function') {
+        overlayFaviconCacheRuntime.setPersistedUrl(cacheKey, url);
+      }
+    }
+
+    function getPersistedOverlayFaviconDataEntry(cacheKey) {
+      return overlayFaviconCacheRuntime &&
+        typeof overlayFaviconCacheRuntime.getPersistedDataEntry === 'function'
+        ? overlayFaviconCacheRuntime.getPersistedDataEntry(cacheKey)
+        : null;
+    }
+
+    function setPersistedOverlayFaviconData(cacheKey, dataUrl) {
+      if (overlayFaviconCacheRuntime && typeof overlayFaviconCacheRuntime.setPersistedData === 'function') {
+        overlayFaviconCacheRuntime.setPersistedData(cacheKey, dataUrl);
+      }
+    }
+
+    const faviconDataCache = window._x_extension_overlay_favicon_data_cache_2026_unique_ || new Map();
+    window._x_extension_overlay_favicon_data_cache_2026_unique_ = faviconDataCache;
+    const faviconDataPending = window._x_extension_overlay_favicon_data_pending_2026_unique_ || new Map();
+    window._x_extension_overlay_favicon_data_pending_2026_unique_ = faviconDataPending;
+    const iconPreloadCache = window._x_extension_overlay_icon_preload_cache_2026_unique_ || new Map();
+    window._x_extension_overlay_icon_preload_cache_2026_unique_ = iconPreloadCache;
     const overlayFaviconRuntime = overlayFaviconView.createOverlayFaviconViewRuntime({
       document,
       windowObj: window,
@@ -1491,12 +1451,35 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       getSiteFaviconUrl,
       normalizeFaviconHost,
       shouldBlockFaviconForHost,
+      isBlockedLocalFaviconUrl: isBlockedLocalFaviconCacheUrl,
       isFaviconProxyUrl,
+      isChromeMonogramFaviconUrl: (url) => (
+        typeof FAVICON_UTILS.isChromeMonogramFaviconUrl === 'function'
+          ? FAVICON_UTILS.isChromeMonogramFaviconUrl(url)
+          : /^chrome:\/\/favicon2\//i.test(String(url || '').trim())
+      ),
+      getKnownThemedFaviconCandidates: (hostname, preferredTheme) => (
+        typeof FAVICON_UTILS.getKnownThemedFaviconCandidateUrls === 'function'
+          ? FAVICON_UTILS.getKnownThemedFaviconCandidateUrls(hostname, preferredTheme, {
+            getRuntimeUrl: (path) => chrome.runtime.getURL(path)
+          })
+          : []
+      ),
+      hostHasExplicitDarkFavicon: (hostname) => (
+        typeof FAVICON_UTILS.hostHasExplicitDarkFavicon === 'function'
+          ? FAVICON_UTILS.hostHasExplicitDarkFavicon(hostname)
+          : false
+      ),
       shouldSkipThemeUpgradeCandidate: shouldSkipOverlayThemeUpgradeCandidate,
       isOverlayDarkMode,
       preloadThemeFromFavicon,
       faviconDataCache,
       faviconDataPending,
+      iconPreloadCache,
+      getPersistedFaviconEntry: getPersistedOverlayFaviconEntry,
+      setPersistedFaviconUrl: setPersistedOverlayFaviconUrl,
+      getPersistedFaviconDataEntry: getPersistedOverlayFaviconDataEntry,
+      setPersistedFaviconData: setPersistedOverlayFaviconData,
       getOverlayPanel: () => overlay,
       hasThemeForHost: (hostKey) => Boolean(hostKey && themeHostCache.has(hostKey))
     });
@@ -2154,14 +2137,9 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     }
 
     function normalizeFaviconHost(hostname) {
-      if (!hostname) {
-        return '';
-      }
-      const host = String(hostname).toLowerCase().replace(/^www\./i, '');
-      if (host === 'feishu.cn' || host.endsWith('.feishu.cn')) {
-        return 'feishu.cn';
-      }
-      return host;
+      return typeof FAVICON_UTILS.normalizeFaviconHost === 'function'
+        ? FAVICON_UTILS.normalizeFaviconHost(hostname)
+        : String(hostname || '').toLowerCase().replace(/^www\./i, '');
     }
 
     function getGoogleFaviconUrl(hostname) {
@@ -2288,12 +2266,15 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     }
 
     function isFaviconProxyUrl(url) {
-      if (!url) {
-        return false;
-      }
-      return /google\.com\/s2\/favicons/i.test(url) ||
-        /gstatic\.com\/favicon/i.test(url) ||
-        /favicon\.is\//i.test(url);
+      return typeof FAVICON_UTILS.isFaviconProxyUrl === 'function'
+        ? FAVICON_UTILS.isFaviconProxyUrl(url)
+        : false;
+    }
+
+    function isBlockedLocalFaviconCacheUrl(url) {
+      return typeof FAVICON_UTILS.isBlockedLocalFaviconUrl === 'function'
+        ? FAVICON_UTILS.isBlockedLocalFaviconUrl(url)
+        : false;
     }
 
     function getThemeFromUrl(url, hostOverride) {
@@ -3868,10 +3849,11 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
 
         const activeSuggestionIndex = selectedIndex >= 0
           ? selectedIndex
-          : ((query.length > 0 || openTabsSearchModeActive) ? getAutoHighlightIndex() : -1);
+          : getAutoHighlightIndex();
         if (activeSuggestionIndex >= 0 && suggestionItems[activeSuggestionIndex]) {
           // Check if we're showing search suggestions or tab suggestions
-          const isSearchSuggestion = query.length > 0 && !openTabsSearchModeActive;
+          const activeItem = suggestionItems[activeSuggestionIndex];
+          const isSearchSuggestion = Boolean(activeItem._xIsSearchSuggestion);
 
           if (isSearchSuggestion && currentSuggestions[activeSuggestionIndex]) {
             const selectedSuggestion = currentSuggestions[activeSuggestionIndex];
@@ -3930,8 +3912,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
                 url: selectedSuggestion.url
               });
             }
-          } else if (!isSearchSuggestion && selectedIndex >= 0) {
-            const activeItem = suggestionItems[activeSuggestionIndex];
+          } else if (!isSearchSuggestion) {
             if (activeItem && activeItem._xIsOpenTabsModeEntry) {
               activateOpenTabsSearchMode();
               searchInput.focus();

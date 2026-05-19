@@ -12,6 +12,12 @@ try {
 }
 
 try {
+  importScripts(chrome.runtime.getURL('src/shared/favicon-utils.js'));
+} catch (error) {
+  console.warn('Lumno: failed to load favicon utils.', error);
+}
+
+try {
   importScripts(chrome.runtime.getURL('src/shared/extension-routes.js'));
 } catch (error) {
   console.warn('Lumno: failed to load extension routes.', error);
@@ -1325,6 +1331,8 @@ function openOverlayOnTab(activeTab, tabs, source) {
     'src/shared/search-input-ui.js',
     'src/shared/search-input-mode.js',
     'src/overlay/runtime.js',
+    'src/shared/favicon-utils.js',
+    'src/shared/favicon-cache.js',
     'src/overlay/favicon-view.js',
     'src/overlay/shell.js',
     'src/overlay/lifecycle.js',
@@ -2732,9 +2740,10 @@ function getFaviconIsUrl(hostname) {
 }
 
 function isFaviconProxyUrl(url) {
-  return /google\.com\/s2\/favicons/i.test(String(url || '')) ||
-    /gstatic\.com\/favicon/i.test(String(url || '')) ||
-    /favicon\.is\//i.test(String(url || ''));
+  const faviconUtils = globalThis.LumnoFaviconUtils || {};
+  return typeof faviconUtils.isFaviconProxyUrl === 'function'
+    ? faviconUtils.isFaviconProxyUrl(url)
+    : false;
 }
 
 function isPersistableResolvedFaviconUrl(url) {
@@ -3340,173 +3349,45 @@ function normalizeLocaleForMessages(locale) {
 }
 
 function isLocalNetworkHost(hostname) {
-  const host = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
-  if (!host) {
-    return false;
-  }
-  if (
-    host === 'localhost' ||
-    host.endsWith('.localhost') ||
-    host.endsWith('.local') ||
-    host === 'host.docker.internal'
-  ) {
-    return true;
-  }
-  if (/^\d{1,3}(?:\.\d{1,3}){0,2}$/.test(host)) {
-    const shortParts = host.split('.').map((part) => Number(part));
-    if (shortParts.every((part) => Number.isInteger(part) && part >= 0 && part <= 255)) {
-      return true;
-    }
-  }
-  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(host)) {
-    const parts = host.split('.').map((part) => Number(part));
-    if (parts.some((part) => Number.isNaN(part) || part < 0 || part > 255)) {
-      return false;
-    }
-    if (
-      parts[0] === 0 ||
-      parts[0] === 10 ||
-      parts[0] === 127 ||
-      (parts[0] === 169 && parts[1] === 254)
-    ) {
-      return true;
-    }
-    if (parts[0] === 192 && parts[1] === 168) {
-      return true;
-    }
-    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) {
-      return true;
-    }
-    if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) {
-      return true;
-    }
-    return false;
-  }
-  const ipv6 = host.split('%')[0];
-  if (
-    ipv6 === '::1' ||
-    ipv6 === '0:0:0:0:0:0:0:1' ||
-    ipv6 === '::' ||
-    /^fe[89ab][0-9a-f]*:/i.test(ipv6) ||
-    /^[fd][0-9a-f]{1,3}:/i.test(ipv6)
-  ) {
-    return true;
-  }
-  const mappedIpv4 = ipv6.match(/::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i);
-  if (mappedIpv4 && mappedIpv4[1]) {
-    return isLocalNetworkHost(mappedIpv4[1]);
-  }
-  return false;
+  const faviconUtils = globalThis.LumnoFaviconUtils || {};
+  return typeof faviconUtils.isLocalNetworkHost === 'function'
+    ? faviconUtils.isLocalNetworkHost(hostname)
+    : false;
 }
 
 function isSuspiciousLocalFaviconHost(hostname) {
-  const host = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
-  if (!host) {
-    return false;
-  }
-  const ipv6 = host.split('%')[0];
-  if (host.includes(':') || ipv6.includes(':')) {
-    return false;
-  }
-  if (/^\d{1,3}(?:\.\d{1,3}){0,3}$/.test(host)) {
-    return false;
-  }
-  if (!host.includes('.')) {
-    return /^[a-z0-9-]+$/i.test(host);
-  }
-  const labels = host.split('.').filter(Boolean);
-  if (labels.length < 2) {
-    return false;
-  }
-  const suffix = labels[labels.length - 1];
-  return [
-    'internal',
-    'intern',
-    'test',
-    'localdev',
-    'lan',
-    'home',
-    'corp',
-    'localdomain'
-  ].includes(suffix);
+  const faviconUtils = globalThis.LumnoFaviconUtils || {};
+  return typeof faviconUtils.isSuspiciousLocalFaviconHost === 'function'
+    ? faviconUtils.isSuspiciousLocalFaviconHost(hostname)
+    : false;
 }
 
 function shouldBlockFaviconForHost(hostname) {
-  return isLocalNetworkHost(hostname) || isSuspiciousLocalFaviconHost(hostname);
+  const faviconUtils = globalThis.LumnoFaviconUtils || {};
+  return typeof faviconUtils.shouldBlockFaviconForHost === 'function'
+    ? faviconUtils.shouldBlockFaviconForHost(hostname)
+    : false;
 }
 
 function isBlockedLocalFaviconUrl(url) {
-  const raw = String(url || '').trim();
-  if (!raw) {
-    return false;
-  }
-  const decodedRaw = (() => {
-    try {
-      return decodeURIComponent(raw);
-    } catch (e) {
-      return raw;
-    }
-  })();
-  const withoutScheme = decodedRaw.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
-  const authority = withoutScheme.split(/[/?#]/)[0] || '';
-  const hostCandidateRaw = authority.includes('@') ? authority.split('@').pop() : authority;
-  const hostCandidate = (() => {
-    const value = String(hostCandidateRaw || '').trim().toLowerCase();
-    if (!value) {
-      return '';
-    }
-    if (value.startsWith('[')) {
-      const endBracket = value.indexOf(']');
-      if (endBracket > 1) {
-        return value.slice(1, endBracket);
-      }
-    }
-    return value.replace(/^\[|\]$/g, '').split(':')[0];
-  })();
-  if (hostCandidate && shouldBlockFaviconForHost(hostCandidate)) {
-    return true;
-  }
-  try {
-    const parsed = new URL(raw);
-    const protocol = String(parsed.protocol || '').toLowerCase();
-    if ((protocol === 'http:' || protocol === 'https:') && shouldBlockFaviconForHost(parsed.hostname)) {
-      return true;
-    }
-    if (protocol === 'chrome:' && parsed.hostname === 'favicon2') {
-      const nested = parsed.searchParams.get('url') || '';
-      if (nested) {
-        try {
-          const nestedUrl = new URL(nested);
-          if (shouldBlockFaviconForHost(nestedUrl.hostname)) {
-            return true;
-          }
-        } catch (e) {
-          // Ignore malformed nested URL.
-        }
-      }
-    }
-  } catch (e) {
-    // Ignore malformed URL.
-  }
-  return false;
+  const faviconUtils = globalThis.LumnoFaviconUtils || {};
+  return typeof faviconUtils.isBlockedLocalFaviconUrl === 'function'
+    ? faviconUtils.isBlockedLocalFaviconUrl(url)
+    : false;
 }
 
 function normalizeFaviconHost(hostname) {
-  if (!hostname) {
-    return '';
-  }
-  const host = String(hostname).toLowerCase().replace(/^www\./i, '');
-  if (host === 'feishu.cn' || host.endsWith('.feishu.cn')) {
-    return 'feishu.cn';
-  }
-  return host;
+  const faviconUtils = globalThis.LumnoFaviconUtils || {};
+  return typeof faviconUtils.normalizeFaviconHost === 'function'
+    ? faviconUtils.normalizeFaviconHost(hostname)
+    : String(hostname || '').toLowerCase().replace(/^www\./i, '');
 }
 
 function getChromeFaviconUrl(url) {
-  if (!url || !/^https?:\/\//i.test(url)) {
-    return '';
-  }
-  return `chrome://favicon2/?size=128&scale_factor=2x&show_fallback_monogram=1&url=${encodeURIComponent(url)}`;
+  const faviconUtils = globalThis.LumnoFaviconUtils || {};
+  return typeof faviconUtils.getChromeFaviconUrl === 'function'
+    ? faviconUtils.getChromeFaviconUrl(url)
+    : '';
 }
 
 function normalizeThemePreference(theme) {
@@ -3517,225 +3398,54 @@ function normalizeThemePreference(theme) {
 }
 
 function hasThemeTokenInUrl(url, token) {
-  const lower = String(url || '').toLowerCase();
-  return new RegExp(`(^|[._/-])${token}([._/-]|$)`).test(lower);
+  const faviconUtils = globalThis.LumnoFaviconUtils || {};
+  return typeof faviconUtils.hasThemeTokenInUrl === 'function'
+    ? faviconUtils.hasThemeTokenInUrl(url, token)
+    : false;
 }
 
 function shouldSkipThemeUpgradeCandidate(candidateUrl, preferredTheme, currentUrl) {
-  const mode = normalizeThemePreference(preferredTheme);
-  if (!mode) {
-    return false;
-  }
-  const opposite = mode === 'dark' ? 'light' : 'dark';
-  if (hasThemeTokenInUrl(candidateUrl, opposite)) {
-    return true;
-  }
-  const currentHasPreferredToken = hasThemeTokenInUrl(currentUrl, mode);
-  const candidateHasPreferredToken = hasThemeTokenInUrl(candidateUrl, mode);
-  if (currentHasPreferredToken && !candidateHasPreferredToken) {
-    return true;
-  }
-  return false;
+  const faviconUtils = globalThis.LumnoFaviconUtils || {};
+  return typeof faviconUtils.shouldSkipThemeUpgradeCandidate === 'function'
+    ? faviconUtils.shouldSkipThemeUpgradeCandidate(candidateUrl, normalizeThemePreference(preferredTheme), currentUrl)
+    : false;
 }
 
 function getKnownThemedFaviconCandidates(hostname, preferredTheme) {
-  const host = normalizeFaviconHost(hostname);
-  const mode = normalizeThemePreference(preferredTheme);
-  if (!host) {
-    return [];
-  }
-  if (host === 'lumno.kubai.design') {
-    const lumnoIconUrl = (chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function')
-      ? chrome.runtime.getURL('assets/images/lumno.png')
-      : 'https://lumno.kubai.design/favicon.png';
-    return [
-      { url: lumnoIconUrl, score: 58 }
-    ];
-  }
-  if (host === 'github.com' || host.endsWith('.github.com')) {
-    if (mode === 'dark') {
-      return [
-        { url: 'https://github.githubassets.com/favicons/favicon-dark.svg', score: 60 },
-        { url: 'https://github.githubassets.com/favicons/favicon.svg', score: 42 },
-        { url: 'https://github.githubassets.com/favicons/favicon.png', score: 36 }
-      ];
-    }
-    if (mode === 'light') {
-      return [
-        { url: 'https://github.githubassets.com/favicons/favicon.svg', score: 60 },
-        { url: 'https://github.githubassets.com/favicons/favicon-dark.svg', score: 40 },
-        { url: 'https://github.githubassets.com/favicons/favicon.png', score: 36 }
-      ];
-    }
-    return [
-      { url: 'https://github.githubassets.com/favicons/favicon.svg', score: 52 },
-      { url: 'https://github.githubassets.com/favicons/favicon-dark.svg', score: 52 },
-      { url: 'https://github.githubassets.com/favicons/favicon.png', score: 36 }
-    ];
-  }
-  return [];
+  const faviconUtils = globalThis.LumnoFaviconUtils || {};
+  return typeof faviconUtils.getKnownThemedFaviconCandidateScores === 'function'
+    ? faviconUtils.getKnownThemedFaviconCandidateScores(hostname, normalizeThemePreference(preferredTheme), {
+      getRuntimeUrl: (path) => chrome.runtime.getURL(path)
+    })
+    : [];
 }
 
 function buildRootFaviconCandidates(hostname, preferredTheme) {
-  const host = normalizeFaviconHost(hostname);
-  const mode = normalizeThemePreference(preferredTheme);
-  if (!host) {
-    return [];
-  }
-  const themed = mode === 'dark'
-    ? [
-      { url: `https://${host}/favicon-dark.svg`, score: 34 },
-      { url: `https://${host}/favicon.svg`, score: 28 },
-      { url: `https://${host}/favicon-light.svg`, score: 16 }
-    ]
-    : mode === 'light'
-      ? [
-        { url: `https://${host}/favicon-light.svg`, score: 32 },
-        { url: `https://${host}/favicon.svg`, score: 29 },
-        { url: `https://${host}/favicon-dark.svg`, score: 15 }
-      ]
-      : [
-        { url: `https://${host}/favicon.svg`, score: 28 },
-        { url: `https://${host}/favicon-dark.svg`, score: 20 },
-        { url: `https://${host}/favicon-light.svg`, score: 20 }
-      ];
-  return [
-    ...themed,
-    { url: `https://${host}/favicon.ico`, score: 24 },
-    { url: `https://${host}/apple-touch-icon.png`, score: 16 }
-  ];
+  const faviconUtils = globalThis.LumnoFaviconUtils || {};
+  return typeof faviconUtils.getRootFaviconCandidateScores === 'function'
+    ? faviconUtils.getRootFaviconCandidateScores(hostname, normalizeThemePreference(preferredTheme))
+    : [];
 }
 
 function getThemeHintScore(url, mediaValue, preferredTheme) {
-  const normalizedTheme = normalizeThemePreference(preferredTheme);
-  if (!normalizedTheme) {
-    return 0;
-  }
-  let score = 0;
-  const lowerMedia = String(mediaValue || '').toLowerCase();
-  if (lowerMedia.includes('prefers-color-scheme')) {
-    const hasDark = /prefers-color-scheme\s*:\s*dark/.test(lowerMedia);
-    const hasLight = /prefers-color-scheme\s*:\s*light/.test(lowerMedia);
-    if ((normalizedTheme === 'dark' && hasDark) || (normalizedTheme === 'light' && hasLight)) {
-      score += 34;
-    }
-    if ((normalizedTheme === 'dark' && hasLight) || (normalizedTheme === 'light' && hasDark)) {
-      score -= 20;
-    }
-  }
-  const lowerUrl = String(url || '').toLowerCase();
-  const hasDarkToken = /(^|[._/-])dark([._/-]|$)/.test(lowerUrl);
-  const hasLightToken = /(^|[._/-])light([._/-]|$)/.test(lowerUrl);
-  if (normalizedTheme === 'dark') {
-    if (hasDarkToken) {
-      score += 16;
-    }
-    if (hasLightToken) {
-      score -= 8;
-    }
-  } else if (normalizedTheme === 'light') {
-    if (hasLightToken) {
-      score += 16;
-    }
-    if (hasDarkToken) {
-      score -= 8;
-    }
-  }
-  return score;
+  const faviconUtils = globalThis.LumnoFaviconUtils || {};
+  return typeof faviconUtils.getThemeHintScore === 'function'
+    ? faviconUtils.getThemeHintScore(url, mediaValue, normalizeThemePreference(preferredTheme))
+    : 0;
 }
 
 function parseHtmlIconCandidates(html, pageUrl, preferredTheme) {
-  if (!html || !pageUrl) {
-    return [];
-  }
-  const normalizedTheme = normalizeThemePreference(preferredTheme);
-  const list = [];
-  const linkMatches = String(html).match(/<link\b[^>]*>/gi) || [];
-  linkMatches.forEach((tag) => {
-    const relMatch = tag.match(/\brel\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
-    const hrefMatch = tag.match(/\bhref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
-    if (!relMatch || !hrefMatch) {
-      return;
-    }
-    const rel = String(relMatch[2] || relMatch[3] || relMatch[4] || '').toLowerCase();
-    const hrefRaw = String(hrefMatch[2] || hrefMatch[3] || hrefMatch[4] || '').trim();
-    if (!rel.includes('icon') || !hrefRaw) {
-      return;
-    }
-    let href = '';
-    try {
-      href = new URL(hrefRaw, pageUrl).href;
-    } catch (e) {
-      return;
-    }
-    const typeMatch = tag.match(/\btype\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
-    const sizesMatch = tag.match(/\bsizes\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
-    const mediaMatch = tag.match(/\bmedia\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
-    const baseHrefMatch = tag.match(/\bdata-base-href\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
-    const type = String(typeMatch ? (typeMatch[2] || typeMatch[3] || typeMatch[4] || '') : '').toLowerCase();
-    const sizes = String(sizesMatch ? (sizesMatch[2] || sizesMatch[3] || sizesMatch[4] || '') : '').toLowerCase();
-    const media = String(mediaMatch ? (mediaMatch[2] || mediaMatch[3] || mediaMatch[4] || '') : '').toLowerCase();
-    let score = 10;
-    if (/\bicon\b/.test(rel)) {
-      score += 20;
-    }
-    if (rel.includes('shortcut')) {
-      score += 6;
-    }
-    if (rel.includes('apple-touch-icon')) {
-      score += 8;
-    }
-    if (type.includes('svg') || href.toLowerCase().endsWith('.svg')) {
-      score += 14;
-    }
-    if (href.toLowerCase().includes('favicon')) {
-      score += 6;
-    }
-    score += getThemeHintScore(href, media, normalizedTheme);
-    const sizeNumbers = sizes.match(/\d+/g);
-    if (sizeNumbers && sizeNumbers.length > 0) {
-      const size = Math.max(...sizeNumbers.map((n) => Number(n) || 0));
-      score += Math.min(20, Math.floor(size / 8));
-    }
-    list.push({ url: href, score: score });
-    if (normalizedTheme === 'dark' && /\/favicon\.svg(?:[?#].*)?$/i.test(href)) {
-      list.push({
-        url: href.replace(/\/favicon\.svg([?#].*)?$/i, '/favicon-dark.svg$1'),
-        score: score + 14
-      });
-    }
-    if (normalizedTheme === 'light' && /\/favicon-dark\.svg(?:[?#].*)?$/i.test(href)) {
-      list.push({
-        url: href.replace(/\/favicon-dark\.svg([?#].*)?$/i, '/favicon.svg$1'),
-        score: score + 14
-      });
-    }
-    const baseHrefRaw = String(baseHrefMatch ? (baseHrefMatch[2] || baseHrefMatch[3] || baseHrefMatch[4] || '') : '').trim();
-    if (baseHrefRaw) {
-      let baseHref = '';
-      try {
-        baseHref = new URL(baseHrefRaw, pageUrl).href;
-      } catch (e) {
-        baseHref = '';
-      }
-      if (baseHref) {
-        if (normalizedTheme === 'dark') {
-          list.push({ url: `${baseHref}-dark.svg`, score: score + 20 });
-          list.push({ url: `${baseHref}.svg`, score: score + 8 });
-        } else if (normalizedTheme === 'light') {
-          list.push({ url: `${baseHref}.svg`, score: score + 20 });
-          list.push({ url: `${baseHref}-light.svg`, score: score + 12 });
-        } else {
-          list.push({ url: `${baseHref}.svg`, score: score + 12 });
-          list.push({ url: `${baseHref}-dark.svg`, score: score + 12 });
-        }
-      }
-    }
-  });
-  return list;
+  const faviconUtils = globalThis.LumnoFaviconUtils || {};
+  return typeof faviconUtils.parseHtmlIconCandidateScores === 'function'
+    ? faviconUtils.parseHtmlIconCandidateScores(html, pageUrl, normalizeThemePreference(preferredTheme))
+    : [];
 }
 
 function getHtmlAttributeValue(tag, name) {
+  const faviconUtils = globalThis.LumnoFaviconUtils || {};
+  if (typeof faviconUtils.getHtmlAttributeValue === 'function') {
+    return faviconUtils.getHtmlAttributeValue(tag, name);
+  }
   if (!tag || !name) {
     return '';
   }

@@ -3,6 +3,7 @@
   if (typeof module === 'object' && module.exports) {
     module.exports = api;
   }
+  root.LumnoFaviconCache = api;
   root.LumnoNewtabFaviconCache = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function(root) {
   const DEFAULTS = Object.freeze({

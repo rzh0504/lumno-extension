@@ -37,7 +37,8 @@
   const SITE_SEARCH_STORE = globalThis.LumnoSiteSearchStore || {};
   const SUGGESTION_NAVIGATION = globalThis.LumnoSuggestionNavigation || {};
   const SEARCH_INPUT_MODE = globalThis.LumnoSearchInputMode || {};
-  const NEWTAB_FAVICON_CACHE = globalThis.LumnoNewtabFaviconCache || {};
+  const FAVICON_UTILS = globalThis.LumnoFaviconUtils || {};
+  const NEWTAB_FAVICON_CACHE = globalThis.LumnoFaviconCache || globalThis.LumnoNewtabFaviconCache || {};
   const NEWTAB_FAVICON_THEME = globalThis.LumnoNewtabFaviconTheme || {};
   const NEWTAB_FAVICON_VIEW = globalThis.LumnoNewtabFaviconView || {};
   const NEWTAB_RECENT_STORE = globalThis.LumnoNewtabRecentSitesStore || {};
@@ -2197,12 +2198,16 @@
       const accent = rgb && rgb.length === 3 ? rgb : defaultAccentColor;
       return `${theme && theme._xThemeSource ? theme._xThemeSource : 'unknown'}:${accent.join(',')}`;
     });
-  const normalizeFaviconHost = NEWTAB_FAVICON_THEME.normalizeFaviconHost;
-  const hasThemeTokenInUrl = NEWTAB_FAVICON_THEME.hasThemeTokenInUrl;
-  const shouldSkipThemeUpgradeCandidate = NEWTAB_FAVICON_THEME.shouldSkipThemeUpgradeCandidate;
-  const getKnownThemedFaviconCandidates = NEWTAB_FAVICON_THEME.getKnownThemedFaviconCandidates;
-  const hostHasExplicitDarkFavicon = NEWTAB_FAVICON_THEME.hostHasExplicitDarkFavicon;
-  const isFaviconProxyUrl = NEWTAB_FAVICON_THEME.isFaviconProxyUrl;
+  const normalizeFaviconHost = FAVICON_UTILS.normalizeFaviconHost || NEWTAB_FAVICON_THEME.normalizeFaviconHost;
+  const hasThemeTokenInUrl = FAVICON_UTILS.hasThemeTokenInUrl || NEWTAB_FAVICON_THEME.hasThemeTokenInUrl;
+  const shouldSkipThemeUpgradeCandidate = FAVICON_UTILS.shouldSkipThemeUpgradeCandidate || NEWTAB_FAVICON_THEME.shouldSkipThemeUpgradeCandidate;
+  const getKnownThemedFaviconCandidates = typeof FAVICON_UTILS.getKnownThemedFaviconCandidateUrls === 'function'
+    ? ((hostname, preferredTheme) => FAVICON_UTILS.getKnownThemedFaviconCandidateUrls(hostname, preferredTheme, {
+      getRuntimeUrl: (path) => chrome.runtime.getURL(path)
+    }))
+    : NEWTAB_FAVICON_THEME.getKnownThemedFaviconCandidates;
+  const hostHasExplicitDarkFavicon = FAVICON_UTILS.hostHasExplicitDarkFavicon || NEWTAB_FAVICON_THEME.hostHasExplicitDarkFavicon;
+  const isFaviconProxyUrl = FAVICON_UTILS.isFaviconProxyUrl || NEWTAB_FAVICON_THEME.isFaviconProxyUrl;
   const extractAverageColor = NEWTAB_FAVICON_THEME.extractAverageColor;
   const defaultTheme = NEWTAB_FAVICON_THEME.createDefaultTheme();
   const urlHighlightTheme = NEWTAB_FAVICON_THEME.createUrlHighlightTheme();
@@ -2977,63 +2982,15 @@
   const scheduleThemeAwareFaviconRescue = faviconViewRuntime.scheduleThemeAwareFaviconRescue;
 
   function isBlockedLocalFaviconUrl(url) {
-    const raw = String(url || '').trim();
-    if (!raw) {
-      return false;
-    }
-    const decodedRaw = (() => {
-      try {
-        return decodeURIComponent(raw);
-      } catch (e) {
-        return raw;
-      }
-    })();
-    const withoutScheme = decodedRaw.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
-    const authority = withoutScheme.split(/[/?#]/)[0] || '';
-    const hostCandidateRaw = authority.includes('@') ? authority.split('@').pop() : authority;
-    const hostCandidate = (() => {
-      const value = String(hostCandidateRaw || '').trim().toLowerCase();
-      if (!value) {
-        return '';
-      }
-      if (value.startsWith('[')) {
-        const endBracket = value.indexOf(']');
-        if (endBracket > 1) {
-          return value.slice(1, endBracket);
-        }
-      }
-      return value.replace(/^\[|\]$/g, '').split(':')[0];
-    })();
-    if (hostCandidate && shouldBlockFaviconForHost(hostCandidate)) {
-      return true;
-    }
-    try {
-      const parsed = new URL(raw);
-      const protocol = String(parsed.protocol || '').toLowerCase();
-      if ((protocol === 'http:' || protocol === 'https:') && shouldBlockFaviconForHost(parsed.hostname)) {
-        return true;
-      }
-      if (protocol === 'chrome:' && parsed.hostname === 'favicon2') {
-        const nested = parsed.searchParams.get('url') || '';
-        if (nested) {
-          try {
-            const nestedUrl = new URL(nested);
-            if (shouldBlockFaviconForHost(nestedUrl.hostname)) {
-              return true;
-            }
-          } catch (e) {
-            // Ignore malformed nested URL.
-          }
-        }
-      }
-    } catch (e) {
-      // Ignore malformed URL.
-    }
-    return false;
+    return typeof FAVICON_UTILS.isBlockedLocalFaviconUrl === 'function'
+      ? FAVICON_UTILS.isBlockedLocalFaviconUrl(url)
+      : false;
   }
 
   function isChromeMonogramFaviconUrl(url) {
-    return /^chrome:\/\/favicon2\//i.test(String(url || '').trim());
+    return typeof FAVICON_UTILS.isChromeMonogramFaviconUrl === 'function'
+      ? FAVICON_UTILS.isChromeMonogramFaviconUrl(url)
+      : /^chrome:\/\/favicon2\//i.test(String(url || '').trim());
   }
 
   function preloadThemeFromFavicon(url, dataUrl, hostOverride) {
@@ -4409,7 +4366,9 @@
     if (location && isBrowserExtensionProtocol(location.protocol)) {
       return '';
     }
-    return `chrome://favicon2/?size=128&scale_factor=2x&show_fallback_monogram=1&url=${encodeURIComponent(url)}`;
+    return typeof FAVICON_UTILS.getChromeFaviconUrl === 'function'
+      ? FAVICON_UTILS.getChromeFaviconUrl(url)
+      : '';
   }
 
   function getGoogleFaviconUrl(hostname) {
@@ -4434,99 +4393,21 @@
   }
 
   function isLocalNetworkHost(hostname) {
-    const host = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
-    if (!host) {
-      return false;
-    }
-    if (
-      host === 'localhost' ||
-      host.endsWith('.localhost') ||
-      host.endsWith('.local') ||
-      host === 'host.docker.internal'
-    ) {
-      return true;
-    }
-    if (/^\d{1,3}(?:\.\d{1,3}){0,2}$/.test(host)) {
-      const shortParts = host.split('.').map((part) => Number(part));
-      if (shortParts.every((part) => Number.isInteger(part) && part >= 0 && part <= 255)) {
-        return true;
-      }
-    }
-    if (/^(\d{1,3}\.){3}\d{1,3}$/.test(host)) {
-      const parts = host.split('.').map((part) => Number(part));
-      if (parts.some((part) => Number.isNaN(part) || part < 0 || part > 255)) {
-        return false;
-      }
-      if (
-        parts[0] === 0 ||
-        parts[0] === 10 ||
-        parts[0] === 127 ||
-        (parts[0] === 169 && parts[1] === 254)
-      ) {
-        return true;
-      }
-      if (parts[0] === 192 && parts[1] === 168) {
-        return true;
-      }
-      if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) {
-        return true;
-      }
-      if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) {
-        return true;
-      }
-      return false;
-    }
-    const ipv6 = host.split('%')[0];
-    if (
-      ipv6 === '::1' ||
-      ipv6 === '0:0:0:0:0:0:0:1' ||
-      ipv6 === '::' ||
-      /^fe[89ab][0-9a-f]*:/i.test(ipv6) ||
-      /^[fd][0-9a-f]{1,3}:/i.test(ipv6)
-    ) {
-      return true;
-    }
-    const mappedIpv4 = ipv6.match(/::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i);
-    if (mappedIpv4 && mappedIpv4[1]) {
-      return isLocalNetworkHost(mappedIpv4[1]);
-    }
-    return false;
+    return typeof FAVICON_UTILS.isLocalNetworkHost === 'function'
+      ? FAVICON_UTILS.isLocalNetworkHost(hostname)
+      : false;
   }
 
   function isSuspiciousLocalFaviconHost(hostname) {
-    const host = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
-    if (!host) {
-      return false;
-    }
-    const ipv6 = host.split('%')[0];
-    if (host.includes(':') || ipv6.includes(':')) {
-      return false;
-    }
-    if (/^\d{1,3}(?:\.\d{1,3}){0,3}$/.test(host)) {
-      return false;
-    }
-    if (!host.includes('.')) {
-      return /^[a-z0-9-]+$/i.test(host);
-    }
-    const labels = host.split('.').filter(Boolean);
-    if (labels.length < 2) {
-      return false;
-    }
-    const suffix = labels[labels.length - 1];
-    return [
-      'internal',
-      'intern',
-      'test',
-      'localdev',
-      'lan',
-      'home',
-      'corp',
-      'localdomain'
-    ].includes(suffix);
+    return typeof FAVICON_UTILS.isSuspiciousLocalFaviconHost === 'function'
+      ? FAVICON_UTILS.isSuspiciousLocalFaviconHost(hostname)
+      : false;
   }
 
   function shouldBlockFaviconForHost(hostname) {
-    return isLocalNetworkHost(hostname) || isSuspiciousLocalFaviconHost(hostname);
+    return typeof FAVICON_UTILS.shouldBlockFaviconForHost === 'function'
+      ? FAVICON_UTILS.shouldBlockFaviconForHost(hostname)
+      : false;
   }
 
   function normalizeSearchBlacklistMatchModes(value) {
