@@ -1,6 +1,7 @@
 const assert = require('assert');
 const faviconTheme = require('../src/newtab/favicon-theme.js');
 
+require('../src/shared/suggestion-action-model.js');
 require('../src/newtab/suggestions-view.js');
 const suggestionsView = globalThis.LumnoNewtabSuggestionsView;
 
@@ -222,7 +223,82 @@ async function testLocalUrlSuggestionUsesFallbackTheme() {
   );
 }
 
+async function testVisitButtonAndEnterTagShareOverlayVisibilityRules() {
+  const document = createFakeDocument();
+  const container = document.createElement('div');
+  container.setConnected(true);
+  const items = [];
+  const defaultTheme = faviconTheme.createDefaultTheme();
+
+  const view = suggestionsView.createSuggestionsView({
+    document,
+    container,
+    items,
+    t: (key, fallback) => fallback || key,
+    formatMessage: (key, fallback, params) => String(fallback || key).replace('{name}', params && params.name ? params.name : ''),
+    getRiSvg: () => '',
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl,
+    getThemeHostForSuggestion: (suggestion) => getHostFromUrl(suggestion && suggestion.url),
+    shouldBlockFaviconForHost,
+    getImmediateThemeForSuggestion: () => defaultTheme,
+    getThemeForSuggestion: () => Promise.resolve(defaultTheme),
+    getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    getHoverColors: (theme) => faviconTheme.getHoverColors(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
+    applyMarkVariables: () => {},
+    actionModel: globalThis.LumnoSuggestionActionModel,
+    defaultTheme
+  });
+
+  view.render({
+    query: 'lumno',
+    primaryHighlightIndex: 0,
+    primaryHighlightReason: 'topSite',
+    suggestions: [{
+      type: 'topSite',
+      title: 'Lumno',
+      url: 'https://lumno.example/',
+      isTopSite: true,
+      favicon: ''
+    }, {
+      type: 'history',
+      title: 'Lumno docs',
+      url: 'https://docs.example/lumno',
+      favicon: ''
+    }]
+  });
+  view.updateSelection(-1);
+
+  const [primaryItem, secondaryItem] = view.getItems();
+  assert.ok(primaryItem._xVisitButton, 'primary suggestion should render a visit button');
+  assert.ok(primaryItem._xTagContainer, 'primary suggestion should render an action tag container');
+  assert.strictEqual(
+    primaryItem._xTagContainer.getAttribute('data-visible'),
+    'true',
+    'primary top-site suggestion should show its Enter action tag'
+  );
+  assert.strictEqual(
+    primaryItem._xVisitButton.getAttribute('data-visible'),
+    'false',
+    'primary suggestion should hide the visit button while the Enter tag is visible'
+  );
+  assert.ok(secondaryItem._xVisitButton, 'secondary suggestion should render a visit button');
+  assert.strictEqual(
+    secondaryItem._xVisitButton.getAttribute('data-visible'),
+    'true',
+    'non-active suggestions should keep the right-side visit button visible'
+  );
+}
+
 testLocalUrlSuggestionUsesFallbackTheme()
+  .then(testVisitButtonAndEnterTagShareOverlayVisibilityRules)
   .then(() => {
     console.log('newtab suggestions view tests passed');
   })

@@ -1,0 +1,13 @@
+Use case: style-transfer
+Asset type: Lumno light newtab UI background
+Primary request: Use the provided reference image as the subject and mood reference, then reinterpret it as a 2048x1152 Claude Monet-inspired Impressionist newtab wallpaper with much more negative space.
+Input image: Use the local image as the main subject reference, not as a fixed canvas size.
+Scene/backdrop: A bright airy meadow with distant rolling hills, pale sky, small cottage, foreground wildflowers, grasses, and butterflies.
+Subject: Keep the feeling of the reference image: soft meadow band, distant hills, small cottage on the right, flowers and grasses near the bottom, a large delicate butterfly near the left. The content may be simplified and repositioned to fit a clean newtab wallpaper.
+Style/medium: French Impressionism inspired by Monet, loose broken oil brushstrokes, luminous pastel atmosphere, visible canvas texture, soft painterly edges.
+Composition/framing: 2048x1152 wide 16:9 wallpaper. Keep 75-85% of the canvas as warm white, pale sky, soft mist, or nearly blank space. Place the meadow and illustration content as a low horizontal band along the bottom third, with the center and upper area open for UI. Extend missing areas with sky, mist, and soft white negative space.
+Lighting/mood: Gentle morning daylight, misty and poetic, calm, refined, airy.
+Color palette: Warm white, ivory, pale sage green, powder blue, soft lavender, blush pink, light ochre, very gentle yellow.
+Materials/textures: Soft oil-paint brushwork, subtle canvas grain, delicate pigment blending.
+Constraints: Do not preserve the original canvas dimensions. Preserve the subject identity and airy meadow mood, but adapt layout to a spacious 2048x1152 Lumno background. No text, no logo, no watermark.
+Avoid: Dense full-frame painting, dark sky, high contrast, hard ink outlines, photorealism, glossy 3D, extra houses, extra large animals, readable typography.

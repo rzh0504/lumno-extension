@@ -19,6 +19,12 @@
     const t = typeof config.t === 'function' ? config.t : function(key, fallback) {
       return fallback || key || '';
     };
+    const formatMessage = typeof config.formatMessage === 'function'
+      ? config.formatMessage
+      : function(key, fallback) {
+        return t(key, fallback);
+      };
+    const actionModel = config.actionModel || root.LumnoSuggestionActionModel || {};
     const getRiSvg = typeof config.getRiSvg === 'function'
       ? config.getRiSvg
       : function() {
@@ -256,6 +262,100 @@
       return tag;
     }
 
+    function setInlineLabelWithIcon(button, labelText, iconMarkup) {
+      if (!button) {
+        return;
+      }
+      button.textContent = '';
+      const label = documentRef.createElement('span');
+      label.className = 'x-nt-suggestion-action-button__label';
+      label.textContent = labelText || '';
+      button.appendChild(label);
+      const icon = documentRef.createElement('span');
+      icon.className = 'x-nt-suggestion-action-button__icon';
+      icon.innerHTML = iconMarkup || '';
+      button.appendChild(icon);
+      button.setAttribute('aria-label', labelText || '');
+      button.title = labelText || '';
+    }
+
+    function getSuggestionActionLabel(action) {
+      switch (action) {
+        case 'search':
+          return getSearchActionLabel();
+        case 'switch':
+          return t('action_switch', '切换');
+        case 'open':
+          return t('action_open', '打开');
+        case 'openNewTab':
+          return t('action_open_new_tab', '新开');
+        case 'go':
+          return t('action_go_current_tab', '前往');
+        case 'commandNewTab':
+          return t('command_newtab', '新建标签页');
+        case 'commandSettings':
+          return formatMessage('command_settings', '打开 {name} 设置', { name: 'Lumno' });
+        default:
+          return t('action_open_new_tab', '新开');
+      }
+    }
+
+    function setSuggestionActionButtonVisible(button, visible) {
+      if (!button) {
+        return;
+      }
+      button.setAttribute('data-visible', visible ? 'true' : 'false');
+    }
+
+    function setSuggestionActionTagsVisible(element, visible) {
+      if (!element) {
+        return;
+      }
+      element.setAttribute('data-visible', visible ? 'true' : 'false');
+    }
+
+    function setSuggestionActionButtonPalette(button, text, bg, border) {
+      if (!button) {
+        return;
+      }
+      button.style.setProperty(
+        '--x-nt-suggestion-action-button-text',
+        text || 'var(--x-nt-subtext, #9CA3AF)'
+      );
+      button.style.setProperty('--x-nt-suggestion-action-button-bg', bg || 'transparent');
+      button.style.setProperty('--x-nt-suggestion-action-button-border', border || 'transparent');
+    }
+
+    function applySuggestionVisitButtonState(button, visible, active, resolvedTheme) {
+      if (!button) {
+        return;
+      }
+      setSuggestionActionButtonVisible(button, visible);
+      if (active && resolvedTheme) {
+        setSuggestionActionButtonPalette(
+          button,
+          resolvedTheme.buttonText,
+          resolvedTheme.buttonBg,
+          resolvedTheme.buttonBorder
+        );
+        return;
+      }
+      setSuggestionActionButtonPalette(button, 'var(--x-nt-subtext, #9CA3AF)', 'transparent', 'transparent');
+    }
+
+    function createSearchActionModel(optionsArg) {
+      if (actionModel && typeof actionModel.createSearchActionModel === 'function') {
+        return actionModel.createSearchActionModel(optionsArg);
+      }
+      return {
+        actionTags: [],
+        visitButtonAction: 'openNewTab',
+        alwaysHideVisitButton: false,
+        hasActionTags: false,
+        hasSwitchAction: false
+      };
+    }
+
     function renderHighlightedText(target, text, query) {
       const safeText = sanitizeDisplayText(text);
       const needle = String(query || '').trim();
@@ -328,11 +428,17 @@
       item.setAttribute('data-active', isActive ? 'true' : 'false');
       item.setAttribute('data-has-action-tags', item._xHasActionTags ? 'true' : 'false');
       applyMarkVariables(item, isActive ? resolvedTheme : getDefaultTheme());
+      if (item._xVisitButton) {
+        const shouldShowVisitButton = actionModel && typeof actionModel.shouldShowVisitButton === 'function'
+          ? actionModel.shouldShowVisitButton(item._xActionModel, isActive)
+          : Boolean(!item._xAlwaysHideVisitButton && !(isActive && item._xHasActionTags));
+        applySuggestionVisitButtonState(item._xVisitButton, shouldShowVisitButton, isActive, resolvedTheme);
+      }
       applySuggestionTagStyles(item._xHistoryTag, resolvedTheme, isActive);
       applySuggestionTagStyles(item._xBookmarkTag, resolvedTheme, isActive);
       applySuggestionTagStyles(item._xTopSiteTag, resolvedTheme, isActive);
       if (item._xTagContainer) {
-        item._xTagContainer.setAttribute('data-active', isActive ? 'true' : 'false');
+        setSuggestionActionTagsVisible(item._xTagContainer, Boolean(isActive && item._xHasActionTags));
       }
       if (item._xHistoryDeleteButton) {
         const shouldShowHistoryDelete = Boolean(item._xHasHistoryDeleteButton && item._xIsHovering);
@@ -767,26 +873,43 @@
 
         const actionTags = documentRef.createElement('div');
         actionTags.className = 'x-nt-suggestion-action-tags';
+        setSuggestionActionTagsVisible(actionTags, false);
 
-        const isDirectHighlight = isPrimaryHighlight &&
-          (suggestion.type === 'directUrl' || suggestion.type === 'browserPage');
         const isMergedHighlight = Boolean(mergedProvider && primarySuggestion === suggestion && isPrimaryHighlight);
-        const shouldShowEnterTag = !isPrimarySearchSuggest && isPrimaryHighlight &&
-          !onlyKeywordSuggestions &&
-          (primaryHighlightReason === 'topSite' ||
-            primaryHighlightReason === 'inline' ||
-            primaryHighlightReason === 'autocomplete' ||
-            isDirectHighlight ||
-            isMergedHighlight);
-        if (shouldShowEnterTag) {
-          actionTags.appendChild(createActionTag(t('action_go_current_tab', '前往'), 'Enter'));
-        }
-        if (isPrimaryHighlight && onlyKeywordSuggestions && suggestion.type === 'newtab') {
-          actionTags.appendChild(createActionTag(getSearchActionLabel(), 'Enter'));
-        }
+        const itemActionModel = createSearchActionModel({
+          suggestion,
+          isPrimaryHighlight,
+          isPrimarySearchSuggest,
+          primaryHighlightReason,
+          onlyKeywordSuggestions,
+          isMergedHighlight,
+          shouldSwitchMatchedTab: false,
+          enterAction: 'go'
+        });
+        itemActionModel.actionTags.forEach((tag) => {
+          actionTags.appendChild(createActionTag(
+            getSuggestionActionLabel(tag.action),
+            tag.keyLabel || 'Enter'
+          ));
+        });
+
+        const visitButton = documentRef.createElement('button');
+        visitButton.type = 'button';
+        visitButton.className = 'x-nt-suggestion-action-button x-nt-suggestion-visit-button';
+        setSuggestionActionButtonVisible(visitButton, !itemActionModel.alwaysHideVisitButton);
+        setSuggestionActionButtonPalette(visitButton, 'var(--x-nt-subtext, #9CA3AF)', 'transparent', 'transparent');
+        setInlineLabelWithIcon(
+          visitButton,
+          getSuggestionActionLabel(itemActionModel.visitButtonAction),
+          getRiSvg('ri-arrow-right-line', 'ri-size-12')
+        );
 
         suggestionItem._xTagContainer = actionTags;
-        suggestionItem._xHasActionTags = actionTags.childNodes.length > 0;
+        suggestionItem._xActionModel = itemActionModel;
+        suggestionItem._xHasActionTags = itemActionModel.hasActionTags;
+        suggestionItem._xVisitButton = visitButton;
+        suggestionItem._xAlwaysHideVisitButton = itemActionModel.alwaysHideVisitButton;
+        suggestionItem._xHasSwitchAction = itemActionModel.hasSwitchAction;
 
         suggestionItem.addEventListener('mouseenter', function() {
           this._xIsHovering = true;
@@ -808,11 +931,16 @@
         suggestionItem.addEventListener('click', function() {
           onActivateSuggestion(suggestion, query);
         });
+        visitButton.addEventListener('click', function(event) {
+          event.stopPropagation();
+          onActivateSuggestion(suggestion, query);
+        });
 
         leftSide.appendChild(iconNode);
         leftSide.appendChild(textWrapper);
         suggestionItem.appendChild(leftSide);
         rightSide.appendChild(actionTags);
+        rightSide.appendChild(visitButton);
 
         let historyDeleteButton = null;
         let historyDeleteSlot = null;

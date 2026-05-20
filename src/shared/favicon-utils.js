@@ -154,6 +154,57 @@
     ];
   }
 
+  function getRootFaviconCandidateUrls(hostname, preferredTheme) {
+    const host = normalizeFaviconHost(hostname);
+    const mode = normalizeFaviconThemePreference(preferredTheme);
+    if (!host) {
+      return [];
+    }
+    const siteSvgFavicon = `https://${host}/favicon.svg`;
+    const siteDarkSvgFavicon = `https://${host}/favicon-dark.svg`;
+    const siteLightSvgFavicon = `https://${host}/favicon-light.svg`;
+    const sitePngFavicon = `https://${host}/favicon.png`;
+    const site32PngFavicon = `https://${host}/favicon-32x32.png`;
+    const site16PngFavicon = `https://${host}/favicon-16x16.png`;
+    const siteIcoFavicon = `https://${host}/favicon.ico`;
+    const siteAppleTouchIcon = `https://${host}/apple-touch-icon.png`;
+    const siteAppleTouchIconPrecomposed = `https://${host}/apple-touch-icon-precomposed.png`;
+    const siteIconPng = `https://${host}/icon.png`;
+    const candidates = mode === 'dark'
+      ? [
+        siteDarkSvgFavicon,
+        siteSvgFavicon,
+        sitePngFavicon,
+        siteIcoFavicon,
+        site32PngFavicon,
+        site16PngFavicon,
+        siteAppleTouchIcon,
+        siteAppleTouchIconPrecomposed,
+        siteIconPng,
+        siteLightSvgFavicon
+      ]
+      : [
+        siteLightSvgFavicon,
+        siteSvgFavicon,
+        sitePngFavicon,
+        siteIcoFavicon,
+        site32PngFavicon,
+        site16PngFavicon,
+        siteAppleTouchIcon,
+        siteAppleTouchIconPrecomposed,
+        siteIconPng,
+        siteDarkSvgFavicon
+      ];
+    const seen = new Set();
+    return candidates.filter((candidate) => {
+      if (!candidate || seen.has(candidate)) {
+        return false;
+      }
+      seen.add(candidate);
+      return true;
+    });
+  }
+
   function getThemeHintScore(url, mediaValue, preferredTheme) {
     const normalizedTheme = normalizeFaviconThemePreference(preferredTheme);
     if (!normalizedTheme) {
@@ -552,6 +603,7 @@
     getKnownThemedFaviconCandidateScores,
     getKnownThemedFaviconCandidateUrls,
     getRootFaviconCandidateScores,
+    getRootFaviconCandidateUrls,
     getThemeHintScore,
     getThemeMediaScore,
     hasThemeTokenInUrl,

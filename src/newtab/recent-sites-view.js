@@ -118,6 +118,8 @@
       const titleText = ownExtensionDisplay
         ? ownExtensionDisplay.titleText
         : (item.title || siteName || item.url);
+      const eagerCount = getCurrentRecentCount();
+      const shouldEager = index < eagerCount;
       const card = documentObj.createElement('div');
       card.className = 'x-nt-recent-card';
       card.tabIndex = 0;
@@ -135,7 +137,7 @@
           card._xTheme = theme || card._xTheme;
           applyCardTheme(card, theme, host);
         }
-      }, { priority: index < 4 ? 0 : 2 });
+      }, { priority: shouldEager ? 0 : 2 });
 
       const inner = documentObj.createElement('div');
       inner.className = 'x-nt-recent-inner';
@@ -144,8 +146,6 @@
       const faviconImage = documentObj.createElement('img');
       faviconImage.className = 'x-nt-recent-favicon';
       faviconImage.alt = siteName || t('site_icon_alt', '站点');
-      const eagerCount = Math.min(4, getCurrentRecentCount());
-      const shouldEager = index < eagerCount;
       faviconImage.loading = shouldEager ? 'eager' : 'lazy';
       if (shouldEager) {
         faviconImage.fetchPriority = 'high';

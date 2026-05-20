@@ -374,6 +374,87 @@
   "settings_wallpaper_error_save": {
     "message": "壁紙儲存失敗，請重試"
   },
+  "newtab_wallpaper_title": {
+    "message": "Lumno 精選壁紙"
+  },
+  "newtab_wallpaper_select_label": {
+    "message": "選擇 {name}"
+  },
+  "newtab_wallpaper_add_local": {
+    "message": "新增本機壁紙"
+  },
+  "newtab_wallpaper_local_tag": {
+    "message": "本機"
+  },
+  "newtab_wallpaper_delete_local": {
+    "message": "刪除已匯入的壁紙"
+  },
+  "newtab_wallpaper_custom_name": {
+    "message": "本機壁紙"
+  },
+  "newtab_wallpaper_overlay_opacity": {
+    "message": "遮罩透明度"
+  },
+  "newtab_wallpaper_overlay_default_tick": {
+    "message": "預設"
+  },
+  "newtab_wallpaper_save_error": {
+    "message": "壁紙儲存失敗"
+  },
+  "newtab_wallpaper_import_done": {
+    "message": "壁紙匯入成功"
+  },
+  "newtab_wallpaper_import_error": {
+    "message": "壁紙匯入失敗"
+  },
+  "newtab_wallpaper_delete_done": {
+    "message": "刪除成功"
+  },
+  "newtab_wallpaper_delete_error": {
+    "message": "壁紙刪除失敗"
+  },
+  "newtab_wallpaper_name_dark_linocut_topographic": {
+    "message": "夜色等高線"
+  },
+  "newtab_wallpaper_name_dark_monet_lily_nocturne": {
+    "message": "夜色睡蓮"
+  },
+  "newtab_wallpaper_name_dark_shanshui_moonlit": {
+    "message": "月夜山水"
+  },
+  "newtab_wallpaper_name_monet_coastal_white": {
+    "message": "莫奈海岸"
+  },
+  "newtab_wallpaper_name_monet_field_white": {
+    "message": "莫奈田野"
+  },
+  "newtab_wallpaper_name_monet_lily_pond_white": {
+    "message": "睡蓮池"
+  },
+  "newtab_wallpaper_name_seurat_coast_white": {
+    "message": "修拉海岸"
+  },
+  "newtab_wallpaper_name_seurat_park_white": {
+    "message": "修拉公園"
+  },
+  "newtab_wallpaper_name_seurat_riverside_white": {
+    "message": "修拉河岸"
+  },
+  "newtab_wallpaper_name_white_3d_architecture": {
+    "message": "白晝建築"
+  },
+  "newtab_wallpaper_name_white_linocut_topographic": {
+    "message": "白晝等高線"
+  },
+  "newtab_wallpaper_name_white_risograph_collage": {
+    "message": "白晝拼貼"
+  },
+  "newtab_wallpaper_name_white_shanshui": {
+    "message": "山水晴光"
+  },
+  "newtab_wallpaper_name_settings_bg_light_monet_newtab": {
+    "message": "莫奈淺色背景"
+  },
   "shortcuts_title": {
     "message": "站內搜尋"
   },

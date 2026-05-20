@@ -374,6 +374,87 @@
   "settings_wallpaper_error_save": {
     "message": "Failed to save wallpaper, please try again"
   },
+  "newtab_wallpaper_title": {
+    "message": "Lumno Picks"
+  },
+  "newtab_wallpaper_select_label": {
+    "message": "Select {name}"
+  },
+  "newtab_wallpaper_add_local": {
+    "message": "Add local wallpaper"
+  },
+  "newtab_wallpaper_local_tag": {
+    "message": "Local"
+  },
+  "newtab_wallpaper_delete_local": {
+    "message": "Delete imported wallpaper"
+  },
+  "newtab_wallpaper_custom_name": {
+    "message": "Local wallpaper"
+  },
+  "newtab_wallpaper_overlay_opacity": {
+    "message": "Background overlay opacity"
+  },
+  "newtab_wallpaper_overlay_default_tick": {
+    "message": "Default"
+  },
+  "newtab_wallpaper_save_error": {
+    "message": "Failed to save wallpaper"
+  },
+  "newtab_wallpaper_import_done": {
+    "message": "Wallpaper imported"
+  },
+  "newtab_wallpaper_import_error": {
+    "message": "Failed to import wallpaper"
+  },
+  "newtab_wallpaper_delete_done": {
+    "message": "Deleted"
+  },
+  "newtab_wallpaper_delete_error": {
+    "message": "Failed to delete wallpaper"
+  },
+  "newtab_wallpaper_name_dark_linocut_topographic": {
+    "message": "Night topography"
+  },
+  "newtab_wallpaper_name_dark_monet_lily_nocturne": {
+    "message": "Lily nocturne"
+  },
+  "newtab_wallpaper_name_dark_shanshui_moonlit": {
+    "message": "Moonlit shanshui"
+  },
+  "newtab_wallpaper_name_monet_coastal_white": {
+    "message": "Monet coast"
+  },
+  "newtab_wallpaper_name_monet_field_white": {
+    "message": "Monet field"
+  },
+  "newtab_wallpaper_name_monet_lily_pond_white": {
+    "message": "Lily pond"
+  },
+  "newtab_wallpaper_name_seurat_coast_white": {
+    "message": "Seurat coast"
+  },
+  "newtab_wallpaper_name_seurat_park_white": {
+    "message": "Seurat park"
+  },
+  "newtab_wallpaper_name_seurat_riverside_white": {
+    "message": "Seurat riverside"
+  },
+  "newtab_wallpaper_name_white_3d_architecture": {
+    "message": "Daylight architecture"
+  },
+  "newtab_wallpaper_name_white_linocut_topographic": {
+    "message": "Daylight topography"
+  },
+  "newtab_wallpaper_name_white_risograph_collage": {
+    "message": "Daylight collage"
+  },
+  "newtab_wallpaper_name_white_shanshui": {
+    "message": "Clear shanshui"
+  },
+  "newtab_wallpaper_name_settings_bg_light_monet_newtab": {
+    "message": "Monet light"
+  },
   "shortcuts_duplicate_tag": {
     "message": "Duplicate with built-in"
   },

@@ -24,6 +24,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   const SETTINGS = window.LumnoSettings || {};
   const SEARCH_UTILS = window.LumnoSearchUtils || {};
   const SITE_SEARCH_STORE = window.LumnoSiteSearchStore || {};
+  const SUGGESTION_ACTION_MODEL = window.LumnoSuggestionActionModel || {};
   const SUGGESTION_NAVIGATION = window.LumnoSuggestionNavigation || {};
   const SEARCH_INPUT_MODE = window.LumnoSearchInputMode || {};
   const FAVICON_UTILS = window.LumnoFaviconUtils || {};
@@ -864,6 +865,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     const suggestionItems = [];
     let currentSuggestions = []; // Store current suggestions for keyboard navigation
     let lastRenderedQuery = '';
+    let lastRenderedActionContextKey = '';
 
     const applyOverlayTheme = (mode) => {
       overlayThemeMode = mode;
@@ -1463,6 +1465,11 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           ? FAVICON_UTILS.getKnownThemedFaviconCandidateUrls(hostname, preferredTheme, {
             getRuntimeUrl: (path) => chrome.runtime.getURL(path)
           })
+          : []
+      ),
+      getRootFaviconCandidates: (hostname, preferredTheme) => (
+        typeof FAVICON_UTILS.getRootFaviconCandidateUrls === 'function'
+          ? FAVICON_UTILS.getRootFaviconCandidateUrls(hostname, preferredTheme)
           : []
       ),
       hostHasExplicitDarkFavicon: (hostname) => (
@@ -2635,6 +2642,50 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       tag.appendChild(label);
       tag.appendChild(keycap);
       return tag;
+    }
+
+    function getSuggestionActionLabel(action) {
+      switch (action) {
+        case 'search':
+          return getSearchActionLabel();
+        case 'switch':
+          return t('action_switch', '切换');
+        case 'open':
+          return t('action_open', '打开');
+        case 'openNewTab':
+          return t('action_open_new_tab', '新开');
+        case 'go':
+          return t('action_go_current_tab', '前往');
+        case 'commandNewTab':
+          return t('command_newtab', '新建标签页');
+        case 'commandSettings':
+          return formatMessage('command_settings', '打开 {name} 设置', { name: 'Lumno' });
+        default:
+          return t('action_open_new_tab', '新开');
+      }
+    }
+
+    function setSuggestionVisitButtonContent(button, action) {
+      setInlineLabelWithIcon(
+        button,
+        getSuggestionActionLabel(action),
+        getRiSvg('ri-arrow-right-line', 'ri-size-12')
+      );
+    }
+
+    function createSuggestionActionModel(optionsArg) {
+      if (SUGGESTION_ACTION_MODEL &&
+          typeof SUGGESTION_ACTION_MODEL.createSearchActionModel === 'function') {
+        return SUGGESTION_ACTION_MODEL.createSearchActionModel(optionsArg);
+      }
+      return {
+        actionTags: [],
+        visitButtonAction: 'openNewTab',
+        alwaysHideVisitButton: false,
+        hasActionTags: false,
+        hasSwitchAction: false,
+        hideSourceTags: false
+      };
     }
 
     function getThemeSourceForSuggestion(suggestion) {
@@ -4239,8 +4290,11 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       applyMarkVariables(item, isActive ? resolvedTheme : defaultTheme);
       const shouldHideSourceTags = Boolean(item._xHasSwitchAction);
       if (item._xVisitButton) {
-        const shouldHide = Boolean(item._xAlwaysHideVisitButton || (isActive && item._xHasActionTags));
-        applySuggestionVisitButtonState(item._xVisitButton, !shouldHide, isActive, resolvedTheme);
+        const shouldShowVisitButton = SUGGESTION_ACTION_MODEL &&
+          typeof SUGGESTION_ACTION_MODEL.shouldShowVisitButton === 'function'
+          ? SUGGESTION_ACTION_MODEL.shouldShowVisitButton(item._xActionModel, isActive)
+          : Boolean(!item._xAlwaysHideVisitButton && !(isActive && item._xHasActionTags));
+        applySuggestionVisitButtonState(item._xVisitButton, shouldShowVisitButton, isActive, resolvedTheme);
       }
       applyHistoryDeleteState(item, isActive, resolvedTheme);
       if (item._xHistoryTag) {
@@ -4386,6 +4440,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       suggestionItems.length = 0;
       currentSuggestions = [];
       lastRenderedQuery = '';
+      lastRenderedActionContextKey = '';
       const list = Array.isArray(tabList) ? tabList : [];
       const showOpenTabsModeEntry = false;
       const totalItems = list.length + (showOpenTabsModeEntry ? 1 : 0);
@@ -4923,6 +4978,19 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       return true;
     }
 
+    function getSuggestionActionContextKey(options) {
+      if (SUGGESTION_ACTION_MODEL &&
+          typeof SUGGESTION_ACTION_MODEL.getActionContextKey === 'function') {
+        return SUGGESTION_ACTION_MODEL.getActionContextKey(options);
+      }
+      const config = options || {};
+      return [
+        Number.isInteger(config.primaryHighlightIndex) ? String(config.primaryHighlightIndex) : '-1',
+        String(config.primaryHighlightReason || ''),
+        config.onlyKeywordSuggestions ? 'keyword' : 'mixed'
+      ].join('|');
+    }
+
     function updateSearchSuggestions(suggestions, query) {
       if (query !== latestOverlayQuery) {
         return;
@@ -5214,7 +5282,15 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           applyAutocomplete(allSuggestions, primarySuggestion, primaryHighlightReason);
         }
         allSuggestions = limitOverlaySuggestionsForDisplay(allSuggestions);
+        const actionContextKey = getSuggestionActionContextKey({
+          primaryHighlightIndex,
+          primaryHighlightReason,
+          onlyKeywordSuggestions,
+          primarySuggestion,
+          mergedProvider
+        });
         const canAppend = query === lastRenderedQuery &&
+          actionContextKey === lastRenderedActionContextKey &&
           isSuggestionPrefix(currentSuggestions, allSuggestions);
         const startIndex = canAppend ? currentSuggestions.length : 0;
         const shouldAnimateGrowth = canAppend && startIndex < allSuggestions.length;
@@ -5234,6 +5310,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
 
         currentSuggestions = allSuggestions; // Store current suggestions including ChatGPT
         lastRenderedQuery = query;
+        lastRenderedActionContextKey = actionContextKey;
         warmIconCache(allSuggestions);
 
         // Add search suggestions
@@ -5475,63 +5552,36 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           actionTags.className = 'x-ov-suggestion-action-tags';
           setSuggestionActionTagsVisible(actionTags, false);
 
-          const isDirectHighlight = isPrimaryHighlight &&
-            (suggestion.type === 'directUrl' || suggestion.type === 'browserPage');
           const isMergedHighlight = Boolean(mergedProvider && primarySuggestion === suggestion && isPrimaryHighlight);
-          const shouldShowEnterTag = !isPrimarySearchSuggest && isPrimaryHighlight &&
-            !onlyKeywordSuggestions &&
-            (primaryHighlightReason === 'topSite' ||
-              primaryHighlightReason === 'inline' ||
-              primaryHighlightReason === 'autocomplete' ||
-              primaryHighlightReason === 'openTab' ||
-              primaryHighlightReason === 'currentOpenTab' ||
-              isDirectHighlight ||
-              isMergedHighlight);
-          if (shouldSwitchMatchedTab) {
-            actionTags.appendChild(createActionTag(t('action_switch', '切换'), 'Enter'));
-          } else if (shouldShowEnterTag) {
-            actionTags.appendChild(createActionTag(t('action_open_new_tab', '新开'), 'Enter'));
-          }
-          if (isPrimaryHighlight && onlyKeywordSuggestions && suggestion.type === 'newtab') {
-            actionTags.appendChild(createActionTag(getSearchActionLabel(), 'Enter'));
-          }
+          const itemActionModel = createSuggestionActionModel({
+            suggestion,
+            isPrimaryHighlight,
+            isPrimarySearchSuggest,
+            primaryHighlightReason,
+            onlyKeywordSuggestions,
+            isMergedHighlight,
+            shouldSwitchMatchedTab,
+            enterAction: 'openNewTab'
+          });
+          itemActionModel.actionTags.forEach((tag) => {
+            actionTags.appendChild(createActionTag(
+              getSuggestionActionLabel(tag.action),
+              tag.keyLabel || 'Enter'
+            ));
+          });
 
           // Create visit button
           const visitButton = document.createElement('button');
           applyNoTranslate(visitButton);
+          visitButton.type = 'button';
           visitButton.className = 'x-ov-suggestion-action-button x-ov-suggestion-visit-button';
           setSuggestionActionButtonVisible(visitButton, true);
           setSuggestionActionButtonPalette(visitButton, 'var(--x-ov-subtext, #9CA3AF)', 'transparent', 'transparent');
-          suggestionItem._xAlwaysHideVisitButton = suggestion.type === 'modeSwitch';
+          suggestionItem._xAlwaysHideVisitButton = itemActionModel.alwaysHideVisitButton;
           if (suggestionItem._xAlwaysHideVisitButton) {
             setSuggestionActionButtonVisible(visitButton, false);
           }
-
-          if (suggestion.type === 'newtab') {
-            setInlineLabelWithIcon(visitButton, getSearchActionLabel(), getRiSvg('ri-arrow-right-line', 'ri-size-12'));
-          } else if (suggestion.type === 'commandNewTab') {
-            setInlineLabelWithIcon(visitButton, t('command_newtab', '新建标签页'), getRiSvg('ri-arrow-right-line', 'ri-size-12'));
-          } else if (suggestion.type === 'commandSettings') {
-            setInlineLabelWithIcon(
-              visitButton,
-              formatMessage('command_settings', '打开 Lumno 设置', { name: 'Lumno' }),
-              getRiSvg('ri-arrow-right-line', 'ri-size-12')
-            );
-          } else if (shouldSwitchMatchedTab) {
-            setInlineLabelWithIcon(visitButton, t('action_switch', '切换'), getRiSvg('ri-arrow-right-line', 'ri-size-12'));
-          } else if (
-            suggestion.type === 'siteSearch' ||
-            suggestion.type === 'siteSearchPrompt' ||
-            suggestion.type === 'inlineSiteSearch'
-          ) {
-            setInlineLabelWithIcon(visitButton, t('action_search', '搜索'), getRiSvg('ri-arrow-right-line', 'ri-size-12'));
-          } else if (suggestion.type === 'directUrl' || suggestion.type === 'browserPage') {
-            setInlineLabelWithIcon(visitButton, t('action_open', '打开'), getRiSvg('ri-arrow-right-line', 'ri-size-12'));
-          } else if (suggestion.type === 'googleSuggest') {
-            setInlineLabelWithIcon(visitButton, getSearchActionLabel(), getRiSvg('ri-arrow-right-line', 'ri-size-12'));
-          } else {
-            setInlineLabelWithIcon(visitButton, t('action_open_new_tab', '新开'), getRiSvg('ri-arrow-right-line', 'ri-size-12'));
-          }
+          setSuggestionVisitButtonContent(visitButton, itemActionModel.visitButtonAction);
 
           let historyDeleteButton = null;
           let historyDeleteSlot = null;
@@ -5779,8 +5829,9 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           suggestionItem.appendChild(rightSide);
           suggestionItem._xVisitButton = visitButton;
           suggestionItem._xTagContainer = actionTags;
-          suggestionItem._xHasActionTags = actionTags.childNodes.length > 0;
-          suggestionItem._xHasSwitchAction = shouldSwitchMatchedTab;
+          suggestionItem._xActionModel = itemActionModel;
+          suggestionItem._xHasActionTags = itemActionModel.hasActionTags;
+          suggestionItem._xHasSwitchAction = itemActionModel.hasSwitchAction;
           suggestionItem._xHistoryDeleteSlot = historyDeleteSlot;
           suggestionItem._xHistoryDeleteButton = historyDeleteButton;
           suggestionItem._xHasHistoryDeleteButton = Boolean(historyDeleteButton);

@@ -374,6 +374,87 @@
   "settings_wallpaper_error_save": {
     "message": "壁纸保存失败，请重试"
   },
+  "newtab_wallpaper_title": {
+    "message": "Lumno 精选壁纸"
+  },
+  "newtab_wallpaper_select_label": {
+    "message": "选择 {name}"
+  },
+  "newtab_wallpaper_add_local": {
+    "message": "添加本地壁纸"
+  },
+  "newtab_wallpaper_local_tag": {
+    "message": "本地"
+  },
+  "newtab_wallpaper_delete_local": {
+    "message": "删除已导入的壁纸"
+  },
+  "newtab_wallpaper_custom_name": {
+    "message": "本地壁纸"
+  },
+  "newtab_wallpaper_overlay_opacity": {
+    "message": "遮罩透明度"
+  },
+  "newtab_wallpaper_overlay_default_tick": {
+    "message": "默认"
+  },
+  "newtab_wallpaper_save_error": {
+    "message": "壁纸保存失败"
+  },
+  "newtab_wallpaper_import_done": {
+    "message": "壁纸导入成功"
+  },
+  "newtab_wallpaper_import_error": {
+    "message": "壁纸导入失败"
+  },
+  "newtab_wallpaper_delete_done": {
+    "message": "删除成功"
+  },
+  "newtab_wallpaper_delete_error": {
+    "message": "壁纸删除失败"
+  },
+  "newtab_wallpaper_name_dark_linocut_topographic": {
+    "message": "夜色等高线"
+  },
+  "newtab_wallpaper_name_dark_monet_lily_nocturne": {
+    "message": "夜色睡莲"
+  },
+  "newtab_wallpaper_name_dark_shanshui_moonlit": {
+    "message": "月夜山水"
+  },
+  "newtab_wallpaper_name_monet_coastal_white": {
+    "message": "莫奈海岸"
+  },
+  "newtab_wallpaper_name_monet_field_white": {
+    "message": "莫奈田野"
+  },
+  "newtab_wallpaper_name_monet_lily_pond_white": {
+    "message": "睡莲池"
+  },
+  "newtab_wallpaper_name_seurat_coast_white": {
+    "message": "修拉海岸"
+  },
+  "newtab_wallpaper_name_seurat_park_white": {
+    "message": "修拉公园"
+  },
+  "newtab_wallpaper_name_seurat_riverside_white": {
+    "message": "修拉河岸"
+  },
+  "newtab_wallpaper_name_white_3d_architecture": {
+    "message": "白昼建筑"
+  },
+  "newtab_wallpaper_name_white_linocut_topographic": {
+    "message": "白昼等高线"
+  },
+  "newtab_wallpaper_name_white_risograph_collage": {
+    "message": "白昼拼贴"
+  },
+  "newtab_wallpaper_name_white_shanshui": {
+    "message": "山水晴光"
+  },
+  "newtab_wallpaper_name_settings_bg_light_monet_newtab": {
+    "message": "莫奈浅色背景"
+  },
   "shortcuts_duplicate_tag": {
     "message": "与内置重复"
   },

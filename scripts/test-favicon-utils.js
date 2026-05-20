@@ -56,6 +56,16 @@ const darkRootCandidates = utils.getRootFaviconCandidateScores('www.Example.com'
 assert.strictEqual(darkRootCandidates[0].url, 'https://example.com/favicon-dark.svg');
 assert.strictEqual(darkRootCandidates.map((candidate) => candidate.score).join(','), '34,28,16,24,16');
 
+const darkRootCandidateUrls = utils.getRootFaviconCandidateUrls('www.Example.com', 'dark');
+assert.strictEqual(darkRootCandidateUrls.slice(0, 5).join('\n'), [
+  'https://example.com/favicon-dark.svg',
+  'https://example.com/favicon.svg',
+  'https://example.com/favicon.png',
+  'https://example.com/favicon.ico',
+  'https://example.com/favicon-32x32.png'
+].join('\n'));
+assert.ok(darkRootCandidateUrls.includes('https://example.com/apple-touch-icon-precomposed.png'));
+
 const htmlIconCandidates = utils.parseHtmlIconCandidateScores(`
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="32x32" media="(prefers-color-scheme: dark)" data-base-href="/assets/favicon">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">

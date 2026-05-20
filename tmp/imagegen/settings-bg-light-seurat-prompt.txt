@@ -1,0 +1,13 @@
+Use case: style-transfer
+Asset type: Lumno settings/newtab light UI background
+Primary request: Transform the provided reference image into a Georges Seurat-inspired pointillist version while preserving the original composition and subject arrangement.
+Input image: Use the attached/local image as the edit target and composition reference.
+Scene/backdrop: A bright airy meadow with distant rolling hills, pale sky, small cottage, flowers, grasses, and butterflies.
+Subject: Preserve the same broad horizontal meadow panorama, large upper white negative space, distant hills, tiny cottage on the right, foreground wildflowers, large butterfly near the left, smaller butterflies, and soft washed edges.
+Style/medium: Pointillist art inspired by Seurat, refined colored stippling, tiny airy dots, subtle optical color mixing, matte paper texture.
+Composition/framing: Preserve the original wide 3152x1328 layout and low landscape band. Keep the top and center very light and open for UI overlay. Do not add new dominant objects.
+Lighting/mood: Soft clear daylight, elegant, calm, playful but quiet.
+Color palette: Warm white, ivory, pale mint green, powder blue, muted rose, soft yellow, light violet, tiny graphite accents.
+Materials/textures: Fine pointillist dots, matte paper grain, low-noise stippling with delicate density variation.
+Constraints: Keep the image background-friendly for a light UI. Preserve large white/near-white negative space. Dots must be delicate and sparse enough not to interfere with UI readability. No text, no logo, no watermark.
+Avoid: Dense all-over dot pattern, dark background, high contrast, hard outlines, photorealism, glossy 3D, extra houses, extra large animals, readable typography.

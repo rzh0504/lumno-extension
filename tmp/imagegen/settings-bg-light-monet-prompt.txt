@@ -1,0 +1,13 @@
+Use case: style-transfer
+Asset type: Lumno settings/newtab light UI background
+Primary request: Transform the provided reference image into a Claude Monet-inspired Impressionist version while preserving the original composition and subject arrangement.
+Input image: Use the attached/local image as the edit target and composition reference.
+Scene/backdrop: A bright airy meadow with distant rolling hills, pale sky, small cottage, flowers, grasses, and butterflies.
+Subject: Preserve the same broad horizontal meadow panorama, large upper white negative space, distant hills, tiny cottage on the right, foreground wildflowers, large butterfly near the left, smaller butterflies, and soft washed edges.
+Style/medium: French Impressionism inspired by Monet, loose broken oil brushstrokes, luminous pastel atmosphere, visible canvas texture, soft painterly edges.
+Composition/framing: Preserve the original wide 3152x1328 layout and low landscape band. Keep the top and center very light and open for UI overlay. Do not add new dominant objects.
+Lighting/mood: Gentle morning daylight, misty and poetic, calm, refined, airy.
+Color palette: Warm white, ivory, pale sage green, powder blue, soft lavender, blush pink, light ochre, very gentle yellow.
+Materials/textures: Soft oil-paint brushwork, subtle canvas grain, delicate pigment blending.
+Constraints: Keep the image background-friendly for a light UI. Preserve large white/near-white negative space. Preserve the original subject placement and approximate scale. No text, no logo, no watermark.
+Avoid: Dense full-frame painting, dark sky, high contrast, hard ink outlines, photorealism, glossy 3D, extra houses, extra large animals, readable typography.
