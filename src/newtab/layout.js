@@ -24,6 +24,8 @@
     const contentSectionsExtraUpshiftPx = getOptionNumber(constants, 'contentSectionsExtraUpshiftPx', 20);
     const emptySectionsExtraUpshiftPx = getOptionNumber(constants, 'emptySectionsExtraUpshiftPx', 96);
     const suggestionsBottomInsetPx = getOptionNumber(constants, 'suggestionsBottomInsetPx', 14);
+    const visibleAttribute = 'data-visible';
+    const suggestionsOpenAttribute = 'data-nt-suggestions-open';
 
     function getRoot() {
       return resolveElement(options.root);
@@ -69,6 +71,35 @@
       return resolveElement(options.suggestionsOutline);
     }
 
+    function setBooleanAttribute(element, name, value) {
+      if (!element || typeof element.setAttribute !== 'function') {
+        return;
+      }
+      element.setAttribute(name, value ? 'true' : 'false');
+    }
+
+    function setSuggestionsOpenState(open) {
+      const body = documentObj && documentObj.body;
+      setBooleanAttribute(body, suggestionsOpenAttribute, Boolean(open));
+    }
+
+    function setPixelStyle(element, property, value) {
+      if (!element || !element.style) {
+        return;
+      }
+      element.style.setProperty(property, `${Math.round(value)}px`);
+    }
+
+    function setFixedFrame(element, frame) {
+      if (!element || !frame) {
+        return;
+      }
+      setPixelStyle(element, 'left', frame.left);
+      setPixelStyle(element, 'top', frame.top);
+      setPixelStyle(element, 'width', frame.width);
+      setPixelStyle(element, 'height', frame.height);
+    }
+
     function applyWidthMode(config) {
       const searchMax = Math.max(720, Number((config && config.searchMaxWidth) || 720));
       const contentMax = Math.max(1040, Number((config && config.contentMaxWidth) || 1040));
@@ -86,10 +117,16 @@
       if (!style || style.display === 'none') {
         return 0;
       }
+      if (element.getAttribute && element.getAttribute('data-visible') === 'false') {
+        return 0;
+      }
       const rect = element.getBoundingClientRect();
       const marginTop = Number.parseFloat(style.marginTop) || 0;
       const marginBottom = Number.parseFloat(style.marginBottom) || 0;
-      return Math.max(0, rect.height + marginTop + marginBottom);
+      const targetHeight = element.getAttribute && element.getAttribute('data-visible') === 'true'
+        ? Math.max(rect.height, Number(element.scrollHeight) || 0)
+        : rect.height;
+      return Math.max(0, targetHeight + marginTop + marginBottom);
     }
 
     function isSectionVisible(section) {
@@ -97,7 +134,7 @@
         return false;
       }
       const visibleAttr = typeof section.getAttribute === 'function'
-        ? section.getAttribute('data-visible')
+        ? section.getAttribute(visibleAttribute)
         : '';
       if (visibleAttr === 'true') {
         return true;
@@ -237,67 +274,19 @@
 
     function setSuggestionsVisible(visible) {
       const shouldShow = Boolean(visible);
-      const root = getRoot();
-      const searchLayer = getSearchLayer();
-      const inputParts = getInputParts();
       const suggestionsContainer = getSuggestionsContainer();
       const suggestionsSurface = getSuggestionsSurface();
       const suggestionsOutline = getSuggestionsOutline();
       if (!suggestionsContainer) {
         return;
       }
-      if (root) {
-        if (shouldShow) {
-          root.style.setProperty('z-index', '22');
-          root.style.setProperty('background', 'transparent');
-          root.style.setProperty('border-color', 'transparent');
-          root.style.setProperty('box-shadow', 'none');
-          root.style.setProperty('backdrop-filter', 'none');
-          root.style.setProperty('-webkit-backdrop-filter', 'none');
-        } else {
-          root.style.removeProperty('z-index');
-          root.style.removeProperty('background');
-          root.style.removeProperty('border-color');
-          root.style.removeProperty('box-shadow');
-          root.style.removeProperty('backdrop-filter');
-          root.style.removeProperty('-webkit-backdrop-filter');
-        }
-      }
-      if (searchLayer) {
-        searchLayer.style.setProperty('z-index', shouldShow ? '20' : '12');
-        searchLayer.style.setProperty('border-radius', shouldShow ? '24px 24px 0 0' : '24px');
-        searchLayer.style.setProperty('background', shouldShow
-          ? 'transparent'
-          : 'var(--x-nt-input-bg, rgba(255, 255, 255, 0.9))');
-        searchLayer.style.setProperty('border', shouldShow
-          ? '1px solid transparent'
-          : '1px solid var(--x-nt-input-border, rgba(0, 0, 0, 0.06))');
-        searchLayer.style.setProperty('box-shadow', shouldShow
-          ? 'none'
-          : 'var(--x-nt-input-shadow, 0 20px 60px rgba(0, 0, 0, 0.08))');
-      }
-      if (inputParts && inputParts.container) {
-        inputParts.container.style.setProperty('border-radius', '0');
-        inputParts.container.style.setProperty('border', 'none');
-        inputParts.container.style.setProperty('border-bottom', 'none');
-        inputParts.container.style.setProperty('box-shadow', 'none');
-        inputParts.container.style.setProperty('background', 'transparent');
-        inputParts.container.style.setProperty('z-index', '2');
-      }
-      if (inputParts && inputParts.divider) {
-        inputParts.divider.style.setProperty('display', 'none');
-        inputParts.divider.style.setProperty('opacity', '0');
-      }
+      setSuggestionsOpenState(shouldShow);
       if (shouldShow) {
         updateSuggestionsFloatingLayout();
       }
-      suggestionsContainer.setAttribute('data-visible', shouldShow ? 'true' : 'false');
-      if (suggestionsSurface) {
-        suggestionsSurface.setAttribute('data-visible', shouldShow ? 'true' : 'false');
-      }
-      if (suggestionsOutline) {
-        suggestionsOutline.setAttribute('data-visible', shouldShow ? 'true' : 'false');
-      }
+      setBooleanAttribute(suggestionsContainer, visibleAttribute, shouldShow);
+      setBooleanAttribute(suggestionsSurface, visibleAttribute, shouldShow);
+      setBooleanAttribute(suggestionsOutline, visibleAttribute, shouldShow);
       if (shouldShow) {
         if (typeof windowObj.requestAnimationFrame === 'function') {
           windowObj.requestAnimationFrame(updateSuggestionsFloatingLayout);
@@ -335,27 +324,25 @@
       const maxHeight = contentHeight > 0 && contentHeight <= availableFitHeight
         ? contentHeight
         : Math.floor(available);
-      suggestionsContainer.style.setProperty('left', `${left}px`);
-      suggestionsContainer.style.setProperty('top', `${top}px`);
-      suggestionsContainer.style.setProperty('width', `${width}px`);
-      suggestionsContainer.style.setProperty('max-height', `${maxHeight}px`);
+      setPixelStyle(suggestionsContainer, 'left', left);
+      setPixelStyle(suggestionsContainer, 'top', top);
+      setPixelStyle(suggestionsContainer, 'width', width);
+      setPixelStyle(suggestionsContainer, 'max-height', maxHeight);
       if (suggestionsSurface) {
         const suggestionsRect = suggestionsContainer.getBoundingClientRect();
-        const surfaceLeft = Math.round(rootRect.left);
-        const surfaceTop = Math.round(rootRect.top);
-        const surfaceWidth = Math.max(0, Math.round(rootRect.width));
+        const surfaceLeft = rootRect.left;
+        const surfaceTop = rootRect.top;
+        const surfaceWidth = Math.max(0, rootRect.width);
         const surfaceBottom = Math.max(rootRect.bottom, suggestionsRect.bottom);
-        const surfaceHeight = Math.max(0, Math.round(surfaceBottom - rootRect.top));
-        suggestionsSurface.style.setProperty('left', `${surfaceLeft}px`);
-        suggestionsSurface.style.setProperty('top', `${surfaceTop}px`);
-        suggestionsSurface.style.setProperty('width', `${surfaceWidth}px`);
-        suggestionsSurface.style.setProperty('height', `${surfaceHeight}px`);
-        if (suggestionsOutline) {
-          suggestionsOutline.style.setProperty('left', `${surfaceLeft}px`);
-          suggestionsOutline.style.setProperty('top', `${surfaceTop}px`);
-          suggestionsOutline.style.setProperty('width', `${surfaceWidth}px`);
-          suggestionsOutline.style.setProperty('height', `${surfaceHeight}px`);
-        }
+        const surfaceHeight = Math.max(0, surfaceBottom - rootRect.top);
+        const surfaceFrame = {
+          left: surfaceLeft,
+          top: surfaceTop,
+          width: surfaceWidth,
+          height: surfaceHeight
+        };
+        setFixedFrame(suggestionsSurface, surfaceFrame);
+        setFixedFrame(suggestionsOutline, surfaceFrame);
       }
     }
 

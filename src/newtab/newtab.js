@@ -29,6 +29,8 @@
   const NEWTAB_THEME_SCOPE_STORAGE_KEY = '_x_extension_newtab_theme_scope_2026_unique_';
   const NEWTAB_WALLPAPER_STORAGE_KEY = '_x_extension_newtab_wallpaper_2026_unique_';
   const NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY = '_x_extension_newtab_wallpaper_overlay_2026_unique_';
+  const NEWTAB_WALLPAPER_EFFECT_STORAGE_KEY = '_x_extension_newtab_wallpaper_effect_2026_unique_';
+  const LUMNO_CHROME_WEB_STORE_URL = 'https://chromewebstore.google.com/detail/nggfkkbmogmadfoikakkfegkoilfcfao?utm_source=item-share-cb';
   const BOOKMARK_COUNT_STORAGE_KEY = '_x_extension_bookmark_count_2024_unique_';
   const BOOKMARK_COLUMNS_STORAGE_KEY = '_x_extension_bookmark_columns_2024_unique_';
   const DEFAULT_SEARCH_ENGINE_STORAGE_KEY = '_x_extension_default_search_engine_2024_unique_';
@@ -56,6 +58,7 @@
   const NEWTAB_SUGGESTIONS_VIEW = globalThis.LumnoNewtabSuggestionsView || {};
   const NEWTAB_WALLPAPER_LOCAL_STORE = globalThis.LumnoNewtabWallpaperLocalStore || {};
   const NEWTAB_WALLPAPER_ADAPTIVE_TONE = globalThis.LumnoNewtabWallpaperAdaptiveTone || {};
+  const NEWTAB_WALLPAPER_EFFECTS = globalThis.LumnoNewtabWallpaperEffects || {};
   const NEWTAB_WALLPAPER = globalThis.LumnoNewtabWallpaper || {};
   if (typeof NEWTAB_FAVICON_CACHE.createFaviconCache !== 'function' ||
       typeof NEWTAB_FAVICON_THEME.buildTheme !== 'function' ||
@@ -71,6 +74,7 @@
       typeof NEWTAB_SUGGESTIONS_VIEW.createSuggestionsView !== 'function' ||
       typeof NEWTAB_WALLPAPER_LOCAL_STORE.createWallpaperLocalStore !== 'function' ||
       typeof NEWTAB_WALLPAPER_ADAPTIVE_TONE.createWallpaperAdaptiveTone !== 'function' ||
+      typeof NEWTAB_WALLPAPER_EFFECTS.createWallpaperEffects !== 'function' ||
       typeof NEWTAB_WALLPAPER.createWallpaperRuntime !== 'function') {
     console.warn('Lumno: newtab helpers not available.');
     return;
@@ -93,8 +97,7 @@
   const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
   let mediaListenerAttached = false;
   let globalThemeMode = 'system';
-  let newtabThemeMode = 'system';
-  let hasNewtabThemeModeValue = false;
+  let newtabThemeMode = 'global';
   let newtabThemeScope = 'global';
   let currentThemeMode = 'system';
   let initialThemeApplied = false;
@@ -133,6 +136,8 @@
   let searchLayer = null;
   let wordmarkContainer = null;
   let wordmarkImageEl = null;
+  let wordmarkSolidEl = null;
+  let wordmarkVisibilityTransitionTimer = 0;
   let wallpaperControl = null;
   let wallpaperRuntime = null;
   let pageNoticeController = null;
@@ -173,6 +178,12 @@
   const SEARCH_LAYOUT_CONTENT_SECTIONS_EXTRA_UPSHIFT_PX = 20;
   const SEARCH_LAYOUT_EMPTY_SECTIONS_EXTRA_UPSHIFT_PX = 96;
   const WORDMARK_ENTRY_ANIMATION_NAME = '_x_nt_wordmark_enter_2026_unique_';
+  const WORDMARK_VISIBILITY_TRANSITION_MS = 260;
+  const WORDMARK_VISIBILITY_TRANSITION_CSS =
+    'max-height 260ms cubic-bezier(0.22, 1, 0.36, 1), ' +
+    'margin-bottom 260ms cubic-bezier(0.22, 1, 0.36, 1), ' +
+    'opacity 180ms ease, ' +
+    'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)';
   const NEWTAB_WIDTH_MODE_CONFIGS = {
     standard: {
       searchMaxWidth: 720,
@@ -253,9 +264,74 @@
     if (!wordmarkContainer) {
       return;
     }
-    wordmarkContainer.style.setProperty('display', newtabWordmarkVisible ? 'flex' : 'none');
+    const body = document.body;
+    const nextVisible = Boolean(newtabWordmarkVisible);
+    const wasVisible = wordmarkContainer.getAttribute('data-visible') !== 'false';
+    const stateChanged = wasVisible !== nextVisible;
+    const prefersReducedMotion = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const shouldAnimate = Boolean(
+      body &&
+      body.getAttribute('data-nt-ready') === '1' &&
+      stateChanged &&
+      !prefersReducedMotion
+    );
+    if (stateChanged && wordmarkVisibilityTransitionTimer) {
+      window.clearTimeout(wordmarkVisibilityTransitionTimer);
+      wordmarkVisibilityTransitionTimer = 0;
+    }
+    if (body) {
+      if (shouldAnimate) {
+        body.setAttribute('data-wordmark-transition', 'true');
+      } else if (!wordmarkVisibilityTransitionTimer) {
+        body.removeAttribute('data-wordmark-transition');
+      }
+    }
+    wordmarkContainer.setAttribute('data-visible', nextVisible ? 'true' : 'false');
+    wordmarkContainer.style.setProperty('display', 'flex');
+    wordmarkContainer.style.setProperty(
+      'transition',
+      prefersReducedMotion ? 'none' : WORDMARK_VISIBILITY_TRANSITION_CSS
+    );
+    wordmarkContainer.style.setProperty('max-height', nextVisible ? '74px' : '0');
+    wordmarkContainer.style.setProperty('margin-bottom', nextVisible ? '28px' : '0');
+    wordmarkContainer.style.setProperty('opacity', nextVisible ? '1' : '0');
+    wordmarkContainer.style.setProperty(
+      'transform',
+      nextVisible ? 'translate3d(0, 0, 0)' : 'translate3d(0, -8px, 0)'
+    );
+    wordmarkContainer.style.setProperty('pointer-events', nextVisible ? 'auto' : 'none');
     updateSearchEntryLayout();
     scheduleWallpaperAdaptiveToneUpdate();
+    if (shouldAnimate && body) {
+      wordmarkVisibilityTransitionTimer = window.setTimeout(() => {
+        wordmarkVisibilityTransitionTimer = 0;
+        body.removeAttribute('data-wordmark-transition');
+      }, WORDMARK_VISIBILITY_TRANSITION_MS + 80);
+    }
+  }
+
+  function getWordmarkSolidFill(wallpaperActive, wallpaperInk, theme) {
+    if (wallpaperActive) {
+      return wallpaperInk === 'dark'
+        ? 'var(--x-nt-wallpaper-wordmark-ink, rgb(238 240 242))'
+        : 'var(--x-nt-wallpaper-wordmark-ink, rgb(78 84 94))';
+    }
+    return theme === 'dark' ? 'rgb(248 250 252)' : 'rgb(31 41 55)';
+  }
+
+  function applyWordmarkSolidFill(fill) {
+    if (!wordmarkContainer || !wordmarkSolidEl) {
+      return;
+    }
+    wordmarkContainer.style.setProperty('--x-nt-wordmark-solid-fill', fill);
+  }
+
+  function applyWordmarkSolidLayerVisible(visible) {
+    if (!wordmarkSolidEl) {
+      return;
+    }
+    wordmarkSolidEl.style.setProperty('opacity', visible ? '1' : '0');
   }
 
   function applyWordmarkThemeAppearance(resolvedTheme) {
@@ -275,19 +351,24 @@
       if (wordmarkImageEl.getAttribute('src') !== wallpaperSrc) {
         wordmarkImageEl.setAttribute('src', wallpaperSrc);
       }
-      wordmarkImageEl.style.setProperty('opacity', '0.92');
+      applyWordmarkSolidFill(getWordmarkSolidFill(true, wallpaperInk, theme));
+      applyWordmarkSolidLayerVisible(true);
+      wordmarkImageEl.style.setProperty('opacity', '0');
       return;
     }
+    applyWordmarkSolidLayerVisible(false);
     if (theme === 'dark') {
       if (wordmarkImageEl.getAttribute('src') !== darkSrc) {
         wordmarkImageEl.setAttribute('src', darkSrc);
       }
+      applyWordmarkSolidFill(getWordmarkSolidFill(false, '', theme));
       wordmarkImageEl.style.setProperty('opacity', '0.9');
       return;
     }
     if (wordmarkImageEl.getAttribute('src') !== lightSrc) {
       wordmarkImageEl.setAttribute('src', lightSrc);
     }
+    applyWordmarkSolidFill(getWordmarkSolidFill(false, '', theme));
     wordmarkImageEl.style.setProperty('opacity', '0.82');
   }
 
@@ -688,7 +769,8 @@
         element: bookmarkPager,
         sampleElement: bookmarkPager,
         minWidth: 92,
-        minHeight: 42
+        minHeight: 42,
+        iconButton: true
       },
       {
         element: recentHeading,
@@ -706,7 +788,9 @@
     storageArea,
     storageKeys: {
       wallpaper: NEWTAB_WALLPAPER_STORAGE_KEY,
-      overlay: NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY
+      overlay: NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY,
+      effect: NEWTAB_WALLPAPER_EFFECT_STORAGE_KEY,
+      wordmark: NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY
     },
     t,
     formatMessage,
@@ -719,6 +803,11 @@
     showTopActionTooltip,
     hideTopActionTooltip,
     applyWordmarkThemeAppearance,
+    getWordmarkVisible: () => newtabWordmarkVisible,
+    setWordmarkVisible: (value) => {
+      newtabWordmarkVisible = normalizeNewtabWordmarkVisible(value);
+      applyNewtabWordmarkVisibility();
+    },
     getAdaptiveToneTargets: createWallpaperAdaptiveToneTargets
   });
 
@@ -740,6 +829,10 @@
 
   function bootstrapInitialWallpaperOverlay() {
     return wallpaperRuntime ? wallpaperRuntime.bootstrapInitialWallpaperOverlay() : Promise.resolve();
+  }
+
+  function bootstrapInitialWallpaperEffect() {
+    return wallpaperRuntime ? wallpaperRuntime.bootstrapInitialWallpaperEffect() : Promise.resolve();
   }
 
   function createWallpaperControls() {
@@ -1793,19 +1886,30 @@
     return 'system';
   }
 
+  function normalizeNewtabThemeMode(value) {
+    if (value === 'light' || value === 'dark') {
+      return value;
+    }
+    return 'global';
+  }
+
   function normalizeNewtabThemeScope(value) {
     return value === 'home' ? 'home' : 'global';
   }
 
+  function isNewtabThemeFollowingGlobal() {
+    return newtabThemeMode === 'global';
+  }
+
   function getScopedThemeMode() {
-    if (newtabThemeScope === 'home') {
-      return newtabThemeMode === 'system' ? globalThemeMode : newtabThemeMode;
-    }
-    return globalThemeMode;
+    return isNewtabThemeFollowingGlobal() ? globalThemeMode : newtabThemeMode;
   }
 
   function getSelectedThemeMode() {
-    return newtabThemeScope === 'home' ? newtabThemeMode : globalThemeMode;
+    if (newtabThemeScope !== 'home') {
+      return globalThemeMode;
+    }
+    return isNewtabThemeFollowingGlobal() ? 'system' : newtabThemeMode;
   }
 
   function applyScopedThemeMode(options) {
@@ -1819,9 +1923,8 @@
     hasThemeBootstrapStarted = true;
     if (!storageArea) {
       globalThemeMode = 'system';
-      newtabThemeMode = 'system';
+      newtabThemeMode = 'global';
       newtabThemeScope = 'global';
-      hasNewtabThemeModeValue = false;
       applyScopedThemeMode();
       return initialThemeReadyPromise;
     }
@@ -1831,9 +1934,7 @@
       NEWTAB_THEME_SCOPE_STORAGE_KEY
     ], (result) => {
       globalThemeMode = normalizeThemeMode(result ? result[THEME_STORAGE_KEY] : 'system');
-      hasNewtabThemeModeValue = Boolean(result &&
-        Object.prototype.hasOwnProperty.call(result, NEWTAB_THEME_MODE_STORAGE_KEY));
-      newtabThemeMode = normalizeThemeMode(result ? result[NEWTAB_THEME_MODE_STORAGE_KEY] : 'system');
+      newtabThemeMode = normalizeNewtabThemeMode(result ? result[NEWTAB_THEME_MODE_STORAGE_KEY] : 'global');
       newtabThemeScope = normalizeNewtabThemeScope(result ? result[NEWTAB_THEME_SCOPE_STORAGE_KEY] : 'global');
       applyScopedThemeMode();
     });
@@ -1900,6 +2001,7 @@
   bootstrapInitialThemeMode();
   bootstrapInitialWallpaper();
   bootstrapInitialWallpaperOverlay();
+  bootstrapInitialWallpaperEffect();
 
   chrome.storage.onChanged.addListener((changes, areaName) => {
     const isPrimaryArea = Boolean(storageAreaName) && areaName === storageAreaName;
@@ -1918,20 +2020,21 @@
     }
     if (changes[THEME_STORAGE_KEY]) {
       globalThemeMode = normalizeThemeMode(changes[THEME_STORAGE_KEY].newValue);
-      if (newtabThemeScope === 'global' || newtabThemeMode === 'system') {
+      if (isNewtabThemeFollowingGlobal()) {
         applyScopedThemeMode();
+      } else {
+        updateWallpaperAppearanceSelectionUi();
+        updateModeCommandSuggestions();
       }
     }
     if (changes[NEWTAB_THEME_MODE_STORAGE_KEY]) {
-      newtabThemeMode = normalizeThemeMode(changes[NEWTAB_THEME_MODE_STORAGE_KEY].newValue);
-      hasNewtabThemeModeValue = true;
-      if (newtabThemeScope === 'home') {
-        applyScopedThemeMode();
-      }
+      newtabThemeMode = normalizeNewtabThemeMode(changes[NEWTAB_THEME_MODE_STORAGE_KEY].newValue);
+      applyScopedThemeMode();
     }
     if (changes[NEWTAB_THEME_SCOPE_STORAGE_KEY]) {
       newtabThemeScope = normalizeNewtabThemeScope(changes[NEWTAB_THEME_SCOPE_STORAGE_KEY].newValue);
-      applyScopedThemeMode();
+      updateWallpaperLanguageStrings();
+      updateModeCommandSuggestions();
     }
     if (wallpaperRuntime) {
       wallpaperRuntime.handleStorageChange(changes);
@@ -2113,6 +2216,9 @@
         storageArea.set({ [NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY]: nextValue });
       }
       applyNewtabWordmarkVisibility();
+      if (wallpaperRuntime && typeof wallpaperRuntime.updateWordmarkVisibilityUi === 'function') {
+        wallpaperRuntime.updateWordmarkVisibilityUi();
+      }
     });
     storageArea.get([RECENT_MODE_STORAGE_KEY], (result) => {
       const stored = result[RECENT_MODE_STORAGE_KEY];
@@ -2287,12 +2393,15 @@
 
   function setThemeMode(mode) {
     const nextMode = normalizeThemeMode(mode);
-    const targetKey = newtabThemeScope === 'home'
+    const isEditingNewtabTheme = newtabThemeScope === 'home';
+    const targetKey = isEditingNewtabTheme
       ? NEWTAB_THEME_MODE_STORAGE_KEY
       : THEME_STORAGE_KEY;
+    const nextStoredMode = isEditingNewtabTheme && nextMode === 'system'
+      ? 'global'
+      : nextMode;
     if (newtabThemeScope === 'home') {
-      newtabThemeMode = nextMode;
-      hasNewtabThemeModeValue = true;
+      newtabThemeMode = normalizeNewtabThemeMode(nextStoredMode);
     } else {
       globalThemeMode = nextMode;
     }
@@ -2300,7 +2409,7 @@
       applyScopedThemeMode();
       return;
     }
-    storageArea.set({ [targetKey]: nextMode }, () => {
+    storageArea.set({ [targetKey]: nextStoredMode }, () => {
       applyScopedThemeMode();
       updateModeCommandSuggestions();
     });
@@ -2310,18 +2419,13 @@
     const nextScope = normalizeNewtabThemeScope(scope);
     const updates = { [NEWTAB_THEME_SCOPE_STORAGE_KEY]: nextScope };
     newtabThemeScope = nextScope;
-    if (nextScope === 'home' && !hasNewtabThemeModeValue) {
-      newtabThemeMode = 'system';
-      hasNewtabThemeModeValue = true;
-      updates[NEWTAB_THEME_MODE_STORAGE_KEY] = newtabThemeMode;
-    }
     if (!storageArea) {
-      applyScopedThemeMode();
+      updateWallpaperLanguageStrings();
       updateModeCommandSuggestions();
       return;
     }
     storageArea.set(updates, () => {
-      applyScopedThemeMode();
+      updateWallpaperLanguageStrings();
       updateModeCommandSuggestions();
     });
   }
@@ -6130,9 +6234,7 @@
             NEWTAB_THEME_SCOPE_STORAGE_KEY
           ], (result) => {
             globalThemeMode = normalizeThemeMode(result ? result[THEME_STORAGE_KEY] : 'system');
-            hasNewtabThemeModeValue = Boolean(result &&
-              Object.prototype.hasOwnProperty.call(result, NEWTAB_THEME_MODE_STORAGE_KEY));
-            newtabThemeMode = normalizeThemeMode(result ? result[NEWTAB_THEME_MODE_STORAGE_KEY] : 'system');
+            newtabThemeMode = normalizeNewtabThemeMode(result ? result[NEWTAB_THEME_MODE_STORAGE_KEY] : 'global');
             newtabThemeScope = normalizeNewtabThemeScope(result ? result[NEWTAB_THEME_SCOPE_STORAGE_KEY] : 'global');
             const storedMode = getScopedThemeMode();
             if (storedMode !== currentThemeMode && query === latestQuery) {
@@ -7052,32 +7154,42 @@
     all: unset;
     width: 90vw;
     max-width: var(--x-nt-search-max-width, 720px);
+    max-height: 74px;
     min-height: 0;
     margin: 0 0 28px;
     display: flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
+    position: relative;
+    z-index: 3;
+    overflow: hidden;
     pointer-events: auto;
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    transition: ${WORDMARK_VISIBILITY_TRANSITION_CSS};
     user-select: none;
   `;
   const wordmarkButton = document.createElement('button');
   wordmarkButton.type = 'button';
-  wordmarkButton.setAttribute('aria-label', t('settings_tab_appearance', '外观'));
+  wordmarkButton.setAttribute('aria-label', 'Lumno Chrome Web Store');
   wordmarkButton.style.cssText = `
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    position: relative;
     cursor: pointer;
+    line-height: 0;
     pointer-events: auto;
   `;
   wordmarkButton.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const optionsUrl = typeof EXTENSION_ROUTES.buildOptionsUrl === 'function'
-      ? EXTENSION_ROUTES.buildOptionsUrl(chrome, 'appearance')
-      : chrome.runtime.getURL('src/options/options.html#appearance');
-    window.open(optionsUrl, '_blank');
+    if (chrome.tabs && typeof chrome.tabs.create === 'function') {
+      chrome.tabs.create({ url: LUMNO_CHROME_WEB_STORE_URL, active: true });
+      return;
+    }
+    window.open(LUMNO_CHROME_WEB_STORE_URL, '_blank', 'noopener');
   });
   const shouldAnimateWordmarkEntry = !window.matchMedia ||
     !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -7098,6 +7210,20 @@
     });
     wordmarkButton.addEventListener('animationcancel', finishWordmarkEntry);
   }
+  wordmarkSolidEl = document.createElement('span');
+  wordmarkSolidEl.setAttribute('aria-hidden', 'true');
+  wordmarkSolidEl.style.cssText = `
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0;
+    background: var(--x-nt-wordmark-solid-fill, rgb(31 41 55));
+    -webkit-mask: url("../../assets/images/lumno-wordmark-mask.svg") center / contain no-repeat;
+    mask: url("../../assets/images/lumno-wordmark-mask.svg") center / contain no-repeat;
+    contain: paint;
+    transition: background-color 180ms ease, opacity 180ms ease;
+  `;
   wordmarkImageEl = document.createElement('img');
   wordmarkImageEl.src = '../../assets/images/lumno-wordmark.svg';
   wordmarkImageEl.alt = '';
@@ -7107,34 +7233,21 @@
     max-width: 52%;
     height: auto;
     display: block;
+    position: relative;
+    z-index: 1;
     object-fit: contain;
     opacity: 0.82;
     filter: none;
     transform: translateY(0);
+    transition: opacity 180ms ease;
   `;
+  wordmarkButton.appendChild(wordmarkSolidEl);
   wordmarkButton.appendChild(wordmarkImageEl);
   wordmarkContainer.appendChild(wordmarkButton);
   applyNewtabWordmarkVisibility();
   applyWordmarkThemeAppearance();
   searchLayer = document.createElement('div');
   searchLayer.id = '_x_extension_newtab_search_layer_2024_unique_';
-  searchLayer.style.cssText = `
-    all: unset;
-    position: relative;
-    width: 100%;
-    min-width: 100%;
-    min-height: 45px;
-    display: block;
-    box-sizing: border-box;
-    overflow: visible;
-    border-radius: 24px;
-    background: var(--x-nt-input-bg, rgba(255, 255, 255, 0.9));
-    border: 1px solid var(--x-nt-input-border, rgba(0, 0, 0, 0.06));
-    box-shadow: var(--x-nt-input-shadow, 0 20px 60px rgba(0, 0, 0, 0.08));
-    margin: 0;
-    padding: 0;
-    z-index: 12;
-  `;
 
   if (rightIcon) {
     rightIcon.style.setProperty('right', '14px');
@@ -7451,6 +7564,7 @@
     bootstrapInitialLanguageMode(),
     bootstrapInitialWallpaper(),
     bootstrapInitialWallpaperOverlay(),
+    bootstrapInitialWallpaperEffect(),
     loadSearchBlacklistItems()
   ]).then(() => {
     hydrateSectionsFromCache();

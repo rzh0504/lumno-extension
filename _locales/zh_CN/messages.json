@@ -396,10 +396,25 @@
     "message": "壁纸保存失败，请重试"
   },
   "newtab_wallpaper_title": {
-    "message": "Lumno 精选壁纸"
+    "message": "壁纸"
+  },
+  "newtab_logo_title": {
+    "message": "Logo"
+  },
+  "newtab_wallpaper_builtin_section": {
+    "message": "内置"
+  },
+  "newtab_wallpaper_local_section": {
+    "message": "本地"
+  },
+  "newtab_wallpaper_toggle_label": {
+    "message": "开启或关闭壁纸"
   },
   "newtab_wallpaper_select_label": {
     "message": "选择 {name}"
+  },
+  "newtab_wallpaper_none": {
+    "message": "无壁纸"
   },
   "newtab_wallpaper_add_local": {
     "message": "添加本地壁纸"
@@ -423,10 +438,43 @@
     "message": "本地壁纸"
   },
   "newtab_wallpaper_overlay_opacity": {
-    "message": "遮罩透明度"
+    "message": "遮罩效果"
+  },
+  "newtab_wallpaper_overlay_transparent_tick": {
+    "message": "透明"
   },
   "newtab_wallpaper_overlay_default_tick": {
     "message": "默认"
+  },
+  "newtab_wallpaper_overlay_cover_tick": {
+    "message": "覆盖"
+  },
+  "newtab_wallpaper_effect_title": {
+    "message": "壁纸滤镜"
+  },
+  "newtab_wallpaper_effect_strength": {
+    "message": "采样强度"
+  },
+  "newtab_wallpaper_effect_size": {
+    "message": "大小"
+  },
+  "newtab_wallpaper_effect_spacing": {
+    "message": "间距"
+  },
+  "newtab_wallpaper_effect_none": {
+    "message": "关闭"
+  },
+  "newtab_wallpaper_effect_grain": {
+    "message": "颗粒"
+  },
+  "newtab_wallpaper_effect_halftone": {
+    "message": "网点"
+  },
+  "newtab_wallpaper_effect_ascii": {
+    "message": "ASCII"
+  },
+  "newtab_wallpaper_effect_select_label": {
+    "message": "使用 {effect} 壁纸滤镜"
   },
   "newtab_wallpaper_save_error": {
     "message": "壁纸保存失败"

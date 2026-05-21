@@ -23,6 +23,167 @@
     return Math.min(max, Math.max(min, number));
   }
 
+  const adaptiveToneStyleProps = [
+    '--x-nt-wallpaper-adaptive-ink',
+    '--x-nt-wallpaper-adaptive-ink-muted',
+    '--x-nt-wallpaper-adaptive-hover-bg',
+    '--x-nt-wallpaper-adaptive-shadow',
+    '--x-nt-wallpaper-adaptive-halo',
+    '--x-nt-wallpaper-wordmark-ink',
+    '--x-nt-wallpaper-icon-solid-bg',
+    '--x-nt-wallpaper-icon-solid-bg-hover'
+  ];
+
+  function mixNumber(start, end, amount) {
+    return start + ((end - start) * clampNumber(amount, 0, 1));
+  }
+
+  function mixChannel(start, end, amount) {
+    return Math.round(mixNumber(start, end, amount));
+  }
+
+  function formatRgb(red, green, blue, alphaPercent) {
+    return `rgb(${red} ${green} ${blue} / ${Math.round(alphaPercent)}%)`;
+  }
+
+  function formatSolidRgb(color) {
+    return `rgb(${Math.round(color.red)} ${Math.round(color.green)} ${Math.round(color.blue)})`;
+  }
+
+  function getColorLuminance(color) {
+    return ((color.red * 0.299) + (color.green * 0.587) + (color.blue * 0.114)) / 255;
+  }
+
+  function mixColor(color, target, amount) {
+    return {
+      red: mixChannel(color.red, target.red, amount),
+      green: mixChannel(color.green, target.green, amount),
+      blue: mixChannel(color.blue, target.blue, amount)
+    };
+  }
+
+  function smoothstep(value) {
+    const amount = clampNumber(value, 0, 1);
+    return amount * amount * (3 - (2 * amount));
+  }
+
+  function setStyleProperty(element, name, value) {
+    if (element.style.getPropertyValue(name) === value) {
+      return;
+    }
+    element.style.setProperty(name, value);
+  }
+
+  function clearAdaptiveToneStyles(element) {
+    adaptiveToneStyleProps.forEach((prop) => {
+      element.style.removeProperty(prop);
+    });
+  }
+
+  function getWordmarkInkColor(color, luminance, ink, overlayAlpha) {
+    const baseColor = color && Number.isFinite(color.red) &&
+      Number.isFinite(color.green) &&
+      Number.isFinite(color.blue)
+      ? color
+      : { red: 128, green: 140, blue: 156 };
+    const defaultColor = ink === 'dark'
+      ? { red: 238, green: 240, blue: 242 }
+      : { red: 78, green: 84, blue: 94 };
+    const overlayAmount = smoothstep((clampNumber(overlayAlpha, 0, 1) - 0.36) / 0.64);
+    let wordmarkColor = null;
+    if (ink === 'dark') {
+      const amount = 0.22 + (clampNumber((luminance - 0.54) / 0.42, 0, 1) * 0.14);
+      wordmarkColor = mixColor(baseColor, { red: 15, green: 23, blue: 42 }, amount);
+      return mixColor(wordmarkColor, defaultColor, overlayAmount);
+    }
+    const amount = 0.26 + (clampNumber((0.56 - luminance) / 0.42, 0, 1) * 0.16);
+    wordmarkColor = mixColor(baseColor, { red: 248, green: 250, blue: 252 }, amount);
+    return mixColor(wordmarkColor, defaultColor, overlayAmount);
+  }
+
+  function shouldUseIconSolidBackground(luminance, overlayAlpha) {
+    return luminance > 0.26 && luminance < 0.82 && clampNumber(overlayAlpha, 0, 1) < 0.82;
+  }
+
+  function getIconSolidBackgroundColor(color, luminance, ink, hover) {
+    const baseColor = color && Number.isFinite(color.red) &&
+      Number.isFinite(color.green) &&
+      Number.isFinite(color.blue)
+      ? color
+      : { red: 128, green: 140, blue: 156 };
+    const middleRisk = 1 - Math.min(1, Math.abs(luminance - 0.54) / 0.28);
+    const hoverLift = hover ? 0.1 : 0;
+    if (ink === 'dark') {
+      const amount = 0.34 + (middleRisk * 0.14) + hoverLift;
+      return mixColor(baseColor, { red: 248, green: 250, blue: 252 }, amount);
+    }
+    const amount = 0.36 + (middleRisk * 0.16) + hoverLift;
+    return mixColor(baseColor, { red: 15, green: 23, blue: 42 }, amount);
+  }
+
+  function applyIconSolidBackgroundStyles(element, luminance, ink, color, overlayAlpha) {
+    if (!element) {
+      return;
+    }
+    const enabled = shouldUseIconSolidBackground(luminance, overlayAlpha);
+    element.setAttribute('data-wallpaper-icon-bg', enabled ? 'true' : 'false');
+    if (!enabled) {
+      element.style.removeProperty('--x-nt-wallpaper-icon-solid-bg');
+      element.style.removeProperty('--x-nt-wallpaper-icon-solid-bg-hover');
+      return;
+    }
+    setStyleProperty(element, '--x-nt-wallpaper-icon-solid-bg',
+      formatSolidRgb(getIconSolidBackgroundColor(color, luminance, ink, false)));
+    setStyleProperty(element, '--x-nt-wallpaper-icon-solid-bg-hover',
+      formatSolidRgb(getIconSolidBackgroundColor(color, luminance, ink, true)));
+  }
+
+  function applyAdaptiveToneStyles(element, luminance, ink, color, overlayAlpha) {
+    if (!element || !Number.isFinite(luminance)) {
+      return;
+    }
+    if (ink === 'dark') {
+      const amount = clampNumber((luminance - 0.52) / 0.42, 0, 1);
+      const red = mixChannel(78, 15, amount);
+      const green = mixChannel(90, 23, amount);
+      const blue = mixChannel(106, 42, amount);
+      const mutedRed = mixChannel(100, 30, amount);
+      const mutedGreen = mixChannel(116, 41, amount);
+      const mutedBlue = mixChannel(139, 59, amount);
+      setStyleProperty(element, '--x-nt-wallpaper-adaptive-ink',
+        formatRgb(red, green, blue, mixNumber(72, 88, amount)));
+      setStyleProperty(element, '--x-nt-wallpaper-wordmark-ink',
+        formatSolidRgb(getWordmarkInkColor(color, luminance, ink, overlayAlpha)));
+      setStyleProperty(element, '--x-nt-wallpaper-adaptive-ink-muted',
+        formatRgb(mutedRed, mutedGreen, mutedBlue, mixNumber(52, 66, amount)));
+      setStyleProperty(element, '--x-nt-wallpaper-adaptive-hover-bg',
+        formatRgb(red, green, blue, mixNumber(7, 12, amount)));
+      setStyleProperty(element, '--x-nt-wallpaper-adaptive-shadow', 'transparent');
+      setStyleProperty(element, '--x-nt-wallpaper-adaptive-halo', 'transparent');
+      return;
+    }
+
+    const amount = clampNumber((0.54 - luminance) / 0.42, 0, 1);
+    const red = mixChannel(226, 253, amount);
+    const green = mixChannel(232, 254, amount);
+    const blue = mixChannel(240, 255, amount);
+    const mutedRed = mixChannel(203, 248, amount);
+    const mutedGreen = mixChannel(213, 250, amount);
+    const mutedBlue = mixChannel(225, 252, amount);
+    setStyleProperty(element, '--x-nt-wallpaper-adaptive-ink',
+      formatRgb(red, green, blue, mixNumber(78, 92, amount)));
+    setStyleProperty(element, '--x-nt-wallpaper-wordmark-ink',
+      formatSolidRgb(getWordmarkInkColor(color, luminance, ink, overlayAlpha)));
+    setStyleProperty(element, '--x-nt-wallpaper-adaptive-ink-muted',
+      formatRgb(mutedRed, mutedGreen, mutedBlue, mixNumber(58, 76, amount)));
+    setStyleProperty(element, '--x-nt-wallpaper-adaptive-hover-bg',
+      formatRgb(248, 250, 252, mixNumber(10, 18, amount)));
+    setStyleProperty(element, '--x-nt-wallpaper-adaptive-shadow',
+      formatRgb(15, 23, 42, mixNumber(26, 42, amount)));
+    setStyleProperty(element, '--x-nt-wallpaper-adaptive-halo',
+      formatRgb(15, 23, 42, mixNumber(12, 22, amount)));
+  }
+
   function createWallpaperAdaptiveTone(options) {
     const documentObj = getOption(options, 'documentObj', root.document);
     const windowObj = getOption(options, 'windowObj', root.window);
@@ -40,6 +201,9 @@
     });
     const getOverlayLuminance = getFunction(options, 'getOverlayLuminance', function() {
       return 1;
+    });
+    const getEffectLuminanceAtViewport = getFunction(options, 'getEffectLuminanceAtViewport', function() {
+      return null;
     });
     const applyWordmarkThemeAppearance = getFunction(options, 'applyWordmarkThemeAppearance');
 
@@ -85,7 +249,9 @@
           return;
         }
         target.element.removeAttribute('data-wallpaper-ink');
+        target.element.removeAttribute('data-wallpaper-icon-bg');
         target.element.style.removeProperty('--x-nt-wallpaper-local-luma');
+        clearAdaptiveToneStyles(target.element);
       });
       if (!options || options.updateWordmark !== false) {
         applyWordmarkThemeAppearance();
@@ -168,16 +334,29 @@
       return (luminance * (1 - alpha)) + (overlayLuminance * alpha);
     }
 
-    function getPixelLuminance(sourceSampler, x, y) {
-      const pixel = sourceSampler.context.getImageData(x, y, 1, 1).data;
-      const alpha = pixel[3] / 255;
-      const red = (pixel[0] * alpha) + (255 * (1 - alpha));
-      const green = (pixel[1] * alpha) + (255 * (1 - alpha));
-      const blue = (pixel[2] * alpha) + (255 * (1 - alpha));
-      return ((red * 0.299) + (green * 0.587) + (blue * 0.114)) / 255;
+    function applyOverlayToColor(color, viewportY) {
+      const alpha = clampNumber(getOverlayAlphaAtViewportY(viewportY), 0, 1);
+      const overlayLuminance = clampNumber(getOverlayLuminance(), 0, 1);
+      const overlayColor = overlayLuminance >= 0.5
+        ? { red: 255, green: 255, blue: 255 }
+        : { red: 0, green: 0, blue: 0 };
+      return {
+        color: mixColor(color, overlayColor, alpha),
+        alpha
+      };
     }
 
-    function sampleLuminanceForRect(sourceSampler, rect) {
+    function getPixelColor(sourceSampler, x, y) {
+      const pixel = sourceSampler.context.getImageData(x, y, 1, 1).data;
+      const alpha = pixel[3] / 255;
+      return {
+        red: (pixel[0] * alpha) + (255 * (1 - alpha)),
+        green: (pixel[1] * alpha) + (255 * (1 - alpha)),
+        blue: (pixel[2] * alpha) + (255 * (1 - alpha))
+      };
+    }
+
+    function sampleToneForRect(sourceSampler, rect, target) {
       if (!sourceSampler || !sourceSampler.canvas || !sourceSampler.context || !rect) {
         return null;
       }
@@ -185,6 +364,7 @@
       const xs = [0.18, 0.34, 0.5, 0.66, 0.82];
       const ys = [0.24, 0.5, 0.76];
       const values = [];
+      const ignoresOverlay = Boolean(target && target.ignoreOverlay);
       try {
         ys.forEach((yRatio) => {
           xs.forEach((xRatio) => {
@@ -194,7 +374,18 @@
             const sourceY = ((viewportY - metrics.offsetY) / metrics.scale) * sourceSampler.sampleScaleY;
             const x = Math.round(clampNumber(sourceX, 0, sourceSampler.canvas.width - 1));
             const y = Math.round(clampNumber(sourceY, 0, sourceSampler.canvas.height - 1));
-            values.push(applyOverlayToLuminance(getPixelLuminance(sourceSampler, x, y), viewportY));
+            const sourceColor = getPixelColor(sourceSampler, x, y);
+            const sourceLuminance = getColorLuminance(sourceColor);
+            const effectLuminance = getEffectLuminanceAtViewport(viewportX, viewportY, sourceLuminance);
+            const resolvedLuminance = Number.isFinite(effectLuminance) ? effectLuminance : sourceLuminance;
+            const overlayColor = ignoresOverlay
+              ? { color: sourceColor, alpha: 0 }
+              : applyOverlayToColor(sourceColor, viewportY);
+            values.push({
+              luminance: ignoresOverlay ? resolvedLuminance : applyOverlayToLuminance(resolvedLuminance, viewportY),
+              color: overlayColor.color,
+              overlayAlpha: overlayColor.alpha
+            });
           });
         });
       } catch (e) {
@@ -203,12 +394,33 @@
       if (values.length === 0) {
         return null;
       }
-      values.sort((a, b) => a - b);
+      values.sort((a, b) => a.luminance - b.luminance);
       const trimCount = values.length >= 10 ? 2 : 0;
       const trimmed = values.slice(trimCount, values.length - trimCount);
       const sourceValues = trimmed.length > 0 ? trimmed : values;
-      const sum = sourceValues.reduce((total, value) => total + value, 0);
-      return sum / sourceValues.length;
+      const sum = sourceValues.reduce((total, value) => {
+        total.luminance += value.luminance;
+        total.red += value.color.red;
+        total.green += value.color.green;
+        total.blue += value.color.blue;
+        total.overlayAlpha += value.overlayAlpha;
+        return total;
+      }, {
+        luminance: 0,
+        red: 0,
+        green: 0,
+        blue: 0,
+        overlayAlpha: 0
+      });
+      return {
+        luminance: sum.luminance / sourceValues.length,
+        color: {
+          red: sum.red / sourceValues.length,
+          green: sum.green / sourceValues.length,
+          blue: sum.blue / sourceValues.length
+        },
+        overlayAlpha: sum.overlayAlpha / sourceValues.length
+      };
     }
 
     function chooseInk(luminance, currentInk) {
@@ -246,18 +458,28 @@
             rect.bottom <= 0 ||
             rect.top >= viewport.height) {
           target.element.removeAttribute('data-wallpaper-ink');
+          target.element.removeAttribute('data-wallpaper-icon-bg');
           target.element.style.removeProperty('--x-nt-wallpaper-local-luma');
+          clearAdaptiveToneStyles(target.element);
           return;
         }
         const sampleRect = getSampleRect(rect, target);
-        const luminance = sampleLuminanceForRect(sampler, sampleRect);
+        const sample = sampleToneForRect(sampler, sampleRect, target);
+        const luminance = sample ? sample.luminance : null;
         if (!Number.isFinite(luminance)) {
+          clearAdaptiveToneStyles(target.element);
           return;
         }
         const currentInk = target.element.getAttribute('data-wallpaper-ink');
         const nextInk = chooseInk(luminance, currentInk);
         target.element.setAttribute('data-wallpaper-ink', nextInk);
         target.element.style.setProperty('--x-nt-wallpaper-local-luma', luminance.toFixed(3));
+        applyAdaptiveToneStyles(target.element, luminance, nextInk, sample.color, sample.overlayAlpha);
+        if (target.iconButton) {
+          applyIconSolidBackgroundStyles(target.element, luminance, nextInk, sample.color, sample.overlayAlpha);
+        } else {
+          target.element.removeAttribute('data-wallpaper-icon-bg');
+        }
       });
       applyWordmarkThemeAppearance();
     }

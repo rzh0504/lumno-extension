@@ -14,6 +14,7 @@
       className: 'x-lumno-feature-hint--newtab-wallpaper',
       arrowSide: 'bottom',
       arrowAlign: 'end',
+      dismissStorage: 'session',
       badgeIcon: 'ri-asterisk',
       badgeKey: 'newtab_wallpaper_feature_hint_badge',
       badgeFallback: 'New',
@@ -36,6 +37,13 @@
     center: true,
     end: true
   });
+
+  const FEATURE_HINT_DISMISS_STORAGE_TYPES = Object.freeze({
+    none: true,
+    session: true
+  });
+
+  const FEATURE_HINT_SESSION_DISMISS_PREFIX = '_x_lumno_feature_hint_session_dismissed_2026_';
 
   const FEATURE_HINTS_BY_ID = Object.freeze(Object.keys(FEATURE_HINTS).reduce((map, key) => {
     const hint = FEATURE_HINTS[key];
@@ -69,6 +77,53 @@
     return normalizeFeatureHintValue(value, FEATURE_HINT_ARROW_ALIGNS, 'center');
   }
 
+  function normalizeDismissStorage(value) {
+    return normalizeFeatureHintValue(value, FEATURE_HINT_DISMISS_STORAGE_TYPES, 'none');
+  }
+
+  function getFeatureHintSessionDismissKey(definition) {
+    const hint = getFeatureHint(definition);
+    return FEATURE_HINT_SESSION_DISMISS_PREFIX + getDomIdPart(hint ? hint.id : '');
+  }
+
+  function getSessionStorageArea(chromeApi) {
+    if (!chromeApi || !chromeApi.storage || !chromeApi.storage.session) {
+      return null;
+    }
+    return chromeApi.storage.session;
+  }
+
+  function getSessionDismissed(chromeApi, key) {
+    const storageArea = getSessionStorageArea(chromeApi);
+    if (!storageArea || typeof storageArea.get !== 'function') {
+      return Promise.resolve(false);
+    }
+    return new Promise((resolve) => {
+      try {
+        storageArea.get([key], (result) => {
+          const runtimeError = chromeApi && chromeApi.runtime
+            ? chromeApi.runtime.lastError
+            : null;
+          resolve(!runtimeError && Boolean(result && result[key]));
+        });
+      } catch (e) {
+        resolve(false);
+      }
+    });
+  }
+
+  function setSessionDismissed(chromeApi, key) {
+    const storageArea = getSessionStorageArea(chromeApi);
+    if (!storageArea || typeof storageArea.set !== 'function') {
+      return;
+    }
+    try {
+      storageArea.set({ [key]: true }, () => {});
+    } catch (e) {
+      // Storage errors should not block the visible in-page dismissal.
+    }
+  }
+
   function getFeatureHint(definition) {
     if (!definition) {
       return null;
@@ -91,13 +146,18 @@
     const idPart = getDomIdPart(definition.id);
     const arrowSide = normalizeArrowSide(config.arrowSide || definition.arrowSide);
     const arrowAlign = normalizeArrowAlign(config.arrowAlign || definition.arrowAlign);
+    const dismissStorage = normalizeDismissStorage(config.dismissStorage || definition.dismissStorage);
+    const chromeApi = config.chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+    const sessionDismissKey = config.sessionDismissKey || getFeatureHintSessionDismissKey(definition);
     const element = documentObj.createElement('span');
     const text = documentObj.createElement('span');
     const badge = documentObj.createElement('span');
     const badgeIcon = documentObj.createElement('span');
     const badgeText = documentObj.createElement('span');
     const closeButton = documentObj.createElement('button');
-    let dismissed = false;
+    let dismissed = Boolean(config.initiallyDismissed);
+    let requestedVisible = config.initiallyVisible !== false;
+    let dismissStateLoaded = dismissStorage !== 'session';
 
     element.id = config.elementId || `_x_lumno_feature_hint_${idPart}_2026_unique_`;
     element.className = ['x-lumno-feature-hint', definition.className || ''].filter(Boolean).join(' ');
@@ -108,9 +168,10 @@
     element.setAttribute('data-feature-hint-version', definition.introducedIn || '');
     element.setAttribute('data-arrow-side', arrowSide);
     element.setAttribute('data-arrow-align', arrowAlign);
-    element.setAttribute('data-visible', 'true');
-    element.setAttribute('data-dismissed', 'false');
-    element.setAttribute('aria-hidden', 'false');
+    element.setAttribute('data-dismiss-storage', dismissStorage);
+    element.setAttribute('data-visible', 'false');
+    element.setAttribute('data-dismissed', dismissed ? 'true' : 'false');
+    element.setAttribute('aria-hidden', 'true');
 
     badge.className = 'x-lumno-feature-hint__badge';
     badgeIcon.className = 'x-lumno-feature-hint__badge-icon';
@@ -137,8 +198,8 @@
     element.appendChild(text);
     element.appendChild(closeButton);
 
-    function syncVisibility(visible) {
-      const nextVisible = Boolean(visible) && !dismissed;
+    function syncVisibility() {
+      const nextVisible = Boolean(requestedVisible) && !dismissed && dismissStateLoaded;
       element.setAttribute('data-visible', nextVisible ? 'true' : 'false');
       element.setAttribute('aria-hidden', nextVisible ? 'false' : 'true');
     }
@@ -148,9 +209,15 @@
       element,
       textId: text.id,
       dismiss() {
+        if (dismissed) {
+          return;
+        }
         dismissed = true;
         element.setAttribute('data-dismissed', 'true');
-        syncVisibility(false);
+        if (dismissStorage === 'session') {
+          setSessionDismissed(chromeApi, sessionDismissKey);
+        }
+        syncVisibility();
         if (typeof config.onDismiss === 'function') {
           config.onDismiss(definition);
         }
@@ -158,7 +225,10 @@
       isDismissed() {
         return dismissed;
       },
-      setVisible: syncVisibility,
+      setVisible(visible) {
+        requestedVisible = Boolean(visible);
+        syncVisibility();
+      },
       updateLanguage() {
         const badgeLabel = getMessage(t, definition.badgeKey, definition.badgeFallback);
         const textLabel = getMessage(t, definition.textKey, definition.textFallback);
@@ -171,6 +241,17 @@
     };
 
     controller.updateLanguage();
+    syncVisibility();
+    if (dismissStorage === 'session') {
+      getSessionDismissed(chromeApi, sessionDismissKey).then((isDismissed) => {
+        dismissStateLoaded = true;
+        if (isDismissed && !dismissed) {
+          dismissed = true;
+          element.setAttribute('data-dismissed', 'true');
+        }
+        syncVisibility();
+      });
+    }
     return controller;
   }
 
@@ -179,6 +260,8 @@
     getFeatureHint,
     normalizeArrowSide,
     normalizeArrowAlign,
+    normalizeDismissStorage,
+    getFeatureHintSessionDismissKey,
     listFeatureHints() {
       return Object.keys(FEATURE_HINTS).map((key) => FEATURE_HINTS[key]);
     },

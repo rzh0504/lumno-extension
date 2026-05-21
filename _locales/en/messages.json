@@ -396,10 +396,25 @@
     "message": "Failed to save wallpaper, please try again"
   },
   "newtab_wallpaper_title": {
-    "message": "Lumno Picks"
+    "message": "Wallpaper"
+  },
+  "newtab_logo_title": {
+    "message": "Logo"
+  },
+  "newtab_wallpaper_builtin_section": {
+    "message": "Built-in"
+  },
+  "newtab_wallpaper_local_section": {
+    "message": "Local"
+  },
+  "newtab_wallpaper_toggle_label": {
+    "message": "Turn wallpaper on or off"
   },
   "newtab_wallpaper_select_label": {
     "message": "Select {name}"
+  },
+  "newtab_wallpaper_none": {
+    "message": "No wallpaper"
   },
   "newtab_wallpaper_add_local": {
     "message": "Add local wallpaper"
@@ -423,10 +438,43 @@
     "message": "Local wallpaper"
   },
   "newtab_wallpaper_overlay_opacity": {
-    "message": "Background overlay opacity"
+    "message": "Mask effect"
+  },
+  "newtab_wallpaper_overlay_transparent_tick": {
+    "message": "Transparent"
   },
   "newtab_wallpaper_overlay_default_tick": {
     "message": "Default"
+  },
+  "newtab_wallpaper_overlay_cover_tick": {
+    "message": "Cover"
+  },
+  "newtab_wallpaper_effect_title": {
+    "message": "Wallpaper filter"
+  },
+  "newtab_wallpaper_effect_strength": {
+    "message": "Sampling strength"
+  },
+  "newtab_wallpaper_effect_size": {
+    "message": "Size"
+  },
+  "newtab_wallpaper_effect_spacing": {
+    "message": "Spacing"
+  },
+  "newtab_wallpaper_effect_none": {
+    "message": "Off"
+  },
+  "newtab_wallpaper_effect_grain": {
+    "message": "Grain"
+  },
+  "newtab_wallpaper_effect_halftone": {
+    "message": "Dots"
+  },
+  "newtab_wallpaper_effect_ascii": {
+    "message": "ASCII"
+  },
+  "newtab_wallpaper_effect_select_label": {
+    "message": "Use {effect} wallpaper filter"
   },
   "newtab_wallpaper_save_error": {
     "message": "Failed to save wallpaper"
