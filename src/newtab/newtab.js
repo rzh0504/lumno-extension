@@ -25,6 +25,8 @@
   const RECENT_COUNT_STORAGE_KEY = '_x_extension_recent_count_2024_unique_';
   const NEWTAB_WIDTH_MODE_STORAGE_KEY = '_x_extension_newtab_width_mode_2026_unique_';
   const NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY = '_x_extension_newtab_wordmark_visible_2026_unique_';
+  const NEWTAB_THEME_MODE_STORAGE_KEY = '_x_extension_newtab_theme_mode_2026_unique_';
+  const NEWTAB_THEME_SCOPE_STORAGE_KEY = '_x_extension_newtab_theme_scope_2026_unique_';
   const NEWTAB_WALLPAPER_STORAGE_KEY = '_x_extension_newtab_wallpaper_2026_unique_';
   const NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY = '_x_extension_newtab_wallpaper_overlay_2026_unique_';
   const BOOKMARK_COUNT_STORAGE_KEY = '_x_extension_bookmark_count_2024_unique_';
@@ -52,6 +54,9 @@
   const NEWTAB_RECENT_VIEW = globalThis.LumnoNewtabRecentSitesView || {};
   const NEWTAB_BOOKMARKS_VIEW = globalThis.LumnoNewtabBookmarksView || {};
   const NEWTAB_SUGGESTIONS_VIEW = globalThis.LumnoNewtabSuggestionsView || {};
+  const NEWTAB_WALLPAPER_LOCAL_STORE = globalThis.LumnoNewtabWallpaperLocalStore || {};
+  const NEWTAB_WALLPAPER_ADAPTIVE_TONE = globalThis.LumnoNewtabWallpaperAdaptiveTone || {};
+  const NEWTAB_WALLPAPER = globalThis.LumnoNewtabWallpaper || {};
   if (typeof NEWTAB_FAVICON_CACHE.createFaviconCache !== 'function' ||
       typeof NEWTAB_FAVICON_THEME.buildTheme !== 'function' ||
       typeof NEWTAB_FAVICON_VIEW.createFaviconViewRuntime !== 'function' ||
@@ -63,7 +68,10 @@
       typeof NEWTAB_LAYOUT.createLayoutController !== 'function' ||
       typeof NEWTAB_RECENT_VIEW.createRecentSitesView !== 'function' ||
       typeof NEWTAB_BOOKMARKS_VIEW.createBookmarksView !== 'function' ||
-      typeof NEWTAB_SUGGESTIONS_VIEW.createSuggestionsView !== 'function') {
+      typeof NEWTAB_SUGGESTIONS_VIEW.createSuggestionsView !== 'function' ||
+      typeof NEWTAB_WALLPAPER_LOCAL_STORE.createWallpaperLocalStore !== 'function' ||
+      typeof NEWTAB_WALLPAPER_ADAPTIVE_TONE.createWallpaperAdaptiveTone !== 'function' ||
+      typeof NEWTAB_WALLPAPER.createWallpaperRuntime !== 'function') {
     console.warn('Lumno: newtab helpers not available.');
     return;
   }
@@ -78,119 +86,16 @@
   const NEWTAB_BOOKMARK_CACHE_STORAGE_KEY = '_x_extension_newtab_bookmark_cache_2024_unique_';
   const PINNED_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_pinned_recent_sites_2026_unique_';
   const HIDDEN_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_hidden_recent_sites_2026_unique_';
-  const NEWTAB_WALLPAPER_DEFAULT_DIRECTORY = '/Users/kevinxu/github/Lumno/output/imagegen';
-  const NEWTAB_WALLPAPER_EXTENSION_DIRECTORY = 'output/imagegen';
-  const NEWTAB_WALLPAPER_THUMBNAIL_SUFFIX = '-thumb.webp';
-  const NEWTAB_CUSTOM_WALLPAPER_ID = 'custom-upload';
-  const NEWTAB_CUSTOM_WALLPAPER_ID_PREFIX = 'custom-wallpaper-';
-  const NEWTAB_CUSTOM_WALLPAPER_DB_NAME = 'lumno-newtab-wallpaper';
-  const NEWTAB_CUSTOM_WALLPAPER_DB_VERSION = 1;
-  const NEWTAB_CUSTOM_WALLPAPER_STORE_NAME = 'wallpapers';
-  const NEWTAB_CUSTOM_WALLPAPER_RECORD_KEY = 'custom';
-  const NEWTAB_CUSTOM_WALLPAPER_OUTPUT_RATIO = 16 / 9;
-  const NEWTAB_CUSTOM_WALLPAPER_MAX_WIDTH = 2560;
-  const NEWTAB_CUSTOM_WALLPAPER_THUMB_WIDTH = 480;
-  const NEWTAB_WALLPAPER_OPTIONS = [
-    {
-      id: 'dark-linocut-topographic',
-      nameKey: 'newtab_wallpaper_name_dark_linocut_topographic',
-      fallbackName: 'Night topography',
-      file: 'lumno-newtab-dark-linocut-topographic.webp'
-    },
-    {
-      id: 'dark-monet-lily-nocturne',
-      nameKey: 'newtab_wallpaper_name_dark_monet_lily_nocturne',
-      fallbackName: 'Lily nocturne',
-      file: 'lumno-newtab-dark-monet-lily-nocturne.webp'
-    },
-    {
-      id: 'dark-shanshui-moonlit',
-      nameKey: 'newtab_wallpaper_name_dark_shanshui_moonlit',
-      fallbackName: 'Moonlit shanshui',
-      file: 'lumno-newtab-dark-shanshui-moonlit.webp'
-    },
-    {
-      id: 'monet-coastal-white',
-      nameKey: 'newtab_wallpaper_name_monet_coastal_white',
-      fallbackName: 'Monet coast',
-      file: 'lumno-newtab-monet-coastal-white.webp'
-    },
-    {
-      id: 'monet-field-white',
-      nameKey: 'newtab_wallpaper_name_monet_field_white',
-      fallbackName: 'Monet field',
-      file: 'lumno-newtab-monet-field-white.webp'
-    },
-    {
-      id: 'monet-lily-pond-white',
-      nameKey: 'newtab_wallpaper_name_monet_lily_pond_white',
-      fallbackName: 'Lily pond',
-      file: 'lumno-newtab-monet-lily-pond-white.webp'
-    },
-    {
-      id: 'seurat-coast-white',
-      nameKey: 'newtab_wallpaper_name_seurat_coast_white',
-      fallbackName: 'Seurat coast',
-      file: 'lumno-newtab-seurat-coast-white.webp'
-    },
-    {
-      id: 'seurat-park-white',
-      nameKey: 'newtab_wallpaper_name_seurat_park_white',
-      fallbackName: 'Seurat park',
-      file: 'lumno-newtab-seurat-park-white.webp'
-    },
-    {
-      id: 'seurat-riverside-white',
-      nameKey: 'newtab_wallpaper_name_seurat_riverside_white',
-      fallbackName: 'Seurat riverside',
-      file: 'lumno-newtab-seurat-riverside-white.webp'
-    },
-    {
-      id: 'white-3d-architecture',
-      nameKey: 'newtab_wallpaper_name_white_3d_architecture',
-      fallbackName: 'Daylight architecture',
-      file: 'lumno-newtab-white-3d-architecture.webp'
-    },
-    {
-      id: 'white-linocut-topographic',
-      nameKey: 'newtab_wallpaper_name_white_linocut_topographic',
-      fallbackName: 'Daylight topography',
-      file: 'lumno-newtab-white-linocut-topographic.webp'
-    },
-    {
-      id: 'white-risograph-collage',
-      nameKey: 'newtab_wallpaper_name_white_risograph_collage',
-      fallbackName: 'Daylight collage',
-      file: 'lumno-newtab-white-risograph-collage.webp'
-    },
-    {
-      id: 'white-shanshui',
-      nameKey: 'newtab_wallpaper_name_white_shanshui',
-      fallbackName: 'Clear shanshui',
-      file: 'lumno-newtab-white-shanshui.webp'
-    },
-    {
-      id: 'settings-bg-light-monet-newtab',
-      nameKey: 'newtab_wallpaper_name_settings_bg_light_monet_newtab',
-      fallbackName: 'Monet light',
-      file: 'settings-bg-light-monet-newtab.webp'
-    }
-  ];
-  const NEWTAB_WALLPAPER_OVERLAY_STORAGE_VERSION = 2;
-  const NEWTAB_WALLPAPER_OVERLAY_DEFAULTS = { light: 50, dark: 50 };
-  const NEWTAB_WALLPAPER_OVERLAY_MAX_STRENGTH = 1.6;
-  const NEWTAB_WALLPAPER_OVERLAY_SNAP_POINTS = [0, 50, 100];
-  const NEWTAB_WALLPAPER_OVERLAY_SNAP_THRESHOLD = 4;
-  const NEWTAB_WALLPAPER_OVERLAY_STOPS = {
-    light: { top: 54, mid: 20, bottom: 38 },
-    dark: { top: 44, mid: 20, bottom: 50 }
-  };
   const MAX_PINNED_RECENT_SITES = 3;
   const MAX_HIDDEN_RECENT_SITES = 60;
   const NEWTAB_SECTION_CACHE_TTL_MS = 1000 * 60 * 5;
   const pageSearchParams = new URLSearchParams(window.location.search || '');
   const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
   let mediaListenerAttached = false;
+  let globalThemeMode = 'system';
+  let newtabThemeMode = 'system';
+  let hasNewtabThemeModeValue = false;
+  let newtabThemeScope = 'global';
   let currentThemeMode = 'system';
   let initialThemeApplied = false;
   let hasThemeBootstrapStarted = false;
@@ -203,12 +108,6 @@
   let resolveInitialLanguageReady = null;
   const initialLanguageReadyPromise = new Promise((resolve) => {
     resolveInitialLanguageReady = resolve;
-  });
-  let initialWallpaperApplied = false;
-  let hasWallpaperBootstrapStarted = false;
-  let resolveInitialWallpaperReady = null;
-  const initialWallpaperReadyPromise = new Promise((resolve) => {
-    resolveInitialWallpaperReady = resolve;
   });
   let modeBadge = null;
   let siteSearchTabHint = null;
@@ -235,30 +134,7 @@
   let wordmarkContainer = null;
   let wordmarkImageEl = null;
   let wallpaperControl = null;
-  let wallpaperButton = null;
-  let wallpaperPanel = null;
-  let wallpaperPanelTitle = null;
-  let wallpaperAppearanceTitle = null;
-  let wallpaperAppearanceOptions = null;
-  let wallpaperOverlayLabel = null;
-  let wallpaperOverlayValue = null;
-  let wallpaperOverlaySlider = null;
-  let wallpaperOverlaySaveTimer = null;
-  let wallpaperOverlayPointerActive = false;
-  let customWallpapers = [];
-  let customWallpaperUploadTile = null;
-  let customWallpaperInput = null;
-  let customWallpaperImporting = false;
-  let currentWallpaperOverlayOpacity = {
-    light: NEWTAB_WALLPAPER_OVERLAY_DEFAULTS.light,
-    dark: NEWTAB_WALLPAPER_OVERLAY_DEFAULTS.dark
-  };
-  let wallpaperGrid = null;
-  let wallpaperPanelRendered = false;
-  let currentWallpaperId = '';
-  let wallpaperAdaptiveSampler = null;
-  let wallpaperAdaptiveLoadToken = 0;
-  let wallpaperAdaptiveToneFrame = 0;
+  let wallpaperRuntime = null;
   let pageNoticeController = null;
   let newtabWordmarkVisible = true;
   let bookmarkCurrentPage = 0;
@@ -785,141 +661,13 @@
     return text;
   }
 
-  function isCustomWallpaperId(id) {
-    return String(id || '').startsWith(NEWTAB_CUSTOM_WALLPAPER_ID_PREFIX);
+  function getRiSvg(id, sizeClass, extraClass) {
+    const size = sizeClass || 'ri-size-16';
+    const extra = extraClass ? ` ${extraClass}` : '';
+    return `<i class="ri-icon ${size}${extra} ${id}" aria-hidden="true"></i>`;
   }
 
-  function getCustomWallpaperById(id) {
-    const normalizedId = String(id || '').trim();
-    if (!normalizedId) {
-      return null;
-    }
-    return customWallpapers.find((item) => item && item.id === normalizedId) || null;
-  }
-
-  function getWallpaperById(id) {
-    const normalizedId = String(id || '').trim();
-    if (!normalizedId) {
-      return null;
-    }
-    if (isCustomWallpaperId(normalizedId)) {
-      return getCustomWallpaperById(normalizedId);
-    }
-    return NEWTAB_WALLPAPER_OPTIONS.find((item) => item && item.id === normalizedId) || null;
-  }
-
-  function normalizeNewtabWallpaperId(value) {
-    const raw = value && typeof value === 'object' && value.id
-      ? value.id
-      : value;
-    const id = String(raw || '').trim();
-    if (id === NEWTAB_CUSTOM_WALLPAPER_ID) {
-      const firstCustomWallpaper = customWallpapers[0];
-      return firstCustomWallpaper ? firstCustomWallpaper.id : '';
-    }
-    if (getWallpaperById(id)) {
-      return id;
-    }
-    const matchedByPath = NEWTAB_WALLPAPER_OPTIONS.find((item) => {
-      const localPath = getWallpaperLocalPath(item);
-      const runtimePath = getWallpaperRuntimePath(item);
-      const legacyFile = getWallpaperLegacyFile(item);
-      return id === localPath ||
-        id === runtimePath ||
-        id.endsWith(`/${item.file}`) ||
-        (legacyFile && id.endsWith(`/${legacyFile}`));
-    });
-    return matchedByPath ? matchedByPath.id : '';
-  }
-
-  function getWallpaperLegacyFile(item) {
-    const file = item && item.file ? item.file : '';
-    return file.endsWith('.webp') ? file.replace(/\.webp$/, '.png') : '';
-  }
-
-  function getWallpaperThumbnailFile(item) {
-    const file = item && item.file ? item.file : '';
-    return file ? file.replace(/\.[^.]+$/, NEWTAB_WALLPAPER_THUMBNAIL_SUFFIX) : '';
-  }
-
-  function getWallpaperLocalPath(item) {
-    if (!item || !item.file) {
-      return '';
-    }
-    return `${NEWTAB_WALLPAPER_DEFAULT_DIRECTORY}/${item.file}`;
-  }
-
-  function getWallpaperRuntimePath(item, options) {
-    if (item && isCustomWallpaperId(item.id)) {
-      return '';
-    }
-    if (!item || !item.file) {
-      return '';
-    }
-    const file = options && options.thumbnail ? getWallpaperThumbnailFile(item) : item.file;
-    return file ? `${NEWTAB_WALLPAPER_EXTENSION_DIRECTORY}/${file}` : '';
-  }
-
-  function getWallpaperImageUrl(item) {
-    if (item && isCustomWallpaperId(item.id)) {
-      return item.imageDataUrl || '';
-    }
-    const runtimePath = getWallpaperRuntimePath(item);
-    if (!runtimePath) {
-      return '';
-    }
-    if (chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
-      return chrome.runtime.getURL(runtimePath);
-    }
-    return `../../${runtimePath}`;
-  }
-
-  function getWallpaperThumbnailUrl(item) {
-    if (item && isCustomWallpaperId(item.id)) {
-      return item.thumbnailDataUrl || item.imageDataUrl || '';
-    }
-    const runtimePath = getWallpaperRuntimePath(item, { thumbnail: true });
-    if (!runtimePath) {
-      return getWallpaperImageUrl(item);
-    }
-    if (chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
-      return chrome.runtime.getURL(runtimePath);
-    }
-    return `../../${runtimePath}`;
-  }
-
-  function getWallpaperDisplayName(item) {
-    if (!item) {
-      return '';
-    }
-    if (item.nameKey) {
-      return t(item.nameKey, item.fallbackName || item.id || '');
-    }
-    const storedName = String(item.name || '').trim();
-    if (!storedName || storedName === '自定义壁纸') {
-      return t('newtab_wallpaper_custom_name', 'Local wallpaper');
-    }
-    return storedName;
-  }
-
-  // Sample wallpaper pixels under floating chrome so foreground contrast follows the image.
-  function clampNumber(value, min, max) {
-    const number = Number(value);
-    if (!Number.isFinite(number)) {
-      return min;
-    }
-    return Math.min(max, Math.max(min, number));
-  }
-
-  function getViewportSize() {
-    const docEl = document.documentElement;
-    return {
-      width: Math.max(1, window.innerWidth || (docEl ? docEl.clientWidth : 0) || 1),
-      height: Math.max(1, window.innerHeight || (docEl ? docEl.clientHeight : 0) || 1)
-    };
-  }
-
-  function getWallpaperAdaptiveToneTargets() {
+  function createWallpaperAdaptiveToneTargets() {
     const bookmarkPager = bookmarkPagerPrevButton && bookmarkPagerPrevButton.parentElement
       ? bookmarkPagerPrevButton.parentElement
       : null;
@@ -947,1236 +695,75 @@
         sampleElement: recentHeading,
         minWidth: 112,
         minHeight: 44
-      },
-      {
-        element: wallpaperButton,
-        sampleElement: wallpaperButton,
-        minWidth: 54,
-        minHeight: 54
       }
     ];
   }
 
-  function clearWallpaperAdaptiveTone(options) {
-    if (wallpaperAdaptiveToneFrame) {
-      cancelAnimationFrame(wallpaperAdaptiveToneFrame);
-      wallpaperAdaptiveToneFrame = 0;
+  wallpaperRuntime = NEWTAB_WALLPAPER.createWallpaperRuntime({
+    documentObj: document,
+    windowObj: window,
+    chromeObj: chrome,
+    storageArea,
+    storageKeys: {
+      wallpaper: NEWTAB_WALLPAPER_STORAGE_KEY,
+      overlay: NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY
+    },
+    t,
+    formatMessage,
+    getThemeMode: getSelectedThemeMode,
+    getThemeScope,
+    setThemeMode,
+    setThemeScope,
+    getRiSvg,
+    showToast,
+    showTopActionTooltip,
+    hideTopActionTooltip,
+    applyWordmarkThemeAppearance,
+    getAdaptiveToneTargets: createWallpaperAdaptiveToneTargets
+  });
+
+  function updateWallpaperLanguageStrings() {
+    if (wallpaperRuntime) {
+      wallpaperRuntime.updateLanguageStrings();
     }
-    getWallpaperAdaptiveToneTargets().forEach((target) => {
-      if (!target || !target.element) {
-        return;
-      }
-      target.element.removeAttribute('data-wallpaper-ink');
-      target.element.style.removeProperty('--x-nt-wallpaper-local-luma');
-    });
-    if (!options || options.updateWordmark !== false) {
-      applyWordmarkThemeAppearance();
-    }
-  }
-
-  function getWallpaperAdaptiveSampleRect(rect, target) {
-    const viewport = getViewportSize();
-    const minWidth = Math.max(1, Number(target && target.minWidth) || 80);
-    const minHeight = Math.max(1, Number(target && target.minHeight) || 40);
-    const width = Math.min(viewport.width, Math.max(rect.width + 32, minWidth));
-    const height = Math.min(viewport.height, Math.max(rect.height + 28, minHeight));
-    const centerX = clampNumber((rect.left + rect.right) / 2, 0, viewport.width);
-    const centerY = clampNumber((rect.top + rect.bottom) / 2, 0, viewport.height);
-    const maxLeft = Math.max(0, viewport.width - width);
-    const maxTop = Math.max(0, viewport.height - height);
-    return {
-      left: clampNumber(centerX - (width / 2), 0, maxLeft),
-      top: clampNumber(centerY - (height / 2), 0, maxTop),
-      width,
-      height
-    };
-  }
-
-  function loadWallpaperAdaptiveImage(url) {
-    return new Promise((resolve, reject) => {
-      const image = new Image();
-      image.decoding = 'async';
-      image.onload = () => {
-        resolve(image);
-      };
-      image.onerror = () => {
-        reject(new Error('Failed to load wallpaper image.'));
-      };
-      image.src = url;
-    });
-  }
-
-  function createWallpaperAdaptiveSampler(image, url) {
-    const naturalWidth = Math.max(1, image.naturalWidth || image.width || 1);
-    const naturalHeight = Math.max(1, image.naturalHeight || image.height || 1);
-    const sampleScale = Math.min(1, 420 / naturalWidth, 260 / naturalHeight);
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(naturalWidth * sampleScale));
-    canvas.height = Math.max(1, Math.round(naturalHeight * sampleScale));
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    if (!context) {
-      return null;
-    }
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    return {
-      url,
-      canvas,
-      context,
-      naturalWidth,
-      naturalHeight,
-      sampleScaleX: canvas.width / naturalWidth,
-      sampleScaleY: canvas.height / naturalHeight
-    };
-  }
-
-  function getWallpaperRenderedMetrics(sampler) {
-    const viewport = getViewportSize();
-    const scale = Math.max(
-      viewport.width / sampler.naturalWidth,
-      viewport.height / sampler.naturalHeight
-    );
-    const renderedWidth = sampler.naturalWidth * scale;
-    const renderedHeight = sampler.naturalHeight * scale;
-    return {
-      scale,
-      offsetX: (viewport.width - renderedWidth) / 2,
-      offsetY: (viewport.height - renderedHeight) / 2
-    };
-  }
-
-  function getWallpaperOverlayAlphaAtViewportY(viewportY) {
-    const mode = getResolvedWallpaperOverlayMode();
-    const stops = NEWTAB_WALLPAPER_OVERLAY_STOPS[mode] || NEWTAB_WALLPAPER_OVERLAY_STOPS.light;
-    const opacity = getWallpaperOverlayOpacityForCurrentMode();
-    const strength = getWallpaperOverlayStrength(opacity);
-    const topAlpha = clampNumber(((Number(stops.top) || 0) * strength) / 100, 0, 1);
-    const midAlpha = clampNumber(((Number(stops.mid) || 0) * strength) / 100, 0, 1);
-    const bottomAlpha = clampNumber(((Number(stops.bottom) || 0) * strength) / 100, 0, 1);
-    const viewport = getViewportSize();
-    const position = clampNumber(viewportY / viewport.height, 0, 1);
-    if (position <= 0.42) {
-      return topAlpha + ((midAlpha - topAlpha) * (position / 0.42));
-    }
-    return midAlpha + ((bottomAlpha - midAlpha) * ((position - 0.42) / 0.58));
-  }
-
-  function applyWallpaperOverlayToLuminance(luminance, viewportY) {
-    const mode = getResolvedWallpaperOverlayMode();
-    const overlayLuminance = mode === 'dark' ? 0 : 1;
-    const alpha = getWallpaperOverlayAlphaAtViewportY(viewportY);
-    return (luminance * (1 - alpha)) + (overlayLuminance * alpha);
-  }
-
-  function getWallpaperPixelLuminance(sampler, x, y) {
-    const pixel = sampler.context.getImageData(x, y, 1, 1).data;
-    const alpha = pixel[3] / 255;
-    const red = (pixel[0] * alpha) + (255 * (1 - alpha));
-    const green = (pixel[1] * alpha) + (255 * (1 - alpha));
-    const blue = (pixel[2] * alpha) + (255 * (1 - alpha));
-    return ((red * 0.299) + (green * 0.587) + (blue * 0.114)) / 255;
-  }
-
-  function sampleWallpaperLuminanceForRect(sampler, rect) {
-    if (!sampler || !sampler.canvas || !sampler.context || !rect) {
-      return null;
-    }
-    const metrics = getWallpaperRenderedMetrics(sampler);
-    const xs = [0.18, 0.34, 0.5, 0.66, 0.82];
-    const ys = [0.24, 0.5, 0.76];
-    const values = [];
-    try {
-      ys.forEach((yRatio) => {
-        xs.forEach((xRatio) => {
-          const viewportX = rect.left + (rect.width * xRatio);
-          const viewportY = rect.top + (rect.height * yRatio);
-          const sourceX = ((viewportX - metrics.offsetX) / metrics.scale) * sampler.sampleScaleX;
-          const sourceY = ((viewportY - metrics.offsetY) / metrics.scale) * sampler.sampleScaleY;
-          const x = Math.round(clampNumber(sourceX, 0, sampler.canvas.width - 1));
-          const y = Math.round(clampNumber(sourceY, 0, sampler.canvas.height - 1));
-          values.push(applyWallpaperOverlayToLuminance(
-            getWallpaperPixelLuminance(sampler, x, y),
-            viewportY
-          ));
-        });
-      });
-    } catch (e) {
-      return null;
-    }
-    if (values.length === 0) {
-      return null;
-    }
-    values.sort((a, b) => a - b);
-    const trimCount = values.length >= 10 ? 2 : 0;
-    const trimmed = values.slice(trimCount, values.length - trimCount);
-    const sourceValues = trimmed.length > 0 ? trimmed : values;
-    const sum = sourceValues.reduce((total, value) => total + value, 0);
-    return sum / sourceValues.length;
-  }
-
-  function chooseWallpaperInk(luminance, currentInk) {
-    if (!Number.isFinite(luminance)) {
-      return currentInk === 'dark' || currentInk === 'light' ? currentInk : 'light';
-    }
-    if (currentInk === 'dark') {
-      return luminance < 0.5 ? 'light' : 'dark';
-    }
-    if (currentInk === 'light') {
-      return luminance > 0.62 ? 'dark' : 'light';
-    }
-    return luminance >= 0.56 ? 'dark' : 'light';
-  }
-
-  function applyWallpaperAdaptiveTone() {
-    if (!currentWallpaperId ||
-        !wallpaperAdaptiveSampler ||
-        !document.body ||
-        document.body.getAttribute('data-wallpaper-active') !== 'true') {
-      clearWallpaperAdaptiveTone({ updateWordmark: false });
-      applyWordmarkThemeAppearance();
-      return;
-    }
-    const viewport = getViewportSize();
-    getWallpaperAdaptiveToneTargets().forEach((target) => {
-      if (!target || !target.element || !target.sampleElement) {
-        return;
-      }
-      const rect = target.sampleElement.getBoundingClientRect();
-      if (rect.width <= 1 ||
-          rect.height <= 1 ||
-          rect.right <= 0 ||
-          rect.left >= viewport.width ||
-          rect.bottom <= 0 ||
-          rect.top >= viewport.height) {
-        target.element.removeAttribute('data-wallpaper-ink');
-        target.element.style.removeProperty('--x-nt-wallpaper-local-luma');
-        return;
-      }
-      const sampleRect = getWallpaperAdaptiveSampleRect(rect, target);
-      const luminance = sampleWallpaperLuminanceForRect(wallpaperAdaptiveSampler, sampleRect);
-      if (!Number.isFinite(luminance)) {
-        return;
-      }
-      const currentInk = target.element.getAttribute('data-wallpaper-ink');
-      const nextInk = chooseWallpaperInk(luminance, currentInk);
-      target.element.setAttribute('data-wallpaper-ink', nextInk);
-      target.element.style.setProperty('--x-nt-wallpaper-local-luma', luminance.toFixed(3));
-    });
-    applyWordmarkThemeAppearance();
-  }
-
-  function scheduleWallpaperAdaptiveToneUpdate() {
-    if (!currentWallpaperId || !wallpaperAdaptiveSampler) {
-      return;
-    }
-    if (wallpaperAdaptiveToneFrame) {
-      return;
-    }
-    wallpaperAdaptiveToneFrame = requestAnimationFrame(() => {
-      wallpaperAdaptiveToneFrame = requestAnimationFrame(() => {
-        wallpaperAdaptiveToneFrame = 0;
-        applyWallpaperAdaptiveTone();
-      });
-    });
-  }
-
-  function refreshWallpaperAdaptiveSampler() {
-    const wallpaper = getWallpaperById(currentWallpaperId);
-    const imageUrl = wallpaper ? getWallpaperImageUrl(wallpaper) : '';
-    const token = ++wallpaperAdaptiveLoadToken;
-    if (!wallpaper || !imageUrl) {
-      wallpaperAdaptiveSampler = null;
-      clearWallpaperAdaptiveTone();
-      return;
-    }
-    if (wallpaperAdaptiveSampler && wallpaperAdaptiveSampler.url === imageUrl) {
-      scheduleWallpaperAdaptiveToneUpdate();
-      return;
-    }
-    wallpaperAdaptiveSampler = null;
-    clearWallpaperAdaptiveTone({ updateWordmark: false });
-    applyWordmarkThemeAppearance();
-    loadWallpaperAdaptiveImage(imageUrl).then((image) => {
-      if (token !== wallpaperAdaptiveLoadToken) {
-        return;
-      }
-      wallpaperAdaptiveSampler = createWallpaperAdaptiveSampler(image, imageUrl);
-      scheduleWallpaperAdaptiveToneUpdate();
-    }).catch(() => {
-      if (token !== wallpaperAdaptiveLoadToken) {
-        return;
-      }
-      wallpaperAdaptiveSampler = null;
-      clearWallpaperAdaptiveTone();
-    });
-  }
-
-  function getRuntimeAssetUrl(path) {
-    const value = String(path || '').trim();
-    if (!value) {
-      return '';
-    }
-    if (chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
-      return chrome.runtime.getURL(value);
-    }
-    return `../../${value}`;
-  }
-
-  function getCssUrlValue(url) {
-    const safe = String(url || '')
-      .replace(/\\/g, '\\\\')
-      .replace(/"/g, '\\"')
-      .replace(/\n/g, '')
-      .replace(/\r/g, '');
-    return safe ? `url("${safe}")` : 'none';
-  }
-
-  function normalizeCustomWallpaperRecord(record) {
-    if (!record || typeof record !== 'object') {
-      return null;
-    }
-    const imageDataUrl = String(record.imageDataUrl || '');
-    const thumbnailDataUrl = String(record.thumbnailDataUrl || imageDataUrl);
-    if (!imageDataUrl || !thumbnailDataUrl) {
-      return null;
-    }
-    const rawId = String(record.id || record.key || '').trim();
-    const isLegacyRecord = rawId === NEWTAB_CUSTOM_WALLPAPER_ID ||
-      String(record.key || '') === NEWTAB_CUSTOM_WALLPAPER_RECORD_KEY;
-    const id = isCustomWallpaperId(rawId)
-      ? rawId
-      : `${NEWTAB_CUSTOM_WALLPAPER_ID_PREFIX}${isLegacyRecord ? 'legacy' : Date.now()}`;
-    return {
-      id,
-      key: String(record.key || id),
-      name: getWallpaperDisplayName(record),
-      imageDataUrl,
-      thumbnailDataUrl,
-      updatedAt: Number(record.updatedAt) || Date.now()
-    };
-  }
-
-  function openCustomWallpaperDb() {
-    return new Promise((resolve, reject) => {
-      if (!window.indexedDB) {
-        reject(new Error('IndexedDB is not available.'));
-        return;
-      }
-      const request = window.indexedDB.open(NEWTAB_CUSTOM_WALLPAPER_DB_NAME, NEWTAB_CUSTOM_WALLPAPER_DB_VERSION);
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains(NEWTAB_CUSTOM_WALLPAPER_STORE_NAME)) {
-          db.createObjectStore(NEWTAB_CUSTOM_WALLPAPER_STORE_NAME, { keyPath: 'key' });
-        }
-      };
-      request.onerror = () => {
-        reject(request.error || new Error('Failed to open wallpaper database.'));
-      };
-      request.onsuccess = () => {
-        resolve(request.result);
-      };
-    });
-  }
-
-  function readCustomWallpaperRecords() {
-    return openCustomWallpaperDb().then((db) => {
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction(NEWTAB_CUSTOM_WALLPAPER_STORE_NAME, 'readonly');
-        const store = transaction.objectStore(NEWTAB_CUSTOM_WALLPAPER_STORE_NAME);
-        const request = typeof store.getAll === 'function' ? store.getAll() : null;
-        if (!request) {
-          reject(new Error('Wallpaper database does not support getAll.'));
-          return;
-        }
-        request.onerror = () => {
-          reject(request.error || new Error('Failed to read wallpapers.'));
-        };
-        request.onsuccess = () => {
-          const records = Array.isArray(request.result) ? request.result : [];
-          const wallpapers = records
-            .map(normalizeCustomWallpaperRecord)
-            .filter(Boolean)
-            .sort((a, b) => a.updatedAt - b.updatedAt);
-          resolve(wallpapers);
-        };
-        transaction.oncomplete = () => {
-          db.close();
-        };
-        transaction.onerror = () => {
-          db.close();
-          reject(transaction.error || new Error('Failed to read wallpapers.'));
-        };
-      });
-    });
-  }
-
-  function writeCustomWallpaperRecord(record) {
-    return openCustomWallpaperDb().then((db) => {
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction(NEWTAB_CUSTOM_WALLPAPER_STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(NEWTAB_CUSTOM_WALLPAPER_STORE_NAME);
-        store.put(Object.assign({}, record, { key: record.key || record.id }));
-        transaction.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-        transaction.onerror = () => {
-          db.close();
-          reject(transaction.error || new Error('Failed to save wallpaper.'));
-        };
-      });
-    });
-  }
-
-  function deleteCustomWallpaperRecord(record) {
-    return openCustomWallpaperDb().then((db) => {
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction(NEWTAB_CUSTOM_WALLPAPER_STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(NEWTAB_CUSTOM_WALLPAPER_STORE_NAME);
-        store.delete(record && record.key ? record.key : '');
-        transaction.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-        transaction.onerror = () => {
-          db.close();
-          reject(transaction.error || new Error('Failed to delete wallpaper.'));
-        };
-      });
-    });
-  }
-
-  function readFileAsDataUrl(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => {
-        reject(reader.error || new Error('Failed to read image.'));
-      };
-      reader.onload = () => {
-        resolve(String(reader.result || ''));
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function loadImageFromDataUrl(dataUrl) {
-    return new Promise((resolve, reject) => {
-      const image = new Image();
-      image.onload = () => {
-        resolve(image);
-      };
-      image.onerror = () => {
-        reject(new Error('Failed to load image.'));
-      };
-      image.src = dataUrl;
-    });
-  }
-
-  function getCenteredWallpaperCrop(width, height) {
-    const sourceWidth = Math.max(1, Number(width) || 1);
-    const sourceHeight = Math.max(1, Number(height) || 1);
-    const sourceRatio = sourceWidth / sourceHeight;
-    if (sourceRatio > NEWTAB_CUSTOM_WALLPAPER_OUTPUT_RATIO) {
-      const cropWidth = Math.round(sourceHeight * NEWTAB_CUSTOM_WALLPAPER_OUTPUT_RATIO);
-      return {
-        x: Math.round((sourceWidth - cropWidth) / 2),
-        y: 0,
-        width: cropWidth,
-        height: sourceHeight
-      };
-    }
-    const cropHeight = Math.round(sourceWidth / NEWTAB_CUSTOM_WALLPAPER_OUTPUT_RATIO);
-    return {
-      x: 0,
-      y: Math.round((sourceHeight - cropHeight) / 2),
-      width: sourceWidth,
-      height: cropHeight
-    };
-  }
-
-  function renderCroppedWallpaperDataUrl(image, crop, targetWidth, quality) {
-    const canvas = document.createElement('canvas');
-    const width = Math.max(1, Math.round(targetWidth));
-    const height = Math.max(1, Math.round(width / NEWTAB_CUSTOM_WALLPAPER_OUTPUT_RATIO));
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext('2d');
-    if (!context) {
-      throw new Error('Canvas is not available.');
-    }
-    context.drawImage(image, crop.x, crop.y, crop.width, crop.height, 0, 0, width, height);
-    const dataUrl = canvas.toDataURL('image/webp', quality);
-    return dataUrl && dataUrl.startsWith('data:image/webp')
-      ? dataUrl
-      : canvas.toDataURL('image/jpeg', quality);
-  }
-
-  function buildCustomWallpaperRecordFromFile(file) {
-    if (!file || !String(file.type || '').startsWith('image/')) {
-      return Promise.reject(new Error('Invalid image file.'));
-    }
-    return readFileAsDataUrl(file).then((dataUrl) => {
-      return loadImageFromDataUrl(dataUrl);
-    }).then((image) => {
-      const crop = getCenteredWallpaperCrop(image.naturalWidth || image.width, image.naturalHeight || image.height);
-      const outputWidth = Math.min(NEWTAB_CUSTOM_WALLPAPER_MAX_WIDTH, Math.max(1, crop.width));
-      const wallpaperDataUrl = renderCroppedWallpaperDataUrl(image, crop, outputWidth, 0.9);
-      const thumbnailDataUrl = renderCroppedWallpaperDataUrl(image, crop, NEWTAB_CUSTOM_WALLPAPER_THUMB_WIDTH, 0.78);
-      return {
-        id: `${NEWTAB_CUSTOM_WALLPAPER_ID_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        name: file.name
-          ? String(file.name).replace(/\.[^.]+$/, '')
-          : t('newtab_wallpaper_custom_name', 'Local wallpaper'),
-        imageDataUrl: wallpaperDataUrl,
-        thumbnailDataUrl,
-        updatedAt: Date.now()
-      };
-    });
-  }
-
-  function normalizeWallpaperOverlayOpacity(value, fallback) {
-    const fallbackValue = Number.isFinite(Number(fallback)) ? Number(fallback) : 50;
-    const parsed = Number.parseInt(value, 10);
-    if (!Number.isFinite(parsed)) {
-      return Math.max(0, Math.min(100, Math.round(fallbackValue)));
-    }
-    return Math.max(0, Math.min(100, parsed));
-  }
-
-  function snapWallpaperOverlaySliderValue(value) {
-    const normalized = normalizeWallpaperOverlayOpacity(value, 50);
-    const target = NEWTAB_WALLPAPER_OVERLAY_SNAP_POINTS.find((point) => {
-      return Math.abs(normalized - point) <= NEWTAB_WALLPAPER_OVERLAY_SNAP_THRESHOLD;
-    });
-    return typeof target === 'number' ? target : normalized;
-  }
-
-  function legacyWallpaperOverlayOpacityToSliderValue(value, fallback) {
-    return normalizeWallpaperOverlayOpacity(
-      Math.round(normalizeWallpaperOverlayOpacity(value, 100) / 2),
-      fallback
-    );
-  }
-
-  function normalizeWallpaperOverlayPrefs(value) {
-    if (value && typeof value === 'object') {
-      if (value.version !== NEWTAB_WALLPAPER_OVERLAY_STORAGE_VERSION) {
-        return {
-          version: NEWTAB_WALLPAPER_OVERLAY_STORAGE_VERSION,
-          light: legacyWallpaperOverlayOpacityToSliderValue(value.light, NEWTAB_WALLPAPER_OVERLAY_DEFAULTS.light),
-          dark: legacyWallpaperOverlayOpacityToSliderValue(value.dark, NEWTAB_WALLPAPER_OVERLAY_DEFAULTS.dark)
-        };
-      }
-      return {
-        version: NEWTAB_WALLPAPER_OVERLAY_STORAGE_VERSION,
-        light: normalizeWallpaperOverlayOpacity(value.light, NEWTAB_WALLPAPER_OVERLAY_DEFAULTS.light),
-        dark: normalizeWallpaperOverlayOpacity(value.dark, NEWTAB_WALLPAPER_OVERLAY_DEFAULTS.dark)
-      };
-    }
-    const shared = typeof value === 'undefined' || value === null
-      ? NEWTAB_WALLPAPER_OVERLAY_DEFAULTS.light
-      : legacyWallpaperOverlayOpacityToSliderValue(value, NEWTAB_WALLPAPER_OVERLAY_DEFAULTS.light);
-    return {
-      version: NEWTAB_WALLPAPER_OVERLAY_STORAGE_VERSION,
-      light: shared,
-      dark: shared
-    };
-  }
-
-  function getResolvedWallpaperOverlayMode() {
-    return document.body && document.body.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-  }
-
-  function getWallpaperOverlayOpacityForCurrentMode() {
-    const mode = getResolvedWallpaperOverlayMode();
-    return normalizeWallpaperOverlayOpacity(
-      currentWallpaperOverlayOpacity[mode],
-      NEWTAB_WALLPAPER_OVERLAY_DEFAULTS[mode]
-    );
-  }
-
-  function getWallpaperOverlayStrength(value) {
-    const sliderValue = normalizeWallpaperOverlayOpacity(value, 50);
-    if (sliderValue <= 50) {
-      return Math.pow(sliderValue / 50, 1.08);
-    }
-    const progress = (sliderValue - 50) / 50;
-    return 1 + (NEWTAB_WALLPAPER_OVERLAY_MAX_STRENGTH - 1) * Math.pow(progress, 0.82);
-  }
-
-  function formatOverlayCssPercent(base, opacity) {
-    const value = (Number(base) || 0) * getWallpaperOverlayStrength(opacity);
-    return `${Number(value.toFixed(1))}%`;
-  }
-
-  function applyWallpaperOverlayOpacity(value) {
-    currentWallpaperOverlayOpacity = normalizeWallpaperOverlayPrefs(value);
-    const target = document.documentElement;
-    if (target) {
-      ['light', 'dark'].forEach((mode) => {
-        const stops = NEWTAB_WALLPAPER_OVERLAY_STOPS[mode];
-        const opacity = currentWallpaperOverlayOpacity[mode];
-        target.style.setProperty(`--x-nt-wallpaper-overlay-${mode}-top`, formatOverlayCssPercent(stops.top, opacity));
-        target.style.setProperty(`--x-nt-wallpaper-overlay-${mode}-mid`, formatOverlayCssPercent(stops.mid, opacity));
-        target.style.setProperty(`--x-nt-wallpaper-overlay-${mode}-bottom`, formatOverlayCssPercent(stops.bottom, opacity));
-      });
-    }
-    updateWallpaperOverlayControlUi();
-    scheduleWallpaperAdaptiveToneUpdate();
-  }
-
-  function updateWallpaperOverlayControlUi() {
-    const value = getWallpaperOverlayOpacityForCurrentMode();
-    if (wallpaperOverlaySlider) {
-      wallpaperOverlaySlider.value = String(value);
-      wallpaperOverlaySlider.style.setProperty('--x-nt-overlay-slider-percent', `${value}%`);
-      wallpaperOverlaySlider.setAttribute('aria-valuenow', String(value));
-      wallpaperOverlaySlider.setAttribute('aria-valuetext', `${value}%`);
-    }
-    if (wallpaperOverlayValue) {
-      wallpaperOverlayValue.textContent = `${value}%`;
-    }
-    if (wallpaperOverlayLabel) {
-      wallpaperOverlayLabel.textContent = t('newtab_wallpaper_overlay_opacity', 'Background overlay opacity');
-    }
-    if (wallpaperOverlaySlider) {
-      wallpaperOverlaySlider.setAttribute(
-        'aria-label',
-        t('newtab_wallpaper_overlay_opacity', 'Background overlay opacity')
-      );
-    }
-  }
-
-  function persistWallpaperOverlayOpacity(mode, value) {
-    const nextMode = mode === 'dark' ? 'dark' : 'light';
-    const nextValue = normalizeWallpaperOverlayOpacity(value, currentWallpaperOverlayOpacity[nextMode]);
-    const nextPrefs = {
-      version: NEWTAB_WALLPAPER_OVERLAY_STORAGE_VERSION,
-      light: currentWallpaperOverlayOpacity.light,
-      dark: currentWallpaperOverlayOpacity.dark,
-      [nextMode]: nextValue
-    };
-    applyWallpaperOverlayOpacity(nextPrefs);
-    if (!storageArea) {
-      return;
-    }
-    if (wallpaperOverlaySaveTimer !== null) {
-      clearTimeout(wallpaperOverlaySaveTimer);
-    }
-    wallpaperOverlaySaveTimer = setTimeout(() => {
-      wallpaperOverlaySaveTimer = null;
-      storageArea.set({ [NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY]: nextPrefs });
-    }, 120);
-  }
-
-  function bootstrapInitialWallpaperOverlay() {
-    if (!storageArea) {
-      applyWallpaperOverlayOpacity({
-        version: NEWTAB_WALLPAPER_OVERLAY_STORAGE_VERSION,
-        light: NEWTAB_WALLPAPER_OVERLAY_DEFAULTS.light,
-        dark: NEWTAB_WALLPAPER_OVERLAY_DEFAULTS.dark
-      });
-      return Promise.resolve();
-    }
-    return new Promise((resolve) => {
-      storageArea.get([NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY], (result) => {
-        const raw = result ? result[NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY] : null;
-        const prefs = normalizeWallpaperOverlayPrefs(raw);
-        applyWallpaperOverlayOpacity(prefs);
-        if (raw && JSON.stringify(raw) !== JSON.stringify(prefs)) {
-          storageArea.set({ [NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY]: prefs });
-        }
-        resolve();
-      });
-    });
-  }
-
-  function finalizeInitialWallpaper() {
-    if (initialWallpaperApplied) {
-      return;
-    }
-    initialWallpaperApplied = true;
-    if (typeof resolveInitialWallpaperReady === 'function') {
-      resolveInitialWallpaperReady();
-    }
-  }
-
-  function updateWallpaperSelectionUi() {
-    if (wallpaperButton) {
-      const isActive = Boolean(currentWallpaperId);
-      wallpaperButton.setAttribute('data-active', isActive ? 'true' : 'false');
-      wallpaperButton.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-    }
-    if (!wallpaperGrid) {
-      return;
-    }
-    wallpaperGrid.querySelectorAll('.x-nt-wallpaper-tile').forEach((tile) => {
-      const selected = tile.getAttribute('data-wallpaper-id') === currentWallpaperId;
-      tile.setAttribute('data-selected', selected ? 'true' : 'false');
-      tile.setAttribute('aria-pressed', selected ? 'true' : 'false');
-    });
   }
 
   function updateWallpaperAppearanceSelectionUi() {
-    if (!wallpaperAppearanceOptions) {
-      return;
+    if (wallpaperRuntime) {
+      wallpaperRuntime.updateAppearanceSelectionUi();
     }
-    wallpaperAppearanceOptions.querySelectorAll('.x-nt-appearance-option').forEach((button) => {
-      const selected = button.getAttribute('data-theme-mode') === currentThemeMode;
-      button.setAttribute('data-selected', selected ? 'true' : 'false');
-      button.setAttribute('aria-pressed', selected ? 'true' : 'false');
-    });
-  }
-
-  function updateCustomWallpaperUploadTile() {
-    if (!customWallpaperUploadTile) {
-      return;
-    }
-    customWallpaperUploadTile.setAttribute('data-loading', customWallpaperImporting ? 'true' : 'false');
-    customWallpaperUploadTile.setAttribute('aria-label', t('newtab_wallpaper_add_local', 'Add local wallpaper'));
-    updateWallpaperSelectionUi();
-  }
-
-  function createCustomWallpaperTile(item) {
-    const tile = document.createElement('div');
-    tile.className = 'x-nt-wallpaper-tile x-nt-wallpaper-custom-tile';
-    tile.setAttribute('role', 'button');
-    tile.setAttribute('tabindex', '0');
-    tile.setAttribute('data-wallpaper-id', item.id);
-    tile.setAttribute('data-custom-wallpaper', 'true');
-    tile.setAttribute('data-selected', 'false');
-    tile.setAttribute('aria-pressed', 'false');
-    const thumb = document.createElement('span');
-    thumb.className = 'x-nt-wallpaper-thumb';
-    const image = document.createElement('img');
-    image.className = 'x-nt-wallpaper-custom-image';
-    image.src = getWallpaperThumbnailUrl(item);
-    image.alt = '';
-    image.draggable = false;
-    thumb.appendChild(image);
-    const localTag = document.createElement('span');
-    localTag.className = 'x-nt-wallpaper-local-tag';
-    localTag.textContent = t('newtab_wallpaper_local_tag', 'Local');
-    const check = document.createElement('span');
-    check.className = 'x-nt-wallpaper-check';
-    check.innerHTML = getRiSvg('ri-check-line', 'ri-size-16');
-    const deleteButton = document.createElement('button');
-    deleteButton.type = 'button';
-    deleteButton.className = 'x-nt-wallpaper-delete-button';
-    deleteButton.setAttribute('aria-label', t('newtab_wallpaper_delete_local', 'Delete imported wallpaper'));
-    deleteButton.innerHTML = getRiSvg('ri-subtract-line', 'ri-size-14');
-    deleteButton.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      deleteCustomWallpaper(item.id);
-    });
-    tile.appendChild(thumb);
-    tile.appendChild(localTag);
-    tile.appendChild(check);
-    tile.appendChild(deleteButton);
-    tile.addEventListener('click', (event) => {
-      if (event.target && event.target.closest && event.target.closest('.x-nt-wallpaper-delete-button')) {
-        return;
-      }
-      persistNewtabWallpaper(item.id);
-    });
-    tile.addEventListener('keydown', (event) => {
-      if (!event || (event.key !== 'Enter' && event.key !== ' ')) {
-        return;
-      }
-      if (event.target && event.target.closest && event.target.closest('.x-nt-wallpaper-delete-button')) {
-        return;
-      }
-      event.preventDefault();
-      persistNewtabWallpaper(item.id);
-    });
-    return tile;
-  }
-
-  function renderCustomWallpaperTiles() {
-    if (!wallpaperGrid || !customWallpaperUploadTile) {
-      return;
-    }
-    wallpaperGrid.querySelectorAll('.x-nt-wallpaper-custom-tile').forEach((tile) => {
-      tile.remove();
-    });
-    const insertionPoint = customWallpaperUploadTile.nextSibling;
-    customWallpapers.forEach((item) => {
-      wallpaperGrid.insertBefore(createCustomWallpaperTile(item), insertionPoint);
-    });
-    updateWallpaperLanguageStrings();
-    updateWallpaperSelectionUi();
-  }
-
-  function loadCustomWallpapers() {
-    return readCustomWallpaperRecords().then((records) => {
-      customWallpapers = records;
-      updateCustomWallpaperUploadTile();
-      renderCustomWallpaperTiles();
-      return records;
-    }).catch(() => {
-      customWallpapers = [];
-      updateCustomWallpaperUploadTile();
-      renderCustomWallpaperTiles();
-      return [];
-    });
-  }
-
-  function applyNewtabWallpaper(value) {
-    const nextId = normalizeNewtabWallpaperId(value);
-    const wallpaper = getWallpaperById(nextId);
-    currentWallpaperId = wallpaper ? wallpaper.id : '';
-    const target = document.documentElement;
-    if (target) {
-      const imageUrl = wallpaper ? getWallpaperImageUrl(wallpaper) : '';
-      target.style.setProperty('--x-nt-wallpaper-image', imageUrl ? getCssUrlValue(imageUrl) : 'none');
-      target.style.setProperty('--x-nt-wallpaper-size', 'cover');
-      target.style.setProperty('--x-nt-wallpaper-position', 'center center');
-    }
-    if (document.body) {
-      document.body.setAttribute('data-wallpaper-active', wallpaper ? 'true' : 'false');
-    }
-    refreshWallpaperAdaptiveSampler();
-    updateWallpaperSelectionUi();
-    finalizeInitialWallpaper();
   }
 
   function bootstrapInitialWallpaper() {
-    if (hasWallpaperBootstrapStarted) {
-      return initialWallpaperReadyPromise;
-    }
-    hasWallpaperBootstrapStarted = true;
-    loadCustomWallpapers().then(() => {
-      if (!storageArea) {
-        applyNewtabWallpaper('');
-        return;
-      }
-      storageArea.get([NEWTAB_WALLPAPER_STORAGE_KEY], (result) => {
-        const raw = result ? result[NEWTAB_WALLPAPER_STORAGE_KEY] : '';
-        const nextId = normalizeNewtabWallpaperId(raw);
-        applyNewtabWallpaper(nextId);
-        if (raw && raw !== nextId) {
-          storageArea.set({ [NEWTAB_WALLPAPER_STORAGE_KEY]: nextId });
-        }
-      });
-    });
-    return initialWallpaperReadyPromise;
+    return wallpaperRuntime ? wallpaperRuntime.bootstrapInitialWallpaper() : Promise.resolve();
   }
 
-  function persistNewtabWallpaper(id) {
-    const nextId = normalizeNewtabWallpaperId(id);
-    applyNewtabWallpaper(nextId);
-    if (!storageArea) {
-      return;
-    }
-    storageArea.set({ [NEWTAB_WALLPAPER_STORAGE_KEY]: nextId }, () => {
-      if (chrome.runtime && chrome.runtime.lastError) {
-        showToast(t('newtab_wallpaper_save_error', 'Failed to save wallpaper'), true);
-      }
-    });
-  }
-
-  function showCustomWallpaperTooltip(target) {
-    showTopActionTooltip(target, t('newtab_wallpaper_add_local', 'Add local wallpaper'));
-  }
-
-  function openCustomWallpaperPicker() {
-    if (customWallpaperInput && !customWallpaperImporting) {
-      customWallpaperInput.click();
-    }
-  }
-
-  function importCustomWallpaperFile(file) {
-    if (!file || customWallpaperImporting) {
-      return;
-    }
-    customWallpaperImporting = true;
-    updateCustomWallpaperUploadTile();
-    buildCustomWallpaperRecordFromFile(file).then((record) => {
-      return writeCustomWallpaperRecord(record).then(() => record);
-    }).then((record) => {
-      const nextWallpaper = normalizeCustomWallpaperRecord(record);
-      if (!nextWallpaper) {
-        throw new Error('Invalid wallpaper record.');
-      }
-      customWallpapers = customWallpapers.concat(nextWallpaper);
-      renderCustomWallpaperTiles();
-      persistNewtabWallpaper(nextWallpaper.id);
-      showToast(t('newtab_wallpaper_import_done', 'Wallpaper imported'), false);
-    }).catch(() => {
-      showToast(t('newtab_wallpaper_import_error', 'Failed to import wallpaper'), true);
-    }).finally(() => {
-      customWallpaperImporting = false;
-      if (customWallpaperInput) {
-        customWallpaperInput.value = '';
-      }
-      updateCustomWallpaperUploadTile();
-    });
-  }
-
-  function deleteCustomWallpaper(id) {
-    const targetWallpaper = getCustomWallpaperById(id);
-    if (!targetWallpaper || customWallpaperImporting) {
-      return;
-    }
-    hideTopActionTooltip();
-    deleteCustomWallpaperRecord(targetWallpaper).then(() => {
-      customWallpapers = customWallpapers.filter((item) => item && item.id !== targetWallpaper.id);
-      renderCustomWallpaperTiles();
-      if (currentWallpaperId === targetWallpaper.id) {
-        persistNewtabWallpaper('');
-      } else {
-        updateWallpaperSelectionUi();
-      }
-      showToast(t('newtab_wallpaper_delete_done', 'Deleted'), false);
-    }).catch(() => {
-      showToast(t('newtab_wallpaper_delete_error', 'Failed to delete wallpaper'), true);
-    });
-  }
-
-  function isWallpaperPanelOpen() {
-    return Boolean(wallpaperPanel && wallpaperPanel.getAttribute('data-open') === 'true');
-  }
-
-  function updateWallpaperLanguageStrings() {
-    if (wallpaperButton) {
-      const label = t('settings_tab_appearance', 'Appearance');
-      wallpaperButton.setAttribute('aria-label', label);
-      wallpaperButton.removeAttribute('title');
-    }
-    if (wallpaperAppearanceTitle) {
-      wallpaperAppearanceTitle.textContent = t('settings_tab_appearance', 'Appearance');
-    }
-    updateWallpaperOverlayControlUi();
-    updateCustomWallpaperUploadTile();
-    if (wallpaperPanelTitle) {
-      const title = t('newtab_wallpaper_title', 'Lumno Picks');
-      wallpaperPanelTitle.textContent = title;
-      if (wallpaperPanel) {
-        wallpaperPanel.setAttribute('aria-label', t('settings_tab_appearance', 'Appearance'));
-      }
-    }
-    if (wallpaperAppearanceOptions) {
-      wallpaperAppearanceOptions.querySelectorAll('.x-nt-appearance-option').forEach((button) => {
-        const mode = button.getAttribute('data-theme-mode') || 'system';
-        button.setAttribute('aria-label', formatMessage('mode_switch_title', '{name}: switch to {mode} mode', {
-          name: 'Lumno',
-          mode: getThemeModeLabel(mode)
-        }));
-        const label = button.querySelector('.x-nt-appearance-label');
-        if (label) {
-          if (mode === 'light') {
-            label.textContent = t('settings_theme_light', 'Light');
-          } else if (mode === 'dark') {
-            label.textContent = t('settings_theme_dark', 'Dark');
-          } else {
-            label.textContent = t('settings_theme_system', 'Auto');
-          }
-        }
-      });
-    }
-    if (wallpaperPanel) {
-      wallpaperPanel.querySelectorAll('[data-overlay-tick="default"]').forEach((tick) => {
-        tick.textContent = t('newtab_wallpaper_overlay_default_tick', 'Default');
-      });
-    }
-    if (!wallpaperGrid) {
-      return;
-    }
-    wallpaperGrid.querySelectorAll('.x-nt-wallpaper-local-tag').forEach((tag) => {
-      tag.textContent = t('newtab_wallpaper_local_tag', 'Local');
-    });
-    wallpaperGrid.querySelectorAll('.x-nt-wallpaper-delete-button').forEach((button) => {
-      button.setAttribute('aria-label', t('newtab_wallpaper_delete_local', 'Delete imported wallpaper'));
-    });
-    wallpaperGrid.querySelectorAll('.x-nt-wallpaper-tile').forEach((tile) => {
-      const item = getWallpaperById(tile.getAttribute('data-wallpaper-id'));
-      if (!item) {
-        return;
-      }
-      tile.setAttribute('aria-label', formatMessage('newtab_wallpaper_select_label', 'Select {name}', {
-        name: getWallpaperDisplayName(item)
-      }));
-    });
-  }
-
-  function renderWallpaperPanel() {
-    if (!wallpaperPanel || wallpaperPanelRendered) {
-      return;
-    }
-    wallpaperPanelRendered = true;
-    const appearanceSection = document.createElement('div');
-    appearanceSection.className = 'x-nt-appearance-section';
-    wallpaperAppearanceTitle = document.createElement('div');
-    wallpaperAppearanceTitle.className = 'x-nt-wallpaper-panel-title';
-    wallpaperAppearanceOptions = document.createElement('div');
-    wallpaperAppearanceOptions.className = 'x-nt-appearance-options';
-    [
-      { mode: 'system', image: 'assets/images/system.svg' },
-      { mode: 'light', image: 'assets/images/light.svg' },
-      { mode: 'dark', image: 'assets/images/dark.svg' }
-    ].forEach((item) => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'x-nt-appearance-option';
-      button.setAttribute('data-theme-mode', item.mode);
-      button.setAttribute('data-selected', 'false');
-      button.setAttribute('aria-pressed', 'false');
-      const preview = document.createElement('span');
-      preview.className = 'x-nt-appearance-preview';
-      const image = document.createElement('img');
-      image.src = getRuntimeAssetUrl(item.image);
-      image.alt = '';
-      image.draggable = false;
-      preview.appendChild(image);
-      const check = document.createElement('span');
-      check.className = 'x-nt-appearance-check';
-      check.innerHTML = getRiSvg('ri-check-line', 'ri-size-16');
-      const label = document.createElement('span');
-      label.className = 'x-nt-appearance-label';
-      preview.appendChild(check);
-      button.appendChild(preview);
-      button.appendChild(label);
-      button.addEventListener('click', () => {
-        setThemeMode(item.mode);
-      });
-      wallpaperAppearanceOptions.appendChild(button);
-    });
-    appearanceSection.appendChild(wallpaperAppearanceTitle);
-    appearanceSection.appendChild(wallpaperAppearanceOptions);
-    const overlayControl = document.createElement('div');
-    overlayControl.className = 'x-nt-overlay-control';
-    const overlayHeader = document.createElement('div');
-    overlayHeader.className = 'x-nt-overlay-control-header';
-    wallpaperOverlayLabel = document.createElement('span');
-    wallpaperOverlayLabel.className = 'x-nt-overlay-label';
-    wallpaperOverlayValue = document.createElement('span');
-    wallpaperOverlayValue.className = 'x-nt-overlay-value';
-    wallpaperOverlaySlider = document.createElement('input');
-    wallpaperOverlaySlider.className = 'x-nt-overlay-slider';
-    wallpaperOverlaySlider.type = 'range';
-    wallpaperOverlaySlider.min = '0';
-    wallpaperOverlaySlider.max = '100';
-    wallpaperOverlaySlider.step = '1';
-    wallpaperOverlaySlider.setAttribute(
-      'aria-label',
-      t('newtab_wallpaper_overlay_opacity', 'Background overlay opacity')
-    );
-    wallpaperOverlaySlider.addEventListener('pointerdown', () => {
-      wallpaperOverlayPointerActive = true;
-    });
-    wallpaperOverlaySlider.addEventListener('pointerup', () => {
-      wallpaperOverlayPointerActive = false;
-    });
-    wallpaperOverlaySlider.addEventListener('pointercancel', () => {
-      wallpaperOverlayPointerActive = false;
-    });
-    wallpaperOverlaySlider.addEventListener('blur', () => {
-      wallpaperOverlayPointerActive = false;
-    });
-    wallpaperOverlaySlider.addEventListener('input', () => {
-      const value = wallpaperOverlayPointerActive
-        ? snapWallpaperOverlaySliderValue(wallpaperOverlaySlider.value)
-        : normalizeWallpaperOverlayOpacity(wallpaperOverlaySlider.value, getWallpaperOverlayOpacityForCurrentMode());
-      if (String(value) !== wallpaperOverlaySlider.value) {
-        wallpaperOverlaySlider.value = String(value);
-      }
-      persistWallpaperOverlayOpacity(getResolvedWallpaperOverlayMode(), value);
-    });
-    overlayHeader.appendChild(wallpaperOverlayLabel);
-    overlayHeader.appendChild(wallpaperOverlayValue);
-    overlayControl.appendChild(overlayHeader);
-    const overlaySliderWrap = document.createElement('div');
-    overlaySliderWrap.className = 'x-nt-overlay-slider-wrap';
-    overlaySliderWrap.appendChild(wallpaperOverlaySlider);
-    const overlayScale = document.createElement('div');
-    overlayScale.className = 'x-nt-overlay-scale';
-    [
-      { align: 'start', text: '0' },
-      { align: 'center', text: t('newtab_wallpaper_overlay_default_tick', 'Default'), key: 'default' },
-      { align: 'end', text: '100%' }
-    ].forEach((item) => {
-      const tick = document.createElement('span');
-      tick.className = 'x-nt-overlay-tick';
-      tick.setAttribute('data-align', item.align);
-      if (item.key) {
-        tick.setAttribute('data-overlay-tick', item.key);
-      }
-      tick.textContent = item.text;
-      overlayScale.appendChild(tick);
-    });
-    overlaySliderWrap.appendChild(overlayScale);
-    overlayControl.appendChild(overlaySliderWrap);
-    appearanceSection.appendChild(overlayControl);
-    const divider = document.createElement('div');
-    divider.className = 'x-nt-panel-divider';
-    const wallpaperSection = document.createElement('div');
-    wallpaperSection.className = 'x-nt-wallpaper-section';
-    wallpaperPanelTitle = document.createElement('div');
-    wallpaperPanelTitle.className = 'x-nt-wallpaper-panel-title';
-    wallpaperGrid = document.createElement('div');
-    wallpaperGrid.className = 'x-nt-wallpaper-grid';
-    customWallpaperInput = document.createElement('input');
-    customWallpaperInput.className = 'x-nt-wallpaper-file-input';
-    customWallpaperInput.type = 'file';
-    customWallpaperInput.accept = 'image/*';
-    customWallpaperInput.tabIndex = -1;
-    customWallpaperInput.addEventListener('change', (event) => {
-      const file = event && event.target && event.target.files ? event.target.files[0] : null;
-      importCustomWallpaperFile(file);
-    });
-    customWallpaperUploadTile = document.createElement('div');
-    customWallpaperUploadTile.className = 'x-nt-wallpaper-tile x-nt-wallpaper-upload-tile';
-    customWallpaperUploadTile.setAttribute('role', 'button');
-    customWallpaperUploadTile.setAttribute('tabindex', '0');
-    customWallpaperUploadTile.setAttribute('data-upload', 'true');
-    customWallpaperUploadTile.setAttribute('data-loading', 'false');
-    customWallpaperUploadTile.setAttribute('data-selected', 'false');
-    customWallpaperUploadTile.setAttribute('aria-pressed', 'false');
-    const customThumb = document.createElement('span');
-    customThumb.className = 'x-nt-wallpaper-thumb x-nt-wallpaper-upload-thumb';
-    const customPlaceholder = document.createElement('span');
-    customPlaceholder.className = 'x-nt-wallpaper-upload-placeholder';
-    customPlaceholder.innerHTML = getRiSvg('ri-add-large-line', 'ri-size-18');
-    customThumb.appendChild(customPlaceholder);
-    customWallpaperUploadTile.appendChild(customThumb);
-    customWallpaperUploadTile.addEventListener('click', () => {
-      openCustomWallpaperPicker();
-    });
-    customWallpaperUploadTile.addEventListener('keydown', (event) => {
-      if (!event || (event.key !== 'Enter' && event.key !== ' ')) {
-        return;
-      }
-      event.preventDefault();
-      openCustomWallpaperPicker();
-    });
-    customWallpaperUploadTile.addEventListener('mouseenter', () => {
-      showCustomWallpaperTooltip(customWallpaperUploadTile);
-    });
-    customWallpaperUploadTile.addEventListener('mouseleave', hideTopActionTooltip);
-    customWallpaperUploadTile.addEventListener('focusin', () => {
-      showCustomWallpaperTooltip(customWallpaperUploadTile);
-    });
-    customWallpaperUploadTile.addEventListener('focusout', (event) => {
-      const nextTarget = event && event.relatedTarget ? event.relatedTarget : null;
-      if (!nextTarget || !customWallpaperUploadTile.contains(nextTarget)) {
-        hideTopActionTooltip();
-      }
-    });
-    wallpaperGrid.appendChild(customWallpaperUploadTile);
-    renderCustomWallpaperTiles();
-    NEWTAB_WALLPAPER_OPTIONS.forEach((item) => {
-      const tile = document.createElement('button');
-      tile.type = 'button';
-      tile.className = 'x-nt-wallpaper-tile';
-      tile.setAttribute('data-wallpaper-id', item.id);
-      tile.setAttribute('data-wallpaper-path', getWallpaperLocalPath(item));
-      tile.setAttribute('data-selected', 'false');
-      tile.setAttribute('aria-pressed', 'false');
-      const thumb = document.createElement('span');
-      thumb.className = 'x-nt-wallpaper-thumb';
-      const image = document.createElement('img');
-      image.src = getWallpaperThumbnailUrl(item);
-      image.alt = '';
-      image.draggable = false;
-      image.loading = 'lazy';
-      image.decoding = 'async';
-      thumb.appendChild(image);
-      const check = document.createElement('span');
-      check.className = 'x-nt-wallpaper-check';
-      check.innerHTML = getRiSvg('ri-check-line', 'ri-size-16');
-      tile.appendChild(thumb);
-      tile.appendChild(check);
-      tile.addEventListener('click', () => {
-        persistNewtabWallpaper(item.id);
-      });
-      wallpaperGrid.appendChild(tile);
-    });
-    wallpaperSection.appendChild(wallpaperPanelTitle);
-    wallpaperSection.appendChild(customWallpaperInput);
-    wallpaperSection.appendChild(wallpaperGrid);
-    wallpaperPanel.appendChild(appearanceSection);
-    wallpaperPanel.appendChild(divider);
-    wallpaperPanel.appendChild(wallpaperSection);
-    updateWallpaperLanguageStrings();
-    updateCustomWallpaperUploadTile();
-    updateWallpaperSelectionUi();
-    updateWallpaperAppearanceSelectionUi();
-  }
-
-  function openWallpaperPanel() {
-    if (!wallpaperPanel || !wallpaperButton) {
-      return;
-    }
-    renderWallpaperPanel();
-    wallpaperPanel.setAttribute('data-open', 'true');
-    wallpaperButton.setAttribute('data-open', 'true');
-    wallpaperButton.setAttribute('aria-expanded', 'true');
-  }
-
-  function closeWallpaperPanel(options) {
-    if (!wallpaperPanel || !wallpaperButton) {
-      return;
-    }
-    wallpaperPanel.setAttribute('data-open', 'false');
-    wallpaperButton.setAttribute('data-open', 'false');
-    wallpaperButton.setAttribute('aria-expanded', 'false');
-    if (options && options.restoreFocus) {
-      try {
-        wallpaperButton.focus({ preventScroll: true });
-      } catch (e) {
-        wallpaperButton.focus();
-      }
-    }
-  }
-
-  function toggleWallpaperPanel() {
-    if (isWallpaperPanelOpen()) {
-      closeWallpaperPanel();
-      return;
-    }
-    openWallpaperPanel();
+  function bootstrapInitialWallpaperOverlay() {
+    return wallpaperRuntime ? wallpaperRuntime.bootstrapInitialWallpaperOverlay() : Promise.resolve();
   }
 
   function createWallpaperControls() {
-    wallpaperControl = document.createElement('div');
-    wallpaperControl.className = 'x-nt-wallpaper-control';
-    wallpaperButton = document.createElement('button');
-    wallpaperButton.type = 'button';
-    wallpaperButton.className = 'x-nt-wallpaper-button';
-    wallpaperButton.setAttribute('aria-haspopup', 'dialog');
-    wallpaperButton.setAttribute('aria-expanded', 'false');
-    wallpaperButton.setAttribute('data-open', 'false');
-    wallpaperButton.setAttribute('data-active', 'false');
-    wallpaperButton.innerHTML = getRiSvg('ri-t-shirt-2-line', 'ri-size-20');
-    wallpaperPanel = document.createElement('div');
-    wallpaperPanel.className = 'x-nt-wallpaper-panel';
-    wallpaperPanel.setAttribute('data-open', 'false');
-    wallpaperPanel.setAttribute('role', 'dialog');
-    wallpaperPanel.setAttribute('aria-modal', 'false');
-    wallpaperButton.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      hideTopActionTooltip();
-      toggleWallpaperPanel();
-    });
-    wallpaperButton.addEventListener('mouseenter', () => {
-      showTopActionTooltip(wallpaperButton, t('settings_tab_appearance', 'Appearance'));
-    });
-    wallpaperButton.addEventListener('mouseleave', hideTopActionTooltip);
-    wallpaperButton.addEventListener('focus', () => {
-      showTopActionTooltip(wallpaperButton, t('settings_tab_appearance', 'Appearance'));
-    });
-    wallpaperButton.addEventListener('blur', hideTopActionTooltip);
-    wallpaperControl.appendChild(wallpaperPanel);
-    wallpaperControl.appendChild(wallpaperButton);
-    updateWallpaperLanguageStrings();
-    updateWallpaperSelectionUi();
+    if (!wallpaperRuntime) {
+      return;
+    }
+    wallpaperRuntime.createControls();
+    wallpaperControl = wallpaperRuntime.getControlElement();
   }
 
-  function getRiSvg(id, sizeClass, extraClass) {
-    const size = sizeClass || 'ri-size-16';
-    const extra = extraClass ? ` ${extraClass}` : '';
-    return `<i class="ri-icon ${size}${extra} ${id}" aria-hidden="true"></i>`;
+  function isWallpaperPanelOpen() {
+    return wallpaperRuntime ? wallpaperRuntime.isPanelOpen() : false;
+  }
+
+  function closeWallpaperPanel(options) {
+    if (wallpaperRuntime) {
+      wallpaperRuntime.closePanel(options);
+    }
+  }
+
+  function scheduleWallpaperAdaptiveToneUpdate() {
+    if (wallpaperRuntime) {
+      wallpaperRuntime.scheduleAdaptiveToneUpdate();
+    }
   }
 
   function getFigmaFolderSvg(idSuffix) {
@@ -3148,7 +1735,7 @@
   }
 
   function applyThemeMode(mode, options) {
-    currentThemeMode = mode || 'system';
+    currentThemeMode = normalizeThemeMode(mode);
     const mediaMatchesOverride = options && typeof options.mediaMatches === 'boolean'
       ? options.mediaMatches
       : null;
@@ -3196,6 +1783,33 @@
       removeMediaQueryChangeListener(mediaQuery, handleMediaChange);
       mediaListenerAttached = false;
     }
+    scheduleWallpaperAdaptiveToneUpdate();
+  }
+
+  function normalizeThemeMode(value) {
+    if (value === 'light' || value === 'dark') {
+      return value;
+    }
+    return 'system';
+  }
+
+  function normalizeNewtabThemeScope(value) {
+    return value === 'home' ? 'home' : 'global';
+  }
+
+  function getScopedThemeMode() {
+    if (newtabThemeScope === 'home') {
+      return newtabThemeMode === 'system' ? globalThemeMode : newtabThemeMode;
+    }
+    return globalThemeMode;
+  }
+
+  function getSelectedThemeMode() {
+    return newtabThemeScope === 'home' ? newtabThemeMode : globalThemeMode;
+  }
+
+  function applyScopedThemeMode(options) {
+    applyThemeMode(getScopedThemeMode(), options);
   }
 
   function bootstrapInitialThemeMode() {
@@ -3204,11 +1818,24 @@
     }
     hasThemeBootstrapStarted = true;
     if (!storageArea) {
-      applyThemeMode('system');
+      globalThemeMode = 'system';
+      newtabThemeMode = 'system';
+      newtabThemeScope = 'global';
+      hasNewtabThemeModeValue = false;
+      applyScopedThemeMode();
       return initialThemeReadyPromise;
     }
-    storageArea.get([THEME_STORAGE_KEY], (result) => {
-      applyThemeMode(result[THEME_STORAGE_KEY] || 'system');
+    storageArea.get([
+      THEME_STORAGE_KEY,
+      NEWTAB_THEME_MODE_STORAGE_KEY,
+      NEWTAB_THEME_SCOPE_STORAGE_KEY
+    ], (result) => {
+      globalThemeMode = normalizeThemeMode(result ? result[THEME_STORAGE_KEY] : 'system');
+      hasNewtabThemeModeValue = Boolean(result &&
+        Object.prototype.hasOwnProperty.call(result, NEWTAB_THEME_MODE_STORAGE_KEY));
+      newtabThemeMode = normalizeThemeMode(result ? result[NEWTAB_THEME_MODE_STORAGE_KEY] : 'system');
+      newtabThemeScope = normalizeNewtabThemeScope(result ? result[NEWTAB_THEME_SCOPE_STORAGE_KEY] : 'global');
+      applyScopedThemeMode();
     });
     return initialThemeReadyPromise;
   }
@@ -3290,10 +1917,24 @@
       return;
     }
     if (changes[THEME_STORAGE_KEY]) {
-      applyThemeMode(changes[THEME_STORAGE_KEY].newValue || 'system');
+      globalThemeMode = normalizeThemeMode(changes[THEME_STORAGE_KEY].newValue);
+      if (newtabThemeScope === 'global' || newtabThemeMode === 'system') {
+        applyScopedThemeMode();
+      }
     }
-    if (changes[NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY]) {
-      applyWallpaperOverlayOpacity(changes[NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY].newValue);
+    if (changes[NEWTAB_THEME_MODE_STORAGE_KEY]) {
+      newtabThemeMode = normalizeThemeMode(changes[NEWTAB_THEME_MODE_STORAGE_KEY].newValue);
+      hasNewtabThemeModeValue = true;
+      if (newtabThemeScope === 'home') {
+        applyScopedThemeMode();
+      }
+    }
+    if (changes[NEWTAB_THEME_SCOPE_STORAGE_KEY]) {
+      newtabThemeScope = normalizeNewtabThemeScope(changes[NEWTAB_THEME_SCOPE_STORAGE_KEY].newValue);
+      applyScopedThemeMode();
+    }
+    if (wallpaperRuntime) {
+      wallpaperRuntime.handleStorageChange(changes);
     }
     if (changes[LANGUAGE_STORAGE_KEY]) {
       applyLanguageMode(changes[LANGUAGE_STORAGE_KEY].newValue || 'system');
@@ -3334,14 +1975,6 @@
         storageArea.set({ [NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY]: nextValue });
       }
       applyNewtabWordmarkVisibility();
-    }
-    if (changes[NEWTAB_WALLPAPER_STORAGE_KEY]) {
-      const raw = changes[NEWTAB_WALLPAPER_STORAGE_KEY].newValue;
-      const nextWallpaperId = normalizeNewtabWallpaperId(raw);
-      if (storageArea && raw && raw !== nextWallpaperId) {
-        storageArea.set({ [NEWTAB_WALLPAPER_STORAGE_KEY]: nextWallpaperId });
-      }
-      applyNewtabWallpaper(nextWallpaperId);
     }
     if (changes[RECENT_MODE_STORAGE_KEY]) {
       const nextMode = changes[RECENT_MODE_STORAGE_KEY].newValue;
@@ -3642,18 +2275,54 @@
     };
   }
 
+  function updateModeCommandSuggestions() {
+    if (isModeCommand(inputParts && inputParts.input ? inputParts.input.value : '')) {
+      renderSuggestions([], (inputParts.input.value || '').trim());
+    }
+  }
+
+  function getThemeScope() {
+    return newtabThemeScope;
+  }
+
   function setThemeMode(mode) {
-    const nextMode = mode || 'system';
-    currentThemeMode = nextMode;
+    const nextMode = normalizeThemeMode(mode);
+    const targetKey = newtabThemeScope === 'home'
+      ? NEWTAB_THEME_MODE_STORAGE_KEY
+      : THEME_STORAGE_KEY;
+    if (newtabThemeScope === 'home') {
+      newtabThemeMode = nextMode;
+      hasNewtabThemeModeValue = true;
+    } else {
+      globalThemeMode = nextMode;
+    }
     if (!storageArea) {
-      applyThemeMode(nextMode);
+      applyScopedThemeMode();
       return;
     }
-    storageArea.set({ [THEME_STORAGE_KEY]: nextMode }, () => {
-      applyThemeMode(nextMode);
-      if (isModeCommand(inputParts && inputParts.input ? inputParts.input.value : '')) {
-        renderSuggestions([], (inputParts.input.value || '').trim());
-      }
+    storageArea.set({ [targetKey]: nextMode }, () => {
+      applyScopedThemeMode();
+      updateModeCommandSuggestions();
+    });
+  }
+
+  function setThemeScope(scope) {
+    const nextScope = normalizeNewtabThemeScope(scope);
+    const updates = { [NEWTAB_THEME_SCOPE_STORAGE_KEY]: nextScope };
+    newtabThemeScope = nextScope;
+    if (nextScope === 'home' && !hasNewtabThemeModeValue) {
+      newtabThemeMode = 'system';
+      hasNewtabThemeModeValue = true;
+      updates[NEWTAB_THEME_MODE_STORAGE_KEY] = newtabThemeMode;
+    }
+    if (!storageArea) {
+      applyScopedThemeMode();
+      updateModeCommandSuggestions();
+      return;
+    }
+    storageArea.set(updates, () => {
+      applyScopedThemeMode();
+      updateModeCommandSuggestions();
     });
   }
 
@@ -3726,6 +2395,8 @@
     RECENT_COUNT_STORAGE_KEY,
     NEWTAB_WIDTH_MODE_STORAGE_KEY,
     NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY,
+    NEWTAB_THEME_MODE_STORAGE_KEY,
+    NEWTAB_THEME_SCOPE_STORAGE_KEY,
     NEWTAB_WALLPAPER_STORAGE_KEY,
     NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY,
     BOOKMARK_COUNT_STORAGE_KEY,
@@ -4733,11 +3404,16 @@
   topActionTooltip.setAttribute('data-visible', 'false');
   document.body.appendChild(topActionTooltip);
   let topActionTooltipHideTimer = null;
+  let topActionTooltipTarget = null;
+  let topActionTooltipToken = 0;
 
   function showTopActionTooltip(button, text) {
     if (!button || !text || !topActionTooltip) {
       return;
     }
+    const tooltipToken = topActionTooltipToken + 1;
+    topActionTooltipToken = tooltipToken;
+    topActionTooltipTarget = button;
     if (topActionTooltipHideTimer) {
       clearTimeout(topActionTooltipHideTimer);
       topActionTooltipHideTimer = null;
@@ -4766,6 +3442,14 @@
     topActionTooltip.style.setProperty('top', `${Math.round(top)}px`);
     topActionTooltip.style.setProperty('left', `${Math.round(left)}px`);
     requestAnimationFrame(() => {
+      if (
+        tooltipToken !== topActionTooltipToken ||
+        topActionTooltipTarget !== button ||
+        !button.isConnected ||
+        (document.activeElement !== button && !button.matches(':hover'))
+      ) {
+        return;
+      }
       topActionTooltip.setAttribute('data-visible', 'true');
     });
   }
@@ -4774,12 +3458,19 @@
     if (!topActionTooltip) {
       return;
     }
+    const tooltipToken = topActionTooltipToken + 1;
+    topActionTooltipToken = tooltipToken;
+    topActionTooltipTarget = null;
     topActionTooltip.setAttribute('data-visible', 'false');
     if (topActionTooltipHideTimer) {
       clearTimeout(topActionTooltipHideTimer);
     }
     topActionTooltipHideTimer = setTimeout(() => {
+      if (tooltipToken !== topActionTooltipToken) {
+        return;
+      }
       topActionTooltip.setAttribute('data-visible', 'false');
+      topActionTooltipHideTimer = null;
     }, 120);
   }
 
@@ -4900,9 +3591,11 @@
     }
     recentMouseInsideSection = false;
     recentMouseLeftAt = Date.now();
+    hideTopActionTooltip();
   });
   recentSection.addEventListener('pointercancel', () => {
     recentMouseInsideSection = false;
+    hideTopActionTooltip();
   });
   recentHeading = document.createElement('div');
   recentHeading.className = 'x-nt-recent-heading';
@@ -7431,10 +6124,19 @@
       const modeCommandActive = !siteSearchQueryModeActive && isModeCommand(rawTagInput);
       if (modeCommandActive) {
         if (storageArea) {
-          storageArea.get([THEME_STORAGE_KEY], (result) => {
-            const storedMode = result[THEME_STORAGE_KEY] || 'system';
+          storageArea.get([
+            THEME_STORAGE_KEY,
+            NEWTAB_THEME_MODE_STORAGE_KEY,
+            NEWTAB_THEME_SCOPE_STORAGE_KEY
+          ], (result) => {
+            globalThemeMode = normalizeThemeMode(result ? result[THEME_STORAGE_KEY] : 'system');
+            hasNewtabThemeModeValue = Boolean(result &&
+              Object.prototype.hasOwnProperty.call(result, NEWTAB_THEME_MODE_STORAGE_KEY));
+            newtabThemeMode = normalizeThemeMode(result ? result[NEWTAB_THEME_MODE_STORAGE_KEY] : 'system');
+            newtabThemeScope = normalizeNewtabThemeScope(result ? result[NEWTAB_THEME_SCOPE_STORAGE_KEY] : 'global');
+            const storedMode = getScopedThemeMode();
             if (storedMode !== currentThemeMode && query === latestQuery) {
-              currentThemeMode = storedMode;
+              applyThemeMode(storedMode);
               renderSuggestions([], query);
             }
           });
@@ -8670,7 +7372,7 @@
       return;
     }
     const target = event && event.target ? event.target : null;
-    if (wallpaperControl && target && wallpaperControl.contains(target)) {
+    if (wallpaperRuntime && wallpaperRuntime.containsTarget(target)) {
       return;
     }
     closeWallpaperPanel();
@@ -8694,7 +7396,9 @@
   bottomDockScroller.appendChild(recentSection);
   bottomDock.appendChild(bottomDockScroller);
   document.body.appendChild(bottomDock);
-  document.body.appendChild(wallpaperControl);
+  if (wallpaperControl) {
+    document.body.appendChild(wallpaperControl);
+  }
 
   function scheduleRecentReloadIfVisible() {
     if (document.visibilityState !== 'visible') {

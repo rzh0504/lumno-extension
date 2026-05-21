@@ -102,6 +102,7 @@
     });
 
     function clear() {
+      hideTopActionTooltip();
       if (grid) {
         grid.innerHTML = '';
       }
@@ -282,6 +283,7 @@
       });
       card.addEventListener('pointercancel', () => {
         isCardPointerActive = false;
+        hideTopActionTooltip();
       });
       card.addEventListener('pointerup', (event) => {
         if (event.button !== 0 || !isCardPointerActive) {
@@ -290,6 +292,7 @@
         isCardPointerActive = false;
       });
       card.addEventListener('pointerleave', () => {
+        hideTopActionTooltip();
         if (!hasNavigateAttempted && !isHoverLocked) {
           card.classList.remove(rollbackClassName);
         }
@@ -346,6 +349,7 @@
         if (!canDismiss()) {
           return;
         }
+        hideTopActionTooltip();
         hideTemporarily(item).then((result) => {
           if (!result || !result.hidden) {
             return;
@@ -376,6 +380,8 @@
         updateDismissButton(dismissButton, item);
         showTopActionTooltip(dismissButton, label);
       });
+      dismissButton.addEventListener('pointerleave', hideTopActionTooltip);
+      dismissButton.addEventListener('pointercancel', hideTopActionTooltip);
       dismissButton.addEventListener('mouseleave', hideTopActionTooltip);
       dismissButton.addEventListener('focus', () => {
         if (!canDismiss()) {

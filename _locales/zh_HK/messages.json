@@ -11,6 +11,27 @@
   "settings_tab_appearance": {
     "message": "外觀"
   },
+  "newtab_theme_scope_label": {
+    "message": "深淺色作用範圍"
+  },
+  "newtab_theme_scope_global": {
+    "message": "全域"
+  },
+  "newtab_theme_scope_home": {
+    "message": "新分頁"
+  },
+  "newtab_theme_scope_select_label": {
+    "message": "將深淺色修改套用到{scope}"
+  },
+  "newtab_theme_scope_help_label": {
+    "message": "深淺色作用範圍說明"
+  },
+  "newtab_theme_scope_help": {
+    "message": "「全域」會作用於全域的深淺色模式，「新分頁」僅作用於新分頁。"
+  },
+  "newtab_theme_follow_global": {
+    "message": "跟隨「全域」"
+  },
   "settings_tab_shortcuts": {
     "message": "站內搜尋"
   },
@@ -382,6 +403,15 @@
   },
   "newtab_wallpaper_add_local": {
     "message": "新增本機壁紙"
+  },
+  "newtab_wallpaper_feature_hint_badge": {
+    "message": "新功能"
+  },
+  "newtab_wallpaper_feature_hint_text": {
+    "message": "新分頁現已支援更換壁紙！"
+  },
+  "newtab_wallpaper_feature_hint_close": {
+    "message": "關閉壁紙提示"
   },
   "newtab_wallpaper_local_tag": {
     "message": "本機"

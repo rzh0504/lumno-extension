@@ -11,6 +11,27 @@
   "settings_tab_appearance": {
     "message": "Appearance"
   },
+  "newtab_theme_scope_label": {
+    "message": "Theme scope"
+  },
+  "newtab_theme_scope_global": {
+    "message": "Global"
+  },
+  "newtab_theme_scope_home": {
+    "message": "New Tab"
+  },
+  "newtab_theme_scope_select_label": {
+    "message": "Apply theme changes to {scope}"
+  },
+  "newtab_theme_scope_help_label": {
+    "message": "Theme scope info"
+  },
+  "newtab_theme_scope_help": {
+    "message": "\"Global\" affects the global theme mode. \"New Tab\" affects only the new tab page."
+  },
+  "newtab_theme_follow_global": {
+    "message": "Follow \"Global\""
+  },
   "settings_tab_shortcuts": {
     "message": "Site Search"
   },
@@ -382,6 +403,15 @@
   },
   "newtab_wallpaper_add_local": {
     "message": "Add local wallpaper"
+  },
+  "newtab_wallpaper_feature_hint_badge": {
+    "message": "New"
+  },
+  "newtab_wallpaper_feature_hint_text": {
+    "message": "New Tab now supports changing wallpaper!"
+  },
+  "newtab_wallpaper_feature_hint_close": {
+    "message": "Dismiss wallpaper tip"
   },
   "newtab_wallpaper_local_tag": {
     "message": "Local"

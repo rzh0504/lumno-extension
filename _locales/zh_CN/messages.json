@@ -11,6 +11,27 @@
   "settings_tab_appearance": {
     "message": "外观"
   },
+  "newtab_theme_scope_label": {
+    "message": "深浅色作用范围"
+  },
+  "newtab_theme_scope_global": {
+    "message": "全局"
+  },
+  "newtab_theme_scope_home": {
+    "message": "新标签页"
+  },
+  "newtab_theme_scope_select_label": {
+    "message": "将深浅色修改作用于{scope}"
+  },
+  "newtab_theme_scope_help_label": {
+    "message": "深浅色作用范围说明"
+  },
+  "newtab_theme_scope_help": {
+    "message": "「全局」会作用于全局的深浅模式，「新标签页」仅作用于新标签页。"
+  },
+  "newtab_theme_follow_global": {
+    "message": "跟随「全局」"
+  },
   "settings_tab_shortcuts": {
     "message": "站内搜索"
   },
@@ -382,6 +403,15 @@
   },
   "newtab_wallpaper_add_local": {
     "message": "添加本地壁纸"
+  },
+  "newtab_wallpaper_feature_hint_badge": {
+    "message": "新功能"
+  },
+  "newtab_wallpaper_feature_hint_text": {
+    "message": "新标签页现已支持更换壁纸！"
+  },
+  "newtab_wallpaper_feature_hint_close": {
+    "message": "关闭壁纸提示"
   },
   "newtab_wallpaper_local_tag": {
     "message": "本地"
