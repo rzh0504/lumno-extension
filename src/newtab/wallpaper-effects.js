@@ -3,11 +3,12 @@
 
   const EFFECT_TYPES = ['none', 'grain', 'halftone', 'ascii'];
   const DEFAULT_PREFS = {
-    version: 2,
+    version: 3,
     type: 'none',
     strength: 50,
     size: 50,
-    spacing: 50
+    spacing: 50,
+    hover: true
   };
 
   function getOption(options, key, fallback) {
@@ -49,7 +50,8 @@
       type,
       strength: Math.round(clampNumber(rawStrength, 0, 100)),
       size: Math.round(clampNumber(rawSize, 0, 100)),
-      spacing: Math.round(clampNumber(rawSpacing, 0, 100))
+      spacing: Math.round(clampNumber(rawSpacing, 0, 100)),
+      hover: value.hover === false ? false : DEFAULT_PREFS.hover
     };
   }
 
@@ -65,6 +67,14 @@
     const onRender = getFunction(options, 'onRender');
     const HOVER_FADE_DURATION_MS = 240;
     const EFFECT_CROSSFADE_MS = 150;
+    const HOVER_SAFE_ZONE_PADDING_PX = 36;
+    const HOVER_SAFE_ZONE_SELECTORS = [
+      '#_x_extension_newtab_bookmarks_2024_unique_',
+      '#_x_extension_newtab_recent_sites_2024_unique_',
+      '#_x_extension_newtab_section_safe_corridor_2026_unique_'
+    ];
+    const HOVER_SAFE_ZONE_RECT_CACHE_MS = 80;
+    const ASCII_CHARS = '  .,:;irsXA253hMHGS#9B&@';
 
     let canvas = null;
     let context = null;
@@ -87,6 +97,11 @@
       fadeFrom: 0
     };
     let hoverRenderIntensity = 0;
+    let hoverSafeZoneElements = null;
+    let hoverSafeZoneRectCache = null;
+    let hoverSafeZoneRectCacheTime = 0;
+    let backgroundLuminanceCache = null;
+    let asciiGlyphMetricsCache = null;
 
     function requestFrame(callback) {
       if (windowObj && typeof windowObj.requestAnimationFrame === 'function') {
@@ -192,6 +207,8 @@
               mutation.attributeName === 'data-wallpaper-active');
         });
         if (shouldRefresh) {
+          clearHoverSafeZoneRectCache();
+          clearBackgroundLuminanceCache();
           scheduleRender();
         }
       });
@@ -202,8 +219,9 @@
     }
 
     function isHoverEnabled() {
-      const type = normalizePrefs(prefs).type;
-      return (type === 'halftone' || type === 'ascii') && isWallpaperActive();
+      const normalized = normalizePrefs(prefs);
+      const type = normalized.type;
+      return normalized.hover !== false && (type === 'halftone' || type === 'ascii') && isWallpaperActive();
     }
 
     function isInteractivePointerTarget(target) {
@@ -213,9 +231,71 @@
       return Boolean(target.closest(
         '#_x_extension_newtab_root_2024_unique_, ' +
         '#_x_extension_newtab_wordmark_2026_unique_, ' +
+        HOVER_SAFE_ZONE_SELECTORS.join(', ') + ', ' +
         '.x-nt-wallpaper-panel, ' +
         'button, a, input, textarea, select, [role="button"], [contenteditable="true"]'
       ));
+    }
+
+    function clearHoverSafeZoneRectCache() {
+      hoverSafeZoneRectCache = null;
+      hoverSafeZoneRectCacheTime = 0;
+    }
+
+    function clearBackgroundLuminanceCache() {
+      backgroundLuminanceCache = null;
+    }
+
+    function getHoverSafeZoneElements() {
+      if (!documentObj || typeof documentObj.querySelectorAll !== 'function') {
+        return [];
+      }
+      if (!hoverSafeZoneElements ||
+          hoverSafeZoneElements.length < HOVER_SAFE_ZONE_SELECTORS.length ||
+          hoverSafeZoneElements.some((element) => !element || !element.isConnected)) {
+        hoverSafeZoneElements = Array.from(documentObj.querySelectorAll(HOVER_SAFE_ZONE_SELECTORS.join(',')));
+      }
+      return hoverSafeZoneElements;
+    }
+
+    function getHoverSafeZoneRects() {
+      const now = getNow();
+      if (hoverSafeZoneRectCache &&
+          (now - hoverSafeZoneRectCacheTime) < HOVER_SAFE_ZONE_RECT_CACHE_MS) {
+        return hoverSafeZoneRectCache;
+      }
+      hoverSafeZoneRectCache = getHoverSafeZoneElements().reduce((entries, element) => {
+        if (!element || typeof element.getBoundingClientRect !== 'function') {
+          return entries;
+        }
+        const rect = element.getBoundingClientRect();
+        if (!rect || rect.width <= 0 || rect.height <= 0) {
+          return entries;
+        }
+        entries.push({
+          rect,
+          padding: element.id === '_x_extension_newtab_section_safe_corridor_2026_unique_'
+            ? 0
+            : HOVER_SAFE_ZONE_PADDING_PX
+        });
+        return entries;
+      }, []);
+      hoverSafeZoneRectCacheTime = now;
+      return hoverSafeZoneRectCache;
+    }
+
+    function isPointerInHoverSafeZone(clientX, clientY) {
+      if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) {
+        return false;
+      }
+      return getHoverSafeZoneRects().some((entry) => {
+        const rect = entry.rect;
+        const padding = entry.padding;
+        return clientX >= rect.left - padding &&
+          clientX <= rect.right + padding &&
+          clientY >= rect.top - padding &&
+          clientY <= rect.bottom + padding;
+      });
     }
 
     function getNow() {
@@ -282,14 +362,14 @@
         clearHoverPointer();
         return;
       }
-      if (isInteractivePointerTarget(event.target)) {
-        fadeHoverPointer();
-        return;
-      }
       const nextX = Number(event.clientX);
       const nextY = Number(event.clientY);
       if (!Number.isFinite(nextX) || !Number.isFinite(nextY)) {
         clearHoverPointer();
+        return;
+      }
+      if (isInteractivePointerTarget(event.target) || isPointerInHoverSafeZone(nextX, nextY)) {
+        fadeHoverPointer();
         return;
       }
       hoverPointer = {
@@ -311,6 +391,8 @@
       windowObj.addEventListener('pointermove', updateHoverPointer, { passive: true });
       windowObj.addEventListener('pointerleave', clearHoverPointer, { passive: true });
       windowObj.addEventListener('blur', clearHoverPointer);
+      windowObj.addEventListener('resize', clearHoverSafeZoneRectCache, { passive: true });
+      windowObj.addEventListener('scroll', clearHoverSafeZoneRectCache, { passive: true });
     }
 
     function resizeCanvas() {
@@ -457,6 +539,16 @@
       return getLuminanceFromRgb(color.red, color.green, color.blue);
     }
 
+    function getBackgroundLuminance() {
+      const theme = getThemeMode();
+      if (backgroundLuminanceCache && backgroundLuminanceCache.theme === theme) {
+        return backgroundLuminanceCache.value;
+      }
+      const value = getLuminance(getBackgroundColor());
+      backgroundLuminanceCache = { theme, value };
+      return value;
+    }
+
     function shiftSampleColor(color, amount, lighten) {
       const shift = clampNumber(amount, 0, 1);
       if (lighten) {
@@ -519,6 +611,40 @@
     function getControlRange(value, minValue, maxValue) {
       const ratio = clampNumber(value, 0, 100) / 100;
       return minValue + ((maxValue - minValue) * ratio);
+    }
+
+    function getAsciiGlyphMetrics(fontSize, font) {
+      if (asciiGlyphMetricsCache &&
+          asciiGlyphMetricsCache.fontSize === fontSize &&
+          asciiGlyphMetricsCache.font === font) {
+        return asciiGlyphMetricsCache;
+      }
+      const glyphWidth = ASCII_CHARS.split('').reduce((maxWidth, char) => {
+        if (char === ' ') {
+          return maxWidth;
+        }
+        const metrics = context.measureText(char);
+        return Math.max(maxWidth, metrics.width || 0);
+      }, fontSize * 0.62);
+      const glyphMetrics = context.measureText('@');
+      const glyphHeight = (glyphMetrics.actualBoundingBoxAscent || 0) +
+        (glyphMetrics.actualBoundingBoxDescent || 0);
+      asciiGlyphMetricsCache = {
+        fontSize,
+        font,
+        glyphWidth,
+        glyphHeight
+      };
+      return asciiGlyphMetricsCache;
+    }
+
+    function getOverlayBlendLuminance(baseLuminance, effectLuminance) {
+      const base = clampNumber(baseLuminance, 0, 1);
+      const source = clampNumber(effectLuminance, 0, 1);
+      if (base <= 0.5) {
+        return 2 * base * source;
+      }
+      return 1 - (2 * (1 - base) * (1 - source));
     }
 
     function getHoverInfluence(viewportX, viewportY) {
@@ -597,13 +723,10 @@
         if (!Number.isFinite(baseLuminance)) {
           return null;
         }
-        const blended = getThemeMode() === 'dark'
-          ? 1 - ((1 - baseLuminance) * (1 - effectLuminance))
-          : baseLuminance * effectLuminance;
+        const blended = getOverlayBlendLuminance(baseLuminance, effectLuminance);
         return (baseLuminance * (1 - canvasAlpha)) + (blended * canvasAlpha);
       }
-      const background = getBackgroundColor();
-      const backgroundLuminance = getLuminance(background);
+      const backgroundLuminance = getBackgroundLuminance();
       return (backgroundLuminance * (1 - canvasAlpha)) + (effectLuminance * canvasAlpha);
     }
 
@@ -630,7 +753,7 @@
       }
       context.fillStyle = pattern;
       context.fillRect(0, 0, viewport.width, viewport.height);
-      setCanvasVisuals('grain', 0.08 + getEffectAlpha(0.22, strength), getThemeMode() === 'dark' ? 'screen' : 'multiply');
+      setCanvasVisuals('grain', 0.08 + getEffectAlpha(0.22, strength), 'overlay');
     }
 
     function drawHalftone(viewport, sampler, strength, size, spacing) {
@@ -671,29 +794,19 @@
     function drawAscii(viewport, sampler, strength, size, spacing) {
       beginHoverRender();
       const metrics = getRenderedMetrics(sampler, viewport);
-      const chars = '  .,:;irsXA253hMHGS#9B&@';
       const darkMode = getThemeMode() === 'dark';
       const fontSize = Math.round(getControlRange(size, 8, viewport.width < 720 ? 24 : 26));
       context.font = `${fontSize}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
       context.textBaseline = 'middle';
       context.textAlign = 'center';
-      const glyphWidth = chars.split('').reduce((maxWidth, char) => {
-        if (char === ' ') {
-          return maxWidth;
-        }
-        const metrics = context.measureText(char);
-        return Math.max(maxWidth, metrics.width || 0);
-      }, fontSize * 0.62);
-      const glyphMetrics = context.measureText('@');
-      const glyphHeight = (glyphMetrics.actualBoundingBoxAscent || 0) +
-        (glyphMetrics.actualBoundingBoxDescent || 0);
+      const glyphMetrics = getAsciiGlyphMetrics(fontSize, context.font);
       const xStep = Math.max(
         getControlRange(spacing, viewport.width < 720 ? 8 : 9, viewport.width < 720 ? 24 : 27),
-        glyphWidth * 1.12
+        glyphMetrics.glyphWidth * 1.12
       );
       const lineHeight = Math.max(
         getControlRange(spacing, 10, viewport.width < 720 ? 26 : 28),
-        (glyphHeight || fontSize) * 1.16,
+        (glyphMetrics.glyphHeight || fontSize) * 1.16,
         fontSize * 1.08
       );
       for (let y = lineHeight / 2; y < viewport.height + lineHeight; y += lineHeight) {
@@ -706,8 +819,8 @@
           if (nextTone <= 0.015) {
             continue;
           }
-          const index = Math.round(nextTone * (chars.length - 1));
-          const char = chars[clampNumber(index, 0, chars.length - 1)];
+          const index = Math.round(nextTone * (ASCII_CHARS.length - 1));
+          const char = ASCII_CHARS[clampNumber(index, 0, ASCII_CHARS.length - 1)];
           if (char === ' ') {
             continue;
           }
@@ -791,7 +904,7 @@
     function apply(nextPrefs) {
       const previousType = normalizePrefs(prefs).type;
       prefs = normalizePrefs(nextPrefs);
-      if (prefs.type !== 'halftone' && prefs.type !== 'ascii') {
+      if (prefs.hover === false || (prefs.type !== 'halftone' && prefs.type !== 'ascii')) {
         resetHoverPointer();
       }
       if (canvas &&

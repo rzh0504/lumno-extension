@@ -12,8 +12,9 @@
       surface: 'newtab',
       placement: 'bottom-right wallpaper control',
       className: 'x-lumno-feature-hint--newtab-wallpaper',
-      arrowSide: 'bottom',
-      arrowAlign: 'end',
+      arrowSide: 'right',
+      arrowAlign: 'center',
+      widthMode: 'content',
       dismissStorage: 'session',
       badgeIcon: 'ri-asterisk',
       badgeKey: 'newtab_wallpaper_feature_hint_badge',
@@ -22,6 +23,27 @@
       textFallback: 'New Tab now supports changing wallpaper!',
       closeLabelKey: 'newtab_wallpaper_feature_hint_close',
       closeLabelFallback: 'Dismiss wallpaper tip'
+    }),
+    NEWTAB_AI_QUICK_JUMP: Object.freeze({
+      id: 'newtab-ai-quick-jump',
+      introducedIn: '0.9.9',
+      surface: 'newtab',
+      placement: 'below search input',
+      className: 'x-lumno-feature-hint--newtab-ai-quick-jump',
+      arrowSide: 'top',
+      arrowAlign: 'center',
+      widthMode: 'container',
+      alignMode: 'auto',
+      dismissStorage: 'session',
+      badgeIcon: 'ri-asterisk',
+      badgeKey: 'newtab_ai_quick_jump_feature_hint_badge',
+      badgeFallback: 'New',
+      textKey: 'newtab_ai_quick_jump_feature_hint_text',
+      textFallback: 'Jump to popular AI sites with your prompt in one click. Try typing "gemini" and pressing Tab.',
+      linkKey: 'newtab_ai_quick_jump_feature_hint_link',
+      linkFallback: 'Support list',
+      closeLabelKey: 'newtab_ai_quick_jump_feature_hint_close',
+      closeLabelFallback: 'Dismiss AI quick jump tip'
     })
   });
 
@@ -41,6 +63,18 @@
   const FEATURE_HINT_DISMISS_STORAGE_TYPES = Object.freeze({
     none: true,
     session: true
+  });
+
+  const FEATURE_HINT_WIDTH_MODES = Object.freeze({
+    fixed: true,
+    container: true,
+    content: true
+  });
+
+  const FEATURE_HINT_ALIGN_MODES = Object.freeze({
+    center: true,
+    start: true,
+    auto: true
   });
 
   const FEATURE_HINT_SESSION_DISMISS_PREFIX = '_x_lumno_feature_hint_session_dismissed_2026_';
@@ -79,6 +113,14 @@
 
   function normalizeDismissStorage(value) {
     return normalizeFeatureHintValue(value, FEATURE_HINT_DISMISS_STORAGE_TYPES, 'none');
+  }
+
+  function normalizeWidthMode(value) {
+    return normalizeFeatureHintValue(value, FEATURE_HINT_WIDTH_MODES, 'fixed');
+  }
+
+  function normalizeAlignMode(value) {
+    return normalizeFeatureHintValue(value, FEATURE_HINT_ALIGN_MODES, 'center');
   }
 
   function getFeatureHintSessionDismissKey(definition) {
@@ -147,14 +189,27 @@
     const arrowSide = normalizeArrowSide(config.arrowSide || definition.arrowSide);
     const arrowAlign = normalizeArrowAlign(config.arrowAlign || definition.arrowAlign);
     const dismissStorage = normalizeDismissStorage(config.dismissStorage || definition.dismissStorage);
+    const widthMode = normalizeWidthMode(config.widthMode || definition.widthMode);
+    const alignMode = normalizeAlignMode(config.alignMode || definition.alignMode);
     const chromeApi = config.chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
     const sessionDismissKey = config.sessionDismissKey || getFeatureHintSessionDismissKey(definition);
+    const windowObj = config.windowObj || (documentObj && documentObj.defaultView) ||
+      (typeof window !== 'undefined' ? window : null);
     const element = documentObj.createElement('span');
     const text = documentObj.createElement('span');
     const badge = documentObj.createElement('span');
     const badgeIcon = documentObj.createElement('span');
     const badgeText = documentObj.createElement('span');
+    const linkButton = documentObj.createElement('button');
+    const linkText = documentObj.createElement('span');
+    const linkIcon = documentObj.createElement('span');
     const closeButton = documentObj.createElement('button');
+    const hasLink = Boolean(
+      config.onLinkClick ||
+      config.linkUrl ||
+      definition.linkKey ||
+      definition.linkFallback
+    );
     let dismissed = Boolean(config.initiallyDismissed);
     let requestedVisible = config.initiallyVisible !== false;
     let dismissStateLoaded = dismissStorage !== 'session';
@@ -169,6 +224,10 @@
     element.setAttribute('data-arrow-side', arrowSide);
     element.setAttribute('data-arrow-align', arrowAlign);
     element.setAttribute('data-dismiss-storage', dismissStorage);
+    element.setAttribute('data-width-mode', widthMode);
+    element.setAttribute('data-align-mode', alignMode);
+    element.setAttribute('data-multiline', 'false');
+    element.setAttribute('data-has-link', hasLink ? 'true' : 'false');
     element.setAttribute('data-visible', 'false');
     element.setAttribute('data-dismissed', dismissed ? 'true' : 'false');
     element.setAttribute('aria-hidden', 'true');
@@ -185,6 +244,38 @@
     text.id = config.textId || `_x_lumno_feature_hint_${idPart}_text_2026_unique_`;
     text.className = 'x-lumno-feature-hint__text';
 
+    if (hasLink) {
+      linkButton.type = 'button';
+      linkButton.className = 'x-lumno-feature-hint__link';
+      linkText.className = 'x-lumno-feature-hint__link-text';
+      linkIcon.className = 'x-lumno-feature-hint__link-icon';
+      linkIcon.innerHTML = getRiSvg('ri-arrow-right-line', 'ri-size-12');
+      linkButton.appendChild(linkText);
+      linkButton.appendChild(linkIcon);
+      linkButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof config.onLinkClick === 'function') {
+          config.onLinkClick(event, definition);
+          return;
+        }
+        const linkUrl = typeof config.getLinkUrl === 'function'
+          ? config.getLinkUrl(definition)
+          : (config.linkUrl || definition.linkUrl || '');
+        const windowObj = config.windowObj || (typeof window !== 'undefined' ? window : null);
+        if (!linkUrl || !windowObj) {
+          return;
+        }
+        if (config.linkTarget === '_blank' && typeof windowObj.open === 'function') {
+          windowObj.open(linkUrl, '_blank', 'noopener');
+          return;
+        }
+        if (windowObj.location && typeof windowObj.location.assign === 'function') {
+          windowObj.location.assign(linkUrl);
+        }
+      });
+    }
+
     closeButton.type = 'button';
     closeButton.className = 'x-lumno-feature-hint__close';
     closeButton.innerHTML = getRiSvg('ri-close-line', 'ri-size-12');
@@ -196,12 +287,75 @@
 
     element.appendChild(badge);
     element.appendChild(text);
+    if (hasLink) {
+      element.appendChild(linkButton);
+    }
     element.appendChild(closeButton);
+
+    let alignUpdateFrame = 0;
+
+    function getCssNumber(style, property) {
+      const value = Number.parseFloat(style && style.getPropertyValue(property));
+      return Number.isFinite(value) ? value : 0;
+    }
+
+    function updateContentAlignment() {
+      alignUpdateFrame = 0;
+      if (alignMode !== 'auto' || !windowObj || typeof windowObj.getComputedStyle !== 'function') {
+        return;
+      }
+      const rect = element.getBoundingClientRect();
+      if (!rect.width || !rect.height) {
+        return;
+      }
+      const elementStyle = windowObj.getComputedStyle(element);
+      const textStyle = windowObj.getComputedStyle(text);
+      const contentHeight = rect.height -
+        getCssNumber(elementStyle, 'padding-top') -
+        getCssNumber(elementStyle, 'padding-bottom') -
+        getCssNumber(elementStyle, 'border-top-width') -
+        getCssNumber(elementStyle, 'border-bottom-width');
+      const textRect = text.getBoundingClientRect();
+      const badgeRect = badge.getBoundingClientRect();
+      const linkRect = hasLink ? linkButton.getBoundingClientRect() : { height: 0 };
+      const lineHeight = getCssNumber(textStyle, 'line-height') ||
+        ((getCssNumber(textStyle, 'font-size') || 12) * 1.45);
+      const maxChildHeight = Math.max(textRect.height, badgeRect.height, linkRect.height);
+      const textWrapped = textRect.height > lineHeight * 1.35;
+      const rowWrapped = contentHeight > maxChildHeight + 6;
+      element.setAttribute('data-multiline', (textWrapped || rowWrapped) ? 'true' : 'false');
+    }
+
+    function scheduleContentAlignmentUpdate() {
+      if (alignMode !== 'auto') {
+        return;
+      }
+      if (!windowObj || typeof windowObj.requestAnimationFrame !== 'function') {
+        updateContentAlignment();
+        return;
+      }
+      if (alignUpdateFrame) {
+        return;
+      }
+      alignUpdateFrame = windowObj.requestAnimationFrame(updateContentAlignment);
+    }
+
+    if (alignMode === 'auto' && windowObj && typeof windowObj.ResizeObserver === 'function') {
+      const alignResizeObserver = new windowObj.ResizeObserver(scheduleContentAlignmentUpdate);
+      alignResizeObserver.observe(element);
+      alignResizeObserver.observe(text);
+      if (hasLink) {
+        alignResizeObserver.observe(linkButton);
+      }
+    }
 
     function syncVisibility() {
       const nextVisible = Boolean(requestedVisible) && !dismissed && dismissStateLoaded;
       element.setAttribute('data-visible', nextVisible ? 'true' : 'false');
       element.setAttribute('aria-hidden', nextVisible ? 'false' : 'true');
+      if (nextVisible) {
+        scheduleContentAlignmentUpdate();
+      }
     }
 
     const controller = {
@@ -236,7 +390,14 @@
         badge.setAttribute('aria-label', badgeLabel);
         badgeText.textContent = badgeLabel;
         text.textContent = textLabel;
+        if (hasLink) {
+          const linkLabel = getMessage(t, config.linkKey || definition.linkKey, config.linkFallback || definition.linkFallback);
+          linkText.textContent = linkLabel;
+          linkButton.setAttribute('aria-label', linkLabel);
+          linkButton.setAttribute('title', linkLabel);
+        }
         closeButton.setAttribute('aria-label', closeLabel);
+        scheduleContentAlignmentUpdate();
       }
     };
 
@@ -261,6 +422,8 @@
     normalizeArrowSide,
     normalizeArrowAlign,
     normalizeDismissStorage,
+    normalizeWidthMode,
+    normalizeAlignMode,
     getFeatureHintSessionDismissKey,
     listFeatureHints() {
       return Object.keys(FEATURE_HINTS).map((key) => FEATURE_HINTS[key]);

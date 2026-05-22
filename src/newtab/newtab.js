@@ -31,6 +31,7 @@
   const NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY = '_x_extension_newtab_wallpaper_overlay_2026_unique_';
   const NEWTAB_WALLPAPER_EFFECT_STORAGE_KEY = '_x_extension_newtab_wallpaper_effect_2026_unique_';
   const LUMNO_CHROME_WEB_STORE_URL = 'https://chromewebstore.google.com/detail/nggfkkbmogmadfoikakkfegkoilfcfao?utm_source=item-share-cb';
+  const LUMNO_FEEDBACK_EMAIL = 'i@kubai.design';
   const BOOKMARK_COUNT_STORAGE_KEY = '_x_extension_bookmark_count_2024_unique_';
   const BOOKMARK_COLUMNS_STORAGE_KEY = '_x_extension_bookmark_columns_2024_unique_';
   const DEFAULT_SEARCH_ENGINE_STORAGE_KEY = '_x_extension_default_search_engine_2024_unique_';
@@ -44,6 +45,7 @@
   const SUGGESTION_ACTION_MODEL = globalThis.LumnoSuggestionActionModel || {};
   const SUGGESTION_NAVIGATION = globalThis.LumnoSuggestionNavigation || {};
   const SEARCH_INPUT_MODE = globalThis.LumnoSearchInputMode || {};
+  const FEATURE_HINTS = globalThis.LumnoFeatureHints || {};
   const FAVICON_UTILS = globalThis.LumnoFaviconUtils || {};
   const NEWTAB_FAVICON_CACHE = globalThis.LumnoFaviconCache || globalThis.LumnoNewtabFaviconCache || {};
   const NEWTAB_FAVICON_THEME = globalThis.LumnoNewtabFaviconTheme || {};
@@ -138,8 +140,12 @@
   let wordmarkImageEl = null;
   let wordmarkSolidEl = null;
   let wordmarkVisibilityTransitionTimer = 0;
+  let wordmarkEntryTransitionTimer = 0;
   let wallpaperControl = null;
   let wallpaperRuntime = null;
+  let feedbackControl = null;
+  let feedbackButton = null;
+  let aiQuickJumpFeatureHintController = null;
   let pageNoticeController = null;
   let newtabWordmarkVisible = true;
   let bookmarkCurrentPage = 0;
@@ -178,6 +184,9 @@
   const SEARCH_LAYOUT_CONTENT_SECTIONS_EXTRA_UPSHIFT_PX = 20;
   const SEARCH_LAYOUT_EMPTY_SECTIONS_EXTRA_UPSHIFT_PX = 96;
   const WORDMARK_ENTRY_ANIMATION_NAME = '_x_nt_wordmark_enter_2026_unique_';
+  const WORDMARK_ENTRY_ANIMATION_TOTAL_MS = 660;
+  const WORDMARK_WALLPAPER_COVER_DARK_OPACITY = '0.32';
+  const WORDMARK_WALLPAPER_COVER_LIGHT_OPACITY = '0.32';
   const WORDMARK_VISIBILITY_TRANSITION_MS = 260;
   const WORDMARK_VISIBILITY_TRANSITION_CSS =
     'max-height 260ms cubic-bezier(0.22, 1, 0.36, 1), ' +
@@ -301,6 +310,11 @@
       nextVisible ? 'translate3d(0, 0, 0)' : 'translate3d(0, -8px, 0)'
     );
     wordmarkContainer.style.setProperty('pointer-events', nextVisible ? 'auto' : 'none');
+    if (stateChanged && !nextVisible) {
+      finishWordmarkEntryAnimation();
+    } else if (shouldAnimate && nextVisible) {
+      restartWordmarkEntryAnimation();
+    }
     updateSearchEntryLayout();
     scheduleWallpaperAdaptiveToneUpdate();
     if (shouldAnimate && body) {
@@ -309,6 +323,42 @@
         body.removeAttribute('data-wordmark-transition');
       }, WORDMARK_VISIBILITY_TRANSITION_MS + 80);
     }
+  }
+
+  function finishWordmarkEntryAnimation() {
+    if (wordmarkEntryTransitionTimer) {
+      window.clearTimeout(wordmarkEntryTransitionTimer);
+      wordmarkEntryTransitionTimer = 0;
+    }
+    if (wordmarkContainer) {
+      wordmarkContainer.setAttribute('data-enter', 'done');
+    }
+  }
+
+  function restartWordmarkEntryAnimation() {
+    if (!wordmarkContainer) {
+      return;
+    }
+    const prefersReducedMotion = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      finishWordmarkEntryAnimation();
+      return;
+    }
+    const wordmarkButton = wordmarkContainer.querySelector('button');
+    if (wordmarkEntryTransitionTimer) {
+      window.clearTimeout(wordmarkEntryTransitionTimer);
+      wordmarkEntryTransitionTimer = 0;
+    }
+    wordmarkContainer.setAttribute('data-enter', 'done');
+    if (wordmarkButton) {
+      void wordmarkButton.offsetWidth;
+    }
+    wordmarkContainer.setAttribute('data-enter', 'run');
+    wordmarkEntryTransitionTimer = window.setTimeout(
+      finishWordmarkEntryAnimation,
+      WORDMARK_ENTRY_ANIMATION_TOTAL_MS
+    );
   }
 
   function getWordmarkSolidFill(wallpaperActive, wallpaperInk, theme) {
@@ -344,6 +394,23 @@
     const lightSrc = '../../assets/images/lumno-wordmark.svg';
     const darkSrc = '../../assets/images/lumno-wordmark-dark.svg';
     if (wallpaperActive) {
+      const wallpaperOverlayCover = wordmarkContainer &&
+        wordmarkContainer.getAttribute('data-wallpaper-overlay-cover') === 'true';
+      if (wallpaperOverlayCover) {
+        applyWordmarkSolidLayerVisible(false);
+        const themeSrc = theme === 'dark' ? darkSrc : lightSrc;
+        if (wordmarkImageEl.getAttribute('src') !== themeSrc) {
+          wordmarkImageEl.setAttribute('src', themeSrc);
+        }
+        applyWordmarkSolidFill(getWordmarkSolidFill(false, '', theme));
+        wordmarkImageEl.style.setProperty(
+          'opacity',
+          theme === 'dark'
+            ? WORDMARK_WALLPAPER_COVER_DARK_OPACITY
+            : WORDMARK_WALLPAPER_COVER_LIGHT_OPACITY
+        );
+        return;
+      }
       const wallpaperInk = wordmarkContainer
         ? wordmarkContainer.getAttribute('data-wallpaper-ink')
         : '';
@@ -662,6 +729,19 @@
       : 'en';
   }
 
+  function localeToHtmlLang(locale) {
+    return typeof SETTINGS.localeToHtmlLang === 'function'
+      ? SETTINGS.localeToHtmlLang(locale)
+      : normalizeLocale(locale).replace('_', '-');
+  }
+
+  function applyDocumentLanguage(locale) {
+    if (!document.documentElement) {
+      return;
+    }
+    document.documentElement.lang = localeToHtmlLang(locale);
+  }
+
   function migrateStorageIfNeeded(keys) {
     if (!storageArea || !chrome || !chrome.storage || !chrome.storage.local) {
       return;
@@ -748,6 +828,207 @@
     return `<i class="ri-icon ${size}${extra} ${id}" aria-hidden="true"></i>`;
   }
 
+  function buildAiSiteSearchSupportListUrl() {
+    if (typeof EXTENSION_ROUTES.buildOptionsUrl === 'function') {
+      return EXTENSION_ROUTES.buildOptionsUrl(chrome, 'shortcuts:site-search-ai');
+    }
+    const fallbackUrl = chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function'
+      ? chrome.runtime.getURL('src/options/options.html')
+      : 'src/options/options.html';
+    const url = new URL(fallbackUrl, window.location.href);
+    url.hash = 'shortcuts:site-search-ai';
+    return url.toString();
+  }
+
+  function openAiSiteSearchSupportList() {
+    window.location.assign(buildAiSiteSearchSupportListUrl());
+  }
+
+  function getRuntimeVersion() {
+    if (chrome && chrome.runtime && typeof chrome.runtime.getManifest === 'function') {
+      const manifest = chrome.runtime.getManifest();
+      return manifest && manifest.version ? manifest.version : '';
+    }
+    return '';
+  }
+
+  function normalizeOperatingSystemName(value, userAgent) {
+    const raw = `${value || ''} ${userAgent || ''}`.toLowerCase();
+    if (/iphone|ipad|ipod|ios/.test(raw)) {
+      return 'iOS';
+    }
+    if (raw.includes('android')) {
+      return 'Android';
+    }
+    if (raw.includes('chrome os') || raw.includes('cros') || raw.includes('chromebook')) {
+      return 'ChromeOS';
+    }
+    if (raw.includes('mac')) {
+      return 'macOS';
+    }
+    if (raw.includes('win')) {
+      return 'Windows';
+    }
+    if (raw.includes('linux') || raw.includes('x11')) {
+      return 'Linux';
+    }
+    return 'unknown';
+  }
+
+  function getOperatingSystemName(platformOverride) {
+    const uaData = navigator.userAgentData || null;
+    const platform = platformOverride ||
+      (uaData && uaData.platform) ||
+      navigator.platform ||
+      '';
+    return normalizeOperatingSystemName(platform, navigator.userAgent || '');
+  }
+
+  function normalizeBrowserName(name) {
+    const value = String(name || '').trim();
+    if (!value) {
+      return '';
+    }
+    if (/edge/i.test(value)) {
+      return 'Microsoft Edge';
+    }
+    if (/chrome/i.test(value)) {
+      return 'Google Chrome';
+    }
+    if (/chromium/i.test(value)) {
+      return 'Chromium';
+    }
+    return value;
+  }
+
+  function parseBrowserFromUserAgent(userAgent) {
+    const ua = String(userAgent || '');
+    const patterns = [
+      { name: 'Microsoft Edge', regex: /\bEdgA?\/([\d.]+)/ },
+      { name: 'Microsoft Edge', regex: /\bEdgiOS\/([\d.]+)/ },
+      { name: 'Opera', regex: /\bOPR\/([\d.]+)/ },
+      { name: 'Vivaldi', regex: /\bVivaldi\/([\d.]+)/ },
+      { name: 'Yandex Browser', regex: /\bYaBrowser\/([\d.]+)/ },
+      { name: 'Dia', regex: /\bDia\/([\d.]+)/ },
+      { name: 'Google Chrome', regex: /\bCriOS\/([\d.]+)/ },
+      { name: 'Google Chrome', regex: /\bChrome\/([\d.]+)/ },
+      { name: 'Firefox', regex: /\bFirefox\/([\d.]+)/ },
+      { name: 'Safari', regex: /\bVersion\/([\d.]+).*?\bSafari\// }
+    ];
+    for (let index = 0; index < patterns.length; index += 1) {
+      const match = ua.match(patterns[index].regex);
+      if (match && match[1]) {
+        return {
+          name: patterns[index].name,
+          version: match[1]
+        };
+      }
+    }
+    return {
+      name: 'unknown',
+      version: ''
+    };
+  }
+
+  function getPreferredBrowserBrand(brands) {
+    const items = Array.isArray(brands) ? brands : [];
+    const validItems = items.filter((item) => {
+      const brand = item && item.brand ? String(item.brand) : '';
+      return brand && !/not.*brand/i.test(brand);
+    });
+    return validItems.find((item) => !/chromium/i.test(item.brand)) ||
+      validItems[0] ||
+      null;
+  }
+
+  async function getBrowserInfo() {
+    const ua = navigator.userAgent || '';
+    const uaInfo = parseBrowserFromUserAgent(ua);
+    const uaData = navigator.userAgentData || null;
+    let highEntropy = null;
+    if (uaData && typeof uaData.getHighEntropyValues === 'function') {
+      try {
+        highEntropy = await uaData.getHighEntropyValues(['fullVersionList', 'platform']);
+      } catch (error) {
+        highEntropy = null;
+      }
+    }
+    const brand = getPreferredBrowserBrand(
+      (highEntropy && highEntropy.fullVersionList) ||
+      (uaData && uaData.brands)
+    );
+    const brandName = normalizeBrowserName(brand && brand.brand);
+    const brandVersion = brand && brand.version ? String(brand.version) : '';
+    const name = brandName || uaInfo.name || 'unknown';
+    const version = brandVersion.includes('.') ? brandVersion : (uaInfo.version || brandVersion);
+    return {
+      name,
+      version,
+      os: getOperatingSystemName(highEntropy && highEntropy.platform)
+    };
+  }
+
+  async function buildFeedbackMailtoUrl() {
+    const browserInfo = await getBrowserInfo();
+    const subject = encodeURIComponent(t('newtab_feedback_mail_subject', 'Lumno feedback'));
+    const browserLine = browserInfo.version
+      ? `${browserInfo.name} ${browserInfo.version}`
+      : browserInfo.name;
+    const body = encodeURIComponent([
+      '',
+      '',
+      '---',
+      `${t('newtab_feedback_mail_source_label', 'Source')}: ${t('newtab_page_label', 'New Tab')}`,
+      `${t('newtab_feedback_mail_version_label', 'Lumno Version')}: ${getRuntimeVersion() || 'unknown'}`,
+      `${t('newtab_feedback_mail_language_label', 'Language')}: ${getSystemLocale()}`,
+      `${t('newtab_feedback_mail_os_label', 'OS')}: ${browserInfo.os || 'unknown'}`,
+      `${t('newtab_feedback_mail_browser_label', 'Browser')}: ${browserLine || 'unknown'}`
+    ].join('\n'));
+    return `mailto:${LUMNO_FEEDBACK_EMAIL}?subject=${subject}&body=${body}`;
+  }
+
+  async function openFeedbackMailto() {
+    const url = await buildFeedbackMailtoUrl();
+    window.location.href = url;
+  }
+
+  function updateFeedbackLanguageStrings() {
+    if (feedbackButton) {
+      const label = t('newtab_feedback_button_aria', 'Send feedback');
+      feedbackButton.setAttribute('aria-label', label);
+      feedbackButton.removeAttribute('title');
+    }
+  }
+
+  function createFeedbackControls() {
+    feedbackControl = document.createElement('div');
+    feedbackControl.className = 'x-nt-feedback-control';
+
+    feedbackButton = document.createElement('button');
+    feedbackButton.type = 'button';
+    feedbackButton.className = 'x-nt-feedback-button';
+    feedbackButton.innerHTML = getRiSvg('ri-message-3-line', 'ri-size-20');
+
+    feedbackButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      hideTopActionTooltip();
+      openFeedbackMailto();
+    });
+    const showFeedbackButtonTooltip = () => {
+      showTopActionTooltip(feedbackButton, t('newtab_feedback_button_aria', 'Send feedback'), {
+        placement: 'left'
+      });
+    };
+    feedbackButton.addEventListener('mouseenter', showFeedbackButtonTooltip);
+    feedbackButton.addEventListener('mouseleave', hideTopActionTooltip);
+    feedbackButton.addEventListener('focus', showFeedbackButtonTooltip);
+    feedbackButton.addEventListener('blur', hideTopActionTooltip);
+
+    feedbackControl.appendChild(feedbackButton);
+    updateFeedbackLanguageStrings();
+  }
+
   function createWallpaperAdaptiveToneTargets() {
     const bookmarkPager = bookmarkPagerPrevButton && bookmarkPagerPrevButton.parentElement
       ? bookmarkPagerPrevButton.parentElement
@@ -777,6 +1058,13 @@
         sampleElement: recentHeading,
         minWidth: 112,
         minHeight: 44
+      },
+      {
+        element: feedbackButton,
+        sampleElement: feedbackButton,
+        minWidth: 42,
+        minHeight: 42,
+        iconButton: true
       }
     ];
   }
@@ -1754,6 +2042,11 @@
     updateBookmarkBreadcrumb();
     updateWallpaperLanguageStrings();
     updateWallpaperAppearanceSelectionUi();
+    updateFeedbackLanguageStrings();
+    if (aiQuickJumpFeatureHintController &&
+        typeof aiQuickJumpFeatureHintController.updateLanguage === 'function') {
+      aiQuickJumpFeatureHintController.updateLanguage();
+    }
     if (inputParts && inputParts.input) {
       defaultPlaceholderText = t('search_placeholder', defaultPlaceholderText);
       if (!siteSearchState) {
@@ -1791,6 +2084,7 @@
   function applyLanguageMode(mode) {
     currentLanguageMode = mode || 'system';
     const targetLocale = currentLanguageMode === 'system' ? getSystemLocale() : normalizeLocale(currentLanguageMode);
+    applyDocumentLanguage(targetLocale);
     const finalizeLanguageInit = () => {
       if (initialLanguageApplied) {
         return;
@@ -3511,10 +3805,14 @@
   let topActionTooltipTarget = null;
   let topActionTooltipToken = 0;
 
-  function showTopActionTooltip(button, text) {
+  function showTopActionTooltip(button, text, options) {
     if (!button || !text || !topActionTooltip) {
       return;
     }
+    const tooltipOptions = options && typeof options === 'object' ? options : {};
+    const placement = tooltipOptions.placement === 'left' || tooltipOptions.placement === 'left-above'
+      ? tooltipOptions.placement
+      : 'top';
     const tooltipToken = topActionTooltipToken + 1;
     topActionTooltipToken = tooltipToken;
     topActionTooltipTarget = button;
@@ -3531,11 +3829,26 @@
     const buttonRect = button.getBoundingClientRect();
     const tooltipRect = topActionTooltip.getBoundingClientRect();
     const spacing = 10;
-    let top = buttonRect.top - tooltipRect.height - spacing;
-    let left = buttonRect.left + (buttonRect.width - tooltipRect.width) / 2;
-    if (top < 8) {
-      top = buttonRect.bottom + spacing;
+    let top = 0;
+    let left = 0;
+    if (placement === 'left' || placement === 'left-above') {
+      top = buttonRect.top + ((buttonRect.height - tooltipRect.height) / 2);
+      left = buttonRect.left - tooltipRect.width - spacing;
+      if (placement === 'left-above') {
+        top = buttonRect.top - tooltipRect.height - spacing;
+      }
+      if (left < 8) {
+        left = buttonRect.right + spacing;
+      }
+    } else {
+      top = buttonRect.top - tooltipRect.height - spacing;
+      left = buttonRect.left + (buttonRect.width - tooltipRect.width) / 2;
+      if (top < 8) {
+        top = buttonRect.bottom + spacing;
+      }
     }
+    const maxTop = window.innerHeight - tooltipRect.height - 8;
+    top = Math.max(8, Math.min(top, Math.max(8, maxTop)));
     if (left < 8) {
       left = 8;
     }
@@ -7113,6 +7426,9 @@
     if (wallpaperControl && (target === wallpaperControl || wallpaperControl.contains(target))) {
       return false;
     }
+    if (feedbackControl && (target === feedbackControl || feedbackControl.contains(target))) {
+      return false;
+    }
     if (rightIcon && (target === rightIcon || rightIcon.contains(target))) {
       return false;
     }
@@ -7195,20 +7511,12 @@
     !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   wordmarkContainer.setAttribute('data-enter', shouldAnimateWordmarkEntry ? 'run' : 'done');
   if (shouldAnimateWordmarkEntry) {
-    let wordmarkEntryDone = false;
-    const finishWordmarkEntry = () => {
-      if (wordmarkEntryDone || !wordmarkContainer) {
-        return;
-      }
-      wordmarkEntryDone = true;
-      wordmarkContainer.setAttribute('data-enter', 'done');
-    };
     wordmarkButton.addEventListener('animationend', (event) => {
       if (!event || event.animationName === WORDMARK_ENTRY_ANIMATION_NAME) {
-        finishWordmarkEntry();
+        finishWordmarkEntryAnimation();
       }
     });
-    wordmarkButton.addEventListener('animationcancel', finishWordmarkEntry);
+    wordmarkButton.addEventListener('animationcancel', finishWordmarkEntryAnimation);
   }
   wordmarkSolidEl = document.createElement('span');
   wordmarkSolidEl.setAttribute('aria-hidden', 'true');
@@ -7248,6 +7556,15 @@
   applyWordmarkThemeAppearance();
   searchLayer = document.createElement('div');
   searchLayer.id = '_x_extension_newtab_search_layer_2024_unique_';
+  if (typeof FEATURE_HINTS.createFeatureHint === 'function') {
+    aiQuickJumpFeatureHintController = FEATURE_HINTS.createFeatureHint({
+      documentObj: document,
+      definition: 'newtab-ai-quick-jump',
+      t,
+      getRiSvg,
+      onLinkClick: openAiSiteSearchSupportList
+    });
+  }
 
   if (rightIcon) {
     rightIcon.style.setProperty('right', '14px');
@@ -7341,7 +7658,9 @@
     }
   }
 
-  window.addEventListener('resize', () => {
+  let newtabResizeFrame = 0;
+  function handleNewtabResize() {
+    newtabResizeFrame = 0;
     const previousBookmarkLimit = getBookmarkLimit();
     applyNewtabWidthMode();
     const recentColumnsChanged = applyRecentGridColumns();
@@ -7358,7 +7677,14 @@
       markRecentDataDirty();
       loadRecentSites({ force: true });
     }
-  });
+  }
+
+  window.addEventListener('resize', () => {
+    if (newtabResizeFrame) {
+      return;
+    }
+    newtabResizeFrame = window.requestAnimationFrame(handleNewtabResize);
+  }, { passive: true });
 
   handleTabKey = function(event) {
     if (siteSearchState) {
@@ -7480,6 +7806,7 @@
   });
 
   createWallpaperControls();
+  createFeedbackControls();
   document.addEventListener('pointerdown', function(event) {
     if (!isWallpaperPanelOpen()) {
       return;
@@ -7500,6 +7827,9 @@
 
   document.body.insertBefore(wordmarkContainer, root);
   searchLayer.appendChild(inputParts.container);
+  if (aiQuickJumpFeatureHintController && aiQuickJumpFeatureHintController.element) {
+    searchLayer.appendChild(aiQuickJumpFeatureHintController.element);
+  }
   root.appendChild(searchLayer);
   document.body.insertBefore(suggestionsSurface, root.nextSibling);
   document.body.insertBefore(suggestionsOutline, root.nextSibling);
@@ -7511,6 +7841,9 @@
   document.body.appendChild(bottomDock);
   if (wallpaperControl) {
     document.body.appendChild(wallpaperControl);
+  }
+  if (feedbackControl) {
+    document.body.appendChild(feedbackControl);
   }
 
   function scheduleRecentReloadIfVisible() {

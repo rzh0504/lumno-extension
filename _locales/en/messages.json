@@ -27,7 +27,7 @@
     "message": "Theme scope info"
   },
   "newtab_theme_scope_help": {
-    "message": "\"Global\" affects the global theme mode. \"New Tab\" affects only the new tab page."
+    "message": "\"Global\" sets the default theme. \"New Tab\" overrides only the new tab page; choose \"Follow Global\" there to inherit the global setting."
   },
   "newtab_theme_follow_global": {
     "message": "Follow \"Global\""
@@ -50,13 +50,13 @@
   "settings_language_desc": {
     "message": "Choose UI language"
   },
+  "settings_version_label": {
+    "message": "Version"
+  },
   "language_zh_cn": {
     "message": "简体中文"
   },
   "language_zh_tw": {
-    "message": "Traditional Chinese"
-  },
-  "language_zh_hk": {
     "message": "Traditional Chinese"
   },
   "language_en": {
@@ -413,9 +413,6 @@
   "newtab_wallpaper_select_label": {
     "message": "Select {name}"
   },
-  "newtab_wallpaper_none": {
-    "message": "No wallpaper"
-  },
   "newtab_wallpaper_add_local": {
     "message": "Add local wallpaper"
   },
@@ -428,8 +425,38 @@
   "newtab_wallpaper_feature_hint_close": {
     "message": "Dismiss wallpaper tip"
   },
-  "newtab_wallpaper_local_tag": {
-    "message": "Local"
+  "newtab_ai_quick_jump_feature_hint_badge": {
+    "message": "New"
+  },
+  "newtab_ai_quick_jump_feature_hint_text": {
+    "message": "Jump to popular AI sites with your prompt in one click. Try typing \"gemini\" and pressing Tab."
+  },
+  "newtab_ai_quick_jump_feature_hint_link": {
+    "message": "Support list"
+  },
+  "newtab_ai_quick_jump_feature_hint_close": {
+    "message": "Dismiss AI quick jump tip"
+  },
+  "newtab_feedback_button_aria": {
+    "message": "Send feedback"
+  },
+  "newtab_feedback_mail_subject": {
+    "message": "Lumno feedback"
+  },
+  "newtab_feedback_mail_source_label": {
+    "message": "Source"
+  },
+  "newtab_feedback_mail_version_label": {
+    "message": "Lumno Version"
+  },
+  "newtab_feedback_mail_language_label": {
+    "message": "Language"
+  },
+  "newtab_feedback_mail_os_label": {
+    "message": "OS"
+  },
+  "newtab_feedback_mail_browser_label": {
+    "message": "Browser"
   },
   "newtab_wallpaper_delete_local": {
     "message": "Delete imported wallpaper"
@@ -460,6 +487,9 @@
   },
   "newtab_wallpaper_effect_spacing": {
     "message": "Spacing"
+  },
+  "newtab_wallpaper_effect_hover": {
+    "message": "Hover effect"
   },
   "newtab_wallpaper_effect_none": {
     "message": "Off"
@@ -655,6 +685,9 @@
   },
   "shortcuts_group_ai": {
     "message": "AI"
+  },
+  "shortcuts_group_ai_desc": {
+    "message": "Enter a keyword, press Tab, then type your prompt to open one of these AI sites and fill it in automatically. Sign in to the site first."
   },
   "shortcuts_badge_custom": {
     "message": "Custom"

@@ -31,7 +31,9 @@
     '--x-nt-wallpaper-adaptive-halo',
     '--x-nt-wallpaper-wordmark-ink',
     '--x-nt-wallpaper-icon-solid-bg',
-    '--x-nt-wallpaper-icon-solid-bg-hover'
+    '--x-nt-wallpaper-icon-solid-bg-hover',
+    '--x-nt-wallpaper-icon-solid-ink',
+    '--x-nt-wallpaper-icon-solid-ink-hover'
   ];
 
   function mixNumber(start, end, amount) {
@@ -80,29 +82,96 @@
     });
   }
 
-  function getWordmarkInkColor(color, luminance, ink, overlayAlpha) {
+  function getWallpaperOffWordmarkColor(overlayLuminance) {
+    return overlayLuminance >= 0.5
+      ? { red: 242, green: 242, blue: 242 }
+      : { red: 38, green: 38, blue: 38 };
+  }
+
+  function getWordmarkInkColor(color, luminance, ink, overlayAlpha, overlayLuminance, textureContrast, effectType) {
+    const resolvedOverlayAlpha = clampNumber(overlayAlpha, 0, 1);
+    if (isWallpaperOverlayCovered(resolvedOverlayAlpha)) {
+      return getWallpaperOffWordmarkColor(clampNumber(overlayLuminance, 0, 1));
+    }
     const baseColor = color && Number.isFinite(color.red) &&
       Number.isFinite(color.green) &&
       Number.isFinite(color.blue)
       ? color
       : { red: 128, green: 140, blue: 156 };
-    const defaultColor = ink === 'dark'
-      ? { red: 238, green: 240, blue: 242 }
-      : { red: 78, green: 84, blue: 94 };
-    const overlayAmount = smoothstep((clampNumber(overlayAlpha, 0, 1) - 0.36) / 0.64);
-    let wordmarkColor = null;
-    if (ink === 'dark') {
-      const amount = 0.22 + (clampNumber((luminance - 0.54) / 0.42, 0, 1) * 0.14);
-      wordmarkColor = mixColor(baseColor, { red: 15, green: 23, blue: 42 }, amount);
-      return mixColor(wordmarkColor, defaultColor, overlayAmount);
-    }
-    const amount = 0.26 + (clampNumber((0.56 - luminance) / 0.42, 0, 1) * 0.16);
-    wordmarkColor = mixColor(baseColor, { red: 248, green: 250, blue: 252 }, amount);
-    return mixColor(wordmarkColor, defaultColor, overlayAmount);
+    const overlayAmount = smoothstep((resolvedOverlayAlpha - 0.36) / 0.64);
+    const highTexture = isHighTextureTone(textureContrast, effectType, 0.16);
+    const darkOverlay = clampNumber(overlayLuminance, 0, 1) < 0.5;
+    const lightTarget = darkOverlay
+      ? { red: 118, green: 126, blue: 136 }
+      : { red: 250, green: 251, blue: 253 };
+    const baseLift = darkOverlay
+      ? (ink === 'light' ? 0.24 : 0.2)
+      : (ink === 'light' ? 0.9 : 0.84);
+    const textureLift = highTexture ? (darkOverlay ? 0.01 : 0.04) : 0;
+    const preferredColor = mixColor(
+      baseColor,
+      lightTarget,
+      clampNumber(baseLift + textureLift, 0, 0.94)
+    );
+    return ensureLightWordmarkReadable(
+      mixColor(preferredColor, lightTarget, overlayAmount * 0.36),
+      luminance,
+      highTexture
+    );
   }
 
-  function shouldUseIconSolidBackground(luminance, overlayAlpha) {
-    return luminance > 0.26 && luminance < 0.82 && clampNumber(overlayAlpha, 0, 1) < 0.82;
+  function ensureLightWordmarkReadable(color, backgroundLuminance, highTexture) {
+    const background = clampNumber(backgroundLuminance, 0, 1);
+    const colorLuminance = getColorLuminance(color);
+    const separation = highTexture ? 0.2 : 0.16;
+    if (Math.abs(colorLuminance - background) >= separation) {
+      return color;
+    }
+    if (background < 0.72) {
+      return color;
+    }
+    const targetLuminance = clampNumber(background - separation, 0.6, 0.82);
+    return mixColorToMaxLuminance(color, { red: 100, green: 116, blue: 139 }, targetLuminance);
+  }
+
+  function mixColorToMaxLuminance(color, target, maxLuminance) {
+    let low = 0;
+    let high = 1;
+    let best = color;
+    for (let index = 0; index < 8; index += 1) {
+      const amount = (low + high) / 2;
+      const mixed = mixColor(color, target, amount);
+      if (getColorLuminance(mixed) <= maxLuminance) {
+        best = mixed;
+        high = amount;
+      } else {
+        low = amount;
+      }
+    }
+    return best;
+  }
+
+  function isTexturedWallpaperEffect(effectType) {
+    return effectType === 'ascii' || effectType === 'halftone';
+  }
+
+  function isHighTextureTone(textureContrast, effectType, threshold) {
+    return isTexturedWallpaperEffect(effectType) ||
+      (Number.isFinite(textureContrast) && textureContrast >= threshold);
+  }
+
+  function isWallpaperOverlayCovered(overlayAlpha) {
+    return clampNumber(overlayAlpha, 0, 1) >= 0.995;
+  }
+
+  function shouldUseIconSolidBackground(luminance, overlayAlpha, textureContrast, effectType) {
+    if (clampNumber(overlayAlpha, 0, 1) >= 0.9) {
+      return false;
+    }
+    if (isHighTextureTone(textureContrast, effectType, 0.1)) {
+      return true;
+    }
+    return luminance > 0.08 && luminance < 0.96;
   }
 
   function getIconSolidBackgroundColor(color, luminance, ink, hover) {
@@ -111,34 +180,48 @@
       Number.isFinite(color.blue)
       ? color
       : { red: 128, green: 140, blue: 156 };
-    const middleRisk = 1 - Math.min(1, Math.abs(luminance - 0.54) / 0.28);
-    const hoverLift = hover ? 0.1 : 0;
+    const middleRisk = 1 - Math.min(1, Math.abs(luminance - 0.54) / 0.34);
+    const hoverLift = hover ? 0.08 : 0;
     if (ink === 'dark') {
-      const amount = 0.34 + (middleRisk * 0.14) + hoverLift;
-      return mixColor(baseColor, { red: 248, green: 250, blue: 252 }, amount);
+      const amount = 0.66 + (middleRisk * 0.18) + hoverLift;
+      return mixColor(baseColor, { red: 252, green: 254, blue: 255 }, amount);
     }
-    const amount = 0.36 + (middleRisk * 0.16) + hoverLift;
+    const amount = 0.68 + (middleRisk * 0.18) + hoverLift;
     return mixColor(baseColor, { red: 15, green: 23, blue: 42 }, amount);
   }
 
-  function applyIconSolidBackgroundStyles(element, luminance, ink, color, overlayAlpha) {
+  function getIconSolidForegroundColor(backgroundColor) {
+    return getColorLuminance(backgroundColor) >= 0.56
+      ? { red: 30, green: 41, blue: 59 }
+      : { red: 248, green: 250, blue: 252 };
+  }
+
+  function applyIconSolidBackgroundStyles(element, luminance, ink, color, overlayAlpha, textureContrast, effectType) {
     if (!element) {
       return;
     }
-    const enabled = shouldUseIconSolidBackground(luminance, overlayAlpha);
+    const overlayCovered = isWallpaperOverlayCovered(overlayAlpha);
+    element.setAttribute('data-wallpaper-overlay-cover', overlayCovered ? 'true' : 'false');
+    const enabled = shouldUseIconSolidBackground(luminance, overlayAlpha, textureContrast, effectType);
     element.setAttribute('data-wallpaper-icon-bg', enabled ? 'true' : 'false');
     if (!enabled) {
       element.style.removeProperty('--x-nt-wallpaper-icon-solid-bg');
       element.style.removeProperty('--x-nt-wallpaper-icon-solid-bg-hover');
+      element.style.removeProperty('--x-nt-wallpaper-icon-solid-ink');
+      element.style.removeProperty('--x-nt-wallpaper-icon-solid-ink-hover');
       return;
     }
-    setStyleProperty(element, '--x-nt-wallpaper-icon-solid-bg',
-      formatSolidRgb(getIconSolidBackgroundColor(color, luminance, ink, false)));
-    setStyleProperty(element, '--x-nt-wallpaper-icon-solid-bg-hover',
-      formatSolidRgb(getIconSolidBackgroundColor(color, luminance, ink, true)));
+    const backgroundColor = getIconSolidBackgroundColor(color, luminance, ink, false);
+    const hoverBackgroundColor = getIconSolidBackgroundColor(color, luminance, ink, true);
+    setStyleProperty(element, '--x-nt-wallpaper-icon-solid-bg', formatSolidRgb(backgroundColor));
+    setStyleProperty(element, '--x-nt-wallpaper-icon-solid-bg-hover', formatSolidRgb(hoverBackgroundColor));
+    setStyleProperty(element, '--x-nt-wallpaper-icon-solid-ink',
+      formatSolidRgb(getIconSolidForegroundColor(backgroundColor)));
+    setStyleProperty(element, '--x-nt-wallpaper-icon-solid-ink-hover',
+      formatSolidRgb(getIconSolidForegroundColor(hoverBackgroundColor)));
   }
 
-  function applyAdaptiveToneStyles(element, luminance, ink, color, overlayAlpha) {
+  function applyAdaptiveToneStyles(element, luminance, ink, color, overlayAlpha, overlayLuminance, textureContrast, effectType) {
     if (!element || !Number.isFinite(luminance)) {
       return;
     }
@@ -153,7 +236,15 @@
       setStyleProperty(element, '--x-nt-wallpaper-adaptive-ink',
         formatRgb(red, green, blue, mixNumber(72, 88, amount)));
       setStyleProperty(element, '--x-nt-wallpaper-wordmark-ink',
-        formatSolidRgb(getWordmarkInkColor(color, luminance, ink, overlayAlpha)));
+        formatSolidRgb(getWordmarkInkColor(
+          color,
+          luminance,
+          ink,
+          overlayAlpha,
+          overlayLuminance,
+          textureContrast,
+          effectType
+        )));
       setStyleProperty(element, '--x-nt-wallpaper-adaptive-ink-muted',
         formatRgb(mutedRed, mutedGreen, mutedBlue, mixNumber(52, 66, amount)));
       setStyleProperty(element, '--x-nt-wallpaper-adaptive-hover-bg',
@@ -173,7 +264,15 @@
     setStyleProperty(element, '--x-nt-wallpaper-adaptive-ink',
       formatRgb(red, green, blue, mixNumber(78, 92, amount)));
     setStyleProperty(element, '--x-nt-wallpaper-wordmark-ink',
-      formatSolidRgb(getWordmarkInkColor(color, luminance, ink, overlayAlpha)));
+      formatSolidRgb(getWordmarkInkColor(
+        color,
+        luminance,
+        ink,
+        overlayAlpha,
+        overlayLuminance,
+        textureContrast,
+        effectType
+      )));
     setStyleProperty(element, '--x-nt-wallpaper-adaptive-ink-muted',
       formatRgb(mutedRed, mutedGreen, mutedBlue, mixNumber(58, 76, amount)));
     setStyleProperty(element, '--x-nt-wallpaper-adaptive-hover-bg',
@@ -250,6 +349,7 @@
         }
         target.element.removeAttribute('data-wallpaper-ink');
         target.element.removeAttribute('data-wallpaper-icon-bg');
+        target.element.removeAttribute('data-wallpaper-overlay-cover');
         target.element.style.removeProperty('--x-nt-wallpaper-local-luma');
         clearAdaptiveToneStyles(target.element);
       });
@@ -302,10 +402,17 @@
         return null;
       }
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      let imageData = null;
+      try {
+        imageData = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      } catch (e) {
+        imageData = null;
+      }
       return {
         url,
         canvas,
         context,
+        imageData,
         naturalWidth,
         naturalHeight,
         sampleScaleX: canvas.width / naturalWidth,
@@ -328,15 +435,11 @@
       };
     }
 
-    function applyOverlayToLuminance(luminance, viewportY) {
-      const alpha = clampNumber(getOverlayAlphaAtViewportY(viewportY), 0, 1);
-      const overlayLuminance = clampNumber(getOverlayLuminance(), 0, 1);
+    function applyOverlayToLuminance(luminance, alpha, overlayLuminance) {
       return (luminance * (1 - alpha)) + (overlayLuminance * alpha);
     }
 
-    function applyOverlayToColor(color, viewportY) {
-      const alpha = clampNumber(getOverlayAlphaAtViewportY(viewportY), 0, 1);
-      const overlayLuminance = clampNumber(getOverlayLuminance(), 0, 1);
+    function applyOverlayToColor(color, alpha, overlayLuminance) {
       const overlayColor = overlayLuminance >= 0.5
         ? { red: 255, green: 255, blue: 255 }
         : { red: 0, green: 0, blue: 0 };
@@ -347,22 +450,42 @@
     }
 
     function getPixelColor(sourceSampler, x, y) {
-      const pixel = sourceSampler.context.getImageData(x, y, 1, 1).data;
-      const alpha = pixel[3] / 255;
+      let red = 255;
+      let green = 255;
+      let blue = 255;
+      let alpha = 1;
+      if (sourceSampler.imageData) {
+        const index = ((y * sourceSampler.canvas.width) + x) * 4;
+        red = sourceSampler.imageData[index];
+        green = sourceSampler.imageData[index + 1];
+        blue = sourceSampler.imageData[index + 2];
+        alpha = sourceSampler.imageData[index + 3] / 255;
+      } else {
+        const pixel = sourceSampler.context.getImageData(x, y, 1, 1).data;
+        red = pixel[0];
+        green = pixel[1];
+        blue = pixel[2];
+        alpha = pixel[3] / 255;
+      }
       return {
-        red: (pixel[0] * alpha) + (255 * (1 - alpha)),
-        green: (pixel[1] * alpha) + (255 * (1 - alpha)),
-        blue: (pixel[2] * alpha) + (255 * (1 - alpha))
+        red: (red * alpha) + (255 * (1 - alpha)),
+        green: (green * alpha) + (255 * (1 - alpha)),
+        blue: (blue * alpha) + (255 * (1 - alpha))
       };
     }
 
-    function sampleToneForRect(sourceSampler, rect, target) {
+    function sampleToneForRect(sourceSampler, rect, target, overlayLuminance, effectType) {
       if (!sourceSampler || !sourceSampler.canvas || !sourceSampler.context || !rect) {
         return null;
       }
       const metrics = getRenderedMetrics(sourceSampler);
-      const xs = [0.18, 0.34, 0.5, 0.66, 0.82];
-      const ys = [0.24, 0.5, 0.76];
+      const isIconButton = Boolean(target && target.iconButton);
+      const xs = isIconButton
+        ? [0.1, 0.24, 0.38, 0.5, 0.62, 0.76, 0.9]
+        : [0.18, 0.34, 0.5, 0.66, 0.82];
+      const ys = isIconButton
+        ? [0.12, 0.32, 0.5, 0.68, 0.88]
+        : [0.24, 0.5, 0.76];
       const values = [];
       const ignoresOverlay = Boolean(target && target.ignoreOverlay);
       try {
@@ -376,13 +499,20 @@
             const y = Math.round(clampNumber(sourceY, 0, sourceSampler.canvas.height - 1));
             const sourceColor = getPixelColor(sourceSampler, x, y);
             const sourceLuminance = getColorLuminance(sourceColor);
-            const effectLuminance = getEffectLuminanceAtViewport(viewportX, viewportY, sourceLuminance);
+            const effectLuminance = effectType && effectType !== 'none'
+              ? getEffectLuminanceAtViewport(viewportX, viewportY, sourceLuminance)
+              : null;
             const resolvedLuminance = Number.isFinite(effectLuminance) ? effectLuminance : sourceLuminance;
+            const overlayAlpha = ignoresOverlay
+              ? 0
+              : clampNumber(getOverlayAlphaAtViewportY(viewportY), 0, 1);
             const overlayColor = ignoresOverlay
               ? { color: sourceColor, alpha: 0 }
-              : applyOverlayToColor(sourceColor, viewportY);
+              : applyOverlayToColor(sourceColor, overlayAlpha, overlayLuminance);
             values.push({
-              luminance: ignoresOverlay ? resolvedLuminance : applyOverlayToLuminance(resolvedLuminance, viewportY),
+              luminance: ignoresOverlay
+                ? resolvedLuminance
+                : applyOverlayToLuminance(resolvedLuminance, overlayAlpha, overlayLuminance),
               color: overlayColor.color,
               overlayAlpha: overlayColor.alpha
             });
@@ -395,6 +525,7 @@
         return null;
       }
       values.sort((a, b) => a.luminance - b.luminance);
+      const textureContrast = values[values.length - 1].luminance - values[0].luminance;
       const trimCount = values.length >= 10 ? 2 : 0;
       const trimmed = values.slice(trimCount, values.length - trimCount);
       const sourceValues = trimmed.length > 0 ? trimmed : values;
@@ -419,7 +550,8 @@
           green: sum.green / sourceValues.length,
           blue: sum.blue / sourceValues.length
         },
-        overlayAlpha: sum.overlayAlpha / sourceValues.length
+        overlayAlpha: sum.overlayAlpha / sourceValues.length,
+        textureContrast
       };
     }
 
@@ -446,6 +578,8 @@
         return;
       }
       const viewport = getViewportSize();
+      const effectType = documentObj.body.getAttribute('data-wallpaper-effect') || '';
+      const overlayLuminance = clampNumber(getOverlayLuminance(), 0, 1);
       getToneTargets().forEach((target) => {
         if (!target || !target.element || !target.sampleElement) {
           return;
@@ -459,24 +593,45 @@
             rect.top >= viewport.height) {
           target.element.removeAttribute('data-wallpaper-ink');
           target.element.removeAttribute('data-wallpaper-icon-bg');
+          target.element.removeAttribute('data-wallpaper-overlay-cover');
           target.element.style.removeProperty('--x-nt-wallpaper-local-luma');
           clearAdaptiveToneStyles(target.element);
           return;
         }
         const sampleRect = getSampleRect(rect, target);
-        const sample = sampleToneForRect(sampler, sampleRect, target);
+        const sample = sampleToneForRect(sampler, sampleRect, target, overlayLuminance, effectType);
         const luminance = sample ? sample.luminance : null;
         if (!Number.isFinite(luminance)) {
+          target.element.removeAttribute('data-wallpaper-overlay-cover');
           clearAdaptiveToneStyles(target.element);
           return;
         }
         const currentInk = target.element.getAttribute('data-wallpaper-ink');
         const nextInk = chooseInk(luminance, currentInk);
+        const overlayCovered = isWallpaperOverlayCovered(sample.overlayAlpha);
         target.element.setAttribute('data-wallpaper-ink', nextInk);
+        target.element.setAttribute('data-wallpaper-overlay-cover', overlayCovered ? 'true' : 'false');
         target.element.style.setProperty('--x-nt-wallpaper-local-luma', luminance.toFixed(3));
-        applyAdaptiveToneStyles(target.element, luminance, nextInk, sample.color, sample.overlayAlpha);
+        applyAdaptiveToneStyles(
+          target.element,
+          luminance,
+          nextInk,
+          sample.color,
+          sample.overlayAlpha,
+          overlayLuminance,
+          sample.textureContrast,
+          effectType
+        );
         if (target.iconButton) {
-          applyIconSolidBackgroundStyles(target.element, luminance, nextInk, sample.color, sample.overlayAlpha);
+          applyIconSolidBackgroundStyles(
+            target.element,
+            luminance,
+            nextInk,
+            sample.color,
+            sample.overlayAlpha,
+            sample.textureContrast,
+            effectType
+          );
         } else {
           target.element.removeAttribute('data-wallpaper-icon-bg');
         }

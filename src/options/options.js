@@ -70,6 +70,7 @@
   const customSelectWraps = Array.from(document.querySelectorAll('._x_extension_custom_select_2024_unique_'));
   const siteSearchCustomList = document.getElementById('_x_extension_site_search_custom_list_2024_unique_');
   const siteSearchBuiltinList = document.getElementById('_x_extension_site_search_builtin_list_2024_unique_');
+  const siteSearchAiGroup = document.getElementById('_x_extension_site_search_ai_group_2026_unique_');
   const siteSearchAiBuiltinList = document.getElementById('_x_extension_site_search_ai_builtin_list_2026_unique_');
   const siteSearchKeyInput = document.getElementById('_x_extension_site_search_key_2024_unique_');
   const siteSearchNameInput = document.getElementById('_x_extension_site_search_name_2024_unique_');
@@ -174,6 +175,7 @@
   const isMacPlatform = String((navigator && navigator.platform) || '').toLowerCase().includes('mac');
   const FORCE_TEXT_KEYCAPS_ON_MAC = false;
   const FORCE_OVERLAY_TAB_QUICK_SWITCH_ENABLED = true;
+  const OPTIONS_TARGET_SITE_SEARCH_AI = 'site-search-ai';
   const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
   let mediaListenerAttached = false;
   let defaultSiteSearchProviders = [];
@@ -191,6 +193,7 @@
   let siteSearchFormExpanded = false;
   let siteSearchRefreshSuppressUntil = 0;
   let siteSearchRefreshTimer = null;
+  let pendingOptionsScrollTarget = '';
   let currentShortcutLabel = null;
   let isCapturingFallbackShortcut = false;
   let cancelCaptureOnMouseLeave = false;
@@ -1613,6 +1616,19 @@
       : 'en';
   }
 
+  function localeToHtmlLang(locale) {
+    return typeof SETTINGS.localeToHtmlLang === 'function'
+      ? SETTINGS.localeToHtmlLang(locale)
+      : normalizeLocale(locale).replace('_', '-');
+  }
+
+  function applyDocumentLanguage(locale) {
+    if (!document.documentElement) {
+      return;
+    }
+    document.documentElement.lang = localeToHtmlLang(locale);
+  }
+
   function getSystemLocale() {
     if (chrome && chrome.i18n && chrome.i18n.getUILanguage) {
       return normalizeLocale(chrome.i18n.getUILanguage());
@@ -1675,6 +1691,7 @@
     const normalizedMode = normalizeLanguageMode(mode);
     currentLanguageMode = normalizedMode;
     const targetLocale = normalizedMode === 'system' ? getSystemLocale() : normalizeLocale(normalizedMode);
+    applyDocumentLanguage(targetLocale);
     const shouldPersist = Boolean(options && options.persist);
     if (shouldPersist) {
       const payload = {
@@ -2246,6 +2263,43 @@
     updateTabsStickyVisualState();
   }
 
+  function getOptionsRouteState() {
+    const rawHash = window.location.hash.replace('#', '').trim();
+    if (!rawHash) {
+      return {
+        tabKey: '',
+        targetKey: ''
+      };
+    }
+    const parts = rawHash.split(':').map((part) => String(part || '').trim()).filter(Boolean);
+    return {
+      tabKey: parts[0] || '',
+      targetKey: parts.slice(1).join(':')
+    };
+  }
+
+  function getOptionsTargetElement(targetKey) {
+    if (targetKey !== OPTIONS_TARGET_SITE_SEARCH_AI) {
+      return null;
+    }
+    return siteSearchAiGroup || (siteSearchAiBuiltinList
+      ? siteSearchAiBuiltinList.closest('._x_extension_shortcut_group_2024_unique_')
+      : null);
+  }
+
+  function scrollToOptionsTarget(targetKey, options) {
+    const target = getOptionsTargetElement(targetKey);
+    if (!target || typeof target.scrollIntoView !== 'function') {
+      return false;
+    }
+    const behavior = options && options.behavior ? options.behavior : 'smooth';
+    window.requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior, block: 'start' });
+      updateTabsStickyVisualState();
+    });
+    return true;
+  }
+
   if (settingsVersion && chrome?.runtime?.getManifest) {
     const manifest = chrome.runtime.getManifest();
     if (manifest?.version) {
@@ -2387,12 +2441,18 @@
   initTooltips();
 
   function getInitialTabKey() {
-    const hash = window.location.hash.replace('#', '').trim();
-    if (!hash) {
+    const routeState = getOptionsRouteState();
+    const tabKey = routeState.tabKey;
+    if (!tabKey) {
       return 'general';
     }
-    const match = tabButtons.find((button) => button.getAttribute('data-tab') === hash);
-    return match ? hash : 'general';
+    const match = tabButtons.find((button) => button.getAttribute('data-tab') === tabKey);
+    return match ? tabKey : 'general';
+  }
+
+  function getInitialOptionsTargetKey() {
+    const routeState = getOptionsRouteState();
+    return routeState.targetKey || '';
   }
 
   tabButtons.forEach((button) => {
@@ -2411,6 +2471,7 @@
   });
 
   const initialTab = getInitialTabKey();
+  pendingOptionsScrollTarget = initialTab === 'shortcuts' ? getInitialOptionsTargetKey() : '';
   setActiveTab(initialTab);
   if (initialTab === 'shortcuts') {
     refreshSiteSearchProviders();
@@ -3828,6 +3889,9 @@
       }
     }
     initTooltips();
+    if (pendingOptionsScrollTarget && scrollToOptionsTarget(pendingOptionsScrollTarget, { behavior: 'auto' })) {
+      pendingOptionsScrollTarget = '';
+    }
   }
 
   function loadDefaultSiteSearchProviders() {

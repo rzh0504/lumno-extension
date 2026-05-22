@@ -84,7 +84,7 @@
     const NEWTAB_WALLPAPER_DEFAULT_DIRECTORY = '/Users/kevinxu/github/Lumno/output/imagegen';
     const NEWTAB_WALLPAPER_EXTENSION_DIRECTORY = 'output/imagegen';
     const NEWTAB_WALLPAPER_THUMBNAIL_SUFFIX = '-thumb.webp';
-    const NEWTAB_WALLPAPER_DEFAULT_ID = 'settings-bg-light-monet-newtab';
+    const NEWTAB_WALLPAPER_DEFAULT_ID = 'monet-coastal-white';
     const NEWTAB_CUSTOM_WALLPAPER_ID = WALLPAPER_LOCAL_STORE.CUSTOM_WALLPAPER_ID || 'custom-upload';
     const NEWTAB_CUSTOM_WALLPAPER_ID_PREFIX = WALLPAPER_LOCAL_STORE.CUSTOM_WALLPAPER_ID_PREFIX || 'custom-wallpaper-';
     const NEWTAB_WALLPAPER_OPTIONS = [
@@ -182,11 +182,12 @@
       dark: { top: 44, mid: 20, bottom: 50 }
     };
     const NEWTAB_WALLPAPER_EFFECT_DEFAULTS = WALLPAPER_EFFECTS.DEFAULT_PREFS || {
-      version: 2,
+      version: 3,
       type: 'none',
       strength: 50,
       size: 50,
-      spacing: 50
+      spacing: 50,
+      hover: true
     };
     const NEWTAB_WALLPAPER_EFFECT_TYPES = [
       { type: 'none', labelKey: 'newtab_wallpaper_effect_none', fallback: 'Off' },
@@ -218,38 +219,412 @@
     let wallpaperAppearanceScopeTabs = null;
     let wallpaperAppearanceOptions = null;
     let wallpaperOverlayLabel = null;
-    let wallpaperOverlayValue = null;
     let wallpaperOverlaySlider = null;
     let wallpaperEffectLabel = null;
-    let wallpaperEffectValue = null;
     let wallpaperEffectOptions = null;
     let wallpaperEffectTabsIndicator = null;
     let wallpaperEffectStrengthControl = null;
+    let wallpaperEffectHoverControl = null;
+    let wallpaperEffectHoverTitle = null;
+    let wallpaperEffectHoverToggle = null;
     let wallpaperEffectStrengthLabel = null;
-    let wallpaperEffectStrengthValue = null;
     let wallpaperEffectSlider = null;
     let wallpaperEffectSizeControl = null;
     let wallpaperEffectSizeLabel = null;
-    let wallpaperEffectSizeValue = null;
     let wallpaperEffectSizeSlider = null;
     let wallpaperEffectSpacingControl = null;
     let wallpaperEffectSpacingLabel = null;
-    let wallpaperEffectSpacingValue = null;
     let wallpaperEffectSpacingSlider = null;
+    let wallpaperSliderValueBubble = null;
+    let wallpaperSliderValueHideTimer = null;
+    let wallpaperSliderValueTarget = null;
+    let wallpaperSliderValueDragTarget = null;
     let wallpaperOverlaySaveTimer = null;
     let wallpaperEffectSaveTimer = null;
     let wallpaperPanelResizeTimer = null;
     let wallpaperPanelResizeCleanup = null;
-    let wallpaperOverlayPointerActive = false;
-    let wallpaperEffectPointerActive = false;
-    let wallpaperEffectSizePointerActive = false;
-    let wallpaperEffectSpacingPointerActive = false;
+    let wallpaperTabsIndicatorRefreshFrame = 0;
+    let wallpaperEffectTabsIndicatorRefreshFrame = 0;
+    let wallpaperActiveSlider = null;
     let wallpaperAppearanceAnimationTimers = [];
     let wallpaperAppearanceModeLabelsHeld = false;
     let customWallpapers = [];
     let customWallpaperUploadTile = null;
     let customWallpaperInput = null;
     let customWallpaperImporting = false;
+
+    function appendChildren(parent, children) {
+      (children || []).forEach((child) => {
+        if (child) {
+          parent.appendChild(child);
+        }
+      });
+      return parent;
+    }
+
+    function createDomElement(tagName, options) {
+      const element = document.createElement(tagName);
+      const config = options || {};
+      if (config.className) {
+        element.className = config.className;
+      }
+      if (config.textContent !== undefined) {
+        element.textContent = config.textContent;
+      }
+      if (config.innerHTML !== undefined) {
+        element.innerHTML = config.innerHTML;
+      }
+      Object.keys(config.attrs || {}).forEach((name) => {
+        const value = config.attrs[name];
+        if (value !== null && value !== undefined) {
+          element.setAttribute(name, String(value));
+        }
+      });
+      appendChildren(element, config.children);
+      return element;
+    }
+
+    function createPanelDivider() {
+      return createDomElement('div', { className: 'x-nt-panel-divider' });
+    }
+
+    function createWallpaperSwitch(onChange) {
+      const label = createDomElement('label', { className: 'x-nt-wallpaper-switch' });
+      const input = createDomElement('input', { attrs: { role: 'switch' } });
+      const slider = createDomElement('span', {
+        className: 'x-nt-wallpaper-switch-slider',
+        attrs: { 'aria-hidden': 'true' }
+      });
+      input.type = 'checkbox';
+      if (typeof onChange === 'function') {
+        input.addEventListener('change', onChange);
+      }
+      appendChildren(label, [input, slider]);
+      return { label, input };
+    }
+
+    function createSwitchPanelSection(onChange) {
+      const section = createDomElement('div', { className: 'x-nt-wallpaper-section' });
+      const header = createDomElement('div', { className: 'x-nt-wallpaper-panel-header' });
+      const title = createDomElement('div', { className: 'x-nt-wallpaper-panel-title' });
+      const switchControl = createWallpaperSwitch(onChange);
+      appendChildren(header, [title, switchControl.label]);
+      section.appendChild(header);
+      return { section, header, title, toggle: switchControl.input };
+    }
+
+    function createOverlayScale(items) {
+      const scale = createDomElement('div', { className: 'x-nt-overlay-scale' });
+      (items || []).forEach((item) => {
+        const tickAttrs = { 'data-align': item.align || 'center' };
+        if (item.key) {
+          tickAttrs['data-overlay-tick'] = item.key;
+        }
+        scale.appendChild(createDomElement('span', {
+          className: 'x-nt-overlay-tick',
+          textContent: item.text,
+          attrs: tickAttrs
+        }));
+      });
+      return scale;
+    }
+
+    function createDefaultEffectScale() {
+      return createOverlayScale([
+        { align: 'start', text: '0' },
+        { align: 'center', text: t('newtab_wallpaper_overlay_default_tick', 'Default'), key: 'default' },
+        { align: 'end', text: '100%' }
+      ]);
+    }
+
+    function ensureWallpaperSliderValueBubble() {
+      if (wallpaperSliderValueBubble && wallpaperSliderValueBubble.isConnected) {
+        return wallpaperSliderValueBubble;
+      }
+      wallpaperSliderValueBubble = document.createElement('div');
+      wallpaperSliderValueBubble.id = '_x_extension_newtab_slider_value_bubble_2026_unique_';
+      wallpaperSliderValueBubble.className = 'x-lumno-feature-hint x-nt-slider-value-bubble';
+      wallpaperSliderValueBubble.setAttribute('data-visible', 'false');
+      wallpaperSliderValueBubble.setAttribute('data-arrow-side', 'bottom');
+      wallpaperSliderValueBubble.setAttribute('data-arrow-align', 'center');
+      wallpaperSliderValueBubble.setAttribute('aria-hidden', 'true');
+      const host = document.body || document.documentElement;
+      if (host) {
+        host.appendChild(wallpaperSliderValueBubble);
+      }
+      return wallpaperSliderValueBubble;
+    }
+
+    function isElementHovered(element) {
+      if (!element || typeof element.matches !== 'function') {
+        return false;
+      }
+      try {
+        return element.matches(':hover');
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function isElementFocusVisible(element) {
+      if (!element || typeof element.matches !== 'function') {
+        return false;
+      }
+      try {
+        return element.matches(':focus-visible');
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function formatWallpaperSliderValue(slider) {
+      if (!slider) {
+        return '';
+      }
+      const value = Number(slider.value);
+      if (!Number.isFinite(value)) {
+        return String(slider.value || '');
+      }
+      return String(Math.round(value));
+    }
+
+    function getWallpaperSliderPercent(slider) {
+      const min = Number(slider && slider.min);
+      const max = Number(slider && slider.max);
+      const value = Number(slider && slider.value);
+      if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min || !Number.isFinite(value)) {
+        return 0;
+      }
+      return clampNumber((value - min) / (max - min), 0, 1);
+    }
+
+    function shouldShowWallpaperSliderValue(slider) {
+      return Boolean(slider && slider.isConnected && !slider.disabled &&
+        (wallpaperSliderValueDragTarget === slider ||
+          (document.activeElement === slider && isElementFocusVisible(slider)) ||
+          isElementHovered(slider)));
+    }
+
+    function positionWallpaperSliderValueBubble(slider) {
+      const bubble = ensureWallpaperSliderValueBubble();
+      if (!bubble || !slider) {
+        return;
+      }
+      bubble.textContent = formatWallpaperSliderValue(slider);
+      const sliderRect = slider.getBoundingClientRect();
+      const bubbleRect = bubble.getBoundingClientRect();
+      const viewportWidth = Math.max(0, window.innerWidth || 0);
+      const thumbSize = 16;
+      const percent = getWallpaperSliderPercent(slider);
+      const centerX = sliderRect.left + (thumbSize / 2) + Math.max(0, sliderRect.width - thumbSize) * percent;
+      const spacing = 12;
+      let arrowSide = 'bottom';
+      let top = sliderRect.top - bubbleRect.height - spacing;
+      if (top < 8) {
+        arrowSide = 'top';
+        top = sliderRect.bottom + spacing;
+      }
+      const maxLeft = viewportWidth > 0 ? viewportWidth - bubbleRect.width - 8 : centerX;
+      const left = clampNumber(centerX - (bubbleRect.width / 2), 8, Math.max(8, maxLeft));
+      bubble.setAttribute('data-arrow-side', arrowSide);
+      bubble.setAttribute('data-arrow-align', 'center');
+      bubble.style.setProperty('top', `${Math.round(top)}px`);
+      bubble.style.setProperty('left', `${Math.round(left)}px`);
+    }
+
+    function syncWallpaperSliderValueBubble(slider) {
+      if (wallpaperSliderValueTarget !== slider) {
+        return;
+      }
+      if (!shouldShowWallpaperSliderValue(slider)) {
+        hideWallpaperSliderValueBubble(slider, { force: true });
+        return;
+      }
+      positionWallpaperSliderValueBubble(slider);
+      if (wallpaperSliderValueBubble) {
+        wallpaperSliderValueBubble.setAttribute('data-visible', 'true');
+      }
+    }
+
+    function showWallpaperSliderValueBubble(slider) {
+      if (!slider || slider.disabled) {
+        return;
+      }
+      wallpaperSliderValueTarget = slider;
+      if (wallpaperSliderValueHideTimer !== null) {
+        window.clearTimeout(wallpaperSliderValueHideTimer);
+        wallpaperSliderValueHideTimer = null;
+      }
+      positionWallpaperSliderValueBubble(slider);
+      window.requestAnimationFrame(() => {
+        if (wallpaperSliderValueTarget !== slider || !shouldShowWallpaperSliderValue(slider)) {
+          return;
+        }
+        if (wallpaperSliderValueBubble) {
+          wallpaperSliderValueBubble.setAttribute('data-visible', 'true');
+        }
+      });
+    }
+
+    function hideWallpaperSliderValueBubble(slider, options) {
+      const force = Boolean(options && options.force);
+      const target = slider || wallpaperSliderValueTarget;
+      if (!target && !wallpaperSliderValueBubble) {
+        return;
+      }
+      if (!force && target && wallpaperSliderValueDragTarget === target) {
+        return;
+      }
+      if (!force && target && shouldShowWallpaperSliderValue(target)) {
+        return;
+      }
+      wallpaperSliderValueTarget = null;
+      if (wallpaperSliderValueBubble) {
+        wallpaperSliderValueBubble.setAttribute('data-visible', 'false');
+      }
+      if (wallpaperSliderValueHideTimer !== null) {
+        window.clearTimeout(wallpaperSliderValueHideTimer);
+      }
+      wallpaperSliderValueHideTimer = window.setTimeout(() => {
+        wallpaperSliderValueHideTimer = null;
+      }, 180);
+    }
+
+    function finishWallpaperSliderValueDrag() {
+      const slider = wallpaperSliderValueDragTarget;
+      wallpaperSliderValueDragTarget = null;
+      window.removeEventListener('pointerup', finishWallpaperSliderValueDrag, true);
+      window.removeEventListener('pointercancel', finishWallpaperSliderValueDrag, true);
+      if (slider && shouldShowWallpaperSliderValue(slider)) {
+        showWallpaperSliderValueBubble(slider);
+        return;
+      }
+      hideWallpaperSliderValueBubble(slider, { force: true });
+    }
+
+    function bindWallpaperSliderValueBubble(slider) {
+      if (!slider) {
+        return;
+      }
+      slider.addEventListener('mouseenter', () => {
+        showWallpaperSliderValueBubble(slider);
+      });
+      slider.addEventListener('mousemove', () => {
+        syncWallpaperSliderValueBubble(slider);
+      });
+      slider.addEventListener('mouseleave', () => {
+        hideWallpaperSliderValueBubble(slider);
+      });
+      slider.addEventListener('focus', () => {
+        showWallpaperSliderValueBubble(slider);
+      });
+      slider.addEventListener('blur', () => {
+        hideWallpaperSliderValueBubble(slider, { force: true });
+      });
+      slider.addEventListener('pointerdown', () => {
+        if (slider.disabled) {
+          return;
+        }
+        wallpaperSliderValueDragTarget = slider;
+        showWallpaperSliderValueBubble(slider);
+        window.addEventListener('pointerup', finishWallpaperSliderValueDrag, true);
+        window.addEventListener('pointercancel', finishWallpaperSliderValueDrag, true);
+      });
+      slider.addEventListener('input', () => {
+        showWallpaperSliderValueBubble(slider);
+      });
+      slider.addEventListener('change', () => {
+        syncWallpaperSliderValueBubble(slider);
+      });
+    }
+
+    function setWallpaperActiveSlider(slider) {
+      wallpaperActiveSlider = slider || null;
+    }
+
+    function clearWallpaperActiveSlider(slider) {
+      if (!slider || wallpaperActiveSlider === slider) {
+        wallpaperActiveSlider = null;
+      }
+    }
+
+    function createWallpaperSliderInput(config) {
+      const slider = createDomElement('input', {
+        className: config.sliderClass || config.className || 'x-nt-overlay-slider x-nt-effect-slider',
+        attrs: {
+          'aria-label': t(config.labelKey, config.fallback),
+          min: '0',
+          max: '100',
+          step: '1'
+        }
+      });
+      slider.type = 'range';
+      slider.addEventListener('pointerdown', () => {
+        setWallpaperActiveSlider(slider);
+      });
+      slider.addEventListener('pointerup', () => {
+        clearWallpaperActiveSlider(slider);
+      });
+      slider.addEventListener('pointercancel', () => {
+        clearWallpaperActiveSlider(slider);
+      });
+      slider.addEventListener('blur', () => {
+        clearWallpaperActiveSlider(slider);
+      });
+      slider.addEventListener('input', () => {
+        const fallbackValue = typeof config.getFallbackValue === 'function'
+          ? config.getFallbackValue()
+          : Number(slider.value);
+        const value = wallpaperActiveSlider === slider
+          ? snapWallpaperOverlaySliderValue(slider.value)
+          : normalizeWallpaperOverlayOpacity(slider.value, fallbackValue);
+        if (String(value) !== slider.value) {
+          slider.value = String(value);
+        }
+        config.persist(value);
+      });
+      bindWallpaperSliderValueBubble(slider);
+      return slider;
+    }
+
+    function createWallpaperSliderControl(config) {
+      const control = createDomElement('div', {
+        className: config.controlClass || 'x-nt-effect-slider-control',
+        attrs: { 'data-visible': 'true' }
+      });
+      const header = createDomElement('div', {
+        className: config.headerClass || 'x-nt-overlay-control-header'
+      });
+      const label = createDomElement('span', {
+        className: config.labelClass || 'x-nt-effect-slider-label'
+      });
+      const wrap = createDomElement('div', {
+        className: config.wrapClass || 'x-nt-overlay-slider-wrap x-nt-effect-slider-wrap'
+      });
+      const slider = createWallpaperSliderInput(config);
+      header.appendChild(label);
+      appendChildren(wrap, [slider, config.scale || createDefaultEffectScale()]);
+      appendChildren(control, [header, wrap]);
+      return { control, label, slider, wrap };
+    }
+
+    function createEffectToggleControl() {
+      const control = createDomElement('div', {
+        className: 'x-nt-effect-slider-control x-nt-effect-toggle-control',
+        attrs: { 'data-visible': 'true' }
+      });
+      const header = createDomElement('div', {
+        className: 'x-nt-overlay-control-header x-nt-effect-toggle-header'
+      });
+      const title = createDomElement('span', { className: 'x-nt-effect-slider-label' });
+      const switchControl = createWallpaperSwitch(() => {
+        persistWallpaperEffectPrefs({ hover: Boolean(switchControl.input.checked) });
+      });
+      appendChildren(header, [title, switchControl.label]);
+      control.appendChild(header);
+      return { control, title, toggle: switchControl.input };
+    }
+
     let currentWallpaperOverlayOpacity = {
       light: NEWTAB_WALLPAPER_OVERLAY_DEFAULTS.light,
       dark: NEWTAB_WALLPAPER_OVERLAY_DEFAULTS.dark
@@ -664,25 +1039,37 @@
       scheduleWallpaperAdaptiveToneUpdate();
     }
 
+    function updateWallpaperSliderElement(slider, config) {
+      if (!slider) {
+        return;
+      }
+      const value = Number(config.value);
+      const normalizedValue = Number.isFinite(value) ? value : 0;
+      slider.value = String(normalizedValue);
+      slider.style.setProperty('--x-nt-overlay-slider-percent', `${normalizedValue}%`);
+      slider.setAttribute('aria-valuenow', String(normalizedValue));
+      slider.setAttribute('aria-valuetext', `${normalizedValue}%`);
+      if (typeof config.enabled === 'boolean') {
+        slider.disabled = !config.enabled;
+        if (slider.parentElement) {
+          slider.parentElement.setAttribute('data-disabled', config.enabled ? 'false' : 'true');
+        }
+      }
+      if (config.labelKey) {
+        slider.setAttribute('aria-label', t(config.labelKey, config.fallback));
+      }
+      syncWallpaperSliderValueBubble(slider);
+    }
+
     function updateWallpaperOverlayControlUi() {
       const value = getWallpaperOverlayOpacityForCurrentMode();
-      if (wallpaperOverlaySlider) {
-        wallpaperOverlaySlider.value = String(value);
-        wallpaperOverlaySlider.style.setProperty('--x-nt-overlay-slider-percent', `${value}%`);
-        wallpaperOverlaySlider.setAttribute('aria-valuenow', String(value));
-        wallpaperOverlaySlider.setAttribute('aria-valuetext', `${value}%`);
-      }
-      if (wallpaperOverlayValue) {
-        wallpaperOverlayValue.textContent = String(value);
-      }
+      updateWallpaperSliderElement(wallpaperOverlaySlider, {
+        value,
+        labelKey: 'newtab_wallpaper_overlay_opacity',
+        fallback: 'Mask effect'
+      });
       if (wallpaperOverlayLabel) {
         wallpaperOverlayLabel.textContent = t('newtab_wallpaper_overlay_opacity', 'Mask effect');
-      }
-      if (wallpaperOverlaySlider) {
-        wallpaperOverlaySlider.setAttribute(
-          'aria-label',
-          t('newtab_wallpaper_overlay_opacity', 'Mask effect')
-        );
       }
     }
 
@@ -752,7 +1139,8 @@
         type: matchedType ? value.type : NEWTAB_WALLPAPER_EFFECT_DEFAULTS.type,
         strength,
         size,
-        spacing
+        spacing,
+        hover: value.hover === false ? false : NEWTAB_WALLPAPER_EFFECT_DEFAULTS.hover
       };
     }
 
@@ -761,6 +1149,10 @@
     }
 
     function doesWallpaperEffectSupportSpacing(type) {
+      return type === 'halftone' || type === 'ascii';
+    }
+
+    function doesWallpaperEffectSupportHover(type) {
       return type === 'halftone' || type === 'ascii';
     }
 
@@ -796,8 +1188,14 @@
     }
 
     function scheduleWallpaperEffectTabsIndicatorRefresh() {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(updateWallpaperEffectTabsIndicator);
+      if (wallpaperEffectTabsIndicatorRefreshFrame) {
+        return;
+      }
+      wallpaperEffectTabsIndicatorRefreshFrame = requestAnimationFrame(() => {
+        wallpaperEffectTabsIndicatorRefreshFrame = requestAnimationFrame(() => {
+          wallpaperEffectTabsIndicatorRefreshFrame = 0;
+          updateWallpaperEffectTabsIndicator();
+        });
       });
     }
 
@@ -827,8 +1225,14 @@
     }
 
     function scheduleWallpaperTabsIndicatorRefresh() {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(updateWallpaperTabsIndicator);
+      if (wallpaperTabsIndicatorRefreshFrame) {
+        return;
+      }
+      wallpaperTabsIndicatorRefreshFrame = requestAnimationFrame(() => {
+        wallpaperTabsIndicatorRefreshFrame = requestAnimationFrame(() => {
+          wallpaperTabsIndicatorRefreshFrame = 0;
+          updateWallpaperTabsIndicator();
+        });
       });
     }
 
@@ -1040,27 +1444,41 @@
       updateWallpaperEffectControlUi();
     }
 
-    function updateWallpaperEffectControlUi() {
-      const prefs = normalizeWallpaperEffectPrefs(currentWallpaperEffectPrefs);
-      const isEffectEnabled = prefs.type !== 'none';
-      const supportsSize = doesWallpaperEffectSupportSize(prefs.type);
-      const supportsSpacing = doesWallpaperEffectSupportSpacing(prefs.type);
-      const strengthVisibleChanged = wallpaperEffectStrengthControl &&
-        wallpaperEffectStrengthControl.getAttribute('data-visible') !== (isEffectEnabled ? 'true' : 'false');
-      const sizeVisibleChanged = wallpaperEffectSizeControl &&
-        wallpaperEffectSizeControl.getAttribute('data-visible') !== (supportsSize ? 'true' : 'false');
-      const spacingVisibleChanged = wallpaperEffectSpacingControl &&
-        wallpaperEffectSpacingControl.getAttribute('data-visible') !== (supportsSpacing ? 'true' : 'false');
-      const updateSliderVisibility = () => {
-        setWallpaperEffectSliderControlVisible(wallpaperEffectStrengthControl, isEffectEnabled);
-        setWallpaperEffectSliderControlVisible(wallpaperEffectSizeControl, supportsSize);
-        setWallpaperEffectSliderControlVisible(wallpaperEffectSpacingControl, supportsSpacing);
+    function getWallpaperEffectControlVisibility(prefs) {
+      return {
+        strength: prefs.type !== 'none',
+        hover: doesWallpaperEffectSupportHover(prefs.type),
+        size: doesWallpaperEffectSupportSize(prefs.type),
+        spacing: doesWallpaperEffectSupportSpacing(prefs.type)
       };
-      if (strengthVisibleChanged || sizeVisibleChanged || spacingVisibleChanged) {
-        animateWallpaperPanelResize(updateSliderVisibility);
-      } else {
-        updateSliderVisibility();
+    }
+
+    function isWallpaperEffectControlVisibilityChanged(control, visible) {
+      return Boolean(control &&
+        control.getAttribute('data-visible') !== (visible ? 'true' : 'false'));
+    }
+
+    function updateWallpaperEffectControlsVisibility(visibility) {
+      const changed = [
+        [wallpaperEffectStrengthControl, visibility.strength],
+        [wallpaperEffectHoverControl, visibility.hover],
+        [wallpaperEffectSizeControl, visibility.size],
+        [wallpaperEffectSpacingControl, visibility.spacing]
+      ].some((item) => isWallpaperEffectControlVisibilityChanged(item[0], item[1]));
+      const applyVisibility = () => {
+        setWallpaperEffectSliderControlVisible(wallpaperEffectStrengthControl, visibility.strength);
+        setWallpaperEffectSliderControlVisible(wallpaperEffectHoverControl, visibility.hover);
+        setWallpaperEffectSliderControlVisible(wallpaperEffectSizeControl, visibility.size);
+        setWallpaperEffectSliderControlVisible(wallpaperEffectSpacingControl, visibility.spacing);
+      };
+      if (changed) {
+        animateWallpaperPanelResize(applyVisibility);
+        return;
       }
+      applyVisibility();
+    }
+
+    function updateWallpaperEffectOptionsUi(prefs) {
       if (wallpaperEffectOptions) {
         wallpaperEffectOptions.querySelectorAll('.x-nt-effect-option').forEach((button) => {
           const selected = button.getAttribute('data-wallpaper-effect-type') === prefs.type;
@@ -1079,72 +1497,67 @@
         wallpaperEffectOptions.setAttribute('aria-label', t('newtab_wallpaper_effect_title', 'Wallpaper filter'));
         scheduleWallpaperEffectTabsIndicatorRefresh();
       }
-      if (wallpaperEffectSlider) {
-        wallpaperEffectSlider.value = String(prefs.strength);
-        wallpaperEffectSlider.style.setProperty('--x-nt-overlay-slider-percent', `${prefs.strength}%`);
-        wallpaperEffectSlider.setAttribute('aria-valuenow', String(prefs.strength));
-        wallpaperEffectSlider.setAttribute('aria-valuetext', `${prefs.strength}%`);
-        wallpaperEffectSlider.disabled = !isEffectEnabled;
-        if (wallpaperEffectSlider.parentElement) {
-          wallpaperEffectSlider.parentElement.setAttribute('data-disabled', isEffectEnabled ? 'false' : 'true');
-        }
-        wallpaperEffectSlider.setAttribute(
+    }
+
+    function updateWallpaperEffectSlidersUi(prefs, visibility) {
+      updateWallpaperSliderElement(wallpaperEffectSlider, {
+        value: prefs.strength,
+        enabled: visibility.strength,
+        labelKey: 'newtab_wallpaper_effect_strength',
+        fallback: 'Sampling strength'
+      });
+      updateWallpaperSliderElement(wallpaperEffectSizeSlider, {
+        value: prefs.size,
+        enabled: visibility.size,
+        labelKey: 'newtab_wallpaper_effect_size',
+        fallback: 'Size'
+      });
+      updateWallpaperSliderElement(wallpaperEffectSpacingSlider, {
+        value: prefs.spacing,
+        enabled: visibility.spacing,
+        labelKey: 'newtab_wallpaper_effect_spacing',
+        fallback: 'Spacing'
+      });
+    }
+
+    function updateWallpaperEffectHoverUi(prefs, supportsHover) {
+      if (wallpaperEffectHoverToggle) {
+        wallpaperEffectHoverToggle.checked = prefs.hover !== false;
+        wallpaperEffectHoverToggle.disabled = !supportsHover;
+        wallpaperEffectHoverToggle.setAttribute('aria-checked', prefs.hover !== false ? 'true' : 'false');
+        wallpaperEffectHoverToggle.setAttribute(
           'aria-label',
-          t('newtab_wallpaper_effect_strength', 'Sampling strength')
+          t('newtab_wallpaper_effect_hover', 'Hover effect')
         );
       }
-      if (wallpaperEffectSizeSlider) {
-        wallpaperEffectSizeSlider.value = String(prefs.size);
-        wallpaperEffectSizeSlider.style.setProperty('--x-nt-overlay-slider-percent', `${prefs.size}%`);
-        wallpaperEffectSizeSlider.setAttribute('aria-valuenow', String(prefs.size));
-        wallpaperEffectSizeSlider.setAttribute('aria-valuetext', `${prefs.size}%`);
-        wallpaperEffectSizeSlider.disabled = !supportsSize;
-        if (wallpaperEffectSizeSlider.parentElement) {
-          wallpaperEffectSizeSlider.parentElement.setAttribute('data-disabled', supportsSize ? 'false' : 'true');
-        }
-        wallpaperEffectSizeSlider.setAttribute(
-          'aria-label',
-          t('newtab_wallpaper_effect_size', 'Size')
-        );
-      }
-      if (wallpaperEffectSpacingSlider) {
-        wallpaperEffectSpacingSlider.value = String(prefs.spacing);
-        wallpaperEffectSpacingSlider.style.setProperty('--x-nt-overlay-slider-percent', `${prefs.spacing}%`);
-        wallpaperEffectSpacingSlider.setAttribute('aria-valuenow', String(prefs.spacing));
-        wallpaperEffectSpacingSlider.setAttribute('aria-valuetext', `${prefs.spacing}%`);
-        wallpaperEffectSpacingSlider.disabled = !supportsSpacing;
-        if (wallpaperEffectSpacingSlider.parentElement) {
-          wallpaperEffectSpacingSlider.parentElement.setAttribute('data-disabled', supportsSpacing ? 'false' : 'true');
-        }
-        wallpaperEffectSpacingSlider.setAttribute(
-          'aria-label',
-          t('newtab_wallpaper_effect_spacing', 'Spacing')
-        );
-      }
+    }
+
+    function updateWallpaperEffectTextUi() {
       if (wallpaperEffectLabel) {
         wallpaperEffectLabel.textContent = t('newtab_wallpaper_effect_title', 'Wallpaper filter');
-      }
-      if (wallpaperEffectValue) {
-        wallpaperEffectValue.textContent = getWallpaperEffectLabel(prefs.type);
       }
       if (wallpaperEffectStrengthLabel) {
         wallpaperEffectStrengthLabel.textContent = t('newtab_wallpaper_effect_strength', 'Sampling strength');
       }
-      if (wallpaperEffectStrengthValue) {
-        wallpaperEffectStrengthValue.textContent = `${prefs.strength}%`;
-      }
       if (wallpaperEffectSizeLabel) {
         wallpaperEffectSizeLabel.textContent = t('newtab_wallpaper_effect_size', 'Size');
-      }
-      if (wallpaperEffectSizeValue) {
-        wallpaperEffectSizeValue.textContent = `${prefs.size}%`;
       }
       if (wallpaperEffectSpacingLabel) {
         wallpaperEffectSpacingLabel.textContent = t('newtab_wallpaper_effect_spacing', 'Spacing');
       }
-      if (wallpaperEffectSpacingValue) {
-        wallpaperEffectSpacingValue.textContent = `${prefs.spacing}%`;
+      if (wallpaperEffectHoverTitle) {
+        wallpaperEffectHoverTitle.textContent = t('newtab_wallpaper_effect_hover', 'Hover effect');
       }
+    }
+
+    function updateWallpaperEffectControlUi() {
+      const prefs = normalizeWallpaperEffectPrefs(currentWallpaperEffectPrefs);
+      const visibility = getWallpaperEffectControlVisibility(prefs);
+      updateWallpaperEffectControlsVisibility(visibility);
+      updateWallpaperEffectOptionsUi(prefs);
+      updateWallpaperEffectSlidersUi(prefs, visibility);
+      updateWallpaperEffectHoverUi(prefs, visibility.hover);
+      updateWallpaperEffectTextUi();
     }
 
     function persistWallpaperEffectPrefs(partial) {
@@ -1286,59 +1699,9 @@
       }
       customWallpaperUploadTile.setAttribute('data-loading', customWallpaperImporting ? 'true' : 'false');
       customWallpaperUploadTile.setAttribute('aria-label', t('newtab_wallpaper_add_local', 'Add local wallpaper'));
-      updateWallpaperSelectionUi();
-    }
-
-    function createCustomWallpaperTile(item) {
-      const tile = document.createElement('div');
-      tile.className = 'x-nt-wallpaper-tile x-nt-wallpaper-custom-tile';
-      tile.setAttribute('role', 'button');
-      tile.setAttribute('tabindex', '0');
-      tile.setAttribute('data-wallpaper-id', item.id);
-      tile.setAttribute('data-custom-wallpaper', 'true');
-      tile.setAttribute('data-selected', 'false');
-      tile.setAttribute('aria-pressed', 'false');
-      const thumb = document.createElement('span');
-      thumb.className = 'x-nt-wallpaper-thumb';
-      const image = document.createElement('img');
-      image.className = 'x-nt-wallpaper-custom-image';
-      image.src = getWallpaperThumbnailUrl(item);
-      image.alt = '';
-      image.draggable = false;
-      thumb.appendChild(image);
-      const check = document.createElement('span');
-      check.className = 'x-nt-wallpaper-check';
-      check.innerHTML = getRiSvg('ri-check-line', 'ri-size-16');
-      const deleteButton = document.createElement('button');
-      deleteButton.type = 'button';
-      deleteButton.className = 'x-nt-wallpaper-delete-button';
-      deleteButton.setAttribute('aria-label', t('newtab_wallpaper_delete_local', 'Delete imported wallpaper'));
-      deleteButton.innerHTML = getRiSvg('ri-subtract-line', 'ri-size-14');
-      deleteButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        deleteCustomWallpaper(item.id);
-      });
-      tile.appendChild(thumb);
-      tile.appendChild(check);
-      tile.appendChild(deleteButton);
-      tile.addEventListener('click', (event) => {
-        if (event.target && event.target.closest && event.target.closest('.x-nt-wallpaper-delete-button')) {
-          return;
-        }
-        persistNewtabWallpaper(item.id);
-      });
-      tile.addEventListener('keydown', (event) => {
-        if (!event || (event.key !== 'Enter' && event.key !== ' ')) {
-          return;
-        }
-        if (event.target && event.target.closest && event.target.closest('.x-nt-wallpaper-delete-button')) {
-          return;
-        }
-        event.preventDefault();
-        persistNewtabWallpaper(item.id);
-      });
-      return tile;
+      if (customWallpaperImporting) {
+        hideCustomWallpaperTooltip();
+      }
     }
 
     function renderCustomWallpaperTiles() {
@@ -1445,12 +1808,28 @@
       });
     }
 
+    function canShowCustomWallpaperTooltip(target) {
+      return Boolean(target &&
+        target.isConnected &&
+        !customWallpaperImporting &&
+        target.getAttribute('data-loading') !== 'true');
+    }
+
     function showCustomWallpaperTooltip(target) {
+      if (!canShowCustomWallpaperTooltip(target)) {
+        hideCustomWallpaperTooltip();
+        return;
+      }
       showTopActionTooltip(target, t('newtab_wallpaper_add_local', 'Add local wallpaper'));
+    }
+
+    function hideCustomWallpaperTooltip() {
+      hideTopActionTooltip();
     }
 
     function openCustomWallpaperPicker() {
       if (customWallpaperInput && !customWallpaperImporting) {
+        hideCustomWallpaperTooltip();
         customWallpaperInput.click();
       }
     }
@@ -1469,8 +1848,8 @@
           throw new Error('Invalid wallpaper record.');
         }
         customWallpapers = customWallpapers.concat(nextWallpaper);
-        renderCustomWallpaperTiles();
         persistNewtabWallpaper(nextWallpaper.id);
+        renderCustomWallpaperTiles();
         showToast(t('newtab_wallpaper_import_done', 'Wallpaper imported'), false);
       }).catch(() => {
         showToast(t('newtab_wallpaper_import_error', 'Failed to import wallpaper'), true);
@@ -1505,6 +1884,17 @@
 
     function isWallpaperPanelOpen() {
       return Boolean(wallpaperPanel && wallpaperPanel.getAttribute('data-open') === 'true');
+    }
+
+    function setWallpaperPanelOpenState(open) {
+      if (!document.body) {
+        return;
+      }
+      if (open) {
+        document.body.setAttribute('data-wallpaper-panel-open', 'true');
+        return;
+      }
+      document.body.removeAttribute('data-wallpaper-panel-open');
     }
 
     function getWallpaperAppearanceModeLabel(mode) {
@@ -1690,9 +2080,13 @@
       wallpaperAppearanceAnimationTimers.push(handoffTimer);
     }
 
-    function updateWallpaperLanguageStrings() {
+    function getWallpaperButtonLabel() {
+      return t('settings_tab_appearance', 'Appearance');
+    }
+
+    function updateWallpaperButtonLanguageStrings() {
       if (wallpaperButton) {
-        const label = t('settings_tab_appearance', 'Appearance');
+        const label = getWallpaperButtonLabel();
         wallpaperButton.setAttribute('aria-label', label);
         wallpaperButton.removeAttribute('title');
       }
@@ -1700,6 +2094,9 @@
           typeof wallpaperFeatureHintController.updateLanguage === 'function') {
         wallpaperFeatureHintController.updateLanguage();
       }
+    }
+
+    function updateWallpaperAppearanceLanguageStrings() {
       if (wallpaperAppearanceTitle) {
         wallpaperAppearanceTitle.textContent = t('settings_tab_appearance', 'Appearance');
       }
@@ -1724,9 +2121,9 @@
           ));
         });
       }
-      updateWallpaperOverlayControlUi();
-      updateWallpaperEffectControlUi();
-      updateCustomWallpaperUploadTile();
+    }
+
+    function updateWallpaperSectionLanguageStrings() {
       if (wallpaperPanelTitle) {
         const title = t('newtab_wallpaper_title', 'Wallpaper');
         wallpaperPanelTitle.textContent = title;
@@ -1756,8 +2153,9 @@
       if (logoPanelTitle) {
         logoPanelTitle.textContent = t('newtab_logo_title', 'Logo');
       }
-      updateLogoSwitchUi();
-      updateWallpaperAppearanceModeLabels();
+    }
+
+    function updateWallpaperScaleLanguageStrings() {
       if (wallpaperPanel) {
         wallpaperPanel.querySelectorAll('[data-overlay-tick="transparent"]').forEach((tick) => {
           tick.textContent = t('newtab_wallpaper_overlay_transparent_tick', 'Transparent');
@@ -1769,6 +2167,9 @@
           tick.textContent = t('newtab_wallpaper_overlay_cover_tick', 'Cover');
         });
       }
+    }
+
+    function updateWallpaperTileLanguageStrings() {
       const tileContainers = getWallpaperTileContainers();
       if (tileContainers.length === 0) {
         return;
@@ -1790,419 +2191,270 @@
       });
     }
 
-    function renderWallpaperPanel() {
-      if (!wallpaperPanel || wallpaperPanelRendered) {
-        return;
-      }
-      wallpaperPanelRendered = true;
-      const appearanceSection = document.createElement('div');
-      appearanceSection.className = 'x-nt-appearance-section';
-      const appearanceHeader = document.createElement('div');
-      appearanceHeader.className = 'x-nt-appearance-header';
-      const appearanceTitleGroup = document.createElement('div');
-      appearanceTitleGroup.className = 'x-nt-appearance-title-group';
-      wallpaperAppearanceTitle = document.createElement('div');
-      wallpaperAppearanceTitle.className = 'x-nt-wallpaper-panel-title';
-      wallpaperAppearanceInfoButton = document.createElement('button');
-      wallpaperAppearanceInfoButton.type = 'button';
-      wallpaperAppearanceInfoButton.className = 'x-nt-appearance-info-button';
-      wallpaperAppearanceInfoButton.innerHTML = getRiSvg('ri-question-line', 'ri-size-14');
-      wallpaperAppearanceInfoButton.addEventListener('mouseenter', () => {
+    function updateWallpaperLanguageStrings() {
+      updateWallpaperButtonLanguageStrings();
+      updateWallpaperAppearanceLanguageStrings();
+      updateWallpaperOverlayControlUi();
+      updateWallpaperEffectControlUi();
+      updateCustomWallpaperUploadTile();
+      updateWallpaperSectionLanguageStrings();
+      updateLogoSwitchUi();
+      updateWallpaperAppearanceModeLabels();
+      updateWallpaperScaleLanguageStrings();
+      updateWallpaperTileLanguageStrings();
+    }
+
+    function createAppearanceInfoButton() {
+      const button = createDomElement('button', {
+        className: 'x-nt-appearance-info-button',
+        innerHTML: getRiSvg('ri-question-line', 'ri-size-14')
+      });
+      button.type = 'button';
+      const showHelp = () => {
         showTopActionTooltip(
-          wallpaperAppearanceInfoButton,
+          button,
           t(
             'newtab_theme_scope_help',
-            '"Global" affects the global theme mode. "New Tab" affects only the new tab page.'
+            '"Global" sets the default theme. "New Tab" overrides only the new tab page; choose "Follow Global" there to inherit the global setting.'
           )
         );
+      };
+      button.addEventListener('mouseenter', showHelp);
+      button.addEventListener('mouseleave', hideTopActionTooltip);
+      button.addEventListener('focus', showHelp);
+      button.addEventListener('blur', hideTopActionTooltip);
+      return button;
+    }
+
+    function createAppearanceScopeTabs() {
+      const tabs = createDomElement('div', {
+        className: 'x-nt-appearance-scope-tabs',
+        attrs: { role: 'group' }
       });
-      wallpaperAppearanceInfoButton.addEventListener('mouseleave', hideTopActionTooltip);
-      wallpaperAppearanceInfoButton.addEventListener('focus', () => {
-        showTopActionTooltip(
-          wallpaperAppearanceInfoButton,
-          t(
-            'newtab_theme_scope_help',
-            '"Global" affects the global theme mode. "New Tab" affects only the new tab page.'
-          )
-        );
-      });
-      wallpaperAppearanceInfoButton.addEventListener('blur', hideTopActionTooltip);
-      wallpaperAppearanceScopeTabs = document.createElement('div');
-      wallpaperAppearanceScopeTabs.className = 'x-nt-appearance-scope-tabs';
-      wallpaperAppearanceScopeTabs.setAttribute('role', 'group');
       [
         { scope: 'global', fallback: 'Global' },
         { scope: 'home', fallback: 'New Tab' }
       ].forEach((item) => {
-        const button = document.createElement('button');
+        const button = createDomElement('button', {
+          className: 'x-nt-appearance-scope-tab',
+          textContent: item.fallback,
+          attrs: {
+            'data-theme-scope': item.scope,
+            'data-selected': 'false',
+            'aria-pressed': 'false'
+          }
+        });
         button.type = 'button';
-        button.className = 'x-nt-appearance-scope-tab';
-        button.setAttribute('data-theme-scope', item.scope);
-        button.setAttribute('data-selected', 'false');
-        button.setAttribute('aria-pressed', 'false');
-        button.textContent = item.fallback;
         button.addEventListener('click', () => {
           animateWallpaperAppearanceScopeChange(getThemeScope(), item.scope);
         });
-        wallpaperAppearanceScopeTabs.appendChild(button);
+        tabs.appendChild(button);
       });
-      wallpaperAppearanceOptions = document.createElement('div');
-      wallpaperAppearanceOptions.className = 'x-nt-appearance-options';
+      return tabs;
+    }
+
+    function createAppearanceOption(item) {
+      const button = createDomElement('button', {
+        className: 'x-nt-appearance-option',
+        attrs: {
+          'data-theme-mode': item.mode,
+          'data-selected': 'false',
+          'aria-pressed': 'false'
+        }
+      });
+      button.type = 'button';
+      const image = createDomElement('img');
+      image.src = getRuntimeAssetUrl(item.image);
+      image.alt = '';
+      image.draggable = false;
+      const check = createDomElement('span', {
+        className: 'x-nt-appearance-check',
+        innerHTML: getRiSvg('ri-check-line', 'ri-size-16')
+      });
+      const preview = createDomElement('span', {
+        className: 'x-nt-appearance-preview',
+        children: [image, check]
+      });
+      const label = createDomElement('span', { className: 'x-nt-appearance-label' });
+      const content = createDomElement('span', {
+        className: 'x-nt-appearance-option-content',
+        children: [preview, label]
+      });
+      button.appendChild(content);
+      button.addEventListener('click', () => {
+        setThemeMode(item.mode);
+      });
+      return button;
+    }
+
+    function createAppearanceSection() {
+      const section = createDomElement('div', { className: 'x-nt-appearance-section' });
+      const header = createDomElement('div', { className: 'x-nt-appearance-header' });
+      const titleGroup = createDomElement('div', { className: 'x-nt-appearance-title-group' });
+      wallpaperAppearanceTitle = createDomElement('div', { className: 'x-nt-wallpaper-panel-title' });
+      wallpaperAppearanceInfoButton = createAppearanceInfoButton();
+      wallpaperAppearanceScopeTabs = createAppearanceScopeTabs();
+      wallpaperAppearanceOptions = createDomElement('div', { className: 'x-nt-appearance-options' });
       [
         { mode: 'system', image: 'assets/images/system.svg' },
         { mode: 'light', image: 'assets/images/light.svg' },
         { mode: 'dark', image: 'assets/images/dark.svg' }
       ].forEach((item) => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'x-nt-appearance-option';
-        button.setAttribute('data-theme-mode', item.mode);
-        button.setAttribute('data-selected', 'false');
-        button.setAttribute('aria-pressed', 'false');
-        const preview = document.createElement('span');
-        preview.className = 'x-nt-appearance-preview';
-        const image = document.createElement('img');
-        image.src = getRuntimeAssetUrl(item.image);
-        image.alt = '';
-        image.draggable = false;
-        preview.appendChild(image);
-        const check = document.createElement('span');
-        check.className = 'x-nt-appearance-check';
-        check.innerHTML = getRiSvg('ri-check-line', 'ri-size-16');
-        const label = document.createElement('span');
-        label.className = 'x-nt-appearance-label';
-        const content = document.createElement('span');
-        content.className = 'x-nt-appearance-option-content';
-        preview.appendChild(check);
-        content.appendChild(preview);
-        content.appendChild(label);
-        button.appendChild(content);
-        button.addEventListener('click', () => {
-          setThemeMode(item.mode);
-        });
-        wallpaperAppearanceOptions.appendChild(button);
+        wallpaperAppearanceOptions.appendChild(createAppearanceOption(item));
       });
-      appearanceTitleGroup.appendChild(wallpaperAppearanceTitle);
-      appearanceTitleGroup.appendChild(wallpaperAppearanceInfoButton);
-      appearanceHeader.appendChild(appearanceTitleGroup);
-      appearanceHeader.appendChild(wallpaperAppearanceScopeTabs);
-      appearanceSection.appendChild(appearanceHeader);
-      appearanceSection.appendChild(wallpaperAppearanceOptions);
-      const overlayControl = document.createElement('div');
-      overlayControl.className = 'x-nt-overlay-control x-nt-overlay-control--effect';
-      const overlayHeader = document.createElement('div');
-      overlayHeader.className = 'x-nt-overlay-control-header';
-      wallpaperOverlayLabel = document.createElement('span');
-      wallpaperOverlayLabel.className = 'x-nt-overlay-label';
-      wallpaperOverlayValue = document.createElement('span');
-      wallpaperOverlayValue.className = 'x-nt-overlay-value';
-      wallpaperOverlaySlider = document.createElement('input');
-      wallpaperOverlaySlider.className = 'x-nt-overlay-slider';
-      wallpaperOverlaySlider.type = 'range';
-      wallpaperOverlaySlider.min = '0';
-      wallpaperOverlaySlider.max = '100';
-      wallpaperOverlaySlider.step = '1';
-      wallpaperOverlaySlider.setAttribute(
-        'aria-label',
-        t('newtab_wallpaper_overlay_opacity', 'Mask effect')
-      );
-      wallpaperOverlaySlider.addEventListener('pointerdown', () => {
-        wallpaperOverlayPointerActive = true;
-      });
-      wallpaperOverlaySlider.addEventListener('pointerup', () => {
-        wallpaperOverlayPointerActive = false;
-      });
-      wallpaperOverlaySlider.addEventListener('pointercancel', () => {
-        wallpaperOverlayPointerActive = false;
-      });
-      wallpaperOverlaySlider.addEventListener('blur', () => {
-        wallpaperOverlayPointerActive = false;
-      });
-      wallpaperOverlaySlider.addEventListener('input', () => {
-        const value = wallpaperOverlayPointerActive
-          ? snapWallpaperOverlaySliderValue(wallpaperOverlaySlider.value)
-          : normalizeWallpaperOverlayOpacity(wallpaperOverlaySlider.value, getWallpaperOverlayOpacityForCurrentMode());
-        if (String(value) !== wallpaperOverlaySlider.value) {
-          wallpaperOverlaySlider.value = String(value);
+      appendChildren(titleGroup, [wallpaperAppearanceTitle, wallpaperAppearanceInfoButton]);
+      appendChildren(header, [titleGroup, wallpaperAppearanceScopeTabs]);
+      appendChildren(section, [header, wallpaperAppearanceOptions]);
+      return section;
+    }
+
+    function createEffectOptions() {
+      const options = createDomElement('div', {
+        className: 'x-nt-effect-options',
+        attrs: {
+          role: 'tablist',
+          'aria-label': t('newtab_wallpaper_effect_title', 'Wallpaper filter')
         }
-        persistWallpaperOverlayOpacity(getResolvedWallpaperOverlayMode(), value);
       });
-      overlayHeader.appendChild(wallpaperOverlayLabel);
-      overlayHeader.appendChild(wallpaperOverlayValue);
-      overlayControl.appendChild(overlayHeader);
-      const overlaySliderWrap = document.createElement('div');
-      overlaySliderWrap.className = 'x-nt-overlay-slider-wrap';
-      overlaySliderWrap.appendChild(wallpaperOverlaySlider);
-      const overlayScale = document.createElement('div');
-      overlayScale.className = 'x-nt-overlay-scale';
-      [
-        { align: 'start', text: t('newtab_wallpaper_overlay_transparent_tick', 'Transparent'), key: 'transparent' },
-        { align: 'center', text: t('newtab_wallpaper_overlay_default_tick', 'Default'), key: 'default' },
-        { align: 'end', text: t('newtab_wallpaper_overlay_cover_tick', 'Cover'), key: 'cover' }
-      ].forEach((item) => {
-        const tick = document.createElement('span');
-        tick.className = 'x-nt-overlay-tick';
-        tick.setAttribute('data-align', item.align);
-        if (item.key) {
-          tick.setAttribute('data-overlay-tick', item.key);
-        }
-        tick.textContent = item.text;
-        overlayScale.appendChild(tick);
+      wallpaperEffectTabsIndicator = createDomElement('span', {
+        className: 'x-nt-effect-indicator',
+        attrs: { 'aria-hidden': 'true' }
       });
-      overlaySliderWrap.appendChild(overlayScale);
-      overlayControl.appendChild(overlaySliderWrap);
-      const effectControl = document.createElement('div');
-      effectControl.className = 'x-nt-effect-control';
-      const effectHeader = document.createElement('div');
-      effectHeader.className = 'x-nt-overlay-control-header x-nt-effect-control-header';
-      wallpaperEffectLabel = document.createElement('span');
-      wallpaperEffectLabel.className = 'x-nt-effect-label';
-      wallpaperEffectValue = document.createElement('span');
-      wallpaperEffectValue.className = 'x-nt-overlay-value x-nt-effect-value';
-      effectHeader.appendChild(wallpaperEffectLabel);
-      effectHeader.appendChild(wallpaperEffectValue);
-      effectControl.appendChild(overlayControl);
-      effectControl.appendChild(effectHeader);
-      wallpaperEffectOptions = document.createElement('div');
-      wallpaperEffectOptions.className = 'x-nt-effect-options';
-      wallpaperEffectOptions.setAttribute('role', 'tablist');
-      wallpaperEffectOptions.setAttribute('aria-label', t('newtab_wallpaper_effect_title', 'Wallpaper filter'));
-      wallpaperEffectTabsIndicator = document.createElement('span');
-      wallpaperEffectTabsIndicator.className = 'x-nt-effect-indicator';
-      wallpaperEffectTabsIndicator.setAttribute('aria-hidden', 'true');
-      wallpaperEffectOptions.appendChild(wallpaperEffectTabsIndicator);
+      options.appendChild(wallpaperEffectTabsIndicator);
       NEWTAB_WALLPAPER_EFFECT_TYPES.forEach((item) => {
-        const button = document.createElement('button');
+        const button = createDomElement('button', {
+          className: 'x-nt-effect-option',
+          textContent: item.fallback,
+          attrs: {
+            'data-wallpaper-effect-type': item.type,
+            'data-selected': 'false',
+            'data-active': 'false',
+            'aria-pressed': 'false'
+          }
+        });
         button.type = 'button';
-        button.className = 'x-nt-effect-option';
-        button.setAttribute('data-wallpaper-effect-type', item.type);
-        button.setAttribute('data-selected', 'false');
-        button.setAttribute('data-active', 'false');
-        button.setAttribute('aria-pressed', 'false');
-        button.textContent = item.fallback;
         button.addEventListener('click', () => {
           persistWallpaperEffectPrefs({ type: item.type });
         });
-        wallpaperEffectOptions.appendChild(button);
+        options.appendChild(button);
       });
-      effectControl.appendChild(wallpaperEffectOptions);
-      wallpaperEffectStrengthControl = document.createElement('div');
-      wallpaperEffectStrengthControl.className = 'x-nt-effect-slider-control';
-      wallpaperEffectStrengthControl.setAttribute('data-visible', 'true');
-      const effectStrengthHeader = document.createElement('div');
-      effectStrengthHeader.className = 'x-nt-overlay-control-header';
-      wallpaperEffectStrengthLabel = document.createElement('span');
-      wallpaperEffectStrengthLabel.className = 'x-nt-effect-slider-label';
-      wallpaperEffectStrengthValue = document.createElement('span');
-      wallpaperEffectStrengthValue.className = 'x-nt-overlay-value x-nt-effect-slider-value';
-      effectStrengthHeader.appendChild(wallpaperEffectStrengthLabel);
-      effectStrengthHeader.appendChild(wallpaperEffectStrengthValue);
-      wallpaperEffectStrengthControl.appendChild(effectStrengthHeader);
-      const effectSliderWrap = document.createElement('div');
-      effectSliderWrap.className = 'x-nt-overlay-slider-wrap x-nt-effect-slider-wrap';
-      wallpaperEffectSlider = document.createElement('input');
-      wallpaperEffectSlider.className = 'x-nt-overlay-slider x-nt-effect-slider';
-      wallpaperEffectSlider.type = 'range';
-      wallpaperEffectSlider.min = '0';
-      wallpaperEffectSlider.max = '100';
-      wallpaperEffectSlider.step = '1';
-      wallpaperEffectSlider.setAttribute(
-        'aria-label',
-        t('newtab_wallpaper_effect_strength', 'Sampling strength')
+      return options;
+    }
+
+    function createWallpaperOverlayControl() {
+      const overlayScale = createOverlayScale([
+        { align: 'start', text: t('newtab_wallpaper_overlay_transparent_tick', 'Transparent'), key: 'transparent' },
+        { align: 'center', text: t('newtab_wallpaper_overlay_default_tick', 'Default'), key: 'default' },
+        { align: 'end', text: t('newtab_wallpaper_overlay_cover_tick', 'Cover'), key: 'cover' }
+      ]);
+      const overlayControl = createWallpaperSliderControl({
+        controlClass: 'x-nt-overlay-control x-nt-overlay-control--effect',
+        labelClass: 'x-nt-overlay-label',
+        sliderClass: 'x-nt-overlay-slider',
+        wrapClass: 'x-nt-overlay-slider-wrap',
+        labelKey: 'newtab_wallpaper_overlay_opacity',
+        fallback: 'Mask effect',
+        getFallbackValue: getWallpaperOverlayOpacityForCurrentMode,
+        persist: (value) => {
+          persistWallpaperOverlayOpacity(getResolvedWallpaperOverlayMode(), value);
+        },
+        scale: overlayScale
+      });
+      wallpaperOverlayLabel = overlayControl.label;
+      wallpaperOverlaySlider = overlayControl.slider;
+      return overlayControl.control;
+    }
+
+    function createWallpaperEffectHeader() {
+      const effectHeader = createDomElement('div', {
+        className: 'x-nt-overlay-control-header x-nt-effect-control-header'
+      });
+      wallpaperEffectLabel = createDomElement('span', { className: 'x-nt-effect-label' });
+      effectHeader.appendChild(wallpaperEffectLabel);
+      return effectHeader;
+    }
+
+    function createWallpaperEffectSlider(prefKey, labelKey, fallback) {
+      return createWallpaperSliderControl({
+        labelKey,
+        fallback,
+        getFallbackValue: () => currentWallpaperEffectPrefs[prefKey],
+        persist: (value) => {
+          persistWallpaperEffectPrefs({ [prefKey]: value });
+        }
+      });
+    }
+
+    function createWallpaperEffectSliderControls() {
+      const hoverControl = createEffectToggleControl();
+      wallpaperEffectHoverControl = hoverControl.control;
+      wallpaperEffectHoverTitle = hoverControl.title;
+      wallpaperEffectHoverToggle = hoverControl.toggle;
+
+      const strengthControl = createWallpaperEffectSlider(
+        'strength',
+        'newtab_wallpaper_effect_strength',
+        'Sampling strength'
       );
-      wallpaperEffectSlider.addEventListener('pointerdown', () => {
-        wallpaperEffectPointerActive = true;
+      wallpaperEffectStrengthControl = strengthControl.control;
+      wallpaperEffectStrengthLabel = strengthControl.label;
+      wallpaperEffectSlider = strengthControl.slider;
+
+      const sizeControl = createWallpaperEffectSlider('size', 'newtab_wallpaper_effect_size', 'Size');
+      wallpaperEffectSizeControl = sizeControl.control;
+      wallpaperEffectSizeLabel = sizeControl.label;
+      wallpaperEffectSizeSlider = sizeControl.slider;
+
+      const spacingControl = createWallpaperEffectSlider('spacing', 'newtab_wallpaper_effect_spacing', 'Spacing');
+      wallpaperEffectSpacingControl = spacingControl.control;
+      wallpaperEffectSpacingLabel = spacingControl.label;
+      wallpaperEffectSpacingSlider = spacingControl.slider;
+
+      return [
+        wallpaperEffectHoverControl,
+        wallpaperEffectStrengthControl,
+        wallpaperEffectSizeControl,
+        wallpaperEffectSpacingControl
+      ];
+    }
+
+    function createWallpaperEffectControl() {
+      const effectControl = createDomElement('div', { className: 'x-nt-effect-control' });
+      wallpaperEffectOptions = createEffectOptions();
+      appendChildren(effectControl, [
+        createWallpaperOverlayControl(),
+        createWallpaperEffectHeader(),
+        wallpaperEffectOptions,
+        ...createWallpaperEffectSliderControls()
+      ]);
+      return effectControl;
+    }
+
+    function createWallpaperTabs() {
+      const tabs = createDomElement('div', {
+        className: 'x-nt-wallpaper-tabs',
+        attrs: { role: 'tablist' }
       });
-      wallpaperEffectSlider.addEventListener('pointerup', () => {
-        wallpaperEffectPointerActive = false;
+      wallpaperTabsIndicator = createDomElement('span', {
+        className: 'x-nt-wallpaper-tabs-indicator',
+        attrs: { 'aria-hidden': 'true' }
       });
-      wallpaperEffectSlider.addEventListener('pointercancel', () => {
-        wallpaperEffectPointerActive = false;
-      });
-      wallpaperEffectSlider.addEventListener('blur', () => {
-        wallpaperEffectPointerActive = false;
-      });
-      wallpaperEffectSlider.addEventListener('input', () => {
-        const value = wallpaperEffectPointerActive
-          ? snapWallpaperOverlaySliderValue(wallpaperEffectSlider.value)
-          : normalizeWallpaperOverlayOpacity(wallpaperEffectSlider.value, currentWallpaperEffectPrefs.strength);
-        if (String(value) !== wallpaperEffectSlider.value) {
-          wallpaperEffectSlider.value = String(value);
-        }
-        persistWallpaperEffectPrefs({ strength: value });
-      });
-      effectSliderWrap.appendChild(wallpaperEffectSlider);
-      const createEffectScale = () => {
-        const scale = document.createElement('div');
-        scale.className = 'x-nt-overlay-scale';
-        [
-          { align: 'start', text: '0' },
-          { align: 'center', text: t('newtab_wallpaper_overlay_default_tick', 'Default'), key: 'default' },
-          { align: 'end', text: '100%' }
-        ].forEach((item) => {
-          const tick = document.createElement('span');
-          tick.className = 'x-nt-overlay-tick';
-          tick.setAttribute('data-align', item.align);
-          if (item.key) {
-            tick.setAttribute('data-overlay-tick', item.key);
-          }
-          tick.textContent = item.text;
-          scale.appendChild(tick);
-        });
-        return scale;
-      };
-      const effectScale = createEffectScale();
-      effectSliderWrap.appendChild(effectScale);
-      wallpaperEffectStrengthControl.appendChild(effectSliderWrap);
-      effectControl.appendChild(wallpaperEffectStrengthControl);
-      wallpaperEffectSizeControl = document.createElement('div');
-      wallpaperEffectSizeControl.className = 'x-nt-effect-slider-control';
-      wallpaperEffectSizeControl.setAttribute('data-visible', 'true');
-      const effectSizeHeader = document.createElement('div');
-      effectSizeHeader.className = 'x-nt-overlay-control-header';
-      wallpaperEffectSizeLabel = document.createElement('span');
-      wallpaperEffectSizeLabel.className = 'x-nt-effect-slider-label';
-      wallpaperEffectSizeValue = document.createElement('span');
-      wallpaperEffectSizeValue.className = 'x-nt-overlay-value x-nt-effect-slider-value';
-      effectSizeHeader.appendChild(wallpaperEffectSizeLabel);
-      effectSizeHeader.appendChild(wallpaperEffectSizeValue);
-      wallpaperEffectSizeControl.appendChild(effectSizeHeader);
-      const effectSizeSliderWrap = document.createElement('div');
-      effectSizeSliderWrap.className = 'x-nt-overlay-slider-wrap x-nt-effect-slider-wrap';
-      wallpaperEffectSizeSlider = document.createElement('input');
-      wallpaperEffectSizeSlider.className = 'x-nt-overlay-slider x-nt-effect-slider';
-      wallpaperEffectSizeSlider.type = 'range';
-      wallpaperEffectSizeSlider.min = '0';
-      wallpaperEffectSizeSlider.max = '100';
-      wallpaperEffectSizeSlider.step = '1';
-      wallpaperEffectSizeSlider.setAttribute(
-        'aria-label',
-        t('newtab_wallpaper_effect_size', 'Size')
-      );
-      wallpaperEffectSizeSlider.addEventListener('pointerdown', () => {
-        wallpaperEffectSizePointerActive = true;
-      });
-      wallpaperEffectSizeSlider.addEventListener('pointerup', () => {
-        wallpaperEffectSizePointerActive = false;
-      });
-      wallpaperEffectSizeSlider.addEventListener('pointercancel', () => {
-        wallpaperEffectSizePointerActive = false;
-      });
-      wallpaperEffectSizeSlider.addEventListener('blur', () => {
-        wallpaperEffectSizePointerActive = false;
-      });
-      wallpaperEffectSizeSlider.addEventListener('input', () => {
-        const value = wallpaperEffectSizePointerActive
-          ? snapWallpaperOverlaySliderValue(wallpaperEffectSizeSlider.value)
-          : normalizeWallpaperOverlayOpacity(wallpaperEffectSizeSlider.value, currentWallpaperEffectPrefs.size);
-        if (String(value) !== wallpaperEffectSizeSlider.value) {
-          wallpaperEffectSizeSlider.value = String(value);
-        }
-        persistWallpaperEffectPrefs({ size: value });
-      });
-      effectSizeSliderWrap.appendChild(wallpaperEffectSizeSlider);
-      effectSizeSliderWrap.appendChild(createEffectScale());
-      wallpaperEffectSizeControl.appendChild(effectSizeSliderWrap);
-      effectControl.appendChild(wallpaperEffectSizeControl);
-      wallpaperEffectSpacingControl = document.createElement('div');
-      wallpaperEffectSpacingControl.className = 'x-nt-effect-slider-control';
-      wallpaperEffectSpacingControl.setAttribute('data-visible', 'true');
-      const effectSpacingHeader = document.createElement('div');
-      effectSpacingHeader.className = 'x-nt-overlay-control-header';
-      wallpaperEffectSpacingLabel = document.createElement('span');
-      wallpaperEffectSpacingLabel.className = 'x-nt-effect-slider-label';
-      wallpaperEffectSpacingValue = document.createElement('span');
-      wallpaperEffectSpacingValue.className = 'x-nt-overlay-value x-nt-effect-slider-value';
-      effectSpacingHeader.appendChild(wallpaperEffectSpacingLabel);
-      effectSpacingHeader.appendChild(wallpaperEffectSpacingValue);
-      wallpaperEffectSpacingControl.appendChild(effectSpacingHeader);
-      const effectSpacingSliderWrap = document.createElement('div');
-      effectSpacingSliderWrap.className = 'x-nt-overlay-slider-wrap x-nt-effect-slider-wrap';
-      wallpaperEffectSpacingSlider = document.createElement('input');
-      wallpaperEffectSpacingSlider.className = 'x-nt-overlay-slider x-nt-effect-slider';
-      wallpaperEffectSpacingSlider.type = 'range';
-      wallpaperEffectSpacingSlider.min = '0';
-      wallpaperEffectSpacingSlider.max = '100';
-      wallpaperEffectSpacingSlider.step = '1';
-      wallpaperEffectSpacingSlider.setAttribute(
-        'aria-label',
-        t('newtab_wallpaper_effect_spacing', 'Spacing')
-      );
-      wallpaperEffectSpacingSlider.addEventListener('pointerdown', () => {
-        wallpaperEffectSpacingPointerActive = true;
-      });
-      wallpaperEffectSpacingSlider.addEventListener('pointerup', () => {
-        wallpaperEffectSpacingPointerActive = false;
-      });
-      wallpaperEffectSpacingSlider.addEventListener('pointercancel', () => {
-        wallpaperEffectSpacingPointerActive = false;
-      });
-      wallpaperEffectSpacingSlider.addEventListener('blur', () => {
-        wallpaperEffectSpacingPointerActive = false;
-      });
-      wallpaperEffectSpacingSlider.addEventListener('input', () => {
-        const value = wallpaperEffectSpacingPointerActive
-          ? snapWallpaperOverlaySliderValue(wallpaperEffectSpacingSlider.value)
-          : normalizeWallpaperOverlayOpacity(wallpaperEffectSpacingSlider.value, currentWallpaperEffectPrefs.spacing);
-        if (String(value) !== wallpaperEffectSpacingSlider.value) {
-          wallpaperEffectSpacingSlider.value = String(value);
-        }
-        persistWallpaperEffectPrefs({ spacing: value });
-      });
-      effectSpacingSliderWrap.appendChild(wallpaperEffectSpacingSlider);
-      effectSpacingSliderWrap.appendChild(createEffectScale());
-      wallpaperEffectSpacingControl.appendChild(effectSpacingSliderWrap);
-      effectControl.appendChild(wallpaperEffectSpacingControl);
-      const divider = document.createElement('div');
-      divider.className = 'x-nt-panel-divider';
-      const wallpaperSection = document.createElement('div');
-      wallpaperSection.className = 'x-nt-wallpaper-section';
-      wallpaperPanelHeader = document.createElement('div');
-      wallpaperPanelHeader.className = 'x-nt-wallpaper-panel-header';
-      wallpaperPanelTitle = document.createElement('div');
-      wallpaperPanelTitle.className = 'x-nt-wallpaper-panel-title';
-      const wallpaperSwitchLabel = document.createElement('label');
-      wallpaperSwitchLabel.className = 'x-nt-wallpaper-switch';
-      wallpaperEnabledToggle = document.createElement('input');
-      wallpaperEnabledToggle.type = 'checkbox';
-      wallpaperEnabledToggle.setAttribute('role', 'switch');
-      wallpaperEnabledToggle.addEventListener('change', () => {
-        if (wallpaperEnabledToggle.checked) {
-          persistNewtabWallpaper(getWallpaperRestoreId());
-          return;
-        }
-        persistNewtabWallpaper('');
-      });
-      const wallpaperSwitchSlider = document.createElement('span');
-      wallpaperSwitchSlider.className = 'x-nt-wallpaper-switch-slider';
-      wallpaperSwitchSlider.setAttribute('aria-hidden', 'true');
-      wallpaperSwitchLabel.appendChild(wallpaperEnabledToggle);
-      wallpaperSwitchLabel.appendChild(wallpaperSwitchSlider);
-      wallpaperPanelHeader.appendChild(wallpaperPanelTitle);
-      wallpaperPanelHeader.appendChild(wallpaperSwitchLabel);
-      wallpaperBody = document.createElement('div');
-      wallpaperBody.className = 'x-nt-wallpaper-body';
-      wallpaperBody.setAttribute('data-visible', 'true');
-      wallpaperBody.setAttribute('data-active-tab', activeWallpaperTab);
-      wallpaperTabs = document.createElement('div');
-      wallpaperTabs.className = 'x-nt-wallpaper-tabs';
-      wallpaperTabs.setAttribute('role', 'tablist');
-      wallpaperTabsIndicator = document.createElement('span');
-      wallpaperTabsIndicator.className = 'x-nt-wallpaper-tabs-indicator';
-      wallpaperTabsIndicator.setAttribute('aria-hidden', 'true');
-      wallpaperTabs.appendChild(wallpaperTabsIndicator);
+      tabs.appendChild(wallpaperTabsIndicator);
       [
         { tab: 'built-in', fallback: 'Built-in' },
         { tab: 'local', fallback: 'Local' }
       ].forEach((item) => {
-        const button = document.createElement('button');
+        const button = createDomElement('button', {
+          className: 'x-nt-wallpaper-tab',
+          textContent: item.fallback,
+          attrs: {
+            role: 'tab',
+            'data-wallpaper-tab': item.tab,
+            'data-active': 'false',
+            'aria-selected': 'false'
+          }
+        });
         button.type = 'button';
-        button.className = 'x-nt-wallpaper-tab';
-        button.setAttribute('role', 'tab');
-        button.setAttribute('data-wallpaper-tab', item.tab);
-        button.setAttribute('data-active', 'false');
-        button.setAttribute('aria-selected', 'false');
-        button.textContent = item.fallback;
         button.addEventListener('click', () => {
           setWallpaperActiveTab(item.tab);
         });
@@ -2211,18 +2463,227 @@
         } else {
           wallpaperLocalTab = button;
         }
-        wallpaperTabs.appendChild(button);
+        tabs.appendChild(button);
       });
-      wallpaperBuiltInGrid = document.createElement('div');
-      wallpaperBuiltInGrid.className = 'x-nt-wallpaper-grid x-nt-wallpaper-grid--built-in';
-      wallpaperBuiltInGrid.setAttribute('role', 'tabpanel');
-      wallpaperBuiltInGrid.setAttribute('data-wallpaper-panel', 'built-in');
-      wallpaperLocalGrid = document.createElement('div');
-      wallpaperLocalGrid.className = 'x-nt-wallpaper-grid x-nt-wallpaper-grid--local';
-      wallpaperLocalGrid.setAttribute('role', 'tabpanel');
-      wallpaperLocalGrid.setAttribute('data-wallpaper-panel', 'local');
-      customWallpaperInput = document.createElement('input');
-      customWallpaperInput.className = 'x-nt-wallpaper-file-input';
+      return tabs;
+    }
+
+    function createWallpaperUploadTile() {
+      customWallpaperUploadTile = createDomElement('div', {
+        className: 'x-nt-wallpaper-tile x-nt-wallpaper-upload-tile',
+        attrs: {
+          role: 'button',
+          tabindex: '0',
+          'data-upload': 'true',
+          'data-loading': 'false',
+          'data-selected': 'false',
+          'aria-pressed': 'false'
+        }
+      });
+      const placeholder = createDomElement('span', {
+        className: 'x-nt-wallpaper-upload-placeholder',
+        innerHTML: getRiSvg('ri-add-large-line', 'ri-size-18')
+      });
+      const thumb = createWallpaperThumb([placeholder], 'x-nt-wallpaper-upload-thumb');
+      customWallpaperUploadTile.appendChild(thumb);
+      bindCustomWallpaperUploadTile(customWallpaperUploadTile);
+      return customWallpaperUploadTile;
+    }
+
+    function bindCustomWallpaperUploadTile(tile) {
+      tile.addEventListener('click', openCustomWallpaperPicker);
+      tile.addEventListener('keydown', (event) => {
+        if (!event || (event.key !== 'Enter' && event.key !== ' ')) {
+          return;
+        }
+        event.preventDefault();
+        openCustomWallpaperPicker();
+      });
+      tile.addEventListener('mouseenter', () => {
+        showCustomWallpaperTooltip(tile);
+      });
+      tile.addEventListener('mouseleave', hideCustomWallpaperTooltip);
+      tile.addEventListener('focusin', () => {
+        showCustomWallpaperTooltip(tile);
+      });
+      tile.addEventListener('focusout', (event) => {
+        const nextTarget = event && event.relatedTarget ? event.relatedTarget : null;
+        if (!nextTarget || !tile.contains(nextTarget)) {
+          hideCustomWallpaperTooltip();
+        }
+      });
+    }
+
+    function createWallpaperImage(src, className) {
+      const image = createDomElement('img');
+      image.src = src;
+      image.alt = '';
+      image.draggable = false;
+      image.loading = 'lazy';
+      image.decoding = 'async';
+      if (className) {
+        image.className = className;
+      }
+      return image;
+    }
+
+    function createWallpaperThumb(children, extraClassName) {
+      return createDomElement('span', {
+        className: ['x-nt-wallpaper-thumb', extraClassName].filter(Boolean).join(' '),
+        children
+      });
+    }
+
+    function createWallpaperCheckMark() {
+      return createDomElement('span', {
+        className: 'x-nt-wallpaper-check',
+        innerHTML: getRiSvg('ri-check-line', 'ri-size-16')
+      });
+    }
+
+    function bindWallpaperTileActivation(tile, onActivate, shouldIgnoreEvent) {
+      const activate = (event) => {
+        if (typeof shouldIgnoreEvent === 'function' && shouldIgnoreEvent(event)) {
+          return;
+        }
+        onActivate(event);
+      };
+      tile.addEventListener('click', activate);
+      tile.addEventListener('keydown', (event) => {
+        if (!event || (event.key !== 'Enter' && event.key !== ' ')) {
+          return;
+        }
+        if (typeof shouldIgnoreEvent === 'function' && shouldIgnoreEvent(event)) {
+          return;
+        }
+        event.preventDefault();
+        onActivate(event);
+      });
+    }
+
+    function createSelectableWallpaperTile(item, options) {
+      const config = options || {};
+      const tile = createDomElement(config.tagName || 'button', {
+        className: ['x-nt-wallpaper-tile', config.className].filter(Boolean).join(' '),
+        attrs: Object.assign({
+          'data-wallpaper-id': item.id,
+          'data-selected': 'false',
+          'aria-pressed': 'false'
+        }, config.attrs || {}),
+        children: [
+          createWallpaperThumb([createWallpaperImage(getWallpaperThumbnailUrl(item), config.imageClassName)]),
+          createWallpaperCheckMark()
+        ]
+      });
+      if (tile.tagName === 'BUTTON') {
+        tile.type = 'button';
+      }
+      if (typeof config.onSelect === 'function') {
+        if (tile.tagName === 'BUTTON') {
+          tile.addEventListener('click', config.onSelect);
+        } else {
+          bindWallpaperTileActivation(tile, config.onSelect, config.shouldIgnoreEvent);
+        }
+      }
+      return tile;
+    }
+
+    function isWallpaperDeleteButtonEvent(event) {
+      return Boolean(event &&
+        event.target &&
+        event.target.closest &&
+        event.target.closest('.x-nt-wallpaper-delete-button'));
+    }
+
+    function createBuiltInWallpaperTile(item) {
+      return createSelectableWallpaperTile(item, {
+        attrs: { 'data-wallpaper-path': getWallpaperLocalPath(item) },
+        onSelect: () => {
+          persistNewtabWallpaper(item.id);
+        }
+      });
+    }
+
+    function createCustomWallpaperTile(item) {
+      const tile = createSelectableWallpaperTile(item, {
+        tagName: 'div',
+        className: 'x-nt-wallpaper-custom-tile',
+        imageClassName: 'x-nt-wallpaper-custom-image',
+        attrs: {
+          role: 'button',
+          tabindex: '0',
+          'data-custom-wallpaper': 'true'
+        },
+        shouldIgnoreEvent: isWallpaperDeleteButtonEvent,
+        onSelect: () => {
+          persistNewtabWallpaper(item.id);
+        }
+      });
+      const deleteButton = createDomElement('button', {
+        className: 'x-nt-wallpaper-delete-button',
+        attrs: {
+          'aria-label': t('newtab_wallpaper_delete_local', 'Delete imported wallpaper')
+        },
+        innerHTML: getRiSvg('ri-subtract-line', 'ri-size-14')
+      });
+      deleteButton.type = 'button';
+      deleteButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        deleteCustomWallpaper(item.id);
+      });
+      tile.appendChild(deleteButton);
+      return tile;
+    }
+
+    function createWallpaperBody(effectControl) {
+      wallpaperBody = createDomElement('div', {
+        className: 'x-nt-wallpaper-body',
+        attrs: {
+          'data-visible': 'true',
+          'data-active-tab': activeWallpaperTab
+        }
+      });
+      wallpaperTabs = createWallpaperTabs();
+      wallpaperBuiltInGrid = createDomElement('div', {
+        className: 'x-nt-wallpaper-grid x-nt-wallpaper-grid--built-in',
+        attrs: {
+          role: 'tabpanel',
+          'data-wallpaper-panel': 'built-in'
+        }
+      });
+      wallpaperLocalGrid = createDomElement('div', {
+        className: 'x-nt-wallpaper-grid x-nt-wallpaper-grid--local',
+        attrs: {
+          role: 'tabpanel',
+          'data-wallpaper-panel': 'local'
+        }
+      });
+      wallpaperLocalGrid.appendChild(createWallpaperUploadTile());
+      NEWTAB_WALLPAPER_OPTIONS.forEach((item) => {
+        wallpaperBuiltInGrid.appendChild(createBuiltInWallpaperTile(item));
+      });
+      appendChildren(wallpaperBody, [
+        wallpaperTabs,
+        wallpaperBuiltInGrid,
+        wallpaperLocalGrid,
+        effectControl
+      ]);
+      return wallpaperBody;
+    }
+
+    function createWallpaperSection(effectControl) {
+      const headerSection = createSwitchPanelSection(() => {
+        if (wallpaperEnabledToggle.checked) {
+          persistNewtabWallpaper(getWallpaperRestoreId());
+          return;
+        }
+        persistNewtabWallpaper('');
+      });
+      wallpaperPanelHeader = headerSection.header;
+      wallpaperPanelTitle = headerSection.title;
+      wallpaperEnabledToggle = headerSection.toggle;
+      customWallpaperInput = createDomElement('input', { className: 'x-nt-wallpaper-file-input' });
       customWallpaperInput.type = 'file';
       customWallpaperInput.accept = 'image/*';
       customWallpaperInput.tabIndex = -1;
@@ -2230,109 +2691,36 @@
         const file = event && event.target && event.target.files ? event.target.files[0] : null;
         importCustomWallpaperFile(file);
       });
-      customWallpaperUploadTile = document.createElement('div');
-      customWallpaperUploadTile.className = 'x-nt-wallpaper-tile x-nt-wallpaper-upload-tile';
-      customWallpaperUploadTile.setAttribute('role', 'button');
-      customWallpaperUploadTile.setAttribute('tabindex', '0');
-      customWallpaperUploadTile.setAttribute('data-upload', 'true');
-      customWallpaperUploadTile.setAttribute('data-loading', 'false');
-      customWallpaperUploadTile.setAttribute('data-selected', 'false');
-      customWallpaperUploadTile.setAttribute('aria-pressed', 'false');
-      const customThumb = document.createElement('span');
-      customThumb.className = 'x-nt-wallpaper-thumb x-nt-wallpaper-upload-thumb';
-      const customPlaceholder = document.createElement('span');
-      customPlaceholder.className = 'x-nt-wallpaper-upload-placeholder';
-      customPlaceholder.innerHTML = getRiSvg('ri-add-large-line', 'ri-size-18');
-      customThumb.appendChild(customPlaceholder);
-      customWallpaperUploadTile.appendChild(customThumb);
-      customWallpaperUploadTile.addEventListener('click', () => {
-        openCustomWallpaperPicker();
-      });
-      customWallpaperUploadTile.addEventListener('keydown', (event) => {
-        if (!event || (event.key !== 'Enter' && event.key !== ' ')) {
-          return;
-        }
-        event.preventDefault();
-        openCustomWallpaperPicker();
-      });
-      customWallpaperUploadTile.addEventListener('mouseenter', () => {
-        showCustomWallpaperTooltip(customWallpaperUploadTile);
-      });
-      customWallpaperUploadTile.addEventListener('mouseleave', hideTopActionTooltip);
-      customWallpaperUploadTile.addEventListener('focusin', () => {
-        showCustomWallpaperTooltip(customWallpaperUploadTile);
-      });
-      customWallpaperUploadTile.addEventListener('focusout', (event) => {
-        const nextTarget = event && event.relatedTarget ? event.relatedTarget : null;
-        if (!nextTarget || !customWallpaperUploadTile.contains(nextTarget)) {
-          hideTopActionTooltip();
-        }
-      });
-      wallpaperLocalGrid.appendChild(customWallpaperUploadTile);
+      appendChildren(headerSection.section, [
+        customWallpaperInput,
+        createWallpaperBody(effectControl)
+      ]);
       renderCustomWallpaperTiles();
-      NEWTAB_WALLPAPER_OPTIONS.forEach((item) => {
-        const tile = document.createElement('button');
-        tile.type = 'button';
-        tile.className = 'x-nt-wallpaper-tile';
-        tile.setAttribute('data-wallpaper-id', item.id);
-        tile.setAttribute('data-wallpaper-path', getWallpaperLocalPath(item));
-        tile.setAttribute('data-selected', 'false');
-        tile.setAttribute('aria-pressed', 'false');
-        const thumb = document.createElement('span');
-        thumb.className = 'x-nt-wallpaper-thumb';
-        const image = document.createElement('img');
-        image.src = getWallpaperThumbnailUrl(item);
-        image.alt = '';
-        image.draggable = false;
-        image.loading = 'lazy';
-        image.decoding = 'async';
-        thumb.appendChild(image);
-        const check = document.createElement('span');
-        check.className = 'x-nt-wallpaper-check';
-        check.innerHTML = getRiSvg('ri-check-line', 'ri-size-16');
-        tile.appendChild(thumb);
-        tile.appendChild(check);
-        tile.addEventListener('click', () => {
-          persistNewtabWallpaper(item.id);
-        });
-        wallpaperBuiltInGrid.appendChild(tile);
-      });
-      wallpaperBody.appendChild(wallpaperTabs);
-      wallpaperBody.appendChild(wallpaperBuiltInGrid);
-      wallpaperBody.appendChild(wallpaperLocalGrid);
-      wallpaperBody.appendChild(effectControl);
-      wallpaperSection.appendChild(wallpaperPanelHeader);
-      wallpaperSection.appendChild(customWallpaperInput);
-      wallpaperSection.appendChild(wallpaperBody);
-      const logoDivider = document.createElement('div');
-      logoDivider.className = 'x-nt-panel-divider';
-      const logoSection = document.createElement('div');
-      logoSection.className = 'x-nt-wallpaper-section';
-      const logoHeader = document.createElement('div');
-      logoHeader.className = 'x-nt-wallpaper-panel-header';
-      logoPanelTitle = document.createElement('div');
-      logoPanelTitle.className = 'x-nt-wallpaper-panel-title';
-      const logoSwitchLabel = document.createElement('label');
-      logoSwitchLabel.className = 'x-nt-wallpaper-switch';
-      logoEnabledToggle = document.createElement('input');
-      logoEnabledToggle.type = 'checkbox';
-      logoEnabledToggle.setAttribute('role', 'switch');
-      logoEnabledToggle.addEventListener('change', () => {
+      return headerSection.section;
+    }
+
+    function createLogoSection() {
+      const logoSection = createSwitchPanelSection(() => {
         persistWordmarkVisible(logoEnabledToggle.checked);
       });
-      const logoSwitchSlider = document.createElement('span');
-      logoSwitchSlider.className = 'x-nt-wallpaper-switch-slider';
-      logoSwitchSlider.setAttribute('aria-hidden', 'true');
-      logoSwitchLabel.appendChild(logoEnabledToggle);
-      logoSwitchLabel.appendChild(logoSwitchSlider);
-      logoHeader.appendChild(logoPanelTitle);
-      logoHeader.appendChild(logoSwitchLabel);
-      logoSection.appendChild(logoHeader);
-      wallpaperPanel.appendChild(appearanceSection);
-      wallpaperPanel.appendChild(divider);
-      wallpaperPanel.appendChild(wallpaperSection);
-      wallpaperPanel.appendChild(logoDivider);
-      wallpaperPanel.appendChild(logoSection);
+      logoPanelTitle = logoSection.title;
+      logoEnabledToggle = logoSection.toggle;
+      return logoSection.section;
+    }
+
+    function renderWallpaperPanel() {
+      if (!wallpaperPanel || wallpaperPanelRendered) {
+        return;
+      }
+      wallpaperPanelRendered = true;
+      const effectControl = createWallpaperEffectControl();
+      appendChildren(wallpaperPanel, [
+        createAppearanceSection(),
+        createPanelDivider(),
+        createWallpaperSection(effectControl),
+        createPanelDivider(),
+        createLogoSection()
+      ]);
       updateWallpaperLanguageStrings();
       setWallpaperActiveTab(activeWallpaperTab);
       updateCustomWallpaperUploadTile();
@@ -2352,6 +2740,7 @@
       if (wallpaperControl) {
         wallpaperControl.setAttribute('data-panel-open', 'true');
       }
+      setWallpaperPanelOpenState(true);
       scheduleWallpaperPanelOpenTabIndicatorsRefresh();
     }
 
@@ -2359,12 +2748,14 @@
       if (!wallpaperPanel || !wallpaperButton) {
         return;
       }
+      hideWallpaperSliderValueBubble(null, { force: true });
       wallpaperPanel.setAttribute('data-open', 'false');
       wallpaperButton.setAttribute('data-open', 'false');
       wallpaperButton.setAttribute('aria-expanded', 'false');
       if (wallpaperControl) {
         wallpaperControl.setAttribute('data-panel-open', 'false');
       }
+      setWallpaperPanelOpenState(false);
       if (options && options.restoreFocus) {
         try {
           wallpaperButton.focus({ preventScroll: true });
@@ -2417,15 +2808,27 @@
       wallpaperPanel.setAttribute('data-open', 'false');
       wallpaperPanel.setAttribute('role', 'dialog');
       wallpaperPanel.setAttribute('aria-modal', 'false');
+      wallpaperPanel.addEventListener('scroll', () => {
+        hideWallpaperSliderValueBubble(null, { force: true });
+      }, { passive: true });
       wallpaperButton.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
         hideTopActionTooltip();
         toggleWallpaperPanel();
       });
-      wallpaperButton.addEventListener('mouseenter', hideTopActionTooltip);
+      const showWallpaperButtonTooltip = () => {
+        if (isWallpaperPanelOpen()) {
+          hideTopActionTooltip();
+          return;
+        }
+        showTopActionTooltip(wallpaperButton, getWallpaperButtonLabel(), {
+          placement: 'left-above'
+        });
+      };
+      wallpaperButton.addEventListener('mouseenter', showWallpaperButtonTooltip);
       wallpaperButton.addEventListener('mouseleave', hideTopActionTooltip);
-      wallpaperButton.addEventListener('focus', hideTopActionTooltip);
+      wallpaperButton.addEventListener('focus', showWallpaperButtonTooltip);
       wallpaperButton.addEventListener('blur', hideTopActionTooltip);
       if (wallpaperFeatureHintController && wallpaperFeatureHintController.element) {
         wallpaperControl.appendChild(wallpaperFeatureHintController.element);
@@ -2433,6 +2836,9 @@
       wallpaperControl.appendChild(wallpaperPanel);
       wallpaperControl.appendChild(wallpaperButton);
       window.addEventListener('resize', scheduleWallpaperPanelTabIndicatorsRefresh, { passive: true });
+      window.addEventListener('resize', () => {
+        hideWallpaperSliderValueBubble(null, { force: true });
+      }, { passive: true });
       updateWallpaperLanguageStrings();
       updateWallpaperSelectionUi();
     }

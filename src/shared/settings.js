@@ -12,13 +12,21 @@
     }
     const lower = raw.toLowerCase();
     if (lower.startsWith('zh')) {
-      if (lower.includes('hk')) {
-        return 'zh_HK';
-      }
-      if (lower.includes('tw') || lower.includes('mo') || lower.includes('hant')) {
+      if (lower.includes('tw') || lower.includes('hk') || lower.includes('mo') || lower.includes('hant')) {
         return 'zh_TW';
       }
       return 'zh_CN';
+    }
+    return 'en';
+  }
+
+  function localeToHtmlLang(locale) {
+    const normalized = normalizeLocale(locale);
+    if (normalized === 'zh_CN') {
+      return 'zh-CN';
+    }
+    if (normalized === 'zh_TW') {
+      return 'zh-TW';
     }
     return 'en';
   }
@@ -71,6 +79,7 @@
 
   return Object.freeze({
     normalizeLocale,
+    localeToHtmlLang,
     normalizeNewtabWidthMode,
     normalizeNewtabWordmarkVisible,
     normalizeOverlaySizeMode,

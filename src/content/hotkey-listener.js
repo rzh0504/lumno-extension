@@ -84,7 +84,7 @@
       return 'zh_TW';
     }
     if (normalized === 'zh_hk' || normalized.startsWith('zh_hk') || normalized.startsWith('zh_hant_hk')) {
-      return 'zh_HK';
+      return 'zh_TW';
     }
     if (normalized.startsWith('zh_hant')) {
       return 'zh_TW';

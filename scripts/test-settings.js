@@ -4,8 +4,11 @@ const settings = require('../src/shared/settings.js');
 assert.strictEqual(settings.normalizeLocale(''), 'en');
 assert.strictEqual(settings.normalizeLocale('en-US'), 'en');
 assert.strictEqual(settings.normalizeLocale('zh-CN'), 'zh_CN');
-assert.strictEqual(settings.normalizeLocale('zh-HK'), 'zh_HK');
+assert.strictEqual(settings.normalizeLocale('zh-HK'), 'zh_TW');
 assert.strictEqual(settings.normalizeLocale('zh-Hant-TW'), 'zh_TW');
+assert.strictEqual(settings.localeToHtmlLang('en-US'), 'en');
+assert.strictEqual(settings.localeToHtmlLang('zh-CN'), 'zh-CN');
+assert.strictEqual(settings.localeToHtmlLang('zh-HK'), 'zh-TW');
 
 assert.strictEqual(settings.normalizeNewtabWidthMode('standard'), 'standard');
 assert.strictEqual(settings.normalizeNewtabWidthMode('wide'), 'wide');

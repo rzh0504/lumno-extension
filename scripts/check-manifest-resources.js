@@ -48,6 +48,47 @@ function checkPath(value) {
   }
 }
 
+function checkRelativeResourcePath(file, value) {
+  if (!value || typeof value !== 'string') {
+    return;
+  }
+  if (/^(https?:|data:|blob:|mailto:|tel:|chrome:|about:|#|__MSG_)/.test(value)) {
+    return;
+  }
+  if (value.includes('${') || value.startsWith('var(')) {
+    return;
+  }
+  const cleanValue = value.split(/[?#]/)[0];
+  if (!cleanValue || cleanValue.startsWith('#')) {
+    return;
+  }
+  const resolved = cleanValue.startsWith('/')
+    ? path.normalize(cleanValue.slice(1))
+    : path.normalize(path.join(path.dirname(file), cleanValue));
+  if (resolved.startsWith('..') || path.isAbsolute(resolved)) {
+    return;
+  }
+  checkPath(resolved);
+}
+
+function checkCssUrlReferences(file, source) {
+  const cssUrlPattern = /url\(\s*(?:"([^"]+)"|'([^']+)'|([^)"'\s]+))\s*\)/g;
+  let match = null;
+  while ((match = cssUrlPattern.exec(source))) {
+    checkRelativeResourcePath(file, match[1] || match[2] || match[3] || '');
+  }
+}
+
+function checkConcreteExtensionPathReferences(file, source) {
+  const extensionPathPattern = /(['"`])((?:assets|src|_locales|output)\/[^'"`?#)>\s]+)(?:[?#][^'"`]*)?\1/g;
+  let match = null;
+  while ((match = extensionPathPattern.exec(source))) {
+    if (!match[2].includes('${')) {
+      checkPath(match[2]);
+    }
+  }
+}
+
 function listJsFiles(dir) {
   if (!fs.existsSync(dir)) {
     return [];
@@ -61,6 +102,25 @@ function listJsFiles(dir) {
       return;
     }
     if (entry.isFile() && fullPath.endsWith('.js')) {
+      files.push(fullPath);
+    }
+  });
+  return files;
+}
+
+function listFilesWithExtension(dir, extension) {
+  if (!fs.existsSync(dir)) {
+    return [];
+  }
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const files = [];
+  entries.forEach((entry) => {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...listFilesWithExtension(fullPath, extension));
+      return;
+    }
+    if (entry.isFile() && fullPath.endsWith(extension)) {
       files.push(fullPath);
     }
   });
@@ -91,6 +151,8 @@ function checkRuntimeGetUrlReferences() {
   const staticGetUrlPattern = /chrome\.runtime\.getURL\(\s*(['"`])([^'"`]+)\1\s*\)/g;
   files.forEach((file) => {
     const source = fs.readFileSync(file, 'utf8');
+    checkConcreteExtensionPathReferences(file, source);
+    checkCssUrlReferences(file, source);
     let match = null;
     while ((match = staticGetUrlPattern.exec(source))) {
       const value = match[2];
@@ -107,6 +169,7 @@ function checkHtmlReferences() {
   const referencePattern = /\b(?:src|href)=["']([^"']+)["']/g;
   files.forEach((file) => {
     const source = fs.readFileSync(file, 'utf8');
+    checkCssUrlReferences(file, source);
     let match = null;
     while ((match = referencePattern.exec(source))) {
       const value = match[1];
@@ -118,6 +181,41 @@ function checkHtmlReferences() {
       checkPath(resolved);
     }
   });
+}
+
+function checkCssFiles() {
+  const files = [
+    ...listFilesWithExtension('src', '.css'),
+    ...listFilesWithExtension('assets', '.css')
+  ];
+  files.forEach((file) => {
+    checkCssUrlReferences(file, fs.readFileSync(file, 'utf8'));
+  });
+}
+
+function checkNewtabWallpaperFiles() {
+  const file = 'src/newtab/wallpaper.js';
+  if (!fs.existsSync(file)) {
+    return;
+  }
+  const source = fs.readFileSync(file, 'utf8');
+  const directoryMatch = source.match(/NEWTAB_WALLPAPER_EXTENSION_DIRECTORY\s*=\s*['"]([^'"]+)['"]/);
+  const suffixMatch = source.match(/NEWTAB_WALLPAPER_THUMBNAIL_SUFFIX\s*=\s*['"]([^'"]+)['"]/);
+  const directory = directoryMatch ? directoryMatch[1] : '';
+  const thumbnailSuffix = suffixMatch ? suffixMatch[1] : '';
+  if (!directory) {
+    return;
+  }
+  const filePattern = /\bfile:\s*['"]([^'"]+\.webp)['"]/g;
+  let match = null;
+  while ((match = filePattern.exec(source))) {
+    const wallpaperFile = match[1];
+    checkPath(`${directory}/${wallpaperFile}`);
+    if (thumbnailSuffix) {
+      const thumbnailFile = wallpaperFile.replace(/\.[^.]+$/, thumbnailSuffix);
+      checkPath(`${directory}/${thumbnailFile}`);
+    }
+  }
 }
 
 checkPath(manifest.background && manifest.background.service_worker);
@@ -135,6 +233,8 @@ Object.values(manifest.icons || {}).forEach(checkPath);
 injectedScriptFiles.forEach(checkPath);
 checkRuntimeGetUrlReferences();
 checkHtmlReferences();
+checkCssFiles();
+checkNewtabWallpaperFiles();
 
 if (missing.length > 0) {
   console.error('Missing manifest resources:');

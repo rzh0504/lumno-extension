@@ -27,7 +27,7 @@
     "message": "深淺色作用範圍說明"
   },
   "newtab_theme_scope_help": {
-    "message": "「全域」會作用於全域的深淺色模式，「新分頁」僅作用於新分頁。"
+    "message": "「全域」設定預設深淺色模式。「新分頁」只覆蓋新分頁；在其中選擇「跟隨全域」即可繼承全域設定。"
   },
   "newtab_theme_follow_global": {
     "message": "跟隨「全域」"
@@ -50,13 +50,13 @@
   "settings_language_desc": {
     "message": "選擇介面顯示語言"
   },
+  "settings_version_label": {
+    "message": "版本"
+  },
   "language_zh_cn": {
     "message": "簡體中文"
   },
   "language_zh_tw": {
-    "message": "繁體中文"
-  },
-  "language_zh_hk": {
     "message": "繁體中文"
   },
   "language_en": {
@@ -413,9 +413,6 @@
   "newtab_wallpaper_select_label": {
     "message": "選擇 {name}"
   },
-  "newtab_wallpaper_none": {
-    "message": "無壁紙"
-  },
   "newtab_wallpaper_add_local": {
     "message": "新增本機壁紙"
   },
@@ -428,8 +425,38 @@
   "newtab_wallpaper_feature_hint_close": {
     "message": "關閉壁紙提示"
   },
-  "newtab_wallpaper_local_tag": {
-    "message": "本機"
+  "newtab_ai_quick_jump_feature_hint_badge": {
+    "message": "新功能"
+  },
+  "newtab_ai_quick_jump_feature_hint_text": {
+    "message": "常用 AI 網站現已支援一鍵輸入並跳轉。試著輸入「doubao」並按下 Tab。"
+  },
+  "newtab_ai_quick_jump_feature_hint_link": {
+    "message": "支援列表"
+  },
+  "newtab_ai_quick_jump_feature_hint_close": {
+    "message": "關閉 AI 跳轉提示"
+  },
+  "newtab_feedback_button_aria": {
+    "message": "回饋"
+  },
+  "newtab_feedback_mail_subject": {
+    "message": "Lumno 回饋"
+  },
+  "newtab_feedback_mail_source_label": {
+    "message": "來源"
+  },
+  "newtab_feedback_mail_version_label": {
+    "message": "Lumno 版本"
+  },
+  "newtab_feedback_mail_language_label": {
+    "message": "語言"
+  },
+  "newtab_feedback_mail_os_label": {
+    "message": "作業系統"
+  },
+  "newtab_feedback_mail_browser_label": {
+    "message": "瀏覽器"
   },
   "newtab_wallpaper_delete_local": {
     "message": "刪除已匯入的壁紙"
@@ -460,6 +487,9 @@
   },
   "newtab_wallpaper_effect_spacing": {
     "message": "間距"
+  },
+  "newtab_wallpaper_effect_hover": {
+    "message": "懸停效果"
   },
   "newtab_wallpaper_effect_none": {
     "message": "關閉"
@@ -646,6 +676,9 @@
   },
   "shortcuts_group_ai": {
     "message": "AI"
+  },
+  "shortcuts_group_ai_desc": {
+    "message": "輸入關鍵詞，按下 Tab 並輸入內容（Prompt）後，可跳轉至以下 AI 網站並自動填入（需先登入對應網站）。"
   },
   "shortcuts_badge_custom": {
     "message": "自訂"
