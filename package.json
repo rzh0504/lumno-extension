@@ -16,6 +16,8 @@
     "test:newtab-stores": "node scripts/test-newtab-stores.js",
     "test:message-router": "node scripts/test-message-router.js",
     "test:extension-routes": "node scripts/test-extension-routes.js",
+    "test:extension-pages": "node scripts/test-extension-pages.js",
+    "test:feature-hints": "node scripts/test-feature-hints.js",
     "test:pip-main-world": "node scripts/test-pip-main-world.js",
     "test:newtab-suggestions": "node scripts/test-newtab-suggestions-view.js",
     "test:shortcut-rules": "node scripts/test-shortcut-rules.js",

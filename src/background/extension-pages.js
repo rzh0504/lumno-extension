@@ -7,6 +7,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function() {
   const ONBOARDING_URL = 'https://lumno.kubai.design/onboarding/';
   const RELEASE_URL = 'https://lumno.kubai.design/release/';
+  const RELEASE_PAGE_OPENED_STORAGE_KEY = '_x_lumno_release_page_opened_2026_unique_';
 
   function getChromeApi() {
     return typeof chrome !== 'undefined' ? chrome : null;
@@ -81,6 +82,33 @@
     return /^v/i.test(version) ? version : `v${version}`;
   }
 
+  function getLocalStorageArea(chromeApi) {
+    return chromeApi && chromeApi.storage && chromeApi.storage.local
+      ? chromeApi.storage.local
+      : null;
+  }
+
+  function getStoredReleasePageOpen(payload) {
+    if (!payload || typeof payload !== 'object') {
+      return null;
+    }
+    const version = typeof payload.version === 'string' ? payload.version.trim() : '';
+    if (!version) {
+      return null;
+    }
+    return {
+      version,
+      reason: typeof payload.reason === 'string' ? payload.reason : '',
+      openedAt: Number(payload.openedAt) || 0
+    };
+  }
+
+  function getReleaseOpenReason(options) {
+    return options && typeof options.reason === 'string'
+      ? String(options.reason).trim().toLowerCase()
+      : '';
+  }
+
   function buildReleaseUrl(options) {
     const params = new URLSearchParams();
     params.set('entry', 'ext');
@@ -102,9 +130,55 @@
       done(false);
       return;
     }
-    chromeApi.tabs.create({ url: buildReleaseUrl(options) }, () => {
-      done(!(chromeApi.runtime && chromeApi.runtime.lastError));
-    });
+    const releaseUrl = buildReleaseUrl(options);
+    const oncePerVersion = Boolean(options && options.oncePerVersion);
+    const version = getExtensionVersionTag();
+    const storageArea = getLocalStorageArea(chromeApi);
+    const openTab = (afterOpen) => {
+      chromeApi.tabs.create({ url: releaseUrl }, () => {
+        const opened = !(chromeApi.runtime && chromeApi.runtime.lastError);
+        if (opened && typeof afterOpen === 'function') {
+          afterOpen();
+        }
+        done(opened);
+      });
+    };
+    const markOpened = () => {
+      if (!storageArea || typeof storageArea.set !== 'function' || !version) {
+        return;
+      }
+      try {
+        storageArea.set({
+          [RELEASE_PAGE_OPENED_STORAGE_KEY]: {
+            version,
+            reason: getReleaseOpenReason(options),
+            openedAt: Date.now()
+          }
+        }, () => {});
+      } catch (e) {
+        // A failed marker should not block the user from seeing the release page.
+      }
+    };
+
+    if (!oncePerVersion || !version || !storageArea || typeof storageArea.get !== 'function') {
+      openTab(oncePerVersion ? markOpened : null);
+      return;
+    }
+    try {
+      storageArea.get([RELEASE_PAGE_OPENED_STORAGE_KEY], (result) => {
+        const runtimeError = chromeApi.runtime ? chromeApi.runtime.lastError : null;
+        const stored = runtimeError
+          ? null
+          : getStoredReleasePageOpen(result && result[RELEASE_PAGE_OPENED_STORAGE_KEY]);
+        if (stored && stored.version === version) {
+          done(false);
+          return;
+        }
+        openTab(markOpened);
+      });
+    } catch (e) {
+      openTab(markOpened);
+    }
   }
 
   function getBookmarkManagerUrls() {
@@ -179,6 +253,7 @@
 
   return Object.freeze({
     buildReleaseUrl,
+    RELEASE_PAGE_OPENED_STORAGE_KEY,
     getBookmarkManagerUrls,
     getExtensionDetailsUrl,
     getExtensionVersionTag,

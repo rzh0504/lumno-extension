@@ -1765,7 +1765,7 @@ chrome.runtime.onInstalled.addListener((details) => {
     return;
   }
   if (reason === 'update') {
-    openReleasePage({ reason: 'update' });
+    openReleasePage({ reason: 'update', oncePerVersion: true });
   }
   schedulePersistPinnedTabSnapshot();
 });

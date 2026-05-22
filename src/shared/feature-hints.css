@@ -41,7 +41,7 @@
   line-height: 1.45;
   white-space: normal;
   text-align: left;
-  pointer-events: auto;
+  pointer-events: none;
   opacity: 0;
   visibility: hidden;
   transform: translateY(6px) scale(0.98);
@@ -52,6 +52,7 @@
 .x-lumno-feature-hint[data-visible="true"] {
   visibility: visible;
   opacity: 1;
+  pointer-events: auto;
   transform: translateY(0) scale(1);
 }
 
