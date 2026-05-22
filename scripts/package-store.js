@@ -10,8 +10,7 @@ const packageRoots = [
   'manifest.json',
   'src',
   '_locales',
-  'assets',
-  'output/imagegen'
+  'assets'
 ];
 const injectedScriptFiles = [
   'src/background/extension-pages.js',

@@ -81,8 +81,8 @@
       })
       : null;
 
-    const NEWTAB_WALLPAPER_DEFAULT_DIRECTORY = '/Users/kevinxu/github/Lumno/output/imagegen';
-    const NEWTAB_WALLPAPER_EXTENSION_DIRECTORY = 'output/imagegen';
+    const NEWTAB_WALLPAPER_DEFAULT_DIRECTORY = 'assets/wallpapers';
+    const NEWTAB_WALLPAPER_EXTENSION_DIRECTORY = 'assets/wallpapers';
     const NEWTAB_WALLPAPER_THUMBNAIL_SUFFIX = '-thumb.webp';
     const NEWTAB_WALLPAPER_DEFAULT_ID = 'monet-coastal-white';
     const NEWTAB_CUSTOM_WALLPAPER_ID = WALLPAPER_LOCAL_STORE.CUSTOM_WALLPAPER_ID || 'custom-upload';
