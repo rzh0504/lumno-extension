@@ -19,9 +19,9 @@
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/59161f7d-0089-4997-b57f-8d3b936a4619" alt="Lumno preview 1" width="100%" /> 
+  <img src="https://github.com/user-attachments/assets/2f32b28c-2655-4ffe-9f07-678793367f10" alt="Lumno preview 1" width="100%" /> 
   &nbsp;
-  <img src="https://github.com/user-attachments/assets/8057bd2b-51db-41f8-8d11-c6a13f8308ac" alt="Lumno preview 3" width="100%" />
+  <img src="https://github.com/user-attachments/assets/0c00c851-27c2-430a-a2a6-4e98c026514e" alt="Lumno preview 3" width="100%" />
 </p>
 
 ## ✨ Why Lumno
