@@ -6,3 +6,8 @@ dist/
 .tmp_fav/
 tmp/
 output/
+AGENTS.md
+search-rule-changes-*.md
+docs/superpowers/
+docs/*-refactor-*.md
+docs/*-audit.md
