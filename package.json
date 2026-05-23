@@ -1,6 +1,6 @@
 {
   "name": "lumno-extension",
-  "version": "0.9.9",
+  "version": "0.9.10",
   "private": true,
   "scripts": {
     "check": "npm run check:js && npm run check:manifest",

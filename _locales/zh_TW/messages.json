@@ -485,9 +485,6 @@
   "newtab_feedback_wechat_qr_alt": {
     "message": "Lumno 微信群二維碼"
   },
-  "newtab_feedback_discord_link_label": {
-    "message": "開啟 Discord"
-  },
   "newtab_feedback_mail_subject": {
     "message": "Lumno 回饋"
   },

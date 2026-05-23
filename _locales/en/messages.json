@@ -485,9 +485,6 @@
   "newtab_feedback_wechat_qr_alt": {
     "message": "Lumno WeChat group QR code"
   },
-  "newtab_feedback_discord_link_label": {
-    "message": "Open Discord"
-  },
   "newtab_feedback_mail_subject": {
     "message": "Lumno feedback"
   },
@@ -546,7 +543,7 @@
     "message": "Grain"
   },
   "newtab_wallpaper_effect_halftone": {
-    "message": "Dots"
+    "message": "Halftone"
   },
   "newtab_wallpaper_effect_ascii": {
     "message": "ASCII"

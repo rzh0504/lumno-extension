@@ -206,7 +206,7 @@
     const NEWTAB_WALLPAPER_EFFECT_TYPES = [
       { type: 'none', labelKey: 'newtab_wallpaper_effect_none', fallback: 'Off' },
       { type: 'grain', labelKey: 'newtab_wallpaper_effect_grain', fallback: 'Grain' },
-      { type: 'halftone', labelKey: 'newtab_wallpaper_effect_halftone', fallback: 'Dots' },
+      { type: 'halftone', labelKey: 'newtab_wallpaper_effect_halftone', fallback: 'Halftone' },
       { type: 'ascii', labelKey: 'newtab_wallpaper_effect_ascii', fallback: 'ASCII' }
     ];
     const WALLPAPER_PANEL_RESIZE_DURATION_MS = 260;
@@ -3233,7 +3233,7 @@
           return;
         }
         showTopActionTooltip(wallpaperButton, getWallpaperButtonLabel(), {
-          placement: 'left-above'
+          placement: 'left'
         });
       };
       wallpaperButton.addEventListener('mouseenter', showWallpaperButtonTooltip);

@@ -1173,9 +1173,17 @@
       feedbackCommunityButton.setAttribute('aria-label', label);
       feedbackCommunityButton.setAttribute('title', label);
       feedbackCommunityButton.setAttribute('data-channel', channel);
+      feedbackCommunityButton.setAttribute('aria-haspopup', channel === 'wechat' ? 'true' : 'false');
+      if (channel !== 'wechat') {
+        feedbackCommunityButton.setAttribute('aria-expanded', 'false');
+      }
     }
     if (feedbackDetail && !feedbackDetail.hidden) {
-      renderFeedbackDetail();
+      if (channel === 'wechat') {
+        renderFeedbackDetail();
+      } else {
+        setFeedbackDetailOpen(false);
+      }
     }
   }
 
@@ -1202,22 +1210,7 @@
       image.alt = t('newtab_feedback_wechat_qr_alt', 'Lumno WeChat group QR code');
       image.loading = 'lazy';
       feedbackDetail.appendChild(image);
-      return;
     }
-
-    const link = document.createElement('a');
-    link.className = 'x-nt-feedback-detail-link';
-    link.href = links.discord || LUMNO_FEEDBACK_LINKS_FALLBACK.discord;
-    link.target = '_blank';
-    link.rel = 'noreferrer noopener';
-    link.innerHTML = getRiSvg('ri-discord-fill', 'ri-size-16');
-    const label = document.createElement('span');
-    label.textContent = t('newtab_feedback_discord_link_label', 'Open Discord');
-    link.appendChild(label);
-    link.addEventListener('click', () => {
-      closeFeedbackPopover();
-    });
-    feedbackDetail.appendChild(link);
   }
 
   function setFeedbackDetailOpen(open) {
@@ -1255,6 +1248,19 @@
   async function openFeedbackMailto(emailOverride) {
     const url = await buildFeedbackMailtoUrl(emailOverride);
     window.location.href = url;
+  }
+
+  function openFeedbackExternalUrl(url) {
+    const safeUrl = normalizeFeedbackHttpsUrl(url);
+    if (!safeUrl) {
+      return false;
+    }
+    if (chrome && chrome.tabs && typeof chrome.tabs.create === 'function') {
+      chrome.tabs.create({ url: safeUrl, active: true });
+      return true;
+    }
+    window.open(safeUrl, '_blank', 'noopener');
+    return true;
   }
 
   function updateFeedbackLanguageStrings() {
@@ -1327,6 +1333,27 @@
     openFeedbackMailto(links && links.email);
   }
 
+  async function handleFeedbackCommunityClick(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    hideTopActionTooltip();
+
+    const currentLinks = feedbackLinks || LUMNO_FEEDBACK_LINKS_FALLBACK;
+    if (getFeedbackCommunityChannel(currentLinks) === 'wechat') {
+      setFeedbackDetailOpen(feedbackDetail ? feedbackDetail.hidden : true);
+      return;
+    }
+
+    const links = await loadFeedbackLinks({ force: false });
+    updateFeedbackContactUi();
+    if (getFeedbackCommunityChannel(links) === 'wechat') {
+      setFeedbackDetailOpen(true);
+      return;
+    }
+    closeFeedbackPopover();
+    openFeedbackExternalUrl((links && links.discord) || LUMNO_FEEDBACK_LINKS_FALLBACK.discord);
+  }
+
   function createFeedbackControls() {
     feedbackControl = document.createElement('div');
     feedbackControl.className = 'x-nt-feedback-control';
@@ -1389,14 +1416,9 @@
     feedbackCommunityButton.type = 'button';
     feedbackCommunityButton.className = 'x-nt-feedback-action x-nt-feedback-action-community';
     feedbackCommunityButton.setAttribute('role', 'menuitem');
-    feedbackCommunityButton.setAttribute('aria-haspopup', 'true');
+    feedbackCommunityButton.setAttribute('aria-haspopup', 'false');
     feedbackCommunityButton.setAttribute('aria-expanded', 'false');
-    feedbackCommunityButton.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      hideTopActionTooltip();
-      setFeedbackDetailOpen(feedbackDetail ? feedbackDetail.hidden : true);
-    });
+    feedbackCommunityButton.addEventListener('click', handleFeedbackCommunityClick);
 
     feedbackDetail = document.createElement('div');
     feedbackDetail.className = 'x-nt-feedback-detail';
