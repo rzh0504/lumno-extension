@@ -14,6 +14,12 @@ assert.strictEqual(settings.normalizeNewtabWidthMode('standard'), 'standard');
 assert.strictEqual(settings.normalizeNewtabWidthMode('wide'), 'wide');
 assert.strictEqual(settings.normalizeNewtabWidthMode('other'), 'wide');
 
+assert.strictEqual(settings.normalizeNewtabSearchWidth(719), 720);
+assert.strictEqual(settings.normalizeNewtabSearchWidth(920), 920);
+assert.strictEqual(settings.normalizeNewtabSearchWidth(1200), 1040);
+assert.strictEqual(settings.normalizeNewtabSearchWidth(undefined), 920);
+assert.strictEqual(settings.normalizeNewtabSearchWidth(undefined, { allowNull: true }), null);
+
 assert.strictEqual(settings.normalizeNewtabWordmarkVisible(false), false);
 assert.strictEqual(settings.normalizeNewtabWordmarkVisible(true), true);
 assert.strictEqual(settings.normalizeNewtabWordmarkVisible(undefined), true);

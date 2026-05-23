@@ -381,6 +381,14 @@
         const image = new Image();
         image.decoding = 'async';
         image.onload = () => {
+          if (typeof image.decode === 'function') {
+            image.decode().then(() => {
+              resolve(image);
+            }).catch(() => {
+              resolve(image);
+            });
+            return;
+          }
           resolve(image);
         };
         image.onerror = () => {

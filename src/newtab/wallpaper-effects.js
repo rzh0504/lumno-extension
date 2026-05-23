@@ -450,11 +450,18 @@
             resolve(null);
             return;
           }
-          loadedImage = image;
-          loadedImageUrl = url;
-          loadedSampler = null;
-          loadedSamplerUrl = '';
-          resolve(image);
+          const resolveLoadedImage = () => {
+            loadedImage = image;
+            loadedImageUrl = url;
+            loadedSampler = null;
+            loadedSamplerUrl = '';
+            resolve(image);
+          };
+          if (typeof image.decode === 'function') {
+            image.decode().then(resolveLoadedImage).catch(resolveLoadedImage);
+            return;
+          }
+          resolveLoadedImage();
         };
         image.onerror = () => {
           reject(new Error('Failed to load wallpaper effect source.'));

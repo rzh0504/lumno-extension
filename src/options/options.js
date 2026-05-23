@@ -2215,15 +2215,17 @@
     requestAnimationFrame(updateTabIndicator);
     if (tabKey === 'appearance') {
       requestAnimationFrame(() => {
-        requestAnimationFrame(updateThemeIndicator);
-        requestAnimationFrame(updateOverlaySizeTabsIndicator);
+        requestAnimationFrame(() => {
+          updateThemeIndicator();
+          updateRecentModeTabsIndicator();
+          updateNewtabWidthTabsIndicator();
+          updateOverlaySizeTabsIndicator();
+        });
       });
     }
     if (tabKey === 'general') {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          updateNewtabWidthTabsIndicator();
-          updateRecentModeTabsIndicator();
           updateRestrictedActionTabsIndicator();
           updateSearchResultPriorityTabsIndicator();
           syncFallbackShortcutWrapWidth();

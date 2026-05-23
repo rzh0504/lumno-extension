@@ -11,6 +11,12 @@
   "settings_tab_appearance": {
     "message": "外观"
   },
+  "settings_appearance_global_section_title": {
+    "message": "全局"
+  },
+  "settings_webpage_focus_overlay_section_title": {
+    "message": "网页聚焦搜索浮层"
+  },
   "newtab_theme_scope_label": {
     "message": "深浅色作用范围"
   },
@@ -32,8 +38,26 @@
   "newtab_theme_follow_global": {
     "message": "跟随「全局」"
   },
+  "newtab_search_width_title": {
+    "message": "搜索框宽度"
+  },
+  "newtab_search_width_aria": {
+    "message": "调整新标签页搜索框宽度"
+  },
+  "newtab_search_width_standard": {
+    "message": "标准"
+  },
+  "newtab_search_width_wide": {
+    "message": "宽屏"
+  },
+  "newtab_search_width_max": {
+    "message": "最大"
+  },
+  "newtab_more_settings": {
+    "message": "更多设置"
+  },
   "settings_tab_shortcuts": {
-    "message": "站内搜索"
+    "message": "站内搜索/AI 搜索"
   },
   "settings_tab_blacklist": {
     "message": "黑名单"
@@ -69,10 +93,10 @@
     "message": "新标签页底部内容"
   },
   "settings_newtab_section_title": {
-    "message": "新标签页设置"
+    "message": "新标签页"
   },
-  "settings_command_bar_section_title": {
-    "message": "聚焦搜索设置"
+  "settings_search_results_section_title": {
+    "message": "搜索结果设置"
   },
   "settings_search_result_priority_title": {
     "message": "搜索结果首位优先级"
@@ -306,7 +330,7 @@
     "message": "宽屏（推荐）"
   },
   "settings_overlay_size_title": {
-    "message": "聚焦搜索框尺寸"
+    "message": "尺寸"
   },
   "overlay_size_compact": {
     "message": "小"
@@ -439,6 +463,30 @@
   },
   "newtab_feedback_button_aria": {
     "message": "反馈"
+  },
+  "newtab_feedback_menu_aria": {
+    "message": "反馈渠道"
+  },
+  "newtab_feedback_x_label": {
+    "message": "X"
+  },
+  "newtab_feedback_mail_label": {
+    "message": "邮箱"
+  },
+  "newtab_feedback_wechat_label": {
+    "message": "微信"
+  },
+  "newtab_feedback_discord_label": {
+    "message": "Discord"
+  },
+  "newtab_feedback_wechat_qr_title": {
+    "message": "微信群二维码"
+  },
+  "newtab_feedback_wechat_qr_alt": {
+    "message": "Lumno 微信群二维码"
+  },
+  "newtab_feedback_discord_link_label": {
+    "message": "打开 Discord"
   },
   "newtab_feedback_mail_subject": {
     "message": "Lumno 反馈"

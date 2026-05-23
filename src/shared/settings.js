@@ -35,6 +35,19 @@
     return value === 'standard' ? 'standard' : 'wide';
   }
 
+  function normalizeNewtabSearchWidth(value, options) {
+    const config = options || {};
+    const allowNull = Boolean(config.allowNull);
+    const min = Number.isFinite(Number(config.min)) ? Number(config.min) : 720;
+    const max = Number.isFinite(Number(config.max)) ? Number(config.max) : 1040;
+    const fallback = Number.isFinite(Number(config.fallback)) ? Number(config.fallback) : 920;
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+      return allowNull ? null : fallback;
+    }
+    return Math.min(max, Math.max(min, Math.round(number)));
+  }
+
   function normalizeNewtabWordmarkVisible(value) {
     return value !== false;
   }
@@ -81,6 +94,7 @@
     normalizeLocale,
     localeToHtmlLang,
     normalizeNewtabWidthMode,
+    normalizeNewtabSearchWidth,
     normalizeNewtabWordmarkVisible,
     normalizeOverlaySizeMode,
     normalizeOverlayTabPriorityMode,

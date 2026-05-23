@@ -3,13 +3,19 @@
     "message": "Lumno - The Ultimate Browser Command Bar"
   },
   "ext_description": {
-    "message": "A lightweight new-tab search and quick navigation overlay for Chromium browsers."
+    "message": "A lightweight browser command bar and new-tab search for Chromium browsers."
   },
   "settings_tab_general": {
     "message": "General"
   },
   "settings_tab_appearance": {
     "message": "Appearance"
+  },
+  "settings_appearance_global_section_title": {
+    "message": "Global"
+  },
+  "settings_webpage_focus_overlay_section_title": {
+    "message": "Command Bar"
   },
   "newtab_theme_scope_label": {
     "message": "Theme scope"
@@ -32,8 +38,26 @@
   "newtab_theme_follow_global": {
     "message": "Follow \"Global\""
   },
+  "newtab_search_width_title": {
+    "message": "Search box width"
+  },
+  "newtab_search_width_aria": {
+    "message": "Adjust New Tab search box width"
+  },
+  "newtab_search_width_standard": {
+    "message": "Standard"
+  },
+  "newtab_search_width_wide": {
+    "message": "Wide"
+  },
+  "newtab_search_width_max": {
+    "message": "Max"
+  },
+  "newtab_more_settings": {
+    "message": "More settings"
+  },
   "settings_tab_shortcuts": {
-    "message": "Site Search"
+    "message": "Site Search / AI Search"
   },
   "settings_tab_blacklist": {
     "message": "Blacklist"
@@ -69,10 +93,10 @@
     "message": "New Tab Bottom Content"
   },
   "settings_newtab_section_title": {
-    "message": "New Tab Settings"
+    "message": "New Tab"
   },
-  "settings_command_bar_section_title": {
-    "message": "Command Bar Settings"
+  "settings_search_results_section_title": {
+    "message": "Search Result Settings"
   },
   "settings_search_result_priority_title": {
     "message": "First Search Result Priority"
@@ -204,7 +228,7 @@
     "message": "Shortcut Settings"
   },
   "settings_shortcuts_desc": {
-    "message": "Use to open the Lumno search box"
+    "message": "Use to open the Lumno command bar"
   },
   "overlay_close_other_tabs_tooltip": {
     "message": "Close other tabs, keep pinned and grouped tabs"
@@ -219,7 +243,7 @@
     "message": "Open shortcut settings"
   },
   "settings_shortcuts_browser_tooltip": {
-    "message": "In Chromium browsers, you must open the extension shortcuts page to set or change the overlay shortcut."
+    "message": "In Chromium browsers, you must open the extension shortcuts page to set or change the command bar shortcut."
   },
   "settings_shortcuts_save": {
     "message": "Save shortcut"
@@ -306,7 +330,7 @@
     "message": "Wide (Recommended)"
   },
   "settings_overlay_size_title": {
-    "message": "Command bar size"
+    "message": "Size"
   },
   "overlay_size_compact": {
     "message": "Compact"
@@ -439,6 +463,30 @@
   },
   "newtab_feedback_button_aria": {
     "message": "Send feedback"
+  },
+  "newtab_feedback_menu_aria": {
+    "message": "Feedback channels"
+  },
+  "newtab_feedback_x_label": {
+    "message": "X"
+  },
+  "newtab_feedback_mail_label": {
+    "message": "Email"
+  },
+  "newtab_feedback_wechat_label": {
+    "message": "WeChat"
+  },
+  "newtab_feedback_discord_label": {
+    "message": "Discord"
+  },
+  "newtab_feedback_wechat_qr_title": {
+    "message": "WeChat group QR code"
+  },
+  "newtab_feedback_wechat_qr_alt": {
+    "message": "Lumno WeChat group QR code"
+  },
+  "newtab_feedback_discord_link_label": {
+    "message": "Open Discord"
   },
   "newtab_feedback_mail_subject": {
     "message": "Lumno feedback"

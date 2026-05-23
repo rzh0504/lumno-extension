@@ -18,6 +18,7 @@
     const document = documentObj;
     const window = windowObj;
     const chrome = options.chromeObj || globalThis.chrome || {};
+    const extensionRoutes = options.extensionRoutes || globalThis.LumnoExtensionRoutes || {};
     const storageArea = options.storageArea || null;
     const storageKeys = Object.assign({}, DEFAULT_STORAGE_KEYS, options.storageKeys || {});
     const NEWTAB_WALLPAPER_STORAGE_KEY = storageKeys.wallpaper;
@@ -47,6 +48,19 @@
       : function() {};
     const setThemeScope = typeof options.setThemeScope === 'function'
       ? options.setThemeScope
+      : function() {};
+    const searchWidthConfig = Object.assign({
+      min: 720,
+      max: 1040,
+      fallback: 920,
+      snapPoints: [720, 920, 1040],
+      snapThreshold: 14
+    }, options.searchWidthConfig || {});
+    const getSearchWidth = typeof options.getSearchWidth === 'function'
+      ? options.getSearchWidth
+      : function() { return searchWidthConfig.fallback; };
+    const setSearchWidth = typeof options.setSearchWidth === 'function'
+      ? options.setSearchWidth
       : function() {};
     const getRiSvg = typeof options.getRiSvg === 'function'
       ? options.getRiSvg
@@ -197,6 +211,9 @@
     ];
     const WALLPAPER_PANEL_RESIZE_DURATION_MS = 260;
     const WALLPAPER_PANEL_RESIZE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
+    const WALLPAPER_VISUAL_TRANSITION_MS = 220;
+    const WALLPAPER_VISUAL_REFRESH_DELAY_MS = 80;
+    const WALLPAPER_IMAGE_READY_CACHE_LIMIT = 8;
 
     let initialWallpaperApplied = false;
     let hasWallpaperBootstrapStarted = false;
@@ -218,6 +235,13 @@
     let wallpaperAppearanceInfoButton = null;
     let wallpaperAppearanceScopeTabs = null;
     let wallpaperAppearanceOptions = null;
+    let wallpaperSearchWidthControl = null;
+    let wallpaperSearchWidthLabel = null;
+    let wallpaperSearchWidthValue = null;
+    let wallpaperSearchWidthSlider = null;
+    let wallpaperAppearanceMoreSettingsLink = null;
+    let wallpaperAppearanceMoreSettingsText = null;
+    let wallpaperSearchWidthSaveTimer = null;
     let wallpaperOverlayLabel = null;
     let wallpaperOverlaySlider = null;
     let wallpaperEffectLabel = null;
@@ -252,6 +276,12 @@
     let customWallpaperUploadTile = null;
     let customWallpaperInput = null;
     let customWallpaperImporting = false;
+    let wallpaperStorageChangeSeq = 0;
+    let wallpaperVisualSeq = 0;
+    let wallpaperVisualRefreshTimer = 0;
+    let appliedWallpaperVisualUrl = '';
+    let appliedWallpaperVisualActive = false;
+    const wallpaperImageReadyCache = new Map();
 
     function appendChildren(parent, children) {
       (children || []).forEach((child) => {
@@ -385,7 +415,8 @@
       if (!Number.isFinite(value)) {
         return String(slider.value || '');
       }
-      return String(Math.round(value));
+      const suffix = slider.getAttribute('data-value-suffix') || '';
+      return `${Math.round(value)}${suffix}`;
     }
 
     function getWallpaperSliderPercent(slider) {
@@ -886,6 +917,117 @@
         .replace(/\n/g, '')
         .replace(/\r/g, '');
       return safe ? `url("${safe}")` : 'none';
+    }
+
+    function cacheWallpaperImageReady(url, promise) {
+      if (!url || !promise) {
+        return;
+      }
+      if (wallpaperImageReadyCache.has(url)) {
+        wallpaperImageReadyCache.delete(url);
+      }
+      wallpaperImageReadyCache.set(url, promise);
+      while (wallpaperImageReadyCache.size > WALLPAPER_IMAGE_READY_CACHE_LIMIT) {
+        const firstKey = wallpaperImageReadyCache.keys().next().value;
+        wallpaperImageReadyCache.delete(firstKey);
+      }
+    }
+
+    function waitForWallpaperImageReady(url) {
+      const imageUrl = String(url || '').trim();
+      if (!imageUrl) {
+        return Promise.resolve();
+      }
+      const cached = wallpaperImageReadyCache.get(imageUrl);
+      if (cached) {
+        return cached;
+      }
+      const promise = new Promise((resolve) => {
+        const image = new Image();
+        image.decoding = 'async';
+        image.onload = () => {
+          if (typeof image.decode === 'function') {
+            image.decode().then(resolve).catch(resolve);
+            return;
+          }
+          resolve();
+        };
+        image.onerror = resolve;
+        image.src = imageUrl;
+      });
+      cacheWallpaperImageReady(imageUrl, promise);
+      return promise;
+    }
+
+    function createWallpaperTransitionLayer() {
+      if (!document.body || shouldReduceMotion()) {
+        return null;
+      }
+      const computedStyle = window.getComputedStyle(document.body);
+      const layer = document.createElement('div');
+      layer.className = 'x-nt-wallpaper-transition-layer';
+      layer.style.backgroundColor = computedStyle.backgroundColor;
+      layer.style.backgroundImage = computedStyle.backgroundImage;
+      layer.style.backgroundSize = computedStyle.backgroundSize;
+      layer.style.backgroundPosition = computedStyle.backgroundPosition;
+      layer.style.backgroundRepeat = computedStyle.backgroundRepeat;
+      layer.style.backgroundAttachment = 'fixed';
+      document.body.insertBefore(layer, document.body.firstChild);
+      return layer;
+    }
+
+    function releaseWallpaperTransitionLayer(layer) {
+      if (!layer || !layer.parentNode) {
+        return;
+      }
+      window.requestAnimationFrame(() => {
+        layer.setAttribute('data-exit', 'true');
+        window.setTimeout(() => {
+          if (layer.parentNode) {
+            layer.parentNode.removeChild(layer);
+          }
+        }, WALLPAPER_VISUAL_TRANSITION_MS + 80);
+      });
+    }
+
+    function applyWallpaperVisualState(wallpaper) {
+      const target = document.documentElement;
+      const imageUrl = wallpaper ? getWallpaperImageUrl(wallpaper) : '';
+      appliedWallpaperVisualUrl = imageUrl;
+      appliedWallpaperVisualActive = Boolean(wallpaper);
+      if (target) {
+        target.style.setProperty('--x-nt-wallpaper-image', imageUrl ? getCssUrlValue(imageUrl) : 'none');
+        target.style.setProperty('--x-nt-wallpaper-size', 'cover');
+        target.style.setProperty('--x-nt-wallpaper-position', 'center center');
+        target.setAttribute('data-wallpaper-active', wallpaper ? 'true' : 'false');
+      }
+      if (document.body) {
+        document.body.setAttribute('data-wallpaper-active', wallpaper ? 'true' : 'false');
+      }
+      return imageUrl;
+    }
+
+    function runWallpaperVisualRefresh(seq) {
+      if (seq !== wallpaperVisualSeq) {
+        return;
+      }
+      refreshWallpaperAdaptiveSampler();
+      refreshWallpaperEffects();
+    }
+
+    function scheduleWallpaperVisualRefresh(seq) {
+      if (wallpaperVisualRefreshTimer) {
+        window.clearTimeout(wallpaperVisualRefreshTimer);
+        wallpaperVisualRefreshTimer = 0;
+      }
+      wallpaperVisualRefreshTimer = window.setTimeout(() => {
+        wallpaperVisualRefreshTimer = 0;
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => {
+            runWallpaperVisualRefresh(seq);
+          });
+        });
+      }, WALLPAPER_VISUAL_REFRESH_DELAY_MS);
     }
 
     function getRawWallpaperId(value) {
@@ -1680,6 +1822,147 @@
           button.setAttribute('aria-pressed', selected ? 'true' : 'false');
         });
       }
+      updateWallpaperSearchWidthControlUi();
+    }
+
+    function getSearchWidthMin() {
+      return Number.isFinite(Number(searchWidthConfig.min)) ? Number(searchWidthConfig.min) : 720;
+    }
+
+    function getSearchWidthMax() {
+      const min = getSearchWidthMin();
+      const max = Number.isFinite(Number(searchWidthConfig.max)) ? Number(searchWidthConfig.max) : 1040;
+      return Math.max(min + 1, max);
+    }
+
+    function normalizeSearchWidthValue(value) {
+      const min = getSearchWidthMin();
+      const max = getSearchWidthMax();
+      const fallback = Number.isFinite(Number(searchWidthConfig.fallback))
+        ? Number(searchWidthConfig.fallback)
+        : 920;
+      const number = Number(value);
+      if (!Number.isFinite(number)) {
+        return Math.min(max, Math.max(min, Math.round(fallback)));
+      }
+      return Math.min(max, Math.max(min, Math.round(number)));
+    }
+
+    function getSearchWidthSnapPoints() {
+      const points = Array.isArray(searchWidthConfig.snapPoints)
+        ? searchWidthConfig.snapPoints
+        : [720, 920, 1040];
+      return points.map(normalizeSearchWidthValue)
+        .filter((value, index, array) => array.indexOf(value) === index)
+        .sort((a, b) => a - b);
+    }
+
+    function getSearchWidthPercent(value) {
+      const min = getSearchWidthMin();
+      const max = getSearchWidthMax();
+      return ((normalizeSearchWidthValue(value) - min) / (max - min)) * 100;
+    }
+
+    function snapSearchWidthValue(value, threshold) {
+      const width = normalizeSearchWidthValue(value);
+      const snapThreshold = Number.isFinite(Number(threshold))
+        ? Number(threshold)
+        : Number(searchWidthConfig.snapThreshold || 14);
+      const matched = getSearchWidthSnapPoints().find((point) => Math.abs(point - width) <= snapThreshold);
+      return Number.isFinite(matched) ? matched : width;
+    }
+
+    function formatSearchWidthValue(value) {
+      return `${normalizeSearchWidthValue(value)} px`;
+    }
+
+    function updateSearchWidthSliderElement(width) {
+      if (!wallpaperSearchWidthSlider) {
+        return;
+      }
+      const value = normalizeSearchWidthValue(width);
+      wallpaperSearchWidthSlider.min = String(getSearchWidthMin());
+      wallpaperSearchWidthSlider.max = String(getSearchWidthMax());
+      wallpaperSearchWidthSlider.value = String(value);
+      wallpaperSearchWidthSlider.style.setProperty('--x-nt-overlay-slider-percent', `${getSearchWidthPercent(value)}%`);
+      wallpaperSearchWidthSlider.setAttribute('aria-valuenow', String(value));
+      wallpaperSearchWidthSlider.setAttribute('aria-valuetext', formatSearchWidthValue(value));
+      if (wallpaperSearchWidthValue) {
+        wallpaperSearchWidthValue.textContent = formatSearchWidthValue(value);
+      }
+    }
+
+    function setSearchWidthControlVisible(visible) {
+      if (!wallpaperSearchWidthControl) {
+        return;
+      }
+      const nextVisible = visible ? 'true' : 'false';
+      if (wallpaperSearchWidthControl.getAttribute('data-visible') === nextVisible) {
+        wallpaperSearchWidthControl.setAttribute('aria-hidden', visible ? 'false' : 'true');
+        return;
+      }
+      animateWallpaperPanelResize(() => {
+        wallpaperSearchWidthControl.setAttribute('data-visible', nextVisible);
+        wallpaperSearchWidthControl.setAttribute('aria-hidden', visible ? 'false' : 'true');
+        if (visible) {
+          playWallpaperEnterMotion(wallpaperSearchWidthControl, 'enter');
+        }
+      });
+    }
+
+    function updateWallpaperSearchWidthControlUi() {
+      if (!wallpaperSearchWidthControl) {
+        return;
+      }
+      if (wallpaperSearchWidthLabel) {
+        wallpaperSearchWidthLabel.textContent = t('newtab_search_width_title', 'Search box width');
+      }
+      if (wallpaperSearchWidthSlider) {
+        wallpaperSearchWidthSlider.setAttribute(
+          'aria-label',
+          t('newtab_search_width_aria', 'Adjust New Tab search box width')
+        );
+      }
+      if (wallpaperSearchWidthControl) {
+        wallpaperSearchWidthControl.querySelectorAll('[data-search-width-tick]').forEach((tick) => {
+          const key = tick.getAttribute('data-search-width-tick');
+          if (key === 'standard') {
+            tick.textContent = t('newtab_search_width_standard', 'Standard');
+          } else if (key === 'wide') {
+            tick.textContent = t('newtab_search_width_wide', 'Wide');
+          } else if (key === 'max') {
+            tick.textContent = t('newtab_search_width_max', 'Max');
+          }
+        });
+      }
+      updateSearchWidthSliderElement(getSearchWidth());
+      setSearchWidthControlVisible(getThemeScope() === 'home');
+    }
+
+    function persistSearchWidthFromSlider(value, options) {
+      const final = Boolean(options && options.final);
+      const threshold = final
+        ? Number(searchWidthConfig.snapThreshold || 14) * 1.35
+        : Number(searchWidthConfig.snapThreshold || 14);
+      const width = snapSearchWidthValue(value, threshold);
+      if (wallpaperSearchWidthSlider && wallpaperSearchWidthSlider.value !== String(width)) {
+        wallpaperSearchWidthSlider.value = String(width);
+      }
+      setSearchWidth(width, { persist: false });
+      updateSearchWidthSliderElement(width);
+      if (wallpaperSearchWidthSaveTimer !== null) {
+        window.clearTimeout(wallpaperSearchWidthSaveTimer);
+        wallpaperSearchWidthSaveTimer = null;
+      }
+      const persist = () => {
+        wallpaperSearchWidthSaveTimer = null;
+        setSearchWidth(width, { persist: true });
+      };
+      if (final) {
+        persist();
+        return;
+      }
+      wallpaperSearchWidthSaveTimer = window.setTimeout(persist, 140);
     }
 
     function updateWallpaperAppearanceSelectionUi() {
@@ -1691,6 +1974,7 @@
           button.setAttribute('aria-pressed', selected ? 'true' : 'false');
         });
       }
+      updateWallpaperSearchWidthControlUi();
     }
 
     function updateCustomWallpaperUploadTile() {
@@ -1738,27 +2022,35 @@
     function applyNewtabWallpaper(value) {
       const nextId = normalizeNewtabWallpaperId(value);
       const wallpaper = getWallpaperById(nextId);
+      const imageUrl = wallpaper ? getWallpaperImageUrl(wallpaper) : '';
+      const active = Boolean(wallpaper);
+      const isInitialWallpaperApply = !initialWallpaperApplied;
+      const shouldAnimateVisualChange = initialWallpaperApplied &&
+        (imageUrl !== appliedWallpaperVisualUrl || active !== appliedWallpaperVisualActive);
+      const visualSeq = ++wallpaperVisualSeq;
       currentWallpaperId = wallpaper ? wallpaper.id : '';
       if (currentWallpaperId) {
         lastActiveWallpaperId = currentWallpaperId;
         setWallpaperActiveTab(isCustomWallpaperId(currentWallpaperId) ? 'local' : 'built-in');
       }
-      const target = document.documentElement;
-      if (target) {
-        const imageUrl = wallpaper ? getWallpaperImageUrl(wallpaper) : '';
-        target.style.setProperty('--x-nt-wallpaper-image', imageUrl ? getCssUrlValue(imageUrl) : 'none');
-        target.style.setProperty('--x-nt-wallpaper-size', 'cover');
-        target.style.setProperty('--x-nt-wallpaper-position', 'center center');
-        target.setAttribute('data-wallpaper-active', wallpaper ? 'true' : 'false');
-      }
-      if (document.body) {
-        document.body.setAttribute('data-wallpaper-active', wallpaper ? 'true' : 'false');
-      }
       writeWallpaperPreloadCache(wallpaper);
-      refreshWallpaperAdaptiveSampler();
-      refreshWallpaperEffects();
       updateWallpaperSelectionUi();
+      if (isInitialWallpaperApply) {
+        applyWallpaperVisualState(wallpaper);
+        scheduleWallpaperVisualRefresh(visualSeq);
+        finalizeInitialWallpaper();
+        return;
+      }
       finalizeInitialWallpaper();
+      waitForWallpaperImageReady(imageUrl).then(() => {
+        if (visualSeq !== wallpaperVisualSeq) {
+          return;
+        }
+        const transitionLayer = shouldAnimateVisualChange ? createWallpaperTransitionLayer() : null;
+        applyWallpaperVisualState(wallpaper);
+        releaseWallpaperTransitionLayer(transitionLayer);
+        scheduleWallpaperVisualRefresh(visualSeq);
+      });
     }
 
     function bootstrapInitialWallpaper() {
@@ -2100,6 +2392,14 @@
       if (wallpaperAppearanceTitle) {
         wallpaperAppearanceTitle.textContent = t('settings_tab_appearance', 'Appearance');
       }
+      if (wallpaperAppearanceMoreSettingsLink) {
+        const label = t('newtab_more_settings', 'More settings');
+        wallpaperAppearanceMoreSettingsLink.setAttribute('aria-label', label);
+        wallpaperAppearanceMoreSettingsLink.setAttribute('href', buildAppearanceSettingsUrl());
+        if (wallpaperAppearanceMoreSettingsText) {
+          wallpaperAppearanceMoreSettingsText.textContent = label;
+        }
+      }
       if (wallpaperAppearanceInfoButton) {
         wallpaperAppearanceInfoButton.setAttribute(
           'aria-label',
@@ -2253,6 +2553,116 @@
       return tabs;
     }
 
+    function createSearchWidthScale() {
+      const scale = createDomElement('div', {
+        className: 'x-nt-overlay-scale x-nt-search-width-scale',
+        attrs: { 'aria-hidden': 'true' }
+      });
+      [
+        { key: 'standard', value: 720, fallback: 'Standard' },
+        { key: 'wide', value: 920, fallback: 'Wide' },
+        { key: 'max', value: 1040, fallback: 'Max' }
+      ].forEach((item) => {
+        const tick = createDomElement('span', {
+          className: 'x-nt-overlay-tick x-nt-search-width-tick',
+          textContent: t(`newtab_search_width_${item.key}`, item.fallback),
+          attrs: {
+            'data-search-width-tick': item.key
+          }
+        });
+        tick.style.setProperty('--x-nt-search-width-tick-percent', `${getSearchWidthPercent(item.value)}%`);
+        scale.appendChild(tick);
+      });
+      return scale;
+    }
+
+    function buildAppearanceSettingsUrl() {
+      if (extensionRoutes && typeof extensionRoutes.buildOptionsUrl === 'function') {
+        return extensionRoutes.buildOptionsUrl(chrome, 'appearance');
+      }
+      if (chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
+        return `${chrome.runtime.getURL('src/options/options.html')}#appearance`;
+      }
+      try {
+        return new URL('../options/options.html#appearance', window.location.href).toString();
+      } catch (e) {
+        return '../options/options.html#appearance';
+      }
+    }
+
+    function createAppearanceMoreSettingsLink() {
+      const label = t('newtab_more_settings', 'More settings');
+      wallpaperAppearanceMoreSettingsText = createDomElement('span', {
+        className: 'x-nt-appearance-more-settings-text',
+        textContent: label
+      });
+      wallpaperAppearanceMoreSettingsLink = createDomElement('a', {
+        className: 'x-nt-appearance-more-settings',
+        attrs: {
+          href: buildAppearanceSettingsUrl(),
+          'aria-label': label
+        },
+        children: [
+          wallpaperAppearanceMoreSettingsText,
+          createDomElement('span', {
+            className: 'x-nt-appearance-more-settings-icon',
+            innerHTML: getRiSvg('ri-arrow-right-s-line', 'ri-size-14'),
+            attrs: { 'aria-hidden': 'true' }
+          })
+        ]
+      });
+      wallpaperAppearanceMoreSettingsLink.addEventListener('click', () => {
+        wallpaperAppearanceMoreSettingsLink.setAttribute('href', buildAppearanceSettingsUrl());
+      });
+      return wallpaperAppearanceMoreSettingsLink;
+    }
+
+    function createSearchWidthControl() {
+      const control = createDomElement('div', {
+        className: 'x-nt-overlay-control x-nt-search-width-control',
+        attrs: {
+          'data-visible': 'false',
+          'aria-hidden': 'true'
+        }
+      });
+      const header = createDomElement('div', { className: 'x-nt-overlay-control-header' });
+      wallpaperSearchWidthLabel = createDomElement('span', {
+        className: 'x-nt-overlay-label',
+        textContent: t('newtab_search_width_title', 'Search box width')
+      });
+      wallpaperSearchWidthValue = createDomElement('span', {
+        className: 'x-nt-overlay-value',
+        textContent: formatSearchWidthValue(getSearchWidth())
+      });
+      const wrap = createDomElement('div', {
+        className: 'x-nt-overlay-slider-wrap x-nt-search-width-slider-wrap'
+      });
+      wallpaperSearchWidthSlider = createDomElement('input', {
+        className: 'x-nt-overlay-slider x-nt-search-width-slider',
+        attrs: {
+          type: 'range',
+          min: String(getSearchWidthMin()),
+          max: String(getSearchWidthMax()),
+          step: '1',
+          'data-value-suffix': ' px',
+          'aria-label': t('newtab_search_width_aria', 'Adjust New Tab search box width')
+        }
+      });
+      wallpaperSearchWidthSlider.addEventListener('input', () => {
+        persistSearchWidthFromSlider(wallpaperSearchWidthSlider.value, { final: false });
+      });
+      wallpaperSearchWidthSlider.addEventListener('change', () => {
+        persistSearchWidthFromSlider(wallpaperSearchWidthSlider.value, { final: true });
+      });
+      bindWallpaperSliderValueBubble(wallpaperSearchWidthSlider);
+      appendChildren(header, [wallpaperSearchWidthLabel, wallpaperSearchWidthValue]);
+      appendChildren(wrap, [wallpaperSearchWidthSlider, createSearchWidthScale()]);
+      appendChildren(control, [header, wrap, createAppearanceMoreSettingsLink()]);
+      wallpaperSearchWidthControl = control;
+      updateSearchWidthSliderElement(getSearchWidth());
+      return control;
+    }
+
     function createAppearanceOption(item) {
       const button = createDomElement('button', {
         className: 'x-nt-appearance-option',
@@ -2304,7 +2714,7 @@
       });
       appendChildren(titleGroup, [wallpaperAppearanceTitle, wallpaperAppearanceInfoButton]);
       appendChildren(header, [titleGroup, wallpaperAppearanceScopeTabs]);
-      appendChildren(section, [header, wallpaperAppearanceOptions]);
+      appendChildren(section, [header, wallpaperAppearanceOptions, createSearchWidthControl()]);
       return section;
     }
 
@@ -2855,11 +3265,30 @@
       }
       if (changes[NEWTAB_WALLPAPER_STORAGE_KEY]) {
         const raw = changes[NEWTAB_WALLPAPER_STORAGE_KEY].newValue;
-        const nextWallpaperId = normalizeNewtabWallpaperId(raw);
-        if (storageArea && raw && raw !== nextWallpaperId) {
-          storageArea.set({ [NEWTAB_WALLPAPER_STORAGE_KEY]: nextWallpaperId });
+        const rawWallpaperId = String(getRawWallpaperId(raw) || '').trim();
+        const shouldRefreshCustomWallpapers = shouldWaitForCustomWallpapers(raw) &&
+          !getWallpaperById(rawWallpaperId);
+        const applyStoredWallpaper = () => {
+          const nextWallpaperId = normalizeNewtabWallpaperId(raw);
+          if (storageArea &&
+              raw &&
+              raw !== nextWallpaperId &&
+              (!shouldWaitForCustomWallpapers(raw) || nextWallpaperId)) {
+            storageArea.set({ [NEWTAB_WALLPAPER_STORAGE_KEY]: nextWallpaperId });
+          }
+          applyNewtabWallpaper(nextWallpaperId);
+        };
+        wallpaperStorageChangeSeq += 1;
+        if (shouldRefreshCustomWallpapers) {
+          const changeSeq = wallpaperStorageChangeSeq;
+          loadCustomWallpapers().then(() => {
+            if (changeSeq === wallpaperStorageChangeSeq) {
+              applyStoredWallpaper();
+            }
+          });
+        } else {
+          applyStoredWallpaper();
         }
-        applyNewtabWallpaper(nextWallpaperId);
         handled = true;
       }
       if (changes[NEWTAB_WALLPAPER_EFFECT_STORAGE_KEY]) {
@@ -2896,6 +3325,7 @@
       closePanel: closeWallpaperPanel,
       updateLanguageStrings: updateWallpaperLanguageStrings,
       updateAppearanceSelectionUi: updateWallpaperAppearanceSelectionUi,
+      updateSearchWidthUi: updateWallpaperSearchWidthControlUi,
       updateWordmarkVisibilityUi: updateLogoSwitchUi,
       bootstrapInitialWallpaper,
       bootstrapInitialWallpaperOverlay,

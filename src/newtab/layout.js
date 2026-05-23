@@ -244,7 +244,11 @@
         targetTop = minTopPx;
       }
       targetTop = Math.max(minTopPx, Math.min(maxTop, targetTop));
-      body.style.setProperty('padding-top', `${Math.round(targetTop)}px`, 'important');
+      const nextTop = Math.round(targetTop);
+      if (body.style.getPropertyValue('padding-top') === `${nextTop}px`) {
+        return;
+      }
+      body.style.setProperty('padding-top', `${nextTop}px`, 'important');
     }
 
     function updateBottomDockLayout(callbacks) {

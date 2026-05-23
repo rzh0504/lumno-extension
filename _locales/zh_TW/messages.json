@@ -11,6 +11,12 @@
   "settings_tab_appearance": {
     "message": "外觀"
   },
+  "settings_appearance_global_section_title": {
+    "message": "全域"
+  },
+  "settings_webpage_focus_overlay_section_title": {
+    "message": "網頁聚焦搜尋浮層"
+  },
   "newtab_theme_scope_label": {
     "message": "深淺色作用範圍"
   },
@@ -32,8 +38,26 @@
   "newtab_theme_follow_global": {
     "message": "跟隨「全域」"
   },
+  "newtab_search_width_title": {
+    "message": "搜尋框寬度"
+  },
+  "newtab_search_width_aria": {
+    "message": "調整新分頁搜尋框寬度"
+  },
+  "newtab_search_width_standard": {
+    "message": "標準"
+  },
+  "newtab_search_width_wide": {
+    "message": "寬螢幕"
+  },
+  "newtab_search_width_max": {
+    "message": "最大"
+  },
+  "newtab_more_settings": {
+    "message": "更多設定"
+  },
   "settings_tab_shortcuts": {
-    "message": "站內搜尋"
+    "message": "站內搜尋/AI 搜尋"
   },
   "settings_tab_blacklist": {
     "message": "黑名單"
@@ -69,10 +93,10 @@
     "message": "新分頁底部內容"
   },
   "settings_newtab_section_title": {
-    "message": "新分頁設定"
+    "message": "新分頁"
   },
-  "settings_command_bar_section_title": {
-    "message": "聚焦搜尋設定"
+  "settings_search_results_section_title": {
+    "message": "搜尋結果設定"
   },
   "settings_search_result_priority_title": {
     "message": "搜尋結果首位優先級"
@@ -306,7 +330,7 @@
     "message": "寬螢幕（推薦）"
   },
   "settings_overlay_size_title": {
-    "message": "聚焦搜尋框尺寸"
+    "message": "尺寸"
   },
   "overlay_size_compact": {
     "message": "小"
@@ -439,6 +463,30 @@
   },
   "newtab_feedback_button_aria": {
     "message": "回饋"
+  },
+  "newtab_feedback_menu_aria": {
+    "message": "回饋管道"
+  },
+  "newtab_feedback_x_label": {
+    "message": "X"
+  },
+  "newtab_feedback_mail_label": {
+    "message": "信箱"
+  },
+  "newtab_feedback_wechat_label": {
+    "message": "微信"
+  },
+  "newtab_feedback_discord_label": {
+    "message": "Discord"
+  },
+  "newtab_feedback_wechat_qr_title": {
+    "message": "微信群二維碼"
+  },
+  "newtab_feedback_wechat_qr_alt": {
+    "message": "Lumno 微信群二維碼"
+  },
+  "newtab_feedback_discord_link_label": {
+    "message": "開啟 Discord"
   },
   "newtab_feedback_mail_subject": {
     "message": "Lumno 回饋"

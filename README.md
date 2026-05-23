@@ -7,7 +7,7 @@
 <p align="center">
   A lightweight command bar for Chromium browsers.
   <br />
-  Open a floating search overlay from any page, search faster, jump to URLs, switch tabs, and upgrade the new tab experience.
+  Open the command bar from any page, search faster, jump to URLs, switch tabs, and upgrade the new tab experience.
 </p>
 
 <p align="center">
@@ -28,7 +28,7 @@
 
 Lumno turns the browser into a faster command surface:
 
-- Open a unified search overlay on top of any page.
+- Open a unified command bar on top of any page.
 - Search history, bookmarks, top sites, open tabs, and web suggestions in one place.
 - Jump directly to URLs and internal browser pages with keyword shortcuts.
 - Use the same search workflow in the overridden new tab page.
@@ -38,7 +38,7 @@ Lumno turns the browser into a faster command surface:
 
 ## 🚀 Highlights
 
-### Global command overlay
+### Global command bar
 
 - Trigger Lumno from anywhere with a keyboard shortcut.
 - Recognize URLs instantly and navigate without extra clicks.
@@ -62,7 +62,7 @@ Lumno turns the browser into a faster command surface:
 ### Extra quality-of-life features
 
 - Optional automatic Picture-in-Picture for supported sites such as YouTube, Bilibili, iQIYI, Youku, Tencent Video, and Douyin.
-- Separate handling for restricted pages where overlays cannot be injected.
+- Separate handling for restricted pages where the command bar cannot be opened.
 - Localized UI with English, Simplified Chinese, Traditional Chinese (Taiwan), and Traditional Chinese (Hong Kong).
 
 ## 📦 Installation
@@ -81,7 +81,7 @@ For manual installation:
 ## 🛠️ Basic usage
 
 ```text
-Open overlay         -> Press the configured shortcut
+Open command bar     -> Press the configured shortcut
 Search GitHub        -> Type gh react query, then press Tab
 Open a URL           -> Type example.com, then press Enter
 Switch to open tab   -> Type a matching tab title, then press Enter
