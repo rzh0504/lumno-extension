@@ -130,9 +130,17 @@
   const RECENT_MODE_STORAGE_KEY = '_x_extension_recent_mode_2024_unique_';
   const RECENT_COUNT_STORAGE_KEY = '_x_extension_recent_count_2024_unique_';
   const NEWTAB_WIDTH_MODE_STORAGE_KEY = '_x_extension_newtab_width_mode_2026_unique_';
+  const NEWTAB_SEARCH_WIDTH_STORAGE_KEY = '_x_extension_newtab_search_width_2026_unique_';
+  const NEWTAB_THEME_MODE_STORAGE_KEY = '_x_extension_newtab_theme_mode_2026_unique_';
+  const NEWTAB_THEME_SCOPE_STORAGE_KEY = '_x_extension_newtab_theme_scope_2026_unique_';
+  const NEWTAB_WALLPAPER_STORAGE_KEY = '_x_extension_newtab_wallpaper_2026_unique_';
+  const NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY = '_x_extension_newtab_wallpaper_overlay_2026_unique_';
+  const NEWTAB_WALLPAPER_EFFECT_STORAGE_KEY = '_x_extension_newtab_wallpaper_effect_2026_unique_';
   const OVERLAY_SIZE_MODE_STORAGE_KEY = '_x_extension_overlay_size_mode_2026_unique_';
   const BOOKMARK_COUNT_STORAGE_KEY = '_x_extension_bookmark_count_2024_unique_';
   const BOOKMARK_COLUMNS_STORAGE_KEY = '_x_extension_bookmark_columns_2024_unique_';
+  const PINNED_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_pinned_recent_sites_2026_unique_';
+  const HIDDEN_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_hidden_recent_sites_2026_unique_';
   const AUTO_PIP_ENABLED_STORAGE_KEY = '_x_extension_auto_pip_enabled_2026_unique_';
   const DOCUMENT_PIP_ENABLED_STORAGE_KEY = '_x_extension_document_pip_enabled_2026_unique_';
   const PINNED_TAB_RECOVERY_ENABLED_STORAGE_KEY = '_x_extension_pinned_tab_recovery_enabled_2026_unique_';
@@ -155,9 +163,17 @@
     RECENT_MODE_STORAGE_KEY,
     RECENT_COUNT_STORAGE_KEY,
     NEWTAB_WIDTH_MODE_STORAGE_KEY,
+    NEWTAB_SEARCH_WIDTH_STORAGE_KEY,
+    NEWTAB_THEME_MODE_STORAGE_KEY,
+    NEWTAB_THEME_SCOPE_STORAGE_KEY,
+    NEWTAB_WALLPAPER_STORAGE_KEY,
+    NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY,
+    NEWTAB_WALLPAPER_EFFECT_STORAGE_KEY,
     OVERLAY_SIZE_MODE_STORAGE_KEY,
     BOOKMARK_COUNT_STORAGE_KEY,
     BOOKMARK_COLUMNS_STORAGE_KEY,
+    PINNED_RECENT_SITES_STORAGE_KEY,
+    HIDDEN_RECENT_SITES_STORAGE_KEY,
     AUTO_PIP_ENABLED_STORAGE_KEY,
     DOCUMENT_PIP_ENABLED_STORAGE_KEY,
     PINNED_TAB_RECOVERY_ENABLED_STORAGE_KEY,
@@ -258,11 +274,16 @@
         return;
       }
       storageArea.get(keys, (syncResult) => {
-        const hasSync = keys.some((key) => typeof syncResult[key] !== 'undefined');
-        if (hasSync) {
+        const missingSyncValues = {};
+        keys.forEach((key) => {
+          if (typeof localResult[key] !== 'undefined' && typeof syncResult[key] === 'undefined') {
+            missingSyncValues[key] = localResult[key];
+          }
+        });
+        if (Object.keys(missingSyncValues).length === 0) {
           return;
         }
-        storageArea.set(localResult);
+        storageArea.set(missingSyncValues);
       });
     });
   }
@@ -2504,6 +2525,15 @@
     BOOKMARK_COUNT_STORAGE_KEY,
     BOOKMARK_COLUMNS_STORAGE_KEY,
     NEWTAB_WIDTH_MODE_STORAGE_KEY,
+    NEWTAB_SEARCH_WIDTH_STORAGE_KEY,
+    NEWTAB_THEME_MODE_STORAGE_KEY,
+    NEWTAB_THEME_SCOPE_STORAGE_KEY,
+    NEWTAB_WALLPAPER_STORAGE_KEY,
+    NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY,
+    NEWTAB_WALLPAPER_EFFECT_STORAGE_KEY,
+    NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY,
+    PINNED_RECENT_SITES_STORAGE_KEY,
+    HIDDEN_RECENT_SITES_STORAGE_KEY,
     OVERLAY_SIZE_MODE_STORAGE_KEY,
     SEARCH_RESULT_PRIORITY_STORAGE_KEY,
     AUTO_PIP_ENABLED_STORAGE_KEY,

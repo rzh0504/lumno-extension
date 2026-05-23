@@ -63,8 +63,8 @@ function createFakeDocument() {
   return fakeDocument;
 }
 
-function createStorageBackedChrome(store) {
-  const local = {
+function createStorageArea(store) {
+  return {
     get(keys, callback) {
       const result = {};
       keys.forEach((key) => {
@@ -79,9 +79,14 @@ function createStorageBackedChrome(store) {
       }
     }
   };
+}
+
+function createStorageBackedChrome(localStore, syncStore) {
+  const local = createStorageArea(localStore);
+  const sync = createStorageArea(syncStore);
   return {
     runtime: { lastError: null },
-    storage: { local }
+    storage: { local, sync }
   };
 }
 
@@ -97,9 +102,15 @@ function flushMicrotasks() {
     'local',
     'local dismiss storage should be supported'
   );
+  assert.strictEqual(
+    featureHints.normalizeDismissStorage('sync'),
+    'sync',
+    'sync dismiss storage should be supported'
+  );
 
-  const store = {};
-  const chromeApi = createStorageBackedChrome(store);
+  const localStore = {};
+  const syncStore = {};
+  const chromeApi = createStorageBackedChrome(localStore, syncStore);
   let resizeObserverDisconnects = 0;
   const fakeWindow = {
     ResizeObserver: class FakeResizeObserver {
@@ -111,7 +122,10 @@ function flushMicrotasks() {
   };
   const localKey = featureHints.getFeatureHintLocalDismissKey('newtab-ai-quick-jump');
   const sessionKey = featureHints.getFeatureHintSessionDismissKey('newtab-ai-quick-jump');
+  const syncKey = featureHints.getFeatureHintSyncDismissKey('newtab-ai-quick-jump');
   assert.notStrictEqual(localKey, sessionKey, 'local and session dismiss keys should not collide');
+  assert.notStrictEqual(syncKey, localKey, 'sync and local dismiss keys should not collide');
+  assert.notStrictEqual(syncKey, sessionKey, 'sync and session dismiss keys should not collide');
 
   const firstDocument = createFakeDocument();
   const firstController = featureHints.createFeatureHint({
@@ -131,10 +145,11 @@ function flushMicrotasks() {
     'first feature hint should become visible after storage loads'
   );
   assert.strictEqual(
-    store[localKey],
+    syncStore[syncKey],
     true,
-    'first visible render should persist a local dismissal marker'
+    'first visible render should persist a sync dismissal marker'
   );
+  assert.strictEqual(localStore[localKey], undefined, 'sync dismiss should not write the legacy local marker');
   assert.strictEqual(firstController.element.inert, false, 'visible feature hint should not be inert');
 
   const closeButton = firstController.element.children[firstController.element.children.length - 1];
@@ -162,7 +177,30 @@ function flushMicrotasks() {
   assert.strictEqual(
     secondController.element.getAttribute('data-dismissed'),
     'true',
-    'second feature hint should load the local dismissed state'
+    'second feature hint should load the sync dismissed state'
+  );
+
+  const legacyLocalStore = { [localKey]: true };
+  const migratedSyncStore = {};
+  const legacyController = featureHints.createFeatureHint({
+    documentObj: createFakeDocument(),
+    definition: 'newtab-ai-quick-jump',
+    chromeApi: createStorageBackedChrome(legacyLocalStore, migratedSyncStore),
+    t: (key, fallback) => fallback,
+    getRiSvg: () => ''
+  });
+  assert(legacyController, 'legacy feature hint should be created');
+  await flushMicrotasks();
+
+  assert.strictEqual(
+    legacyController.element.getAttribute('data-dismissed'),
+    'true',
+    'sync feature hint should honor legacy local dismissed state'
+  );
+  assert.strictEqual(
+    migratedSyncStore[syncKey],
+    true,
+    'legacy local dismissed state should migrate into sync'
   );
 
   console.log('feature hint tests passed');

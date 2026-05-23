@@ -15,7 +15,7 @@
       arrowSide: 'right',
       arrowAlign: 'center',
       widthMode: 'content',
-      dismissStorage: 'local',
+      dismissStorage: 'sync',
       rememberOnFirstShow: true,
       badgeIcon: 'ri-asterisk',
       badgeKey: 'newtab_wallpaper_feature_hint_badge',
@@ -35,7 +35,7 @@
       arrowAlign: 'center',
       widthMode: 'container',
       alignMode: 'auto',
-      dismissStorage: 'local',
+      dismissStorage: 'sync',
       rememberOnFirstShow: true,
       badgeIcon: 'ri-asterisk',
       badgeKey: 'newtab_ai_quick_jump_feature_hint_badge',
@@ -65,7 +65,8 @@
   const FEATURE_HINT_DISMISS_STORAGE_TYPES = Object.freeze({
     none: true,
     session: true,
-    local: true
+    local: true,
+    sync: true
   });
 
   const FEATURE_HINT_WIDTH_MODES = Object.freeze({
@@ -82,6 +83,7 @@
 
   const FEATURE_HINT_SESSION_DISMISS_PREFIX = '_x_lumno_feature_hint_session_dismissed_2026_';
   const FEATURE_HINT_LOCAL_DISMISS_PREFIX = '_x_lumno_feature_hint_local_dismissed_2026_';
+  const FEATURE_HINT_SYNC_DISMISS_PREFIX = '_x_lumno_feature_hint_sync_dismissed_2026_';
 
   const FEATURE_HINTS_BY_ID = Object.freeze(Object.keys(FEATURE_HINTS).reduce((map, key) => {
     const hint = FEATURE_HINTS[key];
@@ -136,9 +138,11 @@
 
   function getFeatureHintDismissKey(definition, storageType) {
     const normalizedStorageType = normalizeDismissStorage(storageType);
-    const prefix = normalizedStorageType === 'local'
-      ? FEATURE_HINT_LOCAL_DISMISS_PREFIX
-      : FEATURE_HINT_SESSION_DISMISS_PREFIX;
+    const prefix = normalizedStorageType === 'sync'
+      ? FEATURE_HINT_SYNC_DISMISS_PREFIX
+      : (normalizedStorageType === 'local'
+        ? FEATURE_HINT_LOCAL_DISMISS_PREFIX
+        : FEATURE_HINT_SESSION_DISMISS_PREFIX);
     return prefix + getFeatureHintStorageId(definition);
   }
 
@@ -150,9 +154,24 @@
     return getFeatureHintDismissKey(definition, 'local');
   }
 
+  function getFeatureHintSyncDismissKey(definition) {
+    return getFeatureHintDismissKey(definition, 'sync');
+  }
+
+  function getLegacyLocalDismissKeyForSyncKey(key) {
+    const rawKey = String(key || '');
+    if (!rawKey.startsWith(FEATURE_HINT_SYNC_DISMISS_PREFIX)) {
+      return '';
+    }
+    return FEATURE_HINT_LOCAL_DISMISS_PREFIX + rawKey.slice(FEATURE_HINT_SYNC_DISMISS_PREFIX.length);
+  }
+
   function getDismissStorageArea(chromeApi, storageType) {
     if (!chromeApi || !chromeApi.storage) {
       return null;
+    }
+    if (storageType === 'sync') {
+      return chromeApi.storage.sync || chromeApi.storage.local || null;
     }
     if (storageType === 'local') {
       return chromeApi.storage.local || null;
@@ -163,8 +182,7 @@
     return null;
   }
 
-  function getStoredDismissed(chromeApi, key, storageType) {
-    const storageArea = getDismissStorageArea(chromeApi, storageType);
+  function getStoredDismissedFromArea(chromeApi, storageArea, key) {
     if (!storageArea || typeof storageArea.get !== 'function') {
       return Promise.resolve(false);
     }
@@ -179,6 +197,26 @@
       } catch (e) {
         resolve(false);
       }
+    });
+  }
+
+  function getStoredDismissed(chromeApi, key, storageType) {
+    const storageArea = getDismissStorageArea(chromeApi, storageType);
+    return getStoredDismissedFromArea(chromeApi, storageArea, key).then((isDismissed) => {
+      if (isDismissed || storageType !== 'sync') {
+        return isDismissed;
+      }
+      const localArea = chromeApi && chromeApi.storage ? chromeApi.storage.local : null;
+      const legacyLocalKey = getLegacyLocalDismissKeyForSyncKey(key);
+      if (!localArea || !legacyLocalKey) {
+        return false;
+      }
+      return getStoredDismissedFromArea(chromeApi, localArea, legacyLocalKey).then((legacyDismissed) => {
+        if (legacyDismissed) {
+          setStoredDismissed(chromeApi, key, storageType);
+        }
+        return legacyDismissed;
+      });
     });
   }
 
@@ -221,9 +259,11 @@
     const alignMode = normalizeAlignMode(config.alignMode || definition.alignMode);
     const chromeApi = config.chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
     const dismissKey = config.dismissKey ||
-      (dismissStorage === 'local'
-        ? (config.localDismissKey || getFeatureHintLocalDismissKey(definition))
-        : (config.sessionDismissKey || getFeatureHintSessionDismissKey(definition)));
+      (dismissStorage === 'sync'
+        ? (config.syncDismissKey || getFeatureHintSyncDismissKey(definition))
+        : (dismissStorage === 'local'
+          ? (config.localDismissKey || getFeatureHintLocalDismissKey(definition))
+          : (config.sessionDismissKey || getFeatureHintSessionDismissKey(definition))));
     const windowObj = config.windowObj || (documentObj && documentObj.defaultView) ||
       (typeof window !== 'undefined' ? window : null);
     const rememberOnFirstShow = typeof config.rememberOnFirstShow === 'boolean'
@@ -501,6 +541,7 @@
     normalizeAlignMode,
     getFeatureHintSessionDismissKey,
     getFeatureHintLocalDismissKey,
+    getFeatureHintSyncDismissKey,
     listFeatureHints() {
       return Object.keys(FEATURE_HINTS).map((key) => FEATURE_HINTS[key]);
     },

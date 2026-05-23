@@ -88,6 +88,13 @@
       : null;
   }
 
+  function getSyncableStorageArea(chromeApi) {
+    if (!chromeApi || !chromeApi.storage) {
+      return null;
+    }
+    return chromeApi.storage.sync || chromeApi.storage.local || null;
+  }
+
   function getStoredReleasePageOpen(payload) {
     if (!payload || typeof payload !== 'object') {
       return null;
@@ -133,7 +140,8 @@
     const releaseUrl = buildReleaseUrl(options);
     const oncePerVersion = Boolean(options && options.oncePerVersion);
     const version = getExtensionVersionTag();
-    const storageArea = getLocalStorageArea(chromeApi);
+    const storageArea = getSyncableStorageArea(chromeApi);
+    const localStorageArea = getLocalStorageArea(chromeApi);
     const openTab = (afterOpen) => {
       chromeApi.tabs.create({ url: releaseUrl }, () => {
         const opened = !(chromeApi.runtime && chromeApi.runtime.lastError);
@@ -172,6 +180,23 @@
           : getStoredReleasePageOpen(result && result[RELEASE_PAGE_OPENED_STORAGE_KEY]);
         if (stored && stored.version === version) {
           done(false);
+          return;
+        }
+        if (storageArea !== localStorageArea &&
+            localStorageArea &&
+            typeof localStorageArea.get === 'function') {
+          localStorageArea.get([RELEASE_PAGE_OPENED_STORAGE_KEY], (localResult) => {
+            const localRuntimeError = chromeApi.runtime ? chromeApi.runtime.lastError : null;
+            const legacyStored = localRuntimeError
+              ? null
+              : getStoredReleasePageOpen(localResult && localResult[RELEASE_PAGE_OPENED_STORAGE_KEY]);
+            if (legacyStored && legacyStored.version === version) {
+              markOpened();
+              done(false);
+              return;
+            }
+            openTab(markOpened);
+          });
           return;
         }
         openTab(markOpened);

@@ -14,8 +14,12 @@
   const localStorageArea = (chrome && chrome.storage && chrome.storage.local)
     ? chrome.storage.local
     : storageArea;
+  const recentSitesStorageArea = storageArea || localStorageArea;
   const storageAreaName = storageArea
     ? (storageArea === (chrome && chrome.storage ? chrome.storage.sync : null) ? 'sync' : 'local')
+    : null;
+  const recentSitesStorageAreaName = recentSitesStorageArea
+    ? (recentSitesStorageArea === (chrome && chrome.storage ? chrome.storage.sync : null) ? 'sync' : 'local')
     : null;
 
   const THEME_STORAGE_KEY = '_x_extension_theme_mode_2024_unique_';
@@ -833,11 +837,16 @@
         return;
       }
       storageArea.get(keys, (syncResult) => {
-        const hasSync = keys.some((key) => typeof syncResult[key] !== 'undefined');
-        if (hasSync) {
+        const missingSyncValues = {};
+        keys.forEach((key) => {
+          if (typeof localResult[key] !== 'undefined' && typeof syncResult[key] === 'undefined') {
+            missingSyncValues[key] = localResult[key];
+          }
+        });
+        if (Object.keys(missingSyncValues).length === 0) {
           return;
         }
-        storageArea.set(localResult);
+        storageArea.set(missingSyncValues);
       });
     });
   }
@@ -2712,12 +2721,16 @@
   chrome.storage.onChanged.addListener((changes, areaName) => {
     const isPrimaryArea = Boolean(storageAreaName) && areaName === storageAreaName;
     if (!isPrimaryArea) {
-      if (areaName === 'local' && changes[PINNED_RECENT_SITES_STORAGE_KEY]) {
+      if (recentSitesStorageAreaName &&
+          areaName === recentSitesStorageAreaName &&
+          changes[PINNED_RECENT_SITES_STORAGE_KEY]) {
         pinnedRecentSites = normalizePinnedRecentSites(changes[PINNED_RECENT_SITES_STORAGE_KEY].newValue);
         recentRenderSignature = '';
         renderRecentSites(recentSourceItems);
       }
-      if (areaName === 'local' && changes[HIDDEN_RECENT_SITES_STORAGE_KEY]) {
+      if (recentSitesStorageAreaName &&
+          areaName === recentSitesStorageAreaName &&
+          changes[HIDDEN_RECENT_SITES_STORAGE_KEY]) {
         hiddenRecentSites = normalizeHiddenRecentSites(changes[HIDDEN_RECENT_SITES_STORAGE_KEY].newValue);
         recentRenderSignature = '';
         renderRecentSites(recentSourceItems);
@@ -3227,6 +3240,7 @@
     NEWTAB_THEME_SCOPE_STORAGE_KEY,
     NEWTAB_WALLPAPER_STORAGE_KEY,
     NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY,
+    NEWTAB_WALLPAPER_EFFECT_STORAGE_KEY,
     BOOKMARK_COUNT_STORAGE_KEY,
     BOOKMARK_COLUMNS_STORAGE_KEY,
     TAB_RANK_SCORE_DEBUG_STORAGE_KEY,
@@ -3234,7 +3248,9 @@
     SEARCH_RESULT_PRIORITY_STORAGE_KEY,
     SITE_SEARCH_STORAGE_KEY,
     SITE_SEARCH_DISABLED_STORAGE_KEY,
-    SEARCH_BLACKLIST_STORAGE_KEY
+    SEARCH_BLACKLIST_STORAGE_KEY,
+    PINNED_RECENT_SITES_STORAGE_KEY,
+    HIDDEN_RECENT_SITES_STORAGE_KEY
   ]);
   let handleTabKey = null;
   const defaultSiteSearchProviders = typeof SEARCH_UTILS.getDefaultSiteSearchProviders === 'function'
@@ -5138,13 +5154,13 @@
   }
 
   function readHiddenRecentSites() {
-    return NEWTAB_RECENT_STORE.loadHiddenRecentSites(localStorageArea, getRecentStoreOptions({
+    return NEWTAB_RECENT_STORE.loadHiddenRecentSites(recentSitesStorageArea, getRecentStoreOptions({
       key: HIDDEN_RECENT_SITES_STORAGE_KEY
     }));
   }
 
   function writeHiddenRecentSites(items) {
-    return NEWTAB_RECENT_STORE.saveHiddenRecentSites(localStorageArea, items, getRecentStoreOptions({
+    return NEWTAB_RECENT_STORE.saveHiddenRecentSites(recentSitesStorageArea, items, getRecentStoreOptions({
       key: HIDDEN_RECENT_SITES_STORAGE_KEY
     })).then((normalized) => {
       hiddenRecentSites = normalized;
@@ -5215,13 +5231,13 @@
   }
 
   function readPinnedRecentSites() {
-    return NEWTAB_RECENT_STORE.loadPinnedRecentSites(localStorageArea, getRecentStoreOptions({
+    return NEWTAB_RECENT_STORE.loadPinnedRecentSites(recentSitesStorageArea, getRecentStoreOptions({
       key: PINNED_RECENT_SITES_STORAGE_KEY
     }));
   }
 
   function writePinnedRecentSites(items) {
-    return NEWTAB_RECENT_STORE.savePinnedRecentSites(localStorageArea, items, getRecentStoreOptions({
+    return NEWTAB_RECENT_STORE.savePinnedRecentSites(recentSitesStorageArea, items, getRecentStoreOptions({
       key: PINNED_RECENT_SITES_STORAGE_KEY
     })).then((normalized) => {
       pinnedRecentSites = normalized;
