@@ -21,6 +21,8 @@ assert.strictEqual(settings.normalizeNewtabSearchWidth(920), 920);
 assert.strictEqual(settings.normalizeNewtabSearchWidth(1200), 1040);
 assert.strictEqual(settings.normalizeNewtabSearchWidth(undefined), 920);
 assert.strictEqual(settings.normalizeNewtabSearchWidth(undefined, { allowNull: true }), null);
+assert.strictEqual(settings.normalizeNewtabSearchWidth(639, { min: 640, max: 1040, fallback: 920 }), 640);
+assert.strictEqual(settings.normalizeNewtabSearchWidth(680, { min: 640, max: 1040, fallback: 920 }), 680);
 
 assert.strictEqual(settings.normalizeNewtabWordmarkVisible(false), false);
 assert.strictEqual(settings.normalizeNewtabWordmarkVisible(true), true);

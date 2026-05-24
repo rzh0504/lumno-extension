@@ -155,7 +155,7 @@
       : DEFAULT_PREFIX_GAP;
     const rightReserveBase = Number.isFinite(Number(config.rightReserveBase))
       ? Number(config.rightReserveBase)
-      : (surface === 'overlay' ? 92 : 96);
+      : (surface === 'overlay' ? 92 : 64);
     const rightAnchorOffset = Number.isFinite(Number(config.rightAnchorOffset))
       ? Number(config.rightAnchorOffset)
       : (surface === 'overlay' ? 86 : 52);

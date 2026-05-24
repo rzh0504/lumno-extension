@@ -2558,16 +2558,26 @@
         className: 'x-nt-overlay-scale x-nt-search-width-scale',
         attrs: { 'aria-hidden': 'true' }
       });
-      [
+      const ticks = [];
+      const min = getSearchWidthMin();
+      if (min < 720) {
+        ticks.push({ key: 'min', value: min, fallback: '', align: 'start' });
+      }
+      ticks.push(
         { key: 'standard', value: 720, fallback: 'Standard' },
         { key: 'wide', value: 920, fallback: 'Wide' },
-        { key: 'max', value: 1040, fallback: 'Max' }
-      ].forEach((item) => {
+        { key: 'max', value: 1040, fallback: 'Max', align: 'end' }
+      );
+      ticks.forEach((item) => {
+        const label = item.key === 'min'
+          ? ''
+          : t(`newtab_search_width_${item.key}`, item.fallback);
         const tick = createDomElement('span', {
           className: 'x-nt-overlay-tick x-nt-search-width-tick',
-          textContent: t(`newtab_search_width_${item.key}`, item.fallback),
+          textContent: label,
           attrs: {
-            'data-search-width-tick': item.key
+            'data-search-width-tick': item.key,
+            'data-align': item.align || 'center'
           }
         });
         tick.style.setProperty('--x-nt-search-width-tick-percent', `${getSearchWidthPercent(item.value)}%`);

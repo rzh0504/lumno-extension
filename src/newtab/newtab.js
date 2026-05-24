@@ -222,6 +222,10 @@
   const SEARCH_LAYOUT_NARROW_TOP_INSET_PX = 16;
   const SEARCH_LAYOUT_SHORT_VIEWPORT_MAX_HEIGHT_PX = 680;
   const SEARCH_LAYOUT_SHORT_MIN_TOP_PX = 44;
+  const BOTTOM_DOCK_TOP_RESERVE_PX = 240;
+  const BOTTOM_DOCK_COMPACT_VIEWPORT_MAX_HEIGHT_PX = 800;
+  const BOTTOM_DOCK_COMPACT_SEARCH_GAP_PX = 30;
+  const BOTTOM_DOCK_COMPACT_MIN_TOP_RESERVE_PX = 168;
   const WORDMARK_ENTRY_ANIMATION_NAME = '_x_nt_wordmark_enter_2026_unique_';
   const WORDMARK_ENTRY_ANIMATION_TOTAL_MS = 660;
   const WORDMARK_WALLPAPER_COVER_DARK_OPACITY = '0.32';
@@ -245,10 +249,10 @@
     }
   };
   const NEWTAB_SEARCH_WIDTH_CONFIG = {
-    min: 720,
+    min: 640,
     max: 1040,
     fallback: 920,
-    snapPoints: [720, 920, 1040],
+    snapPoints: [640, 720, 920, 1040],
     snapThreshold: 14
   };
   const BOOKMARK_CARD_TARGET_WIDTH_PX = 154;
@@ -4740,7 +4744,11 @@
       narrowViewportMaxWidthPx: SEARCH_LAYOUT_NARROW_VIEWPORT_MAX_WIDTH_PX,
       narrowTopInsetPx: SEARCH_LAYOUT_NARROW_TOP_INSET_PX,
       shortViewportMaxHeightPx: SEARCH_LAYOUT_SHORT_VIEWPORT_MAX_HEIGHT_PX,
-      shortMinTopPx: SEARCH_LAYOUT_SHORT_MIN_TOP_PX
+      shortMinTopPx: SEARCH_LAYOUT_SHORT_MIN_TOP_PX,
+      bottomDockTopReservePx: BOTTOM_DOCK_TOP_RESERVE_PX,
+      compactDockViewportMaxHeightPx: BOTTOM_DOCK_COMPACT_VIEWPORT_MAX_HEIGHT_PX,
+      compactDockSearchGapPx: BOTTOM_DOCK_COMPACT_SEARCH_GAP_PX,
+      compactDockMinTopReservePx: BOTTOM_DOCK_COMPACT_MIN_TOP_RESERVE_PX
     }
   });
   applyNewtabWidthMode();
@@ -7517,7 +7525,7 @@
       'border-bottom': 'none',
       'color': 'var(--x-nt-text, #111827)',
       'caret-color': 'var(--x-nt-link, #2563EB)',
-      'padding': '8px 96px 8px 44px',
+      'padding': '8px 64px 8px 44px',
       'min-height': '44px',
       'height': '44px',
       'line-height': '24px'
@@ -8286,7 +8294,7 @@
     defaultPlaceholder,
     defaultCaretColor,
     modeBadgeElement: modeBadge,
-    rightReserveBase: 96,
+    rightReserveBase: 64,
     rightAnchorOffset: 52,
     baseInputPaddingLeft: 44,
     getThemeForMode,

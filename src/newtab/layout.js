@@ -28,6 +28,10 @@
     const narrowTopInsetPx = getOptionNumber(constants, 'narrowTopInsetPx', 0);
     const shortViewportMaxHeightPx = getOptionNumber(constants, 'shortViewportMaxHeightPx', 0);
     const shortMinTopPx = getOptionNumber(constants, 'shortMinTopPx', minTopPx);
+    const bottomDockTopReservePx = getOptionNumber(constants, 'bottomDockTopReservePx', 240);
+    const compactDockViewportMaxHeightPx = getOptionNumber(constants, 'compactDockViewportMaxHeightPx', 0);
+    const compactDockSearchGapPx = getOptionNumber(constants, 'compactDockSearchGapPx', 32);
+    const compactDockMinTopReservePx = getOptionNumber(constants, 'compactDockMinTopReservePx', 168);
     const suggestionsBottomInsetPx = getOptionNumber(constants, 'suggestionsBottomInsetPx', 14);
     const visibleAttribute = 'data-visible';
     const suggestionsOpenAttribute = 'data-nt-suggestions-open';
@@ -106,7 +110,8 @@
     }
 
     function applyWidthMode(config) {
-      const searchMax = Math.max(720, Number((config && config.searchMaxWidth) || 720));
+      const rawSearchMax = Number(config && config.searchMaxWidth);
+      const searchMax = Number.isFinite(rawSearchMax) ? Math.max(1, rawSearchMax) : 720;
       const contentMax = Math.max(1040, Number((config && config.contentMaxWidth) || 1040));
       if (documentObj && documentObj.documentElement) {
         documentObj.documentElement.style.setProperty('--x-nt-search-max-width', `${searchMax}px`);
@@ -274,7 +279,20 @@
       if (!body || !bookmarkSection || !recentSection || !bottomDock || !sectionSafeCorridor) {
         return;
       }
-      const bottomDockMaxHeight = Math.max(0, windowObj.innerHeight - 240);
+      const viewportHeight = Math.max(0, windowObj.innerHeight || 0);
+      let bottomDockTopReserve = bottomDockTopReservePx;
+      if (compactDockViewportMaxHeightPx > 0 && viewportHeight <= compactDockViewportMaxHeightPx) {
+        const root = getRoot();
+        const rootRect = root ? root.getBoundingClientRect() : null;
+        const rootBottom = rootRect ? Number(rootRect.bottom) || 0 : 0;
+        if (rootBottom > 0) {
+          bottomDockTopReserve = Math.min(
+            bottomDockTopReservePx,
+            Math.max(compactDockMinTopReservePx, Math.ceil(rootBottom + compactDockSearchGapPx))
+          );
+        }
+      }
+      const bottomDockMaxHeight = Math.max(0, viewportHeight - bottomDockTopReserve);
       const bookmarkVisible = isSectionVisible(bookmarkSection);
       const recentVisible = isSectionVisible(recentSection);
       if (!recentVisible && callbacks && typeof callbacks.onRecentHidden === 'function') {

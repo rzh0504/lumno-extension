@@ -1195,9 +1195,7 @@
 
   function getCustomSelectContentMetrics(menu, trigger) {
     const metrics = {
-      naturalMenuWidth: 0,
-      maxOptionTextWidth: 0,
-      selectedLabelTextWidth: 0
+      naturalMenuWidth: 0
     };
     if (!menu) {
       return metrics;
@@ -1206,13 +1204,8 @@
     Array.from(menu.children).forEach((item) => {
       const textWidth = measureTextWidth(item);
       const itemWidth = textWidth + getHorizontalBoxSpace(item);
-      metrics.maxOptionTextWidth = Math.max(metrics.maxOptionTextWidth, textWidth);
       metrics.naturalMenuWidth = Math.max(metrics.naturalMenuWidth, itemWidth + menuBoxSpace);
     });
-    const labelEl = trigger
-      ? trigger.querySelector('._x_extension_select_label_2024_unique_')
-      : null;
-    metrics.selectedLabelTextWidth = measureTextWidth(labelEl);
     return metrics;
   }
 
@@ -1386,9 +1379,7 @@
     }
 
     const contentMetrics = getCustomSelectContentMetrics(menu, trigger);
-    const needsContentWidth = contentMetrics.naturalMenuWidth > baseWidth + 1 ||
-      contentMetrics.maxOptionTextWidth > contentMetrics.selectedLabelTextWidth + 24;
-    if (needsContentWidth) {
+    if (contentMetrics.naturalMenuWidth > baseWidth + 1) {
       applyCustomSelectContentMenuWidth(
         wrapper,
         menu,
