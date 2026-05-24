@@ -129,6 +129,10 @@
         --x-nt-wallpaper-overlay-dark-top: 44%;
         --x-nt-wallpaper-overlay-dark-mid: 20%;
         --x-nt-wallpaper-overlay-dark-bottom: 50%;
+        --x-nt-content-viewport-width: 96vw;
+        --x-nt-bottom-dock-section-gap: 32px;
+        --x-nt-bottom-dock-corridor-size: 16px;
+        --x-nt-bottom-dock-bottom-padding: 60px;
       }
       body[data-wallpaper-active="true"] {
         --x-nt-wallpaper-overlay: var(--x-nt-wallpaper-effect-overlay);
@@ -410,7 +414,7 @@
         }
       }
       #_x_extension_newtab_recent_sites_2024_unique_ {
-        width: min(96vw, var(--x-nt-content-max-width, 1040px));
+        width: min(var(--x-nt-content-viewport-width, 96vw), var(--x-nt-content-max-width, 1040px));
         position: relative;
         margin: 52px auto 0;
         display: flex;
@@ -421,7 +425,7 @@
         z-index: 1;
       }
       #_x_extension_newtab_bookmarks_2024_unique_ {
-        width: min(96vw, var(--x-nt-content-max-width, 1040px));
+        width: min(var(--x-nt-content-viewport-width, 96vw), var(--x-nt-content-max-width, 1040px));
         position: relative;
         margin: 28px auto 0;
         display: flex;
@@ -456,7 +460,7 @@
         left: 50%;
         bottom: 0;
         transform: translateX(-50%);
-        width: min(96vw, var(--x-nt-content-max-width, 1040px));
+        width: min(var(--x-nt-content-viewport-width, 96vw), var(--x-nt-content-max-width, 1040px));
         max-height: calc(100vh - 240px);
         display: none;
         flex-direction: column;
@@ -472,12 +476,12 @@
         width: calc(100% + (var(--x-nt-bottom-dock-shadow-bleed) * 2));
         max-height: 100%;
         margin: -24px calc(var(--x-nt-bottom-dock-shadow-bleed) * -1) 0;
-        padding: 24px var(--x-nt-bottom-dock-shadow-bleed) 60px;
+        padding: 24px var(--x-nt-bottom-dock-shadow-bleed) var(--x-nt-bottom-dock-bottom-padding, 60px);
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
         align-items: stretch;
-        gap: 32px;
+        gap: var(--x-nt-bottom-dock-section-gap, 32px);
         pointer-events: auto;
         overflow-y: auto;
         overflow-x: hidden;
@@ -486,9 +490,9 @@
       #_x_extension_newtab_section_safe_corridor_2026_unique_ {
         all: unset;
         width: 100%;
-        height: 16px;
-        min-height: 16px;
-        flex: 0 0 16px;
+        height: var(--x-nt-bottom-dock-corridor-size, 16px);
+        min-height: var(--x-nt-bottom-dock-corridor-size, 16px);
+        flex: 0 0 var(--x-nt-bottom-dock-corridor-size, 16px);
         display: none;
         pointer-events: auto;
         box-sizing: border-box;
@@ -1372,8 +1376,8 @@
       }
       .x-nt-feedback-control {
         position: fixed;
-        right: 14px;
-        bottom: 60px;
+        right: 60px;
+        bottom: 14px;
         z-index: 19;
         width: 38px;
         display: flex;
@@ -1624,7 +1628,7 @@
       }
       .x-nt-feedback-menu {
         display: grid;
-        grid-template-columns: repeat(3, 34px);
+        grid-template-columns: repeat(4, 34px);
         gap: 6px;
       }
       .x-nt-feedback-action {
@@ -3809,8 +3813,8 @@
           bottom: 12px;
         }
         .x-nt-feedback-control {
-          right: 12px;
-          bottom: 58px;
+          right: 58px;
+          bottom: 12px;
         }
         #_x_extension_newtab_bookmarks_grid_2024_unique_ {
           grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3819,14 +3823,22 @@
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
       }
+      @media (min-width: 521px) and (max-width: 1440px) {
+        :root {
+          --x-nt-content-viewport-width: calc(100vw - clamp(56px, 7.5vw, 88px));
+        }
+      }
       @media (max-width: 520px) {
+        :root {
+          --x-nt-content-viewport-width: 96vw;
+        }
         .x-nt-wallpaper-control {
           right: 8px;
           bottom: 8px;
         }
         .x-nt-feedback-control {
-          right: 8px;
-          bottom: 54px;
+          right: 54px;
+          bottom: 8px;
         }
         .x-nt-wallpaper-panel {
           --x-nt-panel-divider-gap: 18px;
@@ -3852,7 +3864,44 @@
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
       }
+      @media (max-height: 800px) {
+        :root {
+          --x-nt-bottom-dock-section-gap: 22px;
+          --x-nt-bottom-dock-corridor-size: 12px;
+          --x-nt-bottom-dock-bottom-padding: 78px;
+        }
+      }
+      @media (max-height: 680px) {
+        :root {
+          --x-nt-content-viewport-width: calc(100vw - clamp(96px, 10vw, 116px));
+          --x-nt-bottom-dock-section-gap: 14px;
+          --x-nt-bottom-dock-corridor-size: 8px;
+          --x-nt-bottom-dock-bottom-padding: 88px;
+        }
+        .x-nt-wallpaper-control {
+          right: 10px;
+          bottom: 10px;
+        }
+        .x-nt-feedback-control {
+          right: 10px;
+          bottom: 56px;
+        }
+      }
       @media (max-height: 560px) {
+        :root {
+          --x-nt-content-viewport-width: calc(100vw - clamp(104px, 12vw, 132px));
+          --x-nt-bottom-dock-section-gap: 12px;
+          --x-nt-bottom-dock-corridor-size: 8px;
+          --x-nt-bottom-dock-bottom-padding: 92px;
+        }
+        .x-nt-wallpaper-control {
+          right: 8px;
+          bottom: 8px;
+        }
+        .x-nt-feedback-control {
+          right: 8px;
+          bottom: 54px;
+        }
         .x-nt-wallpaper-panel {
           --x-nt-panel-divider-gap: 16px;
           --x-nt-panel-item-gap: 18px;

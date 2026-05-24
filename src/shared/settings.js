@@ -17,6 +17,9 @@
       }
       return 'zh_CN';
     }
+    if (lower === 'ja' || lower.startsWith('ja-') || lower.startsWith('ja_')) {
+      return 'ja';
+    }
     return 'en';
   }
 
@@ -27,6 +30,9 @@
     }
     if (normalized === 'zh_TW') {
       return 'zh-TW';
+    }
+    if (normalized === 'ja') {
+      return 'ja';
     }
     return 'en';
   }

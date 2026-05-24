@@ -23,6 +23,11 @@
     const upshiftMaxPx = getOptionNumber(constants, 'upshiftMaxPx', 80);
     const contentSectionsExtraUpshiftPx = getOptionNumber(constants, 'contentSectionsExtraUpshiftPx', 20);
     const emptySectionsExtraUpshiftPx = getOptionNumber(constants, 'emptySectionsExtraUpshiftPx', 96);
+    const narrowViewportMinWidthPx = getOptionNumber(constants, 'narrowViewportMinWidthPx', 0);
+    const narrowViewportMaxWidthPx = getOptionNumber(constants, 'narrowViewportMaxWidthPx', 0);
+    const narrowTopInsetPx = getOptionNumber(constants, 'narrowTopInsetPx', 0);
+    const shortViewportMaxHeightPx = getOptionNumber(constants, 'shortViewportMaxHeightPx', 0);
+    const shortMinTopPx = getOptionNumber(constants, 'shortMinTopPx', minTopPx);
     const suggestionsBottomInsetPx = getOptionNumber(constants, 'suggestionsBottomInsetPx', 14);
     const visibleAttribute = 'data-visible';
     const suggestionsOpenAttribute = 'data-nt-suggestions-open';
@@ -231,6 +236,10 @@
       const recentSection = getRecentSection();
       const bookmarkVisible = isSectionVisible(bookmarkSection);
       const recentVisible = isSectionVisible(recentSection);
+      const viewportWidth = Math.max(0, windowObj.innerWidth || 0);
+      const effectiveMinTopPx = shortViewportMaxHeightPx > 0 && viewportHeight <= shortViewportMaxHeightPx
+        ? Math.max(minTopPx, shortMinTopPx)
+        : minTopPx;
       const extraUpshift = (!bookmarkVisible && !recentVisible)
         ? emptySectionsExtraUpshiftPx
         : contentSectionsExtraUpshiftPx;
@@ -238,12 +247,17 @@
         upshiftMaxPx,
         Math.max(upshiftMinPx, availableHeight * upshiftRatio)
       ) + extraUpshift;
-      const maxTop = Math.max(minTopPx, availableHeight - searchBlockHeight - minBottomPx);
+      const maxTop = Math.max(effectiveMinTopPx, availableHeight - searchBlockHeight - minBottomPx);
       let targetTop = ((availableHeight - searchBlockHeight) / 2) - upwardOffset;
       if (!Number.isFinite(targetTop)) {
-        targetTop = minTopPx;
+        targetTop = effectiveMinTopPx;
       }
-      targetTop = Math.max(minTopPx, Math.min(maxTop, targetTop));
+      if (narrowTopInsetPx > 0 && narrowViewportMaxWidthPx > 0) {
+        if (viewportWidth > narrowViewportMinWidthPx && viewportWidth <= narrowViewportMaxWidthPx) {
+          targetTop += narrowTopInsetPx;
+        }
+      }
+      targetTop = Math.max(effectiveMinTopPx, Math.min(maxTop, targetTop));
       const nextTop = Math.round(targetTop);
       if (body.style.getPropertyValue('padding-top') === `${nextTop}px`) {
         return;

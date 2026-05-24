@@ -3233,7 +3233,7 @@
           return;
         }
         showTopActionTooltip(wallpaperButton, getWallpaperButtonLabel(), {
-          placement: 'left'
+          placement: 'top'
         });
       };
       wallpaperButton.addEventListener('mouseenter', showWallpaperButtonTooltip);

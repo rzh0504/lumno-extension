@@ -89,6 +89,9 @@
     if (normalized.startsWith('zh_hant')) {
       return 'zh_TW';
     }
+    if (normalized === 'ja' || normalized.startsWith('ja_')) {
+      return 'ja';
+    }
     return 'en';
   }
 

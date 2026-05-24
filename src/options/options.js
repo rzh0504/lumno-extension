@@ -1096,6 +1096,126 @@
     return Number.isFinite(parsed) ? parsed : 0;
   }
 
+  function getCustomSelectMenuWidthMode(wrapper) {
+    const raw = wrapper
+      ? String(wrapper.getAttribute('data-menu-width') || '').trim().toLowerCase()
+      : '';
+    if (raw === 'content' || raw === 'trigger') {
+      return raw;
+    }
+    return 'auto';
+  }
+
+  function getCustomSelectMenuAlign(wrapper, options) {
+    const settings = options || {};
+    const raw = wrapper
+      ? String(wrapper.getAttribute('data-menu-align') || '').trim().toLowerCase()
+      : '';
+    if (raw === 'left' || raw === 'right' || raw === 'middle') {
+      return raw;
+    }
+    if (settings.preferRight) {
+      return 'right';
+    }
+    if (wrapper && wrapper.classList.contains('_x_extension_select_align_left_2024_unique_')) {
+      return 'left';
+    }
+    if (wrapper && wrapper.classList.contains('_x_extension_select_align_middle_2024_unique_')) {
+      return 'middle';
+    }
+    return 'right';
+  }
+
+  function applyCustomSelectMenuAlign(wrapper, menu, align) {
+    if (!menu) {
+      return 'right';
+    }
+    const nextAlign = align || getCustomSelectMenuAlign(wrapper);
+    if (wrapper) {
+      wrapper.setAttribute('data-menu-align-current', nextAlign);
+    }
+    if (nextAlign === 'left') {
+      menu.style.left = '0';
+      menu.style.right = 'auto';
+      return nextAlign;
+    }
+    if (nextAlign === 'middle') {
+      menu.style.left = '50%';
+      menu.style.right = 'auto';
+      return nextAlign;
+    }
+    menu.style.left = 'auto';
+    menu.style.right = '0';
+    return nextAlign;
+  }
+
+  function setCustomSelectEffectiveMenuWidth(wrapper, widthMode) {
+    if (wrapper) {
+      wrapper.setAttribute('data-menu-width-current', widthMode);
+    }
+  }
+
+  function applyCustomSelectTriggerMenuWidth(wrapper, menu, width, align) {
+    setCustomSelectEffectiveMenuWidth(wrapper, 'trigger');
+    applyCustomSelectMenuAlign(wrapper, menu, align);
+    menu.style.minWidth = `${width}px`;
+    menu.style.width = `${width}px`;
+    menu.style.maxWidth = '';
+  }
+
+  function applyCustomSelectContentMenuWidth(wrapper, menu, align) {
+    setCustomSelectEffectiveMenuWidth(wrapper, 'content');
+    applyCustomSelectMenuAlign(wrapper, menu, align);
+    menu.style.minWidth = '0';
+    menu.style.width = 'max-content';
+    menu.style.maxWidth = 'calc(100vw - 32px)';
+  }
+
+  function getHorizontalBoxSpace(element) {
+    if (!element) {
+      return 0;
+    }
+    const style = window.getComputedStyle(element);
+    return (Number.parseFloat(style.paddingLeft) || 0) +
+      (Number.parseFloat(style.paddingRight) || 0) +
+      (Number.parseFloat(style.borderLeftWidth) || 0) +
+      (Number.parseFloat(style.borderRightWidth) || 0);
+  }
+
+  function measureTextWidth(element) {
+    if (!element || !element.ownerDocument || !element.childNodes || element.childNodes.length === 0) {
+      return 0;
+    }
+    const range = element.ownerDocument.createRange();
+    range.selectNodeContents(element);
+    const rect = range.getBoundingClientRect();
+    range.detach();
+    return Math.ceil(rect.width || 0);
+  }
+
+  function getCustomSelectContentMetrics(menu, trigger) {
+    const metrics = {
+      naturalMenuWidth: 0,
+      maxOptionTextWidth: 0,
+      selectedLabelTextWidth: 0
+    };
+    if (!menu) {
+      return metrics;
+    }
+    const menuBoxSpace = getHorizontalBoxSpace(menu);
+    Array.from(menu.children).forEach((item) => {
+      const textWidth = measureTextWidth(item);
+      const itemWidth = textWidth + getHorizontalBoxSpace(item);
+      metrics.maxOptionTextWidth = Math.max(metrics.maxOptionTextWidth, textWidth);
+      metrics.naturalMenuWidth = Math.max(metrics.naturalMenuWidth, itemWidth + menuBoxSpace);
+    });
+    const labelEl = trigger
+      ? trigger.querySelector('._x_extension_select_label_2024_unique_')
+      : null;
+    metrics.selectedLabelTextWidth = measureTextWidth(labelEl);
+    return metrics;
+  }
+
   function closeCustomSelect() {
     if (!openCustomSelect) {
       return;
@@ -1245,39 +1365,35 @@
     if (!menu || !trigger) {
       return;
     }
+    const widthMode = getCustomSelectMenuWidthMode(wrapper);
+    if (widthMode === 'content') {
+      applyCustomSelectContentMenuWidth(
+        wrapper,
+        menu,
+        getCustomSelectMenuAlign(wrapper, { preferRight: true })
+      );
+      return;
+    }
     const triggerRect = trigger.getBoundingClientRect();
     const baseWidth = Math.round(triggerRect.width);
     if (!Number.isFinite(baseWidth) || baseWidth <= 0) {
       return;
     }
-    menu.style.minWidth = `${baseWidth}px`;
-    menu.style.width = `${baseWidth}px`;
-    menu.style.right = '0';
+    applyCustomSelectTriggerMenuWidth(wrapper, menu, baseWidth, getCustomSelectMenuAlign(wrapper));
 
-    const menuStyle = window.getComputedStyle(menu);
-    const padLeft = Number.parseFloat(menuStyle.paddingLeft) || 0;
-    const padRight = Number.parseFloat(menuStyle.paddingRight) || 0;
-    const availableWidth = Math.max(0, menu.clientWidth - padLeft - padRight);
-    let needsExpand = false;
-    Array.from(menu.children).forEach((item) => {
-      if (item.scrollWidth > availableWidth + 1) {
-        needsExpand = true;
-      }
-    });
-
-    if (!needsExpand) {
+    if (widthMode === 'trigger') {
       return;
     }
 
-    let maxItemWidth = 0;
-    Array.from(menu.children).forEach((item) => {
-      if (item.scrollWidth > maxItemWidth) {
-        maxItemWidth = item.scrollWidth;
-      }
-    });
-    const naturalWidth = Math.ceil(maxItemWidth + padLeft + padRight);
-    if (Number.isFinite(naturalWidth) && naturalWidth > baseWidth) {
-      menu.style.width = `${naturalWidth}px`;
+    const contentMetrics = getCustomSelectContentMetrics(menu, trigger);
+    const needsContentWidth = contentMetrics.naturalMenuWidth > baseWidth + 1 ||
+      contentMetrics.maxOptionTextWidth > contentMetrics.selectedLabelTextWidth + 24;
+    if (needsContentWidth) {
+      applyCustomSelectContentMenuWidth(
+        wrapper,
+        menu,
+        getCustomSelectMenuAlign(wrapper, { preferRight: true })
+      );
     }
   }
 
@@ -1669,6 +1785,9 @@
     if (lower === 'en' || lower.startsWith('en-') || lower.startsWith('en_')) {
       return 'en';
     }
+    if (lower === 'ja' || lower.startsWith('ja-') || lower.startsWith('ja_')) {
+      return 'ja';
+    }
     if (lower === 'zh-hk' || lower === 'zh_hk') {
       return 'zh-TW';
     }
@@ -1683,7 +1802,9 @@
 
   function loadLocaleMessages(locale) {
     const normalized = normalizeLocale(locale);
-    const localePath = chrome.runtime.getURL(`_locales/${normalized}/messages.json`);
+    const localePath = chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function'
+      ? chrome.runtime.getURL(`_locales/${normalized}/messages.json`)
+      : `../../_locales/${normalized}/messages.json`;
     const fetchFromBackground = () => new Promise((resolve) => {
       if (!chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
         resolve({});

@@ -39,15 +39,18 @@
   const LUMNO_WEB_ORIGIN = 'https://lumno.kubai.design';
   const LUMNO_COMMUNITY_LINKS_URL = `${LUMNO_WEB_ORIGIN}/community-links.json`;
   const LUMNO_FEEDBACK_EMAIL = 'i@kubai.design';
+  const LUMNO_FEEDBACK_GITHUB_ISSUE_URL = 'https://github.com/kubai087/lumno-extension/issues/new';
   const LUMNO_FEEDBACK_LINKS_FETCH_TIMEOUT_MS = 2500;
   const LUMNO_FEEDBACK_LINKS_FALLBACK = Object.freeze({
     x: 'https://x.com/kubai087',
+    githubIssue: LUMNO_FEEDBACK_GITHUB_ISSUE_URL,
     email: LUMNO_FEEDBACK_EMAIL,
     discord: 'https://discord.gg/2u9sg7ZNkJ',
     wechatQr: `${LUMNO_WEB_ORIGIN}/qrcode.JPG`,
     communityByLocale: Object.freeze({
       'zh-CN': 'wechat',
       'zh-TW': 'discord',
+      ja: 'discord',
       en: 'discord'
     })
   });
@@ -168,6 +171,7 @@
   let feedbackPopover = null;
   let feedbackMenu = null;
   let feedbackXLink = null;
+  let feedbackGithubIssueLink = null;
   let feedbackMailButton = null;
   let feedbackCommunityButton = null;
   let feedbackDetail = null;
@@ -213,6 +217,11 @@
   const SEARCH_LAYOUT_UPSHIFT_MAX_PX = 80;
   const SEARCH_LAYOUT_CONTENT_SECTIONS_EXTRA_UPSHIFT_PX = 20;
   const SEARCH_LAYOUT_EMPTY_SECTIONS_EXTRA_UPSHIFT_PX = 96;
+  const SEARCH_LAYOUT_NARROW_VIEWPORT_MIN_WIDTH_PX = 520;
+  const SEARCH_LAYOUT_NARROW_VIEWPORT_MAX_WIDTH_PX = 1440;
+  const SEARCH_LAYOUT_NARROW_TOP_INSET_PX = 16;
+  const SEARCH_LAYOUT_SHORT_VIEWPORT_MAX_HEIGHT_PX = 680;
+  const SEARCH_LAYOUT_SHORT_MIN_TOP_PX = 44;
   const WORDMARK_ENTRY_ANIMATION_NAME = '_x_nt_wordmark_enter_2026_unique_';
   const WORDMARK_ENTRY_ANIMATION_TOTAL_MS = 660;
   const WORDMARK_WALLPAPER_COVER_DARK_OPACITY = '0.32';
@@ -1086,6 +1095,7 @@
     return {
       'zh-CN': normalizeFeedbackCommunityChannel(source['zh-CN'] || source.zh_CN, fallbackMap['zh-CN']),
       'zh-TW': normalizeFeedbackCommunityChannel(source['zh-TW'] || source.zh_TW, fallbackMap['zh-TW']),
+      ja: normalizeFeedbackCommunityChannel(source.ja, fallbackMap.ja),
       en: normalizeFeedbackCommunityChannel(source.en, fallbackMap.en)
     };
   }
@@ -1095,6 +1105,8 @@
     const links = source.links && typeof source.links === 'object' ? source.links : source;
     return {
       x: normalizeFeedbackHttpsUrl(links.x) || LUMNO_FEEDBACK_LINKS_FALLBACK.x,
+      githubIssue: normalizeFeedbackHttpsUrl(links.githubIssue || links.github_issue || links.issue) ||
+        LUMNO_FEEDBACK_LINKS_FALLBACK.githubIssue,
       email: normalizeFeedbackEmail(links.email) || LUMNO_FEEDBACK_LINKS_FALLBACK.email,
       discord: normalizeFeedbackHttpsUrl(links.discord) || LUMNO_FEEDBACK_LINKS_FALLBACK.discord,
       wechatQr: normalizeFeedbackHttpsUrl(links.wechatQr) || LUMNO_FEEDBACK_LINKS_FALLBACK.wechatQr,
@@ -1148,6 +1160,9 @@
     if (locale === 'zh_TW') {
       return 'zh-TW';
     }
+    if (locale === 'ja') {
+      return 'ja';
+    }
     return 'en';
   }
 
@@ -1157,30 +1172,66 @@
     return channel === 'wechat' ? 'wechat' : 'discord';
   }
 
+  function setFeedbackActionLabel(action, label, tooltip) {
+    if (!action) {
+      return;
+    }
+    const actionText = tooltip || label;
+    action.setAttribute('aria-label', actionText);
+    action.setAttribute('data-tooltip', actionText);
+    action.removeAttribute('title');
+  }
+
+  function bindFeedbackActionTooltip(action, getLabel) {
+    if (!action || typeof getLabel !== 'function') {
+      return;
+    }
+    const showTooltip = () => {
+      if (!isFeedbackPopoverOpen()) {
+        return;
+      }
+      showTopActionTooltip(action, getLabel(), { placement: 'top' });
+    };
+    action.addEventListener('pointerenter', showTooltip);
+    action.addEventListener('pointerleave', hideTopActionTooltip);
+    action.addEventListener('mouseenter', showTooltip);
+    action.addEventListener('mouseleave', hideTopActionTooltip);
+    action.addEventListener('focus', showTooltip);
+    action.addEventListener('blur', hideTopActionTooltip);
+  }
+
   function updateFeedbackContactUi() {
     const links = feedbackLinks || LUMNO_FEEDBACK_LINKS_FALLBACK;
     const channel = getFeedbackCommunityChannel(links);
     if (feedbackXLink) {
       const label = t('newtab_feedback_x_label', 'X');
+      const tooltip = t('newtab_feedback_x_tooltip', 'Contacting on X');
       feedbackXLink.href = links.x || LUMNO_FEEDBACK_LINKS_FALLBACK.x;
-      feedbackXLink.setAttribute('aria-label', label);
-      feedbackXLink.setAttribute('title', label);
+      setFeedbackActionLabel(feedbackXLink, label, tooltip);
+    }
+    if (feedbackGithubIssueLink) {
+      const label = t('newtab_feedback_github_issue_label', 'GitHub Issue');
+      const tooltip = t('newtab_feedback_github_issue_tooltip', 'Opening a GitHub Issue');
+      feedbackGithubIssueLink.href = links.githubIssue || LUMNO_FEEDBACK_LINKS_FALLBACK.githubIssue;
+      setFeedbackActionLabel(feedbackGithubIssueLink, label, tooltip);
     }
     if (feedbackMailButton) {
       const label = t('newtab_feedback_mail_label', 'Email');
-      feedbackMailButton.setAttribute('aria-label', label);
-      feedbackMailButton.setAttribute('title', label);
+      const tooltip = t('newtab_feedback_mail_tooltip', 'Sending email');
+      setFeedbackActionLabel(feedbackMailButton, label, tooltip);
     }
     if (feedbackCommunityButton) {
       const label = channel === 'wechat'
         ? t('newtab_feedback_wechat_label', 'WeChat')
         : t('newtab_feedback_discord_label', 'Discord');
+      const tooltip = channel === 'wechat'
+        ? t('newtab_feedback_wechat_tooltip', 'Joining WeChat group')
+        : t('newtab_feedback_discord_tooltip', 'Joining Discord');
       feedbackCommunityButton.innerHTML = getRiSvg(
         channel === 'wechat' ? 'ri-wechat-fill' : 'ri-discord-fill',
         'ri-size-16'
       );
-      feedbackCommunityButton.setAttribute('aria-label', label);
-      feedbackCommunityButton.setAttribute('title', label);
+      setFeedbackActionLabel(feedbackCommunityButton, label, tooltip);
       feedbackCommunityButton.setAttribute('data-channel', channel);
       feedbackCommunityButton.setAttribute('aria-haspopup', channel === 'wechat' ? 'true' : 'false');
       if (channel !== 'wechat') {
@@ -1297,6 +1348,9 @@
     if (!feedbackControl || !feedbackButton || !feedbackPopover) {
       return;
     }
+    if (!open) {
+      hideTopActionTooltip();
+    }
     if (feedbackPopoverCloseTimer) {
       window.clearTimeout(feedbackPopoverCloseTimer);
       feedbackPopoverCloseTimer = 0;
@@ -1387,7 +1441,7 @@
         return;
       }
       showTopActionTooltip(feedbackButton, t('newtab_feedback_button_aria', 'Send feedback'), {
-        placement: 'left'
+        placement: 'top'
       });
     };
     feedbackButton.addEventListener('mouseenter', showFeedbackButtonTooltip);
@@ -1411,8 +1465,29 @@
     feedbackXLink.setAttribute('role', 'menuitem');
     feedbackXLink.innerHTML = getRiSvg('ri-twitter-x-line', 'ri-size-16');
     feedbackXLink.addEventListener('click', () => {
+      hideTopActionTooltip();
       closeFeedbackPopover();
     });
+    bindFeedbackActionTooltip(
+      feedbackXLink,
+      () => feedbackXLink.getAttribute('data-tooltip') || t('newtab_feedback_x_tooltip', 'Contacting on X')
+    );
+
+    feedbackGithubIssueLink = document.createElement('a');
+    feedbackGithubIssueLink.className = 'x-nt-feedback-action';
+    feedbackGithubIssueLink.target = '_blank';
+    feedbackGithubIssueLink.rel = 'noreferrer noopener';
+    feedbackGithubIssueLink.setAttribute('role', 'menuitem');
+    feedbackGithubIssueLink.innerHTML = getRiSvg('ri-github-line', 'ri-size-16');
+    feedbackGithubIssueLink.addEventListener('click', () => {
+      hideTopActionTooltip();
+      closeFeedbackPopover();
+    });
+    bindFeedbackActionTooltip(
+      feedbackGithubIssueLink,
+      () => feedbackGithubIssueLink.getAttribute('data-tooltip') ||
+        t('newtab_feedback_github_issue_tooltip', 'Opening a GitHub Issue')
+    );
 
     feedbackMailButton = document.createElement('button');
     feedbackMailButton.type = 'button';
@@ -1420,6 +1495,10 @@
     feedbackMailButton.setAttribute('role', 'menuitem');
     feedbackMailButton.innerHTML = getRiSvg('ri-mail-line', 'ri-size-16');
     feedbackMailButton.addEventListener('click', handleFeedbackMailClick);
+    bindFeedbackActionTooltip(
+      feedbackMailButton,
+      () => feedbackMailButton.getAttribute('data-tooltip') || t('newtab_feedback_mail_tooltip', 'Sending email')
+    );
 
     feedbackCommunityButton = document.createElement('button');
     feedbackCommunityButton.type = 'button';
@@ -1428,12 +1507,18 @@
     feedbackCommunityButton.setAttribute('aria-haspopup', 'false');
     feedbackCommunityButton.setAttribute('aria-expanded', 'false');
     feedbackCommunityButton.addEventListener('click', handleFeedbackCommunityClick);
+    bindFeedbackActionTooltip(
+      feedbackCommunityButton,
+      () => feedbackCommunityButton.getAttribute('data-tooltip') ||
+        t('newtab_feedback_discord_tooltip', 'Joining Discord')
+    );
 
     feedbackDetail = document.createElement('div');
     feedbackDetail.className = 'x-nt-feedback-detail';
     feedbackDetail.hidden = true;
 
     feedbackMenu.appendChild(feedbackXLink);
+    feedbackMenu.appendChild(feedbackGithubIssueLink);
     feedbackMenu.appendChild(feedbackMailButton);
     feedbackMenu.appendChild(feedbackCommunityButton);
     feedbackPopover.appendChild(feedbackMenu);
@@ -3331,21 +3416,60 @@
       : null;
   }
 
+  function isNeutralThemeAccent(value) {
+    const rgb = normalizeAccentRgb(value);
+    if (!rgb) {
+      return false;
+    }
+    if (typeof FAVICON_UTILS.isNeutralThemeColor === 'function') {
+      return FAVICON_UTILS.isNeutralThemeColor(rgb);
+    }
+    const max = Math.max(...rgb);
+    const min = Math.min(...rgb);
+    const range = max - min;
+    const saturation = max === 0 ? 0 : range / max;
+    return range <= 24 ||
+      saturation <= 0.12 ||
+      (min >= 235 && max >= 245) ||
+      (max <= 36 && min <= 24);
+  }
+
+  function normalizeThemeConfidence(value, accentRgb) {
+    const confidence = String(value || '').trim().toLowerCase();
+    if (confidence === 'color' || confidence === 'neutral') {
+      return confidence;
+    }
+    return isNeutralThemeAccent(accentRgb) ? 'neutral' : 'color';
+  }
+
   function normalizeThemeSource(source) {
     const value = String(source || '').trim().toLowerCase();
-    if (value === 'brand' || value === 'meta' || value === 'favicon' || value === 'url') {
+    if (
+      value === 'brand' ||
+      value === 'mask-icon' ||
+      value === 'meta' ||
+      value === 'manifest' ||
+      value === 'favicon' ||
+      value === 'url'
+    ) {
       return value;
     }
     return 'fallback';
   }
 
-  function getThemeSourcePriority(source) {
+  function getThemeSourcePriority(source, theme) {
     const value = normalizeThemeSource(source);
     if (value === 'brand') {
       return 40;
     }
+    if (value === 'mask-icon') {
+      return 38;
+    }
     if (value === 'meta') {
-      return 34;
+      return theme && isLowConfidenceTheme(theme) ? 20 : 34;
+    }
+    if (value === 'manifest') {
+      return theme && isLowConfidenceTheme(theme) ? 18 : 32;
     }
     if (value === 'favicon') {
       return 24;
@@ -3375,15 +3499,50 @@
     }
     const theme = buildTheme(rgb);
     const normalizedSource = normalizeThemeSource(source);
+    const confidence = normalizeThemeConfidence(null, rgb);
     theme._xThemeSource = normalizedSource;
     theme._xIsBrand = normalizedSource !== 'fallback';
     theme._xIsDefault = normalizedSource === 'fallback';
+    theme._xThemeNeutral = confidence === 'neutral';
+    theme._xThemeConfidence = confidence;
     return theme;
+  }
+
+  function buildThemeFromThemeResult(result, fallbackSource) {
+    const accentRgb = result && normalizeAccentRgb(result.accentRgb);
+    if (!accentRgb) {
+      return null;
+    }
+    const source = normalizeThemeSource((result && result.source) || fallbackSource || 'meta');
+    const confidence = normalizeThemeConfidence(result && result.confidence, accentRgb);
+    const theme = buildThemeFromAccent(accentRgb, source);
+    theme._xThemeNeutral = typeof (result && result.neutral) === 'boolean'
+      ? result.neutral
+      : confidence === 'neutral';
+    theme._xThemeConfidence = confidence;
+    return theme;
+  }
+
+  function isLowConfidenceTheme(theme) {
+    if (!theme) {
+      return false;
+    }
+    const source = getThemeSource(theme);
+    if (source !== 'meta' && source !== 'manifest') {
+      return false;
+    }
+    const accentRgb = normalizeAccentRgb(theme.accentRgb || parseCssColor(theme.accent));
+    const confidence = normalizeThemeConfidence(theme._xThemeConfidence, accentRgb);
+    return theme._xThemeNeutral === true || confidence === 'neutral';
   }
 
   function isPersistableTheme(theme) {
     const source = getThemeSource(theme);
-    return source === 'brand' || source === 'meta' || source === 'favicon';
+    return source === 'brand' ||
+      source === 'mask-icon' ||
+      source === 'meta' ||
+      source === 'manifest' ||
+      source === 'favicon';
   }
 
   function getProviderThemeHost(provider) {
@@ -3461,7 +3620,11 @@
       return nextTheme;
     }
     const currentTheme = themeHostCache.get(normalizedHost);
-    if (currentTheme && getThemeSourcePriority(getThemeSource(currentTheme)) > getThemeSourcePriority(getThemeSource(nextTheme))) {
+    if (
+      currentTheme &&
+      getThemeSourcePriority(getThemeSource(currentTheme), currentTheme) >
+        getThemeSourcePriority(getThemeSource(nextTheme), nextTheme)
+    ) {
       if (iconUrl) {
         themeColorCache.set(iconUrl, currentTheme);
       }
@@ -3494,7 +3657,13 @@
     if (!accentRgb) {
       return null;
     }
-    const theme = buildThemeFromAccent(accentRgb, entry.source);
+    const theme = buildThemeFromThemeResult(entry, entry.source);
+    if (!theme) {
+      return null;
+    }
+    if (isLowConfidenceTheme(theme)) {
+      return theme;
+    }
     return setResolvedThemeForHost(normalizedHost, theme, { persist: false, refresh: false });
   }
 
@@ -3516,7 +3685,12 @@
         preferredTheme: getFaviconPreferredTheme()
       }, (response) => {
         const accentRgb = response && normalizeAccentRgb(response.accentRgb);
-        resolve(accentRgb ? { accentRgb, source: response.source || 'meta' } : null);
+        resolve(accentRgb ? {
+          accentRgb,
+          source: response.source || 'meta',
+          neutral: response.neutral === true,
+          confidence: normalizeThemeConfidence(response.confidence, accentRgb)
+        } : null);
       });
     }).catch(() => null).then((result) => {
       siteThemeRequestPending.delete(requestKey);
@@ -3535,12 +3709,19 @@
     const useHostCache = hostKey && (!isProxy || Boolean(hostOverride));
     if (useHostCache && themeHostCache.has(hostKey)) {
       const cachedTheme = themeHostCache.get(hostKey);
-      if (cachedTheme && !cachedTheme._xIsDefault) {
+      if (
+        cachedTheme &&
+        !cachedTheme._xIsDefault &&
+        getThemeSourcePriority(getThemeSource(cachedTheme), cachedTheme) >= getThemeSourcePriority('favicon')
+      ) {
         return Promise.resolve(cachedTheme);
       }
     }
     if (themeColorCache.has(url)) {
-      return Promise.resolve(themeColorCache.get(url));
+      const cachedTheme = themeColorCache.get(url);
+      if (cachedTheme && !isLowConfidenceTheme(cachedTheme)) {
+        return Promise.resolve(cachedTheme);
+      }
     }
     const brandAccent = (isProxy && hostOverride) ? null : getBrandAccentForUrl(url);
     if (brandAccent) {
@@ -3651,35 +3832,53 @@
     return brandTheme;
   }
 
+  function resolveThemeWithFaviconFallback(hostKey, iconUrl, persistedTheme, siteTheme) {
+    const siteThemeValue = siteTheme ? buildThemeFromThemeResult(siteTheme, siteTheme.source || 'meta') : null;
+    if (siteThemeValue && !isLowConfidenceTheme(siteThemeValue)) {
+      return Promise.resolve(setResolvedThemeForHost(hostKey, siteThemeValue, { iconUrl }));
+    }
+    return getThemeFromUrl(iconUrl, hostKey).then((theme) => {
+      if (theme && !theme._xIsDefault) {
+        return theme;
+      }
+      if (siteThemeValue) {
+        return setResolvedThemeForHost(hostKey, siteThemeValue, { iconUrl });
+      }
+      if (persistedTheme) {
+        return setResolvedThemeForHost(hostKey, persistedTheme, {
+          iconUrl,
+          persist: false
+        });
+      }
+      return defaultTheme;
+    });
+  }
+
   function getThemeForProvider(provider) {
     const hostKey = getProviderThemeHost(provider);
     const iconUrl = getProviderIcon(provider);
     if (hostKey && themeHostCache.has(hostKey)) {
-      return Promise.resolve(themeHostCache.get(hostKey));
+      const cachedTheme = themeHostCache.get(hostKey);
+      if (cachedTheme && !isLowConfidenceTheme(cachedTheme)) {
+        return Promise.resolve(cachedTheme);
+      }
     }
     if (iconUrl && themeColorCache.has(iconUrl)) {
-      return Promise.resolve(themeColorCache.get(iconUrl));
+      const cachedIconTheme = themeColorCache.get(iconUrl);
+      if (cachedIconTheme && !isLowConfidenceTheme(cachedIconTheme)) {
+        return Promise.resolve(cachedIconTheme);
+      }
     }
     const brandTheme = buildAndCacheBrandThemeForHost(hostKey, iconUrl);
     if (brandTheme) {
       return Promise.resolve(brandTheme);
     }
     const persistedTheme = getPersistedThemeForHost(hostKey);
-    if (persistedTheme && !isHostFaviconVisitDirty(hostKey)) {
+    if (persistedTheme && !isHostFaviconVisitDirty(hostKey) && !isLowConfidenceTheme(persistedTheme)) {
       return Promise.resolve(persistedTheme);
     }
     return requestSiteThemeColor(getThemePageUrlForSuggestion({ provider }, hostKey), hostKey).then((siteTheme) => {
-      if (siteTheme) {
-        return setResolvedThemeForHost(
-          hostKey,
-          buildThemeFromAccent(siteTheme.accentRgb, siteTheme.source || 'meta'),
-          { iconUrl }
-        );
-      }
-      if (persistedTheme) {
-        return persistedTheme;
-      }
-      return getThemeFromUrl(iconUrl, hostKey);
+      return resolveThemeWithFaviconFallback(hostKey, iconUrl, persistedTheme, siteTheme);
     });
   }
 
@@ -3708,23 +3907,11 @@
       return Promise.resolve(brandTheme);
     }
     const persistedTheme = getPersistedThemeForHost(hostKey);
-    if (persistedTheme && !isHostFaviconVisitDirty(hostKey)) {
+    if (persistedTheme && !isHostFaviconVisitDirty(hostKey) && !isLowConfidenceTheme(persistedTheme)) {
       return Promise.resolve(persistedTheme);
     }
     return requestSiteThemeColor(getThemePageUrlForSuggestion(suggestion, hostKey), hostKey).then((siteTheme) => {
-      if (siteTheme) {
-        return setResolvedThemeForHost(
-          hostKey,
-          buildThemeFromAccent(siteTheme.accentRgb, siteTheme.source || 'meta'),
-          { iconUrl }
-        );
-      }
-      if (persistedTheme) {
-        return persistedTheme;
-      }
-      return getThemeFromUrl(iconUrl, hostKey).then((theme) => (
-        theme && !theme._xIsDefault ? theme : defaultTheme
-      ));
+      return resolveThemeWithFaviconFallback(hostKey, iconUrl, persistedTheme, siteTheme);
     });
   }
 
@@ -3736,17 +3923,23 @@
       const hostKey = getProviderThemeHost(suggestion.provider);
       const iconUrl = getProviderIcon(suggestion.provider);
       if (hostKey && themeHostCache.has(hostKey)) {
-        return themeHostCache.get(hostKey);
+        const cachedTheme = themeHostCache.get(hostKey);
+        if (cachedTheme && !isLowConfidenceTheme(cachedTheme)) {
+          return cachedTheme;
+        }
       }
       if (iconUrl && themeColorCache.has(iconUrl)) {
-        return themeColorCache.get(iconUrl);
+        const cachedIconTheme = themeColorCache.get(iconUrl);
+        if (cachedIconTheme && !isLowConfidenceTheme(cachedIconTheme)) {
+          return cachedIconTheme;
+        }
       }
       const brandTheme = buildAndCacheBrandThemeForHost(hostKey, iconUrl);
       if (brandTheme) {
         return brandTheme;
       }
       const persistedTheme = getPersistedThemeForHost(hostKey);
-      if (persistedTheme) {
+      if (persistedTheme && !isLowConfidenceTheme(persistedTheme)) {
         return persistedTheme;
       }
       return defaultTheme;
@@ -3754,17 +3947,23 @@
     if (suggestion && suggestion.url) {
       const hostKey = getHostFromUrl(suggestion.url);
       if (hostKey && themeHostCache.has(hostKey)) {
-        return themeHostCache.get(hostKey);
+        const cachedTheme = themeHostCache.get(hostKey);
+        if (cachedTheme && !isLowConfidenceTheme(cachedTheme)) {
+          return cachedTheme;
+        }
       }
       if (themeColorCache.has(suggestion.url)) {
-        return themeColorCache.get(suggestion.url);
+        const cachedUrlTheme = themeColorCache.get(suggestion.url);
+        if (cachedUrlTheme && !isLowConfidenceTheme(cachedUrlTheme)) {
+          return cachedUrlTheme;
+        }
       }
       const brandTheme = buildAndCacheBrandThemeForHost(hostKey, suggestion.url);
       if (brandTheme) {
         return brandTheme;
       }
       const persistedTheme = getPersistedThemeForHost(hostKey);
-      if (persistedTheme) {
+      if (persistedTheme && !isLowConfidenceTheme(persistedTheme)) {
         return persistedTheme;
       }
       return defaultTheme;
@@ -4010,7 +4209,9 @@
     }
     return faviconCacheRuntime.setPersistedThemeEntry(hostKey, {
       accentRgb,
-      source: getThemeSource(theme)
+      source: getThemeSource(theme),
+      neutral: isLowConfidenceTheme(theme) || theme._xThemeNeutral === true,
+      confidence: normalizeThemeConfidence(theme._xThemeConfidence, accentRgb)
     });
   }
 
@@ -4081,7 +4282,10 @@
     const hostKey = normalizeHost(hostOverride || getHostFromUrl(url));
     const useHostCache = hostKey && (Boolean(hostOverride) || !isFaviconProxyUrl(url));
     const cachedHostTheme = useHostCache ? themeHostCache.get(hostKey) : null;
-    if (cachedHostTheme && getThemeSourcePriority(getThemeSource(cachedHostTheme)) > getThemeSourcePriority('favicon')) {
+    if (
+      cachedHostTheme &&
+      getThemeSourcePriority(getThemeSource(cachedHostTheme), cachedHostTheme) > getThemeSourcePriority('favicon')
+    ) {
       return;
     }
     if (!dataUrl) {
@@ -4531,7 +4735,12 @@
       upshiftMinPx: SEARCH_LAYOUT_UPSHIFT_MIN_PX,
       upshiftMaxPx: SEARCH_LAYOUT_UPSHIFT_MAX_PX,
       contentSectionsExtraUpshiftPx: SEARCH_LAYOUT_CONTENT_SECTIONS_EXTRA_UPSHIFT_PX,
-      emptySectionsExtraUpshiftPx: SEARCH_LAYOUT_EMPTY_SECTIONS_EXTRA_UPSHIFT_PX
+      emptySectionsExtraUpshiftPx: SEARCH_LAYOUT_EMPTY_SECTIONS_EXTRA_UPSHIFT_PX,
+      narrowViewportMinWidthPx: SEARCH_LAYOUT_NARROW_VIEWPORT_MIN_WIDTH_PX,
+      narrowViewportMaxWidthPx: SEARCH_LAYOUT_NARROW_VIEWPORT_MAX_WIDTH_PX,
+      narrowTopInsetPx: SEARCH_LAYOUT_NARROW_TOP_INSET_PX,
+      shortViewportMaxHeightPx: SEARCH_LAYOUT_SHORT_VIEWPORT_MAX_HEIGHT_PX,
+      shortMinTopPx: SEARCH_LAYOUT_SHORT_MIN_TOP_PX
     }
   });
   applyNewtabWidthMode();

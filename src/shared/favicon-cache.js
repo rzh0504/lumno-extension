@@ -154,10 +154,39 @@
 
     function normalizeThemeSource(value) {
       const source = String(value || '').trim().toLowerCase();
-      if (source === 'brand' || source === 'meta' || source === 'favicon') {
+      if (
+        source === 'brand' ||
+        source === 'mask-icon' ||
+        source === 'meta' ||
+        source === 'manifest' ||
+        source === 'favicon'
+      ) {
         return source;
       }
       return '';
+    }
+
+    function isNeutralThemeColor(rgb) {
+      const channels = normalizeAccentRgb(rgb);
+      if (!channels) {
+        return false;
+      }
+      const max = Math.max(...channels);
+      const min = Math.min(...channels);
+      const range = max - min;
+      const saturation = max === 0 ? 0 : range / max;
+      return range <= 24 ||
+        saturation <= 0.12 ||
+        (min >= 235 && max >= 245) ||
+        (max <= 36 && min <= 24);
+    }
+
+    function normalizeThemeConfidence(value, accentRgb) {
+      const confidence = String(value || '').trim().toLowerCase();
+      if (confidence === 'color' || confidence === 'neutral') {
+        return confidence;
+      }
+      return isNeutralThemeColor(accentRgb) ? 'neutral' : 'color';
     }
 
     function getValidSiteThemePersistEntries(rawEntries) {
@@ -171,6 +200,10 @@
         }
         const accentRgb = normalizeAccentRgb(item.accentRgb);
         const source = normalizeThemeSource(item.source);
+        const confidence = normalizeThemeConfidence(item.confidence, accentRgb);
+        const neutral = typeof item.neutral === 'boolean'
+          ? item.neutral
+          : confidence === 'neutral';
         const updatedAt = Number(item.updatedAt || 0);
         if (!key || !accentRgb || !source || !Number.isFinite(updatedAt)) {
           return;
@@ -178,7 +211,7 @@
         if (now - updatedAt > siteThemePersistTtlMs) {
           return;
         }
-        valid.push({ key, accentRgb, source, updatedAt });
+        valid.push({ key, accentRgb, source, neutral, confidence, updatedAt });
       });
       valid.sort((a, b) => b.updatedAt - a.updatedAt);
       return valid.slice(0, siteThemePersistMaxEntries);
@@ -277,6 +310,8 @@
             siteThemePersistCache.set(item.key, {
               accentRgb: item.accentRgb,
               source: item.source,
+              neutral: item.neutral,
+              confidence: item.confidence,
               updatedAt: item.updatedAt
             });
           });
@@ -413,6 +448,8 @@
             key: String(key || ''),
             accentRgb: normalizeAccentRgb(value && value.accentRgb),
             source: normalizeThemeSource(value && value.source),
+            neutral: Boolean(value && value.neutral),
+            confidence: normalizeThemeConfidence(value && value.confidence, value && value.accentRgb),
             updatedAt: Number(value && value.updatedAt ? value.updatedAt : 0)
           }))
           .filter((item) => item.key && item.accentRgb && item.source && Number.isFinite(item.updatedAt))
@@ -423,6 +460,8 @@
           serialized[item.key] = {
             accentRgb: item.accentRgb,
             source: item.source,
+            neutral: item.neutral,
+            confidence: item.confidence,
             updatedAt: item.updatedAt
           };
         });
@@ -571,6 +610,10 @@
       const cached = siteThemePersistCache.get(key);
       const accentRgb = cached ? normalizeAccentRgb(cached.accentRgb) : null;
       const source = cached ? normalizeThemeSource(cached.source) : '';
+      const confidence = cached ? normalizeThemeConfidence(cached.confidence, accentRgb) : '';
+      const neutral = cached
+        ? (typeof cached.neutral === 'boolean' ? cached.neutral : confidence === 'neutral')
+        : false;
       if (!cached || !accentRgb || !source) {
         return null;
       }
@@ -583,6 +626,8 @@
       return {
         accentRgb,
         source,
+        neutral,
+        confidence,
         updatedAt: cached.updatedAt
       };
     }
@@ -591,18 +636,34 @@
       const key = normalizeFaviconHost(cacheKey);
       const accentRgb = normalizeAccentRgb(entry && entry.accentRgb);
       const source = normalizeThemeSource(entry && entry.source);
+      const confidence = normalizeThemeConfidence(entry && entry.confidence, accentRgb);
+      const neutral = typeof (entry && entry.neutral) === 'boolean'
+        ? entry.neutral
+        : confidence === 'neutral';
       if (!key || !accentRgb || !source) {
         return false;
       }
       const current = siteThemePersistCache.get(key);
       const currentRgb = current ? normalizeAccentRgb(current.accentRgb) : null;
       const currentSource = current ? normalizeThemeSource(current.source) : '';
-      if (currentRgb && currentSource === source && currentRgb.join(',') === accentRgb.join(',')) {
+      const currentConfidence = current ? normalizeThemeConfidence(current.confidence, currentRgb) : '';
+      const currentNeutral = current
+        ? (typeof current.neutral === 'boolean' ? current.neutral : currentConfidence === 'neutral')
+        : false;
+      if (
+        currentRgb &&
+        currentSource === source &&
+        currentRgb.join(',') === accentRgb.join(',') &&
+        currentNeutral === neutral &&
+        currentConfidence === confidence
+      ) {
         return false;
       }
       siteThemePersistCache.set(key, {
         accentRgb,
         source,
+        neutral,
+        confidence,
         updatedAt: Date.now()
       });
       if (siteThemePersistCache.size > siteThemePersistMaxEntries * 2) {

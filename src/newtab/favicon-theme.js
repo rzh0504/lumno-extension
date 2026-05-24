@@ -261,9 +261,11 @@
     const source = theme && theme._xThemeSource
       ? String(theme._xThemeSource)
       : (theme && theme._xIsDefault ? 'fallback' : (theme && theme._xIsBrand ? 'brand' : 'unknown'));
+    const confidence = theme && theme._xThemeConfidence ? String(theme._xThemeConfidence) : '';
+    const neutral = theme && theme._xThemeNeutral ? 'neutral' : 'color';
     const rgb = theme && (theme.accentRgb || parseCssColor(theme.accent));
     const accent = rgb && rgb.length === 3 ? rgb : defaultAccentColor;
-    return `${source}:${accent.join(',')}`;
+    return `${source}:${confidence || neutral}:${accent.join(',')}`;
   }
 
   function hasThemeTokenInUrl(url, token) {

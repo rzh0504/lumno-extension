@@ -364,6 +364,44 @@
       : null;
   }
 
+  function isNeutralThemeColor(rgb) {
+    if (!Array.isArray(rgb) || rgb.length !== 3) {
+      return false;
+    }
+    const channels = rgb.map((channel) => Math.round(Number(channel)));
+    if (!channels.every((channel) => Number.isFinite(channel) && channel >= 0 && channel <= 255)) {
+      return false;
+    }
+    const max = Math.max(...channels);
+    const min = Math.min(...channels);
+    const range = max - min;
+    const saturation = max === 0 ? 0 : range / max;
+    return range <= 24 ||
+      saturation <= 0.12 ||
+      (min >= 235 && max >= 245) ||
+      (max <= 36 && min <= 24);
+  }
+
+  function getThemeColorConfidence(rgb) {
+    return isNeutralThemeColor(rgb) ? 'neutral' : 'color';
+  }
+
+  function buildThemeColorCandidate(accentRgb, source, baseScore, extraScore) {
+    const rgb = parseCssThemeColor(Array.isArray(accentRgb) ? `rgb(${accentRgb.join(',')})` : accentRgb);
+    if (!rgb) {
+      return null;
+    }
+    const confidence = getThemeColorConfidence(rgb);
+    const neutralPenalty = confidence === 'neutral' ? 56 : 0;
+    return {
+      accentRgb: rgb,
+      source: source || 'meta',
+      neutral: confidence === 'neutral',
+      confidence,
+      score: Number(baseScore || 0) + Number(extraScore || 0) - neutralPenalty
+    };
+  }
+
   function getThemeMediaScore(media, preferredTheme) {
     const theme = normalizeFaviconThemePreference(preferredTheme);
     const value = String(media || '').toLowerCase();
@@ -389,27 +427,38 @@
       if (name !== 'theme-color') {
         return;
       }
-      const accentRgb = parseCssThemeColor(getHtmlAttributeValue(tag, 'content'));
-      if (!accentRgb) {
-        return;
+      const candidate = buildThemeColorCandidate(
+        getHtmlAttributeValue(tag, 'content'),
+        'meta',
+        80,
+        getThemeMediaScore(getHtmlAttributeValue(tag, 'media'), preferredTheme)
+      );
+      if (candidate) {
+        list.push(candidate);
       }
-      list.push({
-        accentRgb,
-        source: 'meta',
-        score: 80 + getThemeMediaScore(getHtmlAttributeValue(tag, 'media'), preferredTheme)
-      });
     });
     const manifestMatches = String(html || '').match(/<link\b[^>]*>/gi) || [];
     manifestMatches.forEach((tag) => {
       const rel = getHtmlAttributeValue(tag, 'rel').toLowerCase();
       const hrefRaw = getHtmlAttributeValue(tag, 'href');
+      if (rel.includes('mask-icon')) {
+        const candidate = buildThemeColorCandidate(
+          getHtmlAttributeValue(tag, 'color'),
+          'mask-icon',
+          96,
+          0
+        );
+        if (candidate) {
+          list.push(candidate);
+        }
+      }
       if (!rel.includes('manifest') || !hrefRaw) {
         return;
       }
       try {
         list.push({
           manifestUrl: new URL(hrefRaw, pageUrl).href,
-          source: 'meta',
+          source: 'manifest',
           score: 42
         });
       } catch (e) {
@@ -605,6 +654,7 @@
     getRootFaviconCandidateScores,
     getRootFaviconCandidateUrls,
     getThemeHintScore,
+    getThemeColorConfidence,
     getThemeMediaScore,
     hasThemeTokenInUrl,
     hostHasExplicitDarkFavicon,
@@ -615,6 +665,7 @@
     isSuspiciousLocalFaviconHost,
     normalizeFaviconThemePreference,
     normalizeFaviconHost,
+    isNeutralThemeColor,
     parseCssThemeColor,
     parseHtmlIconCandidateScores,
     parseHtmlThemeColorCandidates,

@@ -86,6 +86,9 @@
   "language_en": {
     "message": "English"
   },
+  "language_ja": {
+    "message": "日本語"
+  },
   "language_system": {
     "message": "跟隨瀏覽器語言"
   },
@@ -470,14 +473,32 @@
   "newtab_feedback_x_label": {
     "message": "X"
   },
+  "newtab_feedback_x_tooltip": {
+    "message": "透過 X 聯絡"
+  },
+  "newtab_feedback_github_issue_label": {
+    "message": "GitHub Issue"
+  },
+  "newtab_feedback_github_issue_tooltip": {
+    "message": "提交 GitHub Issue"
+  },
   "newtab_feedback_mail_label": {
     "message": "信箱"
+  },
+  "newtab_feedback_mail_tooltip": {
+    "message": "寄送郵件"
   },
   "newtab_feedback_wechat_label": {
     "message": "微信"
   },
+  "newtab_feedback_wechat_tooltip": {
+    "message": "加入微信群組"
+  },
   "newtab_feedback_discord_label": {
     "message": "Discord"
+  },
+  "newtab_feedback_discord_tooltip": {
+    "message": "加入 Discord"
   },
   "newtab_feedback_wechat_qr_title": {
     "message": "微信群二維碼"

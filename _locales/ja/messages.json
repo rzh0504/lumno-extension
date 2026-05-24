@@ -1,0 +1,1208 @@
+{
+  "ext_name": {
+    "message": "Lumno | コマンドバー＆新しいタブ"
+  },
+  "ext_description": {
+    "message": "どのページからでもコマンドバーを呼び出し、検索、URL移動、タブ切替をすばやく実行。新しいタブも使いやすくします。"
+  },
+  "settings_tab_general": {
+    "message": "一般"
+  },
+  "settings_tab_appearance": {
+    "message": "外観"
+  },
+  "settings_appearance_global_section_title": {
+    "message": "全体"
+  },
+  "settings_webpage_focus_overlay_section_title": {
+    "message": "コマンドバー"
+  },
+  "newtab_theme_scope_label": {
+    "message": "ライト/ダークの適用範囲"
+  },
+  "newtab_theme_scope_global": {
+    "message": "全体"
+  },
+  "newtab_theme_scope_home": {
+    "message": "新しいタブ"
+  },
+  "newtab_theme_scope_select_label": {
+    "message": "テーマ変更を{scope}に適用"
+  },
+  "newtab_theme_scope_help_label": {
+    "message": "テーマ適用範囲の説明"
+  },
+  "newtab_theme_scope_help": {
+    "message": "「全体」は既定のテーマを設定します。「新しいタブ」は新しいタブだけに適用され、「全体に合わせる」で全体設定を継承できます。"
+  },
+  "newtab_theme_follow_global": {
+    "message": "「全体」に合わせる"
+  },
+  "newtab_search_width_title": {
+    "message": "検索ボックスの幅"
+  },
+  "newtab_search_width_aria": {
+    "message": "新しいタブの検索ボックス幅を調整"
+  },
+  "newtab_search_width_standard": {
+    "message": "標準"
+  },
+  "newtab_search_width_wide": {
+    "message": "ワイド"
+  },
+  "newtab_search_width_max": {
+    "message": "最大"
+  },
+  "newtab_more_settings": {
+    "message": "その他の設定"
+  },
+  "settings_tab_shortcuts": {
+    "message": "サイト内検索 / AI検索"
+  },
+  "settings_tab_blacklist": {
+    "message": "ブラックリスト"
+  },
+  "settings_tab_labs": {
+    "message": "ラボ機能"
+  },
+  "settings_global_section_title": {
+    "message": "全体設定"
+  },
+  "settings_language_title": {
+    "message": "言語"
+  },
+  "settings_language_desc": {
+    "message": "表示言語を選択"
+  },
+  "settings_version_label": {
+    "message": "バージョン"
+  },
+  "language_zh_cn": {
+    "message": "简体中文"
+  },
+  "language_zh_tw": {
+    "message": "繁體中文"
+  },
+  "language_en": {
+    "message": "English"
+  },
+  "language_ja": {
+    "message": "日本語"
+  },
+  "language_system": {
+    "message": "ブラウザの言語に合わせる"
+  },
+  "settings_recent_title": {
+    "message": "新しいタブ下部の内容"
+  },
+  "settings_newtab_section_title": {
+    "message": "新しいタブ"
+  },
+  "settings_search_results_section_title": {
+    "message": "検索結果設定"
+  },
+  "settings_search_result_priority_title": {
+    "message": "検索結果の先頭優先度"
+  },
+  "search_result_priority_autocomplete": {
+    "message": "補完を優先"
+  },
+  "search_result_priority_search": {
+    "message": "検索を優先"
+  },
+  "settings_recent_desc": {
+    "message": "最近/よくアクセスするサイトを表示"
+  },
+  "settings_recent_sites_title": {
+    "message": "サイトカード"
+  },
+  "settings_newtab_width_title": {
+    "message": "新しいタブの内容幅"
+  },
+  "settings_bookmarks_title": {
+    "message": "ブックマーク"
+  },
+  "settings_document_pip_title": {
+    "message": "ページクリップ"
+  },
+  "settings_document_pip_desc": {
+    "message": "ページ内の一部を切り出して浮かせて表示。参照や比較に使えます"
+  },
+  "settings_auto_pip_title": {
+    "message": "動画の自動ピクチャーインピクチャー"
+  },
+  "settings_auto_pip_desc": {
+    "message": "動画再生中に別タブへ移動すると、再生中の動画を小窓で表示します"
+  },
+  "settings_pinned_tab_recovery_title": {
+    "message": "再起動後に固定タブを復元"
+  },
+  "settings_pinned_tab_recovery_desc": {
+    "message": "復元可能な固定タブを記録し、ブラウザ再起動後に自動で戻します。"
+  },
+  "document_pip_picker_hint": {
+    "message": "マウスを動かして要素を選択、クリックで小窓表示、ホイールで親要素へ切替、Escでキャンセル。"
+  },
+  "document_pip_picker_idle": {
+    "message": "ページの表示領域にマウスを移動して選択を開始します。"
+  },
+  "document_pip_picker_started": {
+    "message": "浮かせたい内容をクリック。ホイールで範囲切替、Escでキャンセル"
+  },
+  "document_pip_picker_cancelled": {
+    "message": "内容選択を終了しました"
+  },
+  "document_pip_picker_closed": {
+    "message": "内容の小窓を閉じました"
+  },
+  "document_pip_picker_guidance_default": {
+    "message": "この範囲は小窓表示に適しています。"
+  },
+  "document_pip_picker_guidance_leaf": {
+    "message": "この範囲は小さな要素です。安定させるにはホイールで親要素へ切り替えてください。"
+  },
+  "document_pip_picker_guidance_interactive": {
+    "message": "この範囲はボタン群のようです。PiP内でクリックできない場合は、背景のある大きめのコンテナへ切り替えてください。"
+  },
+  "document_pip_picker_guidance_toolbar": {
+    "message": "この範囲はナビゲーション/ツールバーのようです。PiPでは複雑なメニューがうまく動かない場合があります。必要に応じて外側のコンテナへ切り替えてください。"
+  },
+  "document_pip_picker_unsupported": {
+    "message": "このページではDocument PiPを利用できません"
+  },
+  "document_pip_picker_conflict_video_pip": {
+    "message": "動画のピクチャーインピクチャーが開いています。先に閉じてからページクリップを使ってください"
+  },
+  "document_pip_picker_invalid": {
+    "message": "この範囲は小窓表示できません。より大きな内容範囲を選んでください"
+  },
+  "document_pip_picker_open_failed": {
+    "message": "内容の小窓を開けませんでした。別の範囲でお試しください"
+  },
+  "document_pip_picker_badge": {
+    "message": "小窓で開きました"
+  },
+  "document_pip_picker_button_reselect": {
+    "message": "選び直す"
+  },
+  "document_pip_picker_button_return": {
+    "message": "元のページへ"
+  },
+  "document_pip_picker_button_close": {
+    "message": "閉じる"
+  },
+  "settings_newtab_scope_desc": {
+    "message": "新しいタブ"
+  },
+  "settings_overlay_tab_priority_title": {
+    "message": "開いているタブへすばやく切替"
+  },
+  "settings_overlay_tab_priority_desc": {
+    "message": "入力が開いているタブに一致したときの、先頭候補のEnter動作"
+  },
+  "overlay_tab_priority_switch_first": {
+    "message": "Enterで開いているタブへ切替"
+  },
+  "overlay_tab_priority_newtab_first": {
+    "message": "Enterで新しいタブに開く"
+  },
+  "settings_shortcuts_title": {
+    "message": "コマンドバーを開く"
+  },
+  "settings_shortcuts_browser_desc_prefix": {
+    "message": "Chromiumベースのブラウザ（Dia、Edgeなど）では、"
+  },
+  "settings_shortcuts_browser_desc_path_extensions": {
+    "message": "「拡張機能」"
+  },
+  "settings_shortcuts_browser_desc_path_shortcuts": {
+    "message": "「キーボードショートカット」"
+  },
+  "settings_shortcuts_browser_desc_suffix": {
+    "message": "でショートカットキーを変更します"
+  },
+  "settings_shortcuts_dia_tag": {
+    "message": "Diaで使用"
+  },
+  "settings_shortcuts_dia_tooltip": {
+    "message": "Diaではブラウザ制限により、Lumnoの新しいタブ機能は現在利用できませんが、コマンドバーは通常どおり使えます。\n\nDiaでショートカットキーが使えない場合は、右下のボタンからブラウザのショートカット設定を開き、「Open command bar」をIn DiaからGlobalに変更してください。"
+  },
+  "settings_shortcuts_section_title": {
+    "message": "ショートカットキー設定"
+  },
+  "settings_shortcuts_desc": {
+    "message": "Lumnoのコマンドバーを開きます"
+  },
+  "overlay_close_other_tabs_tooltip": {
+    "message": "このページ以外のタブを閉じる（固定・グループを除く）"
+  },
+  "settings_shortcuts_status": {
+    "message": "現在：{shortcut}"
+  },
+  "settings_shortcuts_unset": {
+    "message": "未設定"
+  },
+  "settings_shortcuts_action": {
+    "message": "ショートカットキー設定へ"
+  },
+  "settings_shortcuts_browser_tooltip": {
+    "message": "Chromiumブラウザでは、コマンドバーのショートカットキーを拡張機能のショートカットページで設定・変更します。"
+  },
+  "settings_shortcuts_save": {
+    "message": "ショートカットキーを保存"
+  },
+  "settings_shortcuts_reset": {
+    "message": "既定に戻す"
+  },
+  "settings_shortcuts_record_placeholder": {
+    "message": "ショートカットキーを押す"
+  },
+  "settings_shortcuts_empty_state": {
+    "message": "なし"
+  },
+  "settings_shortcuts_invalid": {
+    "message": "ショートカットキーが無効です。Ctrl+Kなどの組み合わせを押してください"
+  },
+  "settings_restricted_title": {
+    "message": "制限ページでのショートカット動作"
+  },
+  "settings_restricted_tooltip": {
+    "message": "制限ページ（chrome://、拡張機能ストア、一部のfile://ページなど）ではコマンドバーを開けません。ショートカットキーを押したときはこの設定に従います。"
+  },
+  "restricted_action_default": {
+    "message": "新しいタブへ移動"
+  },
+  "restricted_action_none": {
+    "message": "何もしない"
+  },
+  "newtab_file_access_notice_title": {
+    "message": "ローカルファイル（PDF、HTMLなど）でコマンドバーを使うには、「ファイルのURLへのアクセスを許可する」をオンにしてください"
+  },
+  "newtab_file_access_notice_body": {
+    "message": "現在、ファイルURLへのアクセス権がありません。拡張機能の詳細ページで「ファイルのURLへのアクセスを許可する」をオンにし、元のページでショートカットキーをもう一度押してください。"
+  },
+  "newtab_file_access_notice_open_cta": {
+    "message": "有効にする"
+  },
+  "newtab_file_access_notice_dismiss": {
+    "message": "あとで"
+  },
+  "newtab_file_access_notice_close": {
+    "message": "通知を閉じる"
+  },
+  "recent_count_4": {
+    "message": "1行表示"
+  },
+  "recent_count_8": {
+    "message": "2行表示"
+  },
+  "recent_count_off": {
+    "message": "表示しない"
+  },
+  "bookmark_count_off": {
+    "message": "表示しない"
+  },
+  "bookmark_count_4": {
+    "message": "1行表示"
+  },
+  "bookmark_count_8": {
+    "message": "2行表示"
+  },
+  "bookmark_count_16": {
+    "message": "4行表示"
+  },
+  "bookmark_count_32": {
+    "message": "8行表示"
+  },
+  "settings_bookmark_columns_title": {
+    "message": "1行のブックマーク数"
+  },
+  "bookmark_columns_4": {
+    "message": "1行に4個"
+  },
+  "bookmark_columns_6": {
+    "message": "1行に6個"
+  },
+  "bookmark_columns_8": {
+    "message": "1行に8個"
+  },
+  "newtab_width_standard": {
+    "message": "標準"
+  },
+  "newtab_width_wide": {
+    "message": "ワイド（推奨）"
+  },
+  "settings_overlay_size_title": {
+    "message": "サイズ"
+  },
+  "overlay_size_compact": {
+    "message": "小"
+  },
+  "overlay_size_standard": {
+    "message": "標準"
+  },
+  "overlay_size_large": {
+    "message": "大"
+  },
+  "recent_mode_latest": {
+    "message": "最近のアクセス"
+  },
+  "recent_mode_most": {
+    "message": "よくアクセス"
+  },
+  "settings_toggle_on": {
+    "message": "オン"
+  },
+  "settings_theme_title": {
+    "message": "ライト/ダークモード"
+  },
+  "settings_theme_desc": {
+    "message": "システムに合わせるか、テーマを手動で選択"
+  },
+  "settings_theme_system": {
+    "message": "システム/サイトに合わせる"
+  },
+  "settings_theme_light": {
+    "message": "ライト"
+  },
+  "settings_theme_dark": {
+    "message": "ダーク"
+  },
+  "settings_newtab_wordmark_title": {
+    "message": "新しいタブの検索ボックス上にロゴを表示"
+  },
+  "settings_wallpaper_title": {
+    "message": "新しいタブの壁紙"
+  },
+  "settings_wallpaper_desc": {
+    "message": "ローカル画像を新しいタブの背景に使う"
+  },
+  "settings_wallpaper_upload": {
+    "message": "画像をアップロード"
+  },
+  "settings_wallpaper_remove": {
+    "message": "削除"
+  },
+  "settings_wallpaper_fit_cover": {
+    "message": "塗りつぶし"
+  },
+  "settings_wallpaper_fit_contain": {
+    "message": "全体表示"
+  },
+  "settings_wallpaper_status_none": {
+    "message": "壁紙は未アップロード"
+  },
+  "settings_wallpaper_status_ready": {
+    "message": "壁紙アップロード済み"
+  },
+  "settings_wallpaper_status_local_only": {
+    "message": "壁紙アップロード済み（この端末のみ）"
+  },
+  "settings_wallpaper_status_missing": {
+    "message": "壁紙ファイルが見つかりません。再アップロードしてください"
+  },
+  "settings_wallpaper_status_processing": {
+    "message": "処理中..."
+  },
+  "settings_wallpaper_upload_done": {
+    "message": "壁紙を更新しました"
+  },
+  "settings_wallpaper_remove_done": {
+    "message": "壁紙を削除しました"
+  },
+  "settings_wallpaper_error_type": {
+    "message": "画像ファイル（JPG / PNG / WEBP）をアップロードしてください。"
+  },
+  "settings_wallpaper_error_oversize": {
+    "message": "画像が大きすぎます。8MB以内のファイルをアップロードしてください。"
+  },
+  "settings_wallpaper_error_oversize_after_compress": {
+    "message": "画像が大きすぎます。より小さい画像にしてください。"
+  },
+  "settings_wallpaper_error_save": {
+    "message": "壁紙を保存できませんでした。再試行してください"
+  },
+  "newtab_wallpaper_title": {
+    "message": "壁紙"
+  },
+  "newtab_logo_title": {
+    "message": "ロゴ"
+  },
+  "newtab_wallpaper_builtin_section": {
+    "message": "内蔵"
+  },
+  "newtab_wallpaper_local_section": {
+    "message": "ローカル"
+  },
+  "newtab_wallpaper_toggle_label": {
+    "message": "壁紙のオン/オフ"
+  },
+  "newtab_wallpaper_select_label": {
+    "message": "{name} を選択"
+  },
+  "newtab_wallpaper_add_local": {
+    "message": "ローカル壁紙を追加"
+  },
+  "newtab_wallpaper_feature_hint_badge": {
+    "message": "新機能"
+  },
+  "newtab_wallpaper_feature_hint_text": {
+    "message": "新しいタブで壁紙を変更できるようになりました！"
+  },
+  "newtab_wallpaper_feature_hint_close": {
+    "message": "壁紙ヒントを閉じる"
+  },
+  "newtab_ai_quick_jump_feature_hint_badge": {
+    "message": "新機能"
+  },
+  "newtab_ai_quick_jump_feature_hint_text": {
+    "message": "よく使うAIサイトへ、ワンキーで入力して移動できます。「doubao」と入力してTabを押してみてください。"
+  },
+  "newtab_ai_quick_jump_feature_hint_link": {
+    "message": "対応リスト"
+  },
+  "newtab_ai_quick_jump_feature_hint_close": {
+    "message": "AIジャンプヒントを閉じる"
+  },
+  "newtab_feedback_button_aria": {
+    "message": "フィードバック"
+  },
+  "newtab_feedback_menu_aria": {
+    "message": "フィードバック先"
+  },
+  "newtab_feedback_x_label": {
+    "message": "X"
+  },
+  "newtab_feedback_x_tooltip": {
+    "message": "Xで連絡する"
+  },
+  "newtab_feedback_github_issue_label": {
+    "message": "GitHub Issue"
+  },
+  "newtab_feedback_github_issue_tooltip": {
+    "message": "GitHub Issueを作成"
+  },
+  "newtab_feedback_mail_label": {
+    "message": "メール"
+  },
+  "newtab_feedback_mail_tooltip": {
+    "message": "メールを送信"
+  },
+  "newtab_feedback_wechat_label": {
+    "message": "WeChat"
+  },
+  "newtab_feedback_wechat_tooltip": {
+    "message": "WeChatグループに参加"
+  },
+  "newtab_feedback_discord_label": {
+    "message": "Discord"
+  },
+  "newtab_feedback_discord_tooltip": {
+    "message": "Discordに参加"
+  },
+  "newtab_feedback_wechat_qr_title": {
+    "message": "WeChatグループQRコード"
+  },
+  "newtab_feedback_wechat_qr_alt": {
+    "message": "Lumno WeChatグループQRコード"
+  },
+  "newtab_feedback_mail_subject": {
+    "message": "Lumnoフィードバック"
+  },
+  "newtab_feedback_mail_source_label": {
+    "message": "送信元"
+  },
+  "newtab_feedback_mail_version_label": {
+    "message": "Lumnoバージョン"
+  },
+  "newtab_feedback_mail_language_label": {
+    "message": "言語"
+  },
+  "newtab_feedback_mail_os_label": {
+    "message": "OS"
+  },
+  "newtab_feedback_mail_browser_label": {
+    "message": "ブラウザ"
+  },
+  "newtab_wallpaper_delete_local": {
+    "message": "インポート済み壁紙を削除"
+  },
+  "newtab_wallpaper_custom_name": {
+    "message": "ローカル壁紙"
+  },
+  "newtab_wallpaper_overlay_opacity": {
+    "message": "マスク効果"
+  },
+  "newtab_wallpaper_overlay_transparent_tick": {
+    "message": "透明"
+  },
+  "newtab_wallpaper_overlay_default_tick": {
+    "message": "既定"
+  },
+  "newtab_wallpaper_overlay_cover_tick": {
+    "message": "カバー"
+  },
+  "newtab_wallpaper_effect_title": {
+    "message": "壁紙フィルター"
+  },
+  "newtab_wallpaper_effect_strength": {
+    "message": "サンプリング強度"
+  },
+  "newtab_wallpaper_effect_size": {
+    "message": "サイズ"
+  },
+  "newtab_wallpaper_effect_spacing": {
+    "message": "間隔"
+  },
+  "newtab_wallpaper_effect_hover": {
+    "message": "ホバー効果"
+  },
+  "newtab_wallpaper_effect_none": {
+    "message": "オフ"
+  },
+  "newtab_wallpaper_effect_grain": {
+    "message": "粒子"
+  },
+  "newtab_wallpaper_effect_halftone": {
+    "message": "ハーフトーン"
+  },
+  "newtab_wallpaper_effect_ascii": {
+    "message": "ASCII"
+  },
+  "newtab_wallpaper_effect_select_label": {
+    "message": "{effect} 壁紙フィルターを使用"
+  },
+  "newtab_wallpaper_save_error": {
+    "message": "壁紙を保存できませんでした"
+  },
+  "newtab_wallpaper_import_done": {
+    "message": "壁紙をインポートしました"
+  },
+  "newtab_wallpaper_import_error": {
+    "message": "壁紙をインポートできませんでした"
+  },
+  "newtab_wallpaper_delete_done": {
+    "message": "削除しました"
+  },
+  "newtab_wallpaper_delete_error": {
+    "message": "壁紙を削除できませんでした"
+  },
+  "newtab_wallpaper_name_dark_linocut_topographic": {
+    "message": "夜の等高線"
+  },
+  "newtab_wallpaper_name_dark_monet_lily_nocturne": {
+    "message": "夜の睡蓮"
+  },
+  "newtab_wallpaper_name_dark_shanshui_moonlit": {
+    "message": "月夜の山水"
+  },
+  "newtab_wallpaper_name_monet_coastal_white": {
+    "message": "モネの海岸"
+  },
+  "newtab_wallpaper_name_monet_field_white": {
+    "message": "モネの野原"
+  },
+  "newtab_wallpaper_name_monet_lily_pond_white": {
+    "message": "睡蓮池"
+  },
+  "newtab_wallpaper_name_seurat_coast_white": {
+    "message": "スーラの海岸"
+  },
+  "newtab_wallpaper_name_seurat_park_white": {
+    "message": "スーラの公園"
+  },
+  "newtab_wallpaper_name_seurat_riverside_white": {
+    "message": "スーラの河岸"
+  },
+  "newtab_wallpaper_name_white_3d_architecture": {
+    "message": "白昼の建築"
+  },
+  "newtab_wallpaper_name_white_linocut_topographic": {
+    "message": "白昼の等高線"
+  },
+  "newtab_wallpaper_name_white_risograph_collage": {
+    "message": "白昼のコラージュ"
+  },
+  "newtab_wallpaper_name_white_shanshui": {
+    "message": "晴れの山水"
+  },
+  "newtab_wallpaper_name_settings_bg_light_monet_newtab": {
+    "message": "モネ風ライト背景"
+  },
+  "shortcuts_duplicate_tag": {
+    "message": "内蔵と重複"
+  },
+  "shortcuts_duplicate_action": {
+    "message": "内蔵項目へ移動"
+  },
+  "shortcuts_template_help": {
+    "message": "1.追加したいサイトを開く\n2.任意の検索語で検索する\n3.検索結果ページのURLをここに貼り付ける\n4.検索語を{query}に置き換える"
+  },
+  "shortcuts_title": {
+    "message": "サイト内検索"
+  },
+  "shortcuts_desc": {
+    "message": "キーワードを入力してTabを押すとサイト内検索に入ります"
+  },
+  "shortcuts_group_custom": {
+    "message": "カスタム"
+  },
+  "blacklist_section_title": {
+    "message": "検索と最近のアクセスのブラックリスト"
+  },
+  "blacklist_section_desc": {
+    "message": "以下のURLはLumnoの検索結果、および新しいタブの「最近のアクセス」「よくアクセス」に表示されません"
+  },
+  "blacklist_group_custom": {
+    "message": "URLリスト"
+  },
+  "blacklist_label_url": {
+    "message": "URLルール"
+  },
+  "blacklist_label_domain": {
+    "message": "サイトのドメイン"
+  },
+  "blacklist_label_prefix": {
+    "message": "サイトまたはパス"
+  },
+  "blacklist_label_exact": {
+    "message": "完全なURL"
+  },
+  "blacklist_label_suffix": {
+    "message": "サイトのドメイン"
+  },
+  "blacklist_match_label": {
+    "message": "一致条件"
+  },
+  "blacklist_match_exact": {
+    "message": "現在のページ"
+  },
+  "blacklist_match_prefix": {
+    "message": "現在のサイト内パス"
+  },
+  "blacklist_match_suffix": {
+    "message": "サイト全体"
+  },
+  "blacklist_match_exact_tooltip": {
+    "message": "このページだけを非表示\n────────\n例：x.com/home を入力すると、このページだけが表示されず、他のページには影響しません"
+  },
+  "blacklist_match_prefix_tooltip": {
+    "message": "このサイト配下の指定パスだけを非表示\n────────\n例：baidu.com/search を入力すると、baidu.com/search と baidu.com/search/1 は表示されませんが、baidu.com/news は対象外です"
+  },
+  "blacklist_match_suffix_tooltip": {
+    "message": "このサイトのすべてのページとサブドメインを非表示\n────────\n例：baidu.com を入力すると、baidu.com/search と tieba.baidu.com は表示されません"
+  },
+  "blacklist_preview_title": {
+    "message": "実際の一致プレビュー"
+  },
+  "blacklist_preview_match": {
+    "message": "一致します"
+  },
+  "blacklist_preview_miss": {
+    "message": "一致しません"
+  },
+  "blacklist_preview_www_note": {
+    "message": "www. 付きにも自動対応します。例：baidu.com は www.baidu.com にも一致します"
+  },
+  "blacklist_placeholder_url": {
+    "message": "現在のページは完全なURL、サイト全体はドメインを入力"
+  },
+  "blacklist_placeholder_domain": {
+    "message": "baidu.com"
+  },
+  "blacklist_placeholder_prefix": {
+    "message": "baidu.com または baidu.com/search"
+  },
+  "blacklist_placeholder_exact": {
+    "message": "x.com/home"
+  },
+  "blacklist_placeholder_suffix": {
+    "message": "baidu.com"
+  },
+  "blacklist_add": {
+    "message": "ブラックリストに追加"
+  },
+  "blacklist_empty": {
+    "message": "ブラックリストのURLはまだありません"
+  },
+  "blacklist_error_url": {
+    "message": "サイトのドメインまたは完全なURLを入力してください"
+  },
+  "blacklist_error_match_mode": {
+    "message": "一致条件を1つ以上選択してください"
+  },
+  "blacklist_error_suffix": {
+    "message": "サイトのドメインを入力してください"
+  },
+  "blacklist_error_domain": {
+    "message": "サイトのドメインを入力してください"
+  },
+  "blacklist_match_mode_prefix": {
+    "message": "このURLで始まるページに一致"
+  },
+  "blacklist_match_unset": {
+    "message": "一致条件未設定"
+  },
+  "blacklist_removed_toast": {
+    "message": "ブラックリストから削除しました"
+  },
+  "shortcuts_group_builtin": {
+    "message": "内蔵"
+  },
+  "shortcuts_group_ai": {
+    "message": "AI"
+  },
+  "shortcuts_group_ai_desc": {
+    "message": "キーワードを入力してTabを押し、プロンプトを入力すると、以下のAIサイトへ移動して自動入力します（事前に各サイトへのログインが必要です）。"
+  },
+  "shortcuts_badge_custom": {
+    "message": "カスタム"
+  },
+  "shortcuts_badge_builtin": {
+    "message": "内蔵"
+  },
+  "shortcuts_badge_ai": {
+    "message": "AI"
+  },
+  "shortcuts_label_key": {
+    "message": "起動ワード"
+  },
+  "shortcuts_label_name": {
+    "message": "名前"
+  },
+  "shortcuts_label_template": {
+    "message": "検索URL"
+  },
+  "shortcuts_label_alias": {
+    "message": "別名"
+  },
+  "shortcuts_placeholder_required": {
+    "message": "必須。複数は半角カンマで区切ります。例：jd,bili"
+  },
+  "shortcuts_placeholder_optional_default": {
+    "message": "任意。既定では起動ワードと同じです"
+  },
+  "shortcuts_placeholder_template": {
+    "message": "https://example.com/search?q={query}"
+  },
+  "shortcuts_placeholder_alias": {
+    "message": "任意。例：Bilibili、YouTubeなど"
+  },
+  "shortcuts_add": {
+    "message": "サイト内検索を追加"
+  },
+  "shortcuts_save": {
+    "message": "変更を保存"
+  },
+  "shortcuts_cancel": {
+    "message": "キャンセル"
+  },
+  "shortcuts_edit": {
+    "message": "編集"
+  },
+  "shortcuts_remove": {
+    "message": "削除"
+  },
+  "shortcuts_empty_custom": {
+    "message": "カスタムサイト内検索はまだありません"
+  },
+  "shortcuts_empty_builtin": {
+    "message": "内蔵サイト内検索はありません"
+  },
+  "shortcuts_empty_ai": {
+    "message": "内蔵AIはありません"
+  },
+  "toast_saved": {
+    "message": "保存しました"
+  },
+  "toast_removed": {
+    "message": "削除しました"
+  },
+  "toast_error": {
+    "message": "操作に失敗しました。再試行してください"
+  },
+  "toast_error_template": {
+    "message": "検索テンプレートには {query} が必要です。"
+  },
+  "toast_reset": {
+    "message": "リセットしました"
+  },
+  "shortcuts_reset_builtin": {
+    "message": "初期リストに戻す"
+  },
+  "shortcuts_clear_custom": {
+    "message": "カスタムをすべて削除"
+  },
+  "blacklist_clear": {
+    "message": "ブラックリストを空にする"
+  },
+  "toast_cleared": {
+    "message": "空にしました"
+  },
+  "confirm_clear_custom": {
+    "message": "カスタム検索をすべて削除しますか？"
+  },
+  "confirm_clear_blacklist": {
+    "message": "ブラックリストを空にしますか？"
+  },
+  "confirm_reset_builtin": {
+    "message": "内蔵リストをリセットしますか？"
+  },
+  "confirm_ok": {
+    "message": "確定"
+  },
+  "confirm_cancel": {
+    "message": "キャンセル"
+  },
+  "confirm_remove_item": {
+    "message": "この項目を削除しますか？"
+  },
+  "shortcuts_error_key": {
+    "message": "起動ワードを入力してください。"
+  },
+  "shortcuts_error_key_space": {
+    "message": "起動ワードにスペースは使えません。"
+  },
+  "search_placeholder": {
+    "message": "検索またはURLを入力..."
+  },
+  "overlay_search_placeholder": {
+    "message": "検索またはURLを入力、Tabで開いているタブを検索"
+  },
+  "options_page_title": {
+    "message": "Lumno設定"
+  },
+  "newtab_page_title": {
+    "message": "新しいタブ"
+  },
+  "recent_heading": {
+    "message": "最近のアクセス"
+  },
+  "recent_heading_latest": {
+    "message": "最近のアクセス"
+  },
+  "recent_heading_most": {
+    "message": "よくアクセス"
+  },
+  "bookmarks_heading": {
+    "message": "ブックマーク"
+  },
+  "bookmarks_empty_folder": {
+    "message": "内容はありません"
+  },
+  "bookmarks_page_prev": {
+    "message": "前のページ"
+  },
+  "bookmarks_page_next": {
+    "message": "次のページ"
+  },
+  "bookmarks_open_manager": {
+    "message": "ブックマークマネージャーを開く"
+  },
+  "search_tag_history": {
+    "message": "履歴"
+  },
+  "search_remove_history": {
+    "message": "履歴から削除"
+  },
+  "search_remove_history_tooltip": {
+    "message": "この履歴を削除"
+  },
+  "search_tag_top_site": {
+    "message": "よく使う"
+  },
+  "search_tag_bookmark": {
+    "message": "ブックマーク"
+  },
+  "search_tag_open_tab": {
+    "message": "開いている"
+  },
+  "visit_label": {
+    "message": "アクセス"
+  },
+  "action_open_new_tab": {
+    "message": "新規"
+  },
+  "action_go_current_tab": {
+    "message": "移動"
+  },
+  "open_prefix": {
+    "message": "{title} を開く"
+  },
+  "open_url": {
+    "message": "{url} を開く"
+  },
+  "mode_badge": {
+    "message": "モード：{mode}"
+  },
+  "mode_badge_follow_system": {
+    "message": "モード：{mode}（システムに合わせる）"
+  },
+  "mode_badge_follow_site": {
+    "message": "モード：{mode}（サイトに合わせる）"
+  },
+  "theme_label_dark": {
+    "message": "ダーク"
+  },
+  "theme_label_light": {
+    "message": "ライト"
+  },
+  "theme_label_system": {
+    "message": "システムに合わせる"
+  },
+  "command_newtab": {
+    "message": "新しいタブを開く"
+  },
+  "command_settings": {
+    "message": "{name} の設定を開く"
+  },
+  "command_show_search": {
+    "message": "コマンドバーを開く"
+  },
+  "command_show_search_prefill": {
+    "message": "コマンドバーを開き、現在のページURLを入力"
+  },
+  "command_show_search_prefill_v": {
+    "message": "現在のページURLをコピー"
+  },
+  "mode_switch_title": {
+    "message": "{name}：{mode}モードに切替"
+  },
+  "switch_to_tab": {
+    "message": "切替"
+  },
+  "untitled": {
+    "message": "無題"
+  },
+  "site_search_default": {
+    "message": "サイト内"
+  },
+  "site_search_name_baidu": {
+    "message": "Baidu"
+  },
+  "site_search_name_chatgpt": {
+    "message": "ChatGPT"
+  },
+  "site_search_name_gemini": {
+    "message": "Gemini"
+  },
+  "site_search_name_doubao": {
+    "message": "Doubao"
+  },
+  "site_search_name_qianwen": {
+    "message": "Qwen"
+  },
+  "site_search_name_yuanbao": {
+    "message": "Yuanbao"
+  },
+  "site_search_name_minimax": {
+    "message": "MiniMax"
+  },
+  "site_search_name_deepseek": {
+    "message": "DeepSeek"
+  },
+  "site_search_name_kimi": {
+    "message": "Kimi"
+  },
+  "site_search_name_zhihu": {
+    "message": "Zhihu"
+  },
+  "site_search_name_douban": {
+    "message": "Douban"
+  },
+  "site_search_name_juejin": {
+    "message": "Juejin"
+  },
+  "site_search_name_taobao": {
+    "message": "Taobao"
+  },
+  "site_search_name_tmall": {
+    "message": "Tmall"
+  },
+  "site_search_name_wechat": {
+    "message": "WeChat"
+  },
+  "site_search_name_wikipedia": {
+    "message": "Wikipedia"
+  },
+  "search_in_site": {
+    "message": "{site} で検索"
+  },
+  "search_in_site_query": {
+    "message": "{site} で「{query}」を検索"
+  },
+  "ask_ai_provider": {
+    "message": "{site} に質問"
+  },
+  "ask_ai_provider_query": {
+    "message": "{site} に「{query}」と質問"
+  },
+  "site_search_tab_hint": {
+    "message": "{site} で検索"
+  },
+  "search_query": {
+    "message": "「{query}」を検索"
+  },
+  "search_in_site_ellipsis": {
+    "message": "{site} で検索..."
+  },
+  "search_in_site_prefix": {
+    "message": "{site} で検索｜"
+  },
+  "search_open_tabs_only_prefix": {
+    "message": "開いているタブを検索｜"
+  },
+  "search_open_tabs_only_entry": {
+    "message": "開いているタブを検索"
+  },
+  "action_search": {
+    "message": "検索"
+  },
+  "action_search_engine": {
+    "message": "{engine} で検索"
+  },
+  "action_search_google": {
+    "message": "Googleで検索"
+  },
+  "action_switch": {
+    "message": "切替"
+  },
+  "action_open": {
+    "message": "開く"
+  },
+  "overlay_empty_result": {
+    "message": "一致する結果はありません"
+  },
+  "overlay_empty_open_tabs": {
+    "message": "タブはありません"
+  },
+  "site_icon_alt": {
+    "message": "サイト"
+  },
+  "site_brand_wechat_official": {
+    "message": "WeChat公式アカウント"
+  },
+  "settings_sync_title": {
+    "message": "{name} の設定"
+  },
+  "settings_sync_desc": {
+    "message": "同期状態を確認し、手動同期や設定のインポート/エクスポートを行います"
+  },
+  "sync_status_unavailable": {
+    "message": "同期できません"
+  },
+  "sync_status_unavailable_hint": {
+    "message": "同期できません：ログインしていないか、ブラウザが同期に対応していません"
+  },
+  "sync_status_ready": {
+    "message": "自動同期オン"
+  },
+  "sync_status_done": {
+    "message": "同期完了"
+  },
+  "sync_status_failed": {
+    "message": "同期失敗"
+  },
+  "sync_status_failed_reason": {
+    "message": "同期失敗：{reason}"
+  },
+  "sync_action_now": {
+    "message": "手動同期"
+  },
+  "sync_action_export": {
+    "message": "設定をエクスポート"
+  },
+  "sync_action_import": {
+    "message": "設定をインポート"
+  },
+  "sync_tooltip_export": {
+    "message": "設定をエクスポート"
+  },
+  "sync_tooltip_import": {
+    "message": "設定をインポート"
+  },
+  "sync_tooltip_last_manual": {
+    "message": "前回のインポート/手動同期：{time}"
+  },
+  "sync_tooltip_default": {
+    "message": "手動同期"
+  },
+  "sync_status_hint": {
+    "message": "ブラウザアカウントにログインすると設定が自動同期されます。別ブラウザ間では手動でエクスポート/インポートしてください"
+  },
+  "sync_export_done": {
+    "message": "設定をエクスポートしました"
+  },
+  "sync_import_done": {
+    "message": "インポート完了"
+  },
+  "sync_import_invalid": {
+    "message": "設定ファイルが無効です"
+  },
+  "document_pip_picker_unsupported_policy": {
+    "message": "このサイトはサイトポリシーによりピクチャーインピクチャーを無効にしています。"
+  },
+  "document_pip_picker_unsupported_iframe": {
+    "message": "Document Picture-in-Pictureはトップレベルページでのみ使用できます。"
+  },
+  "document_pip_picker_unsupported_insecure": {
+    "message": "Document Picture-in-PictureはHTTPSページでのみ使用できます。"
+  },
+  "document_pip_picker_open_failed_not_allowed": {
+    "message": "サイトまたはブラウザによりDocument Picture-in-Pictureの起動がブロックされました。"
+  },
+  "document_pip_picker_open_failed_not_supported": {
+    "message": "現在選択した内容は、このページではDocument Picture-in-Pictureで開けません。"
+  },
+  "document_pip_picker_open_failed_invalid_state": {
+    "message": "すでに小窓が開いているか、ページ状態が変わりました。再試行してください。"
+  },
+  "document_pip_picker_open_failed_security": {
+    "message": "ブラウザのセキュリティポリシーにより、この操作はブロックされました。"
+  },
+  "newtab_page_label": {
+    "message": "新しいタブ"
+  },
+  "settings_title": {
+    "message": "設定"
+  },
+  "extension_page_label": {
+    "message": "拡張機能ページ"
+  },
+  "settings_button_aria": {
+    "message": "設定"
+  },
+  "copy_page_url_failed_retry": {
+    "message": "コピーできませんでした。再試行してください"
+  },
+  "copy_page_url_success": {
+    "message": "現在のページURLをコピーしました"
+  },
+  "copy_page_url_failed_permission": {
+    "message": "コピーできませんでした。クリップボード権限を確認してください"
+  },
+  "recent_pin_add": {
+    "message": "固定"
+  },
+  "recent_pin_remove": {
+    "message": "固定を解除"
+  },
+  "recent_pin_limit": {
+    "message": "固定は最大3枚"
+  },
+  "recent_pin_limit_toast": {
+    "message": "固定できるカードは最大3枚です"
+  },
+  "recent_dismiss_tooltip": {
+    "message": "非表示"
+  },
+  "recent_dismiss_pinned_tooltip": {
+    "message": "固定解除して非表示"
+  },
+  "recent_dismiss_toast": {
+    "message": "非表示にしました"
+  },
+  "recent_dismiss_pinned_toast": {
+    "message": "固定解除して非表示にしました"
+  }
+}

@@ -86,6 +86,9 @@
   "language_en": {
     "message": "English"
   },
+  "language_ja": {
+    "message": "日本語"
+  },
   "language_system": {
     "message": "Follow browser language"
   },
@@ -470,14 +473,32 @@
   "newtab_feedback_x_label": {
     "message": "X"
   },
+  "newtab_feedback_x_tooltip": {
+    "message": "Contacting on X"
+  },
+  "newtab_feedback_github_issue_label": {
+    "message": "GitHub Issue"
+  },
+  "newtab_feedback_github_issue_tooltip": {
+    "message": "Opening a GitHub Issue"
+  },
   "newtab_feedback_mail_label": {
     "message": "Email"
+  },
+  "newtab_feedback_mail_tooltip": {
+    "message": "Sending email"
   },
   "newtab_feedback_wechat_label": {
     "message": "WeChat"
   },
+  "newtab_feedback_wechat_tooltip": {
+    "message": "Joining WeChat group"
+  },
   "newtab_feedback_discord_label": {
     "message": "Discord"
+  },
+  "newtab_feedback_discord_tooltip": {
+    "message": "Joining Discord"
   },
   "newtab_feedback_wechat_qr_title": {
     "message": "WeChat group QR code"
@@ -969,7 +990,7 @@
     "message": "Doubao"
   },
   "site_search_name_qianwen": {
-    "message": "Qianwen"
+    "message": "Qwen"
   },
   "site_search_name_yuanbao": {
     "message": "Yuanbao"

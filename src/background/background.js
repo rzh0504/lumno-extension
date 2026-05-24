@@ -3486,6 +3486,41 @@ function pickBestThemeColorCandidate(candidates) {
     : null;
 }
 
+function normalizeThemeAccentRgb(value) {
+  if (!Array.isArray(value) || value.length !== 3) {
+    return null;
+  }
+  const rgb = value.map((channel) => Math.round(Number(channel)));
+  return rgb.every((channel) => Number.isFinite(channel) && channel >= 0 && channel <= 255)
+    ? rgb
+    : null;
+}
+
+function getThemeColorConfidence(accentRgb) {
+  return typeof FAVICON_UTILS.getThemeColorConfidence === 'function'
+    ? FAVICON_UTILS.getThemeColorConfidence(accentRgb)
+    : 'color';
+}
+
+function buildSiteThemeColorResult(accentRgb, source, options) {
+  const rgb = normalizeThemeAccentRgb(accentRgb);
+  if (!rgb) {
+    return null;
+  }
+  const confidence = options && options.confidence
+    ? String(options.confidence)
+    : getThemeColorConfidence(rgb);
+  const neutral = options && typeof options.neutral === 'boolean'
+    ? options.neutral
+    : confidence === 'neutral';
+  return {
+    accentRgb: rgb,
+    source: source || 'meta',
+    neutral,
+    confidence
+  };
+}
+
 function fetchManifestThemeColor(manifestUrl) {
   if (!manifestUrl || isBlockedLocalFaviconUrl(manifestUrl)) {
     return Promise.resolve(null);
@@ -3507,9 +3542,34 @@ function fetchManifestThemeColor(manifestUrl) {
     })
     .then((manifest) => {
       const accentRgb = parseCssThemeColor(manifest && (manifest.theme_color || manifest.background_color));
-      return accentRgb ? { accentRgb, source: 'meta' } : null;
+      return accentRgb ? buildSiteThemeColorResult(accentRgb, 'manifest') : null;
     })
     .catch(() => null);
+}
+
+function resolveThemeColorCandidates(candidates) {
+  const sorted = (Array.isArray(candidates) ? candidates : [])
+    .filter((item) => item && (item.accentRgb || item.manifestUrl))
+    .sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+  let index = 0;
+  const next = () => {
+    const candidate = sorted[index];
+    index += 1;
+    if (!candidate) {
+      return Promise.resolve(null);
+    }
+    if (candidate.accentRgb) {
+      return Promise.resolve(buildSiteThemeColorResult(candidate.accentRgb, candidate.source || 'meta', {
+        neutral: candidate.neutral,
+        confidence: candidate.confidence
+      }));
+    }
+    if (candidate.manifestUrl) {
+      return fetchManifestThemeColor(candidate.manifestUrl).then((result) => result || next());
+    }
+    return next();
+  };
+  return next();
 }
 
 function resolveSiteThemeColor(targetUrl, hostOverride, preferredTheme) {
@@ -3552,14 +3612,7 @@ function resolveSiteThemeColor(targetUrl, hostOverride, preferredTheme) {
     })
     .then((html) => {
       const candidates = parseHtmlThemeColorCandidates(html, inputUrl, normalizedTheme);
-      const best = pickBestThemeColorCandidate(candidates);
-      if (!best) {
-        return null;
-      }
-      if (best.accentRgb) {
-        return { accentRgb: best.accentRgb, source: 'meta' };
-      }
-      return fetchManifestThemeColor(best.manifestUrl);
+      return resolveThemeColorCandidates(candidates);
     })
     .then((result) => {
       siteThemeColorCache.set(cacheKey, result || null);

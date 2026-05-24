@@ -7,7 +7,5 @@ dist/
 tmp/
 output/
 AGENTS.md
+docs/
 search-rule-changes-*.md
-docs/superpowers/
-docs/*-refactor-*.md
-docs/*-audit.md
