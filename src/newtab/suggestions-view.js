@@ -70,6 +70,11 @@
       : function() {
         return Promise.resolve(config.defaultTheme || null);
       };
+    const shouldUseUrlFallbackThemeForSuggestion = typeof config.shouldUseUrlFallbackThemeForSuggestion === 'function'
+      ? config.shouldUseUrlFallbackThemeForSuggestion
+      : function() {
+        return false;
+      };
     const getThemeForMode = typeof config.getThemeForMode === 'function'
       ? config.getThemeForMode
       : function(theme) {
@@ -149,6 +154,16 @@
       : function() {
         return 'Search';
       };
+    const getSiteSearchDisplayName = typeof config.getSiteSearchDisplayName === 'function'
+      ? config.getSiteSearchDisplayName
+      : function(provider) {
+        return provider && (provider.name || provider.key) ? String(provider.name || provider.key) : '';
+      };
+    const isAiSiteSearchProvider = typeof config.isAiSiteSearchProvider === 'function'
+      ? config.isAiSiteSearchProvider
+      : function(provider) {
+        return Boolean(provider && String(provider.action || '').trim() === 'openAndSubmit');
+      };
     const getDefaultSearchEngineThemeUrl = typeof config.getDefaultSearchEngineThemeUrl === 'function'
       ? config.getDefaultSearchEngineThemeUrl
       : function() {
@@ -171,6 +186,13 @@
 
     function getUrlFallbackTheme(fallbackTheme) {
       return config.urlHighlightTheme || fallbackTheme || getDefaultTheme();
+    }
+
+    function resolveThemeForSuggestion(suggestion, theme) {
+      const resolvedTheme = theme || getDefaultTheme();
+      return shouldUseUrlFallbackThemeForSuggestion(suggestion, resolvedTheme)
+        ? getUrlFallbackTheme(resolvedTheme)
+        : resolvedTheme;
     }
 
     function isLocalUrlSuggestion(suggestion) {
@@ -279,10 +301,22 @@
       button.title = labelText || '';
     }
 
-    function getSuggestionActionLabel(action) {
+    function getSuggestionProviderSearchActionLabel(suggestion) {
+      const provider = suggestion && suggestion.provider ? suggestion.provider : null;
+      if (!provider) {
+        return '';
+      }
+      const site = getSiteSearchDisplayName(provider);
+      if (isAiSiteSearchProvider(provider)) {
+        return formatMessage('action_open_ai_web', '打开 {site} 网页版', { site });
+      }
+      return formatMessage('search_in_site', '在 {site} 中搜索', { site });
+    }
+
+    function getSuggestionActionLabel(action, suggestion) {
       switch (action) {
         case 'search':
-          return getSearchActionLabel();
+          return getSuggestionProviderSearchActionLabel(suggestion) || getSearchActionLabel();
         case 'switch':
           return t('action_switch', '切换');
         case 'open':
@@ -651,7 +685,7 @@
             if (!suggestionItem.isConnected) {
               return;
             }
-            suggestionItem._xTheme = theme;
+            suggestionItem._xTheme = resolveThemeForSuggestion(themeSourceSuggestion, theme);
             updateSelection(getSelectedIndex());
           });
         }
@@ -888,7 +922,7 @@
         });
         itemActionModel.actionTags.forEach((tag) => {
           actionTags.appendChild(createActionTag(
-            getSuggestionActionLabel(tag.action),
+            getSuggestionActionLabel(tag.action, suggestion),
             tag.keyLabel || 'Enter'
           ));
         });
@@ -900,7 +934,7 @@
         setSuggestionActionButtonPalette(visitButton, 'var(--x-nt-subtext, #9CA3AF)', 'transparent', 'transparent');
         setInlineLabelWithIcon(
           visitButton,
-          getSuggestionActionLabel(itemActionModel.visitButtonAction),
+          getSuggestionActionLabel(itemActionModel.visitButtonAction, suggestion),
           getRiSvg('ri-arrow-right-line', 'ri-size-12')
         );
 
@@ -1020,8 +1054,9 @@
             if (!suggestionItem.isConnected) {
               return;
             }
-            suggestionItem._xTheme = theme;
-            applyThemeVariables(suggestionItem, theme);
+            const nextTheme = resolveThemeForSuggestion(suggestion, theme);
+            suggestionItem._xTheme = nextTheme;
+            applyThemeVariables(suggestionItem, nextTheme);
             updateSelection(getSelectedIndex());
           });
         }

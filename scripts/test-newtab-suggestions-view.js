@@ -223,6 +223,78 @@ async function testLocalUrlSuggestionUsesFallbackTheme() {
   );
 }
 
+async function testGoogleFallbackFaviconUsesFallbackTheme() {
+  const document = createFakeDocument();
+  const container = document.createElement('div');
+  container.setConnected(true);
+  const items = [];
+  const defaultTheme = faviconTheme.createDefaultTheme();
+  const urlHighlightTheme = faviconTheme.createUrlHighlightTheme();
+  const googleFallbackFavicon = 'https://www.google.com/s2/favicons?domain=dyjs.cuc.edu.cn&sz=128';
+  let requestedTheme = false;
+
+  const view = suggestionsView.createSuggestionsView({
+    document,
+    container,
+    items,
+    t: (key, fallback) => fallback || key,
+    getRiSvg: () => '',
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl,
+    getThemeHostForSuggestion: (suggestion) => getHostFromUrl(suggestion && suggestion.url),
+    shouldBlockFaviconForHost,
+    getImmediateThemeForSuggestion: () => defaultTheme,
+    getThemeForSuggestion: (suggestion) => {
+      requestedTheme = true;
+      assert.strictEqual(suggestion.favicon, googleFallbackFavicon);
+      return Promise.resolve(defaultTheme);
+    },
+    shouldUseUrlFallbackThemeForSuggestion: (suggestion, theme) =>
+      Boolean(theme && theme._xIsDefault && suggestion && suggestion.favicon === googleFallbackFavicon),
+    getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    getHoverColors: (theme) => faviconTheme.getHoverColors(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
+    applyMarkVariables: () => {},
+    defaultTheme,
+    urlHighlightTheme
+  });
+
+  view.render({
+    query: '研究生',
+    primaryHighlightIndex: 0,
+    primaryHighlightReason: 'topSite',
+    suggestions: [{
+      type: 'topSite',
+      title: '研究生应用管理平台',
+      url: 'https://dyjs.cuc.edu.cn/gsapp/sys/emaphome/portal/',
+      isTopSite: true,
+      favicon: googleFallbackFavicon
+    }]
+  });
+  view.updateSelection(-1);
+  await Promise.resolve();
+
+  const item = view.getItems()[0];
+  assert.ok(requestedTheme, 'remote URL suggestion should resolve its theme');
+  assert.ok(item, 'remote URL suggestion should render');
+  assert.strictEqual(
+    item._xTheme,
+    urlHighlightTheme,
+    'Google fallback favicon suggestions should use the URL fallback highlight theme'
+  );
+  assert.strictEqual(
+    item.style.getPropertyValue('--x-nt-suggestion-active-bg'),
+    urlHighlightTheme.highlightBg,
+    'Google fallback active row should use the fallback theme highlight background'
+  );
+}
+
 async function testVisitButtonAndEnterTagShareOverlayVisibilityRules() {
   const document = createFakeDocument();
   const container = document.createElement('div');
@@ -297,8 +369,77 @@ async function testVisitButtonAndEnterTagShareOverlayVisibilityRules() {
   );
 }
 
+async function testAiProviderVisitButtonUsesWebAppLabel() {
+  const document = createFakeDocument();
+  const container = document.createElement('div');
+  container.setConnected(true);
+  const items = [];
+  const defaultTheme = faviconTheme.createDefaultTheme();
+
+  const view = suggestionsView.createSuggestionsView({
+    document,
+    container,
+    items,
+    t: (key, fallback) => fallback || key,
+    formatMessage: (key, fallback, params) => String(fallback || key).replace(/\{(\w+)\}/g, (match, name) => {
+      return params && Object.prototype.hasOwnProperty.call(params, name) ? params[name] : match;
+    }),
+    getRiSvg: () => '',
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl,
+    getThemeHostForSuggestion: (suggestion) => getHostFromUrl(suggestion && suggestion.url),
+    shouldBlockFaviconForHost,
+    getImmediateThemeForSuggestion: () => defaultTheme,
+    getThemeForSuggestion: () => Promise.resolve(defaultTheme),
+    getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    getHoverColors: (theme) => faviconTheme.getHoverColors(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
+    applyMarkVariables: () => {},
+    getSearchActionLabel: () => '在 Google 中搜索',
+    getSiteSearchDisplayName: (provider) => provider && provider.name ? provider.name : '',
+    isAiSiteSearchProvider: (provider) => Boolean(provider && provider.action === 'openAndSubmit'),
+    actionModel: globalThis.LumnoSuggestionActionModel,
+    defaultTheme
+  });
+
+  view.render({
+    query: '阿萨德',
+    primaryHighlightIndex: 0,
+    primaryHighlightReason: 'none',
+    suggestions: [{
+      type: 'siteSearch',
+      title: '向 豆包 提问 "阿萨德"',
+      url: 'https://www.doubao.com/chat/',
+      favicon: '',
+      provider: {
+        key: 'dbai',
+        name: '豆包',
+        action: 'openAndSubmit',
+        submitStrategy: 'doubaoPrompt'
+      },
+      searchQuery: '阿萨德'
+    }]
+  });
+
+  const item = view.getItems()[0];
+  assert.ok(item && item._xVisitButton, 'AI provider suggestion should render a visit button');
+  assert.strictEqual(
+    item._xVisitButton.textContent,
+    '打开 豆包 网页版',
+    'AI provider visit button should use the provider web app label instead of default search engine'
+  );
+}
+
 testLocalUrlSuggestionUsesFallbackTheme()
+  .then(testGoogleFallbackFaviconUsesFallbackTheme)
   .then(testVisitButtonAndEnterTagShareOverlayVisibilityRules)
+  .then(testAiProviderVisitButtonUsesWebAppLabel)
   .then(() => {
     console.log('newtab suggestions view tests passed');
   })

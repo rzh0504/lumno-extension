@@ -3975,6 +3975,18 @@
     return defaultTheme;
   }
 
+  function shouldUseUrlFallbackThemeForSuggestion(suggestion, theme) {
+    if (!suggestion || !shouldUseBrandTheme(suggestion)) {
+      return false;
+    }
+    const resolvedTheme = theme || defaultTheme;
+    if (!resolvedTheme._xIsDefault && !isLowConfidenceTheme(resolvedTheme)) {
+      return false;
+    }
+    const iconUrl = getThemeSourceForSuggestion(suggestion);
+    return Boolean(iconUrl && isFaviconProxyUrl(iconUrl));
+  }
+
   const themeResolutionQueue = [];
   const queuedThemeResolutionByTarget = new WeakMap();
   let themeResolutionSequence = 0;
@@ -7005,6 +7017,7 @@
     getThemeHostForSuggestion,
     getImmediateThemeForSuggestion,
     getThemeForSuggestion,
+    shouldUseUrlFallbackThemeForSuggestion,
     getThemeForMode,
     getHoverColors,
     getNeutralHoverActionColors,
@@ -7033,6 +7046,8 @@
     showTopActionTooltip,
     hideTopActionTooltip,
     getSearchActionLabel,
+    getSiteSearchDisplayName,
+    isAiSiteSearchProvider,
     getDefaultSearchEngineThemeUrl,
     getBrandAccentForUrl,
     buildThemeFromAccent,

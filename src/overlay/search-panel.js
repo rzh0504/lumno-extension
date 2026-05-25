@@ -2644,10 +2644,22 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       return tag;
     }
 
-    function getSuggestionActionLabel(action) {
+    function getSuggestionProviderSearchActionLabel(suggestion) {
+      const provider = suggestion && suggestion.provider ? suggestion.provider : null;
+      if (!provider) {
+        return '';
+      }
+      const site = getSiteSearchDisplayName(provider);
+      if (isAiSiteSearchProvider(provider)) {
+        return formatMessage('action_open_ai_web', '打开 {site} 网页版', { site });
+      }
+      return formatMessage('search_in_site', '在 {site} 中搜索', { site });
+    }
+
+    function getSuggestionActionLabel(action, suggestion) {
       switch (action) {
         case 'search':
-          return getSearchActionLabel();
+          return getSuggestionProviderSearchActionLabel(suggestion) || getSearchActionLabel();
         case 'switch':
           return t('action_switch', '切换');
         case 'open':
@@ -2665,10 +2677,10 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       }
     }
 
-    function setSuggestionVisitButtonContent(button, action) {
+    function setSuggestionVisitButtonContent(button, action, suggestion) {
       setInlineLabelWithIcon(
         button,
-        getSuggestionActionLabel(action),
+        getSuggestionActionLabel(action, suggestion),
         getRiSvg('ri-arrow-right-line', 'ri-size-12')
       );
     }
@@ -5565,7 +5577,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           });
           itemActionModel.actionTags.forEach((tag) => {
             actionTags.appendChild(createActionTag(
-              getSuggestionActionLabel(tag.action),
+              getSuggestionActionLabel(tag.action, suggestion),
               tag.keyLabel || 'Enter'
             ));
           });
@@ -5581,7 +5593,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           if (suggestionItem._xAlwaysHideVisitButton) {
             setSuggestionActionButtonVisible(visitButton, false);
           }
-          setSuggestionVisitButtonContent(visitButton, itemActionModel.visitButtonAction);
+          setSuggestionVisitButtonContent(visitButton, itemActionModel.visitButtonAction, suggestion);
 
           let historyDeleteButton = null;
           let historyDeleteSlot = null;

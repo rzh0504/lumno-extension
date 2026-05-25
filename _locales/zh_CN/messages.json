@@ -1061,6 +1061,9 @@
   "action_search_engine": {
     "message": "在 {engine} 中搜索"
   },
+  "action_open_ai_web": {
+    "message": "打开 {site} 网页版"
+  },
   "action_search_google": {
     "message": "在 Google 中搜索"
   },
