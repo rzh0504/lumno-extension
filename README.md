@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/Browser-Chromium-2563eb?style=flat-square" alt="Chromium" />
   <img src="https://img.shields.io/badge/Language-JavaScript-f59e0b?style=flat-square" alt="JavaScript" />
   <img src="https://img.shields.io/badge/License-GPL--3.0-16a34a?style=flat-square" alt="GPL-3.0" />
-  <img src="https://img.shields.io/badge/Build-No%20build%20step-7c3aed?style=flat-square" alt="No build step" />
+  <img src="https://img.shields.io/badge/Build-No%20build%20step-7c3aed?style=flat-square" alt="0.9.10" />
 </p>
 
 <p align="center">
