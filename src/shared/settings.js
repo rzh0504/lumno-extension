@@ -82,6 +82,37 @@
     return value === 'search' ? 'search' : 'autocomplete';
   }
 
+  const SEARCH_RESULT_SOURCE_TYPES = Object.freeze(['topSite', 'bookmark', 'history']);
+
+  function normalizeSearchResultSourceType(value) {
+    const raw = String(value || '').trim();
+    if (raw === 'topSite' || raw === 'topSites' || raw === 'frequent' || raw === 'common') {
+      return 'topSite';
+    }
+    if (raw === 'bookmark' || raw === 'bookmarks') {
+      return 'bookmark';
+    }
+    if (raw === 'history') {
+      return 'history';
+    }
+    return '';
+  }
+
+  function normalizeSearchResultSourceTypes(value) {
+    const rawItems = Array.isArray(value)
+      ? value
+      : (typeof value === 'string' ? value.split(/[\s,]+/) : []);
+    const selected = [];
+    rawItems.forEach((item) => {
+      const type = normalizeSearchResultSourceType(item);
+      if (!type || selected.includes(type)) {
+        return;
+      }
+      selected.push(type);
+    });
+    return selected.length > 0 ? selected : SEARCH_RESULT_SOURCE_TYPES.slice();
+  }
+
   function normalizeTabRankScoreDebugMode(value) {
     return value === true;
   }
@@ -105,6 +136,7 @@
     normalizeOverlaySizeMode,
     normalizeOverlayTabPriorityMode,
     normalizeSearchResultPriority,
+    normalizeSearchResultSourceTypes,
     normalizeTabRankScoreDebugMode,
     normalizeThemePreference
   });

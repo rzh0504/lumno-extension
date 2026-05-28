@@ -343,6 +343,18 @@
         swallowPinEvent(event);
         pinButton.click();
       });
+      const showPinTooltip = () => {
+        const label = pinButton.getAttribute('data-tooltip') || pinButton.getAttribute('aria-label') || '';
+        if (label) {
+          showTopActionTooltip(pinButton, label);
+        }
+      };
+      pinButton.addEventListener('mouseenter', showPinTooltip);
+      pinButton.addEventListener('pointerleave', hideTopActionTooltip);
+      pinButton.addEventListener('pointercancel', hideTopActionTooltip);
+      pinButton.addEventListener('mouseleave', hideTopActionTooltip);
+      pinButton.addEventListener('focus', showPinTooltip);
+      pinButton.addEventListener('blur', hideTopActionTooltip);
       dismissButton.addEventListener('pointerdown', swallowPinEvent);
       dismissButton.addEventListener('click', (event) => {
         swallowPinEvent(event);

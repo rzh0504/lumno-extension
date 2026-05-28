@@ -245,6 +245,18 @@
     return items.slice(start, start + pageLimit);
   }
 
+  function shouldApplyBookmarkCacheHydration(snapshot, current) {
+    const snapshotLoadToken = Number(snapshot && snapshot.loadToken);
+    const currentLoadToken = Number(current && current.loadToken);
+    if (!Number.isFinite(snapshotLoadToken) || !Number.isFinite(currentLoadToken)) {
+      return false;
+    }
+    if (snapshotLoadToken !== currentLoadToken) {
+      return false;
+    }
+    return !(Boolean(current && current.loadedOnce) && current && current.dataDirty === false);
+  }
+
   return Object.freeze({
     BOOKMARKS_BAR_TITLES,
     findBookmarksBarNode,
@@ -254,6 +266,7 @@
     buildBookmarkItemsFromChildren,
     buildBookmarkFolderCache,
     buildBookmarkFolderPath,
-    getBookmarkPageItems
+    getBookmarkPageItems,
+    shouldApplyBookmarkCacheHydration
   });
 });

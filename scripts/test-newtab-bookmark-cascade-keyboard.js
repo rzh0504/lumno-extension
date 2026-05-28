@@ -1,0 +1,365 @@
+const assert = require('assert');
+const path = require('path');
+
+const repoRoot = path.resolve(__dirname, '..');
+const {
+  createBookmarkCascadeMenuRuntime
+} = require(path.join(repoRoot, 'src', 'newtab', 'bookmark-cascade-menu.js'));
+
+function createFakeEvent(type, values) {
+  return {
+    type,
+    defaultPrevented: false,
+    propagationStopped: false,
+    immediatePropagationStopped: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    },
+    stopPropagation() {
+      this.propagationStopped = true;
+    },
+    stopImmediatePropagation() {
+      this.immediatePropagationStopped = true;
+      this.propagationStopped = true;
+    },
+    ...(values || {})
+  };
+}
+
+function parseSelector(selector) {
+  const source = String(selector || '').trim();
+  const attrMatch = source.match(/\[([^=\]]+)="([^"]*)"\]/);
+  const attr = attrMatch ? { name: attrMatch[1], value: attrMatch[2] } : null;
+  const withoutAttr = attr ? source.replace(attrMatch[0], '') : source;
+  const classMatch = withoutAttr.match(/\.([A-Za-z0-9_-]+)/);
+  const className = classMatch ? classMatch[1] : '';
+  const tag = withoutAttr.replace(/\.[A-Za-z0-9_-]+/, '').trim().toUpperCase();
+  return { attr, className, tag };
+}
+
+function createFakeElement(tagName, ownerDocument) {
+  const children = [];
+  const attributes = new Map();
+  const listeners = new Map();
+  const classes = new Set();
+  const styleValues = new Map();
+  let classNameValue = '';
+  let textContentValue = '';
+  let rect = { left: 0, top: 0, width: 210, height: 32 };
+  const element = {
+    tagName: String(tagName || '').toUpperCase(),
+    nodeType: 1,
+    children,
+    childNodes: children,
+    ownerDocument,
+    parentNode: null,
+    get className() {
+      return classNameValue;
+    },
+    set className(value) {
+      classNameValue = String(value || '');
+      classes.clear();
+      classNameValue.split(/\s+/).filter(Boolean).forEach((part) => classes.add(part));
+    },
+    innerHTML: '',
+    get textContent() {
+      return textContentValue || children.map((child) => child.textContent || '').join('');
+    },
+    set textContent(value) {
+      textContentValue = String(value || '');
+    },
+    title: '',
+    type: '',
+    value: '',
+    tabIndex: 0,
+    _connected: false,
+    get isConnected() {
+      return element._connected || element === ownerDocument.body || Boolean(element.parentNode && element.parentNode.isConnected);
+    },
+    get firstChild() {
+      return children[0] || null;
+    },
+    get offsetWidth() {
+      return rect.width;
+    },
+    get offsetHeight() {
+      return rect.height;
+    },
+    classList: {
+      add: (...names) => {
+        names.forEach((name) => {
+          String(name || '').split(/\s+/).filter(Boolean).forEach((part) => classes.add(part));
+        });
+        classNameValue = Array.from(classes).join(' ');
+      },
+      remove: (...names) => {
+        names.forEach((name) => classes.delete(name));
+        classNameValue = Array.from(classes).join(' ');
+      },
+      contains: (name) => classes.has(name)
+    },
+    style: {
+      setProperty: (name, value) => styleValues.set(name, String(value)),
+      removeProperty: (name) => styleValues.delete(name),
+      getPropertyValue: (name) => styleValues.get(name) || ''
+    },
+    setRect(nextRect) {
+      rect = { ...rect, ...(nextRect || {}) };
+    },
+    appendChild(child) {
+      child.parentNode = element;
+      child.ownerDocument = ownerDocument;
+      children.push(child);
+      return child;
+    },
+    insertBefore(child, reference) {
+      child.parentNode = element;
+      child.ownerDocument = ownerDocument;
+      const index = children.indexOf(reference);
+      if (index < 0) {
+        children.push(child);
+      } else {
+        children.splice(index, 0, child);
+      }
+      return child;
+    },
+    removeChild(child) {
+      const index = children.indexOf(child);
+      if (index >= 0) {
+        children.splice(index, 1);
+        child.parentNode = null;
+      }
+      return child;
+    },
+    setAttribute(name, value) {
+      attributes.set(name, String(value));
+    },
+    getAttribute(name) {
+      return attributes.get(name) || '';
+    },
+    removeAttribute(name) {
+      attributes.delete(name);
+    },
+    addEventListener(type, listener) {
+      const eventName = String(type || '');
+      listeners.set(eventName, [...(listeners.get(eventName) || []), listener]);
+    },
+    dispatchEvent(event) {
+      const nextEvent = event || createFakeEvent('');
+      nextEvent.target = nextEvent.target || element;
+      (listeners.get(nextEvent.type) || []).forEach((listener) => listener(nextEvent));
+      return !nextEvent.defaultPrevented;
+    },
+    focus() {
+      ownerDocument.activeElement = element;
+      element.dispatchEvent(createFakeEvent('focus', { target: element }));
+    },
+    matches(selector) {
+      if (selector === ':hover') {
+        return false;
+      }
+      const parsed = parseSelector(selector);
+      if (parsed.tag && element.tagName !== parsed.tag) {
+        return false;
+      }
+      if (parsed.className && !classes.has(parsed.className)) {
+        return false;
+      }
+      if (parsed.attr && element.getAttribute(parsed.attr.name) !== parsed.attr.value) {
+        return false;
+      }
+      return true;
+    },
+    contains(target) {
+      if (target === element) {
+        return true;
+      }
+      return children.some((child) => child.contains && child.contains(target));
+    },
+    querySelector(selector) {
+      return element.querySelectorAll(selector)[0] || null;
+    },
+    querySelectorAll(selector) {
+      const matches = [];
+      function visit(node) {
+        if (node.matches && node.matches(selector)) {
+          matches.push(node);
+        }
+        (node.children || []).forEach(visit);
+      }
+      children.forEach(visit);
+      return matches;
+    },
+    getBoundingClientRect() {
+      return {
+        left: rect.left,
+        top: rect.top,
+        right: rect.left + rect.width,
+        bottom: rect.top + rect.height,
+        width: rect.width,
+        height: rect.height
+      };
+    }
+  };
+  return element;
+}
+
+function createFakeDocument() {
+  const listeners = new Map();
+  const fakeDocument = {
+    activeElement: null,
+    body: null,
+    documentElement: { clientWidth: 1024, clientHeight: 720 },
+    createElement(tagName) {
+      return createFakeElement(tagName, fakeDocument);
+    },
+    createElementNS(_namespace, tagName) {
+      return createFakeElement(tagName, fakeDocument);
+    },
+    addEventListener(type, listener) {
+      const eventName = String(type || '');
+      listeners.set(eventName, [...(listeners.get(eventName) || []), listener]);
+    },
+    dispatchEvent(event) {
+      const nextEvent = event || createFakeEvent('');
+      nextEvent.target = nextEvent.target || fakeDocument.activeElement || fakeDocument.body;
+      (listeners.get(nextEvent.type) || []).forEach((listener) => listener(nextEvent));
+      return !nextEvent.defaultPrevented;
+    }
+  };
+  fakeDocument.body = createFakeElement('body', fakeDocument);
+  fakeDocument.body._connected = true;
+  return fakeDocument;
+}
+
+function getMenuItems(levelElement) {
+  return levelElement ? levelElement.querySelectorAll('.x-nt-bookmark-cascade-item') : [];
+}
+
+function getActiveLabel(levelElement) {
+  const active = levelElement && levelElement.querySelector('.x-nt-bookmark-cascade-item[data-active="true"]');
+  return active ? active.textContent : '';
+}
+
+function dispatchKey(documentObj, key) {
+  const event = createFakeEvent('keydown', { key });
+  documentObj.dispatchEvent(event);
+  assert.ok(event.defaultPrevented, `${key} should be handled by the open cascade menu`);
+  return event;
+}
+
+async function flushPromises() {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
+(async () => {
+  const documentObj = createFakeDocument();
+  const anchor = documentObj.createElement('button');
+  anchor.setRect({ left: 20, top: 20, width: 120, height: 40 });
+  documentObj.body.appendChild(anchor);
+
+  const itemsByFolder = {
+    root: [
+      { id: 'research', title: 'Research', type: 'folder' },
+      { id: 'patterns', title: 'Patterns', type: 'folder' },
+      { id: 'archive', title: 'Archive', url: 'https://example.com/archive' }
+    ],
+    research: [
+      { id: 'amazon', title: 'Amazon Menu Aim', url: 'https://example.com/amazon' },
+      { id: 'nngroup', title: 'NNGroup', url: 'https://example.com/nngroup' }
+    ],
+    patterns: [
+      { id: 'pattern-library', title: 'Pattern Library', url: 'https://example.com/patterns' }
+    ]
+  };
+
+  const runtime = createBookmarkCascadeMenuRuntime({
+    documentObj,
+    windowObj: {
+      innerWidth: 1024,
+      innerHeight: 720,
+      performance: { now: () => 0 },
+      setTimeout,
+      clearTimeout,
+      requestAnimationFrame: (callback) => {
+        callback();
+        return 1;
+      },
+      cancelAnimationFrame() {},
+      getComputedStyle: () => ({ transform: 'none' })
+    },
+    positionUtils: {
+      placeRootCascadeMenu: () => ({ left: 40, top: 70, side: 'right', horizontal: 'right', vertical: 'bottom' }),
+      placeCascadeSubmenu: () => ({ left: 260, top: 70, side: 'right', horizontal: 'right', vertical: 'bottom' }),
+      getTranslateNeutralRect: (rect) => rect,
+      buildCascadeSafeTriangle: () => null,
+      isPointInsideCascadeSafeTriangle: () => false
+    },
+    menuSurface: {
+      applyContentWidth() {},
+      open(element) {
+        element.setAttribute('data-open', 'true');
+      }
+    },
+    t: (_key, fallback) => fallback || '',
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl: () => '',
+    getSiteDisplayName: (_host, title) => title || '',
+    getUrlDisplay: (url) => url,
+    getRiSvg: () => '',
+    getFigmaFolderSvg: () => '',
+    initFolderPathMorph() {},
+    playFolderPathMorph() {},
+    attachFaviconWithFallbacks() {},
+    ensureReady: () => Promise.resolve(true),
+    getItems: (folderId) => itemsByFolder[String(folderId || '')] || [],
+    navigateToUrl() {}
+  });
+
+  runtime.open({ id: 'root' }, anchor);
+  await flushPromises();
+
+  let levels = documentObj.body.querySelectorAll('.x-nt-bookmark-cascade-level');
+  assert.strictEqual(levels.length, 1, 'opening a cascade should render the root menu level');
+  let rootItems = getMenuItems(levels[0]);
+  assert.strictEqual(getActiveLabel(levels[0]), 'Research', 'opening a cascade should select the first menu item');
+  assert.strictEqual(documentObj.activeElement, rootItems[0], 'opening a cascade should move keyboard focus into the menu');
+
+  dispatchKey(documentObj, 'ArrowDown');
+  assert.strictEqual(getActiveLabel(levels[0]), 'Patterns', 'ArrowDown should move selection to the next root item');
+  assert.strictEqual(documentObj.activeElement, rootItems[1], 'ArrowDown should move focus with the selected item');
+
+  dispatchKey(documentObj, 'ArrowUp');
+  assert.strictEqual(getActiveLabel(levels[0]), 'Research', 'ArrowUp should move selection to the previous root item');
+  assert.strictEqual(documentObj.activeElement, rootItems[0], 'ArrowUp should focus the previous item');
+
+  dispatchKey(documentObj, 'ArrowRight');
+  levels = documentObj.body.querySelectorAll('.x-nt-bookmark-cascade-level');
+  assert.strictEqual(levels.length, 2, 'ArrowRight on a folder should open its submenu');
+  assert.strictEqual(rootItems[0].getAttribute('aria-expanded'), 'true', 'ArrowRight should mark the selected folder expanded');
+  assert.strictEqual(getActiveLabel(levels[1]), 'Amazon Menu Aim', 'opening a submenu from keyboard should select its first item');
+  assert.strictEqual(documentObj.activeElement, getMenuItems(levels[1])[0], 'ArrowRight should move focus into the submenu');
+
+  dispatchKey(documentObj, 'ArrowDown');
+  assert.strictEqual(getActiveLabel(levels[1]), 'NNGroup', 'ArrowDown should move selection inside the current submenu');
+
+  dispatchKey(documentObj, 'ArrowLeft');
+  levels = documentObj.body.querySelectorAll('.x-nt-bookmark-cascade-level');
+  assert.strictEqual(levels.length, 1, 'ArrowLeft inside a submenu should close that submenu');
+  assert.strictEqual(rootItems[0].getAttribute('aria-expanded'), 'false', 'ArrowLeft should collapse the parent folder');
+  assert.strictEqual(getActiveLabel(levels[0]), 'Research', 'ArrowLeft should keep the parent item selected');
+  assert.strictEqual(documentObj.activeElement, rootItems[0], 'ArrowLeft should restore focus to the parent item');
+
+  dispatchKey(documentObj, 'ArrowDown');
+  dispatchKey(documentObj, 'ArrowRight');
+  levels = documentObj.body.querySelectorAll('.x-nt-bookmark-cascade-level');
+  assert.strictEqual(levels.length, 2, 'ArrowRight should enter the newly selected sibling folder');
+  assert.strictEqual(getActiveLabel(levels[1]), 'Pattern Library', 'the newly opened submenu should select its first child');
+
+  dispatchKey(documentObj, 'Escape');
+  assert.strictEqual(runtime.isOpen(), false, 'Escape should close the cascade menu');
+  assert.strictEqual(documentObj.activeElement, anchor, 'Escape should restore focus to the trigger');
+
+  console.log('newtab bookmark cascade keyboard tests passed');
+})();

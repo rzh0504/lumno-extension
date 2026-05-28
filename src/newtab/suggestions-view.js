@@ -298,7 +298,7 @@
       icon.innerHTML = iconMarkup || '';
       button.appendChild(icon);
       button.setAttribute('aria-label', labelText || '');
-      button.title = labelText || '';
+      button.removeAttribute('title');
     }
 
     function getSuggestionProviderSearchActionLabel(suggestion) {

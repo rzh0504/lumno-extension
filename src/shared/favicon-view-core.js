@@ -158,11 +158,23 @@
       return promise;
     }
 
+    function isCurrentFaviconSource(img, sourceUrl) {
+      const expected = String(sourceUrl || '').trim();
+      if (!img || !expected || !img.isConnected) {
+        return false;
+      }
+      const resolvedSrc = String(img.getAttribute('data-favicon-current-src') || '').trim();
+      const renderedSrc = String(img.getAttribute('src') || img.src || '').trim();
+      const dataSource = String(img.getAttribute('data-favicon-data-source') || '').trim();
+      return resolvedSrc === expected || renderedSrc === expected || dataSource === expected;
+    }
+
     function setFaviconSrcWithAnimation(img, nextSrc, optionsArg) {
       if (!img || !nextSrc || isBlockedLocalFaviconUrl(nextSrc)) {
         return false;
       }
       const shouldPersist = !(optionsArg && optionsArg.persist === false);
+      const sourceUrl = String((optionsArg && optionsArg.sourceUrl) || '').trim();
       const currentSrc = img.getAttribute('data-favicon-current-src') || '';
       const isFallbackVisible = img.getAttribute('data-fallback-icon') === 'true';
       const isPlaceholderVisible = img.getAttribute('data-favicon-placeholder') === 'true';
@@ -192,6 +204,11 @@
         }
         showResolvedFavicon(img);
         img.setAttribute('data-favicon-current-src', nextSrc);
+        if (nextSrc.startsWith('data:') && sourceUrl) {
+          img.setAttribute('data-favicon-data-source', sourceUrl);
+        } else {
+          img.removeAttribute('data-favicon-data-source');
+        }
         img.setAttribute('data-favicon-has-appeared', 'true');
         applyFaviconOpticalShift(img);
         const persistKey = getPersistCacheKey(img);
@@ -292,17 +309,21 @@
       if (!img || !url) {
         return;
       }
+      const sourceUrl = String(url || '').trim();
       const cached = faviconDataCache.get(url);
       if (cached) {
-        setFaviconSrcWithAnimation(img, cached);
+        if (!isCurrentFaviconSource(img, sourceUrl)) {
+          return;
+        }
+        setFaviconSrcWithAnimation(img, cached, { sourceUrl });
         preloadThemeFromFavicon(url, cached, hostOverride);
         return;
       }
       requestFaviconData(url).then((dataUrl) => {
-        if (!dataUrl || !img.isConnected) {
+        if (!dataUrl || !isCurrentFaviconSource(img, sourceUrl)) {
           return;
         }
-        setFaviconSrcWithAnimation(img, dataUrl);
+        setFaviconSrcWithAnimation(img, dataUrl, { sourceUrl });
         preloadThemeFromFavicon(url, dataUrl, hostOverride);
       });
     }

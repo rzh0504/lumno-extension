@@ -41,6 +41,18 @@ assert.strictEqual(settings.normalizeOverlayTabPriorityMode(undefined), true);
 assert.strictEqual(settings.normalizeSearchResultPriority('search'), 'search');
 assert.strictEqual(settings.normalizeSearchResultPriority('autocomplete'), 'autocomplete');
 assert.strictEqual(settings.normalizeSearchResultPriority('other'), 'autocomplete');
+assert.deepStrictEqual(
+  settings.normalizeSearchResultSourceTypes(['topSite', 'bookmark']),
+  ['topSite', 'bookmark']
+);
+assert.deepStrictEqual(
+  settings.normalizeSearchResultSourceTypes(['frequent', 'bookmarks', 'history', 'history']),
+  ['topSite', 'bookmark', 'history']
+);
+assert.deepStrictEqual(
+  settings.normalizeSearchResultSourceTypes([]),
+  ['topSite', 'bookmark', 'history']
+);
 
 assert.strictEqual(settings.normalizeTabRankScoreDebugMode(true), true);
 assert.strictEqual(settings.normalizeTabRankScoreDebugMode(false), false);

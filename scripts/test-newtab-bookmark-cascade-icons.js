@@ -1,0 +1,78 @@
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+
+const repoRoot = path.resolve(__dirname, '..');
+const newtabJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/newtab.js'), 'utf8');
+const newtabHtml = fs.readFileSync(path.join(repoRoot, 'src/newtab/newtab.html'), 'utf8');
+const cascadeMenuJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/bookmark-cascade-menu.js'), 'utf8');
+
+function assertContains(source, needle, message) {
+  assert.ok(source.includes(needle), message);
+}
+
+function getFunctionBody(source, functionName) {
+  const marker = `function ${functionName}`;
+  const start = source.indexOf(marker);
+  assert.ok(start >= 0, `${functionName} should exist`);
+  const braceStart = source.indexOf('{', start);
+  assert.ok(braceStart >= 0, `${functionName} should have a body`);
+  let depth = 0;
+  for (let index = braceStart; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === '{') {
+      depth += 1;
+    } else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(braceStart + 1, index);
+      }
+    }
+  }
+  throw new Error(`${functionName} body should be parseable`);
+}
+
+const cascadeIconBody = getFunctionBody(cascadeMenuJs, 'createBookmarkCascadeItemIcon');
+const cascadeActiveBody = getFunctionBody(cascadeMenuJs, 'setBookmarkCascadeLevelActiveItem');
+
+assertContains(
+  cascadeIconBody,
+  'getFigmaFolderSvg',
+  'bookmark cascade folder items should reuse the newtab bookmark folder SVG'
+);
+assertContains(
+  cascadeIconBody,
+  'initFolderPathMorph(folderIcon);',
+  'bookmark cascade folder SVGs should initialize the same morph behavior'
+);
+assert.ok(
+  !cascadeIconBody.includes("getRiSvg('ri-folder"),
+  'bookmark cascade folder items should not use the Remix folder glyph'
+);
+assertContains(
+  cascadeActiveBody,
+  'playFolderPathMorph(icon, active);',
+  'bookmark cascade menu item hover/active state should drive the folder SVG morph'
+);
+assertContains(
+  cascadeMenuJs,
+  "arrow.innerHTML = getRiSvg('ri-arrow-right-s-line', 'ri-size-16');",
+  'bookmark cascade disclosure arrows should continue to use Remix Icon'
+);
+
+assertContains(
+  newtabHtml,
+  '.x-nt-bookmark-cascade-icon--folder svg',
+  'bookmark cascade folder SVGs should be sized by page CSS'
+);
+assertContains(
+  newtabHtml,
+  '.x-nt-bookmark-cascade-icon--folder .x-nt-folder-shape--hover',
+  'bookmark cascade folder SVG hover layer should start hidden like bookmark cards'
+);
+assert.ok(
+  !/\.x-nt-bookmark-cascade-item(?:(?!\}).)*translateY/s.test(newtabHtml),
+  'bookmark cascade item hover styling should not vertically translate menu rows'
+);
+
+console.log('newtab bookmark cascade icon tests passed');

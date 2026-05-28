@@ -44,6 +44,7 @@
   const newtabWordmarkToggle = document.getElementById('_x_extension_newtab_wordmark_toggle_2026_unique_');
   const restrictedActionSelect = document.getElementById('_x_extension_restricted_action_select_2024_unique_');
   const searchResultPrioritySelect = document.getElementById('_x_extension_search_result_priority_select_2026_unique_');
+  const searchResultSourceTypeInputs = Array.from(document.querySelectorAll('input[data-search-result-source-type]'));
   const syncStatus = document.getElementById('_x_extension_sync_status_2024_unique_');
   const syncStatusText = document.getElementById('_x_extension_sync_status_text_2024_unique_');
   const syncNowButton = document.getElementById('_x_extension_sync_now_2024_unique_');
@@ -148,12 +149,16 @@
   const NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY = '_x_extension_newtab_wordmark_visible_2026_unique_';
   const RESTRICTED_ACTION_STORAGE_KEY = '_x_extension_restricted_action_2024_unique_';
   const SEARCH_RESULT_PRIORITY_STORAGE_KEY = '_x_extension_search_result_priority_2026_unique_';
+  const SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY = '_x_extension_search_result_source_types_2026_unique_';
   const FALLBACK_SHORTCUT_STORAGE_KEY = '_x_extension_fallback_hotkey_2024_unique_';
   const SITE_SEARCH_STORAGE_KEY = '_x_extension_site_search_custom_2024_unique_';
   const SITE_SEARCH_DISABLED_STORAGE_KEY = '_x_extension_site_search_disabled_2024_unique_';
   const SEARCH_BLACKLIST_STORAGE_KEY = '_x_extension_search_blacklist_2026_unique_';
   const BLACKLIST_UTILS = globalThis.LumnoBlacklistUtils || {};
   const SETTINGS = globalThis.LumnoSettings || {};
+  const CHECKBOX = globalThis.LumnoCheckbox || {};
+  const CHECKBOX_CLASS_NAME = CHECKBOX.className || '_x_extension_checkbox_2026_unique_';
+  const CHECKBOX_GROUP_CLASS_NAME = CHECKBOX.groupClassName || '_x_extension_checkbox_group_2026_unique_';
   const DEFAULT_SEARCH_ENGINE_STORAGE_KEY = '_x_extension_default_search_engine_2024_unique_';
   const SYNC_META_KEY = '_x_extension_sync_meta_2024_unique_';
   const SYNC_KEYS = [
@@ -181,6 +186,7 @@
     NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY,
     RESTRICTED_ACTION_STORAGE_KEY,
     SEARCH_RESULT_PRIORITY_STORAGE_KEY,
+    SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY,
     FALLBACK_SHORTCUT_STORAGE_KEY,
     SITE_SEARCH_STORAGE_KEY,
     SITE_SEARCH_DISABLED_STORAGE_KEY,
@@ -202,7 +208,6 @@
   let confirmOffset = { x: 0, y: 0 };
   let confirmClosingTimer = null;
   let bodyFixedSnapshot = null;
-  let tooltipEl = null;
   let languageApplyRequestId = 0;
   let editingSiteSearchKey = null;
   let activePopconfirm = null;
@@ -218,13 +223,31 @@
   let isFallbackWidthReady = false;
   let searchBlacklistItems = [];
   let blacklistFormExpanded = false;
+  let searchResultSourceTypeGroup = null;
+  const customSelectController = globalThis.LumnoCustomSelect &&
+      typeof globalThis.LumnoCustomSelect.createController === 'function'
+    ? globalThis.LumnoCustomSelect.createController({
+      documentObj: document,
+      windowObj: window,
+      afterRefresh: syncFallbackShortcutWrapWidth
+    })
+    : null;
+  const tooltipController = globalThis.LumnoTooltip &&
+      typeof globalThis.LumnoTooltip.createController === 'function'
+    ? globalThis.LumnoTooltip.createController({
+      documentObj: document,
+      windowObj: window,
+      id: '_x_extension_options_tooltip_2026_unique_',
+      appendTo: document.body,
+      maxWidth: 'min(360px, calc(100vw - 24px))'
+    })
+    : null;
   const fallbackSiteSearchProviders = typeof SEARCH_UTILS.getDefaultSiteSearchProviders === 'function'
     ? SEARCH_UTILS.getDefaultSiteSearchProviders()
     : [];
 
   let currentMessages = null;
   let currentLanguageMode = 'system';
-  let openCustomSelect = null;
 
   function normalizeBlacklistMatchModes(value, fallbackMode) {
     if (BLACKLIST_UTILS.normalizeMatchModes) {
@@ -590,7 +613,7 @@
 
   function createBlacklistModeOption(textKey, fallback, tooltipKey, tooltipFallback) {
     const wrap = document.createElement('label');
-    wrap.className = '_x_extension_blacklist_match_mode_2026_unique_';
+    wrap.className = CHECKBOX_CLASS_NAME;
     const input = document.createElement('input');
     input.type = 'checkbox';
     const text = document.createElement('span');
@@ -710,6 +733,66 @@
     return typeof SETTINGS.normalizeSearchResultPriority === 'function'
       ? SETTINGS.normalizeSearchResultPriority(value)
       : (value === 'search' ? 'search' : 'autocomplete');
+  }
+
+  function normalizeSearchResultSourceTypes(value) {
+    if (typeof SETTINGS.normalizeSearchResultSourceTypes === 'function') {
+      return SETTINGS.normalizeSearchResultSourceTypes(value);
+    }
+    const rawItems = Array.isArray(value) ? value : [];
+    const selected = [];
+    rawItems.forEach((item) => {
+      const raw = String(item || '').trim();
+      const type = raw === 'topSite' || raw === 'bookmark' || raw === 'history' ? raw : '';
+      if (type && !selected.includes(type)) {
+        selected.push(type);
+      }
+    });
+    return selected.length > 0 ? selected : ['topSite', 'bookmark', 'history'];
+  }
+
+  function collectCheckedSearchResultSourceTypes() {
+    if (searchResultSourceTypeGroup && typeof searchResultSourceTypeGroup.getValue === 'function') {
+      return searchResultSourceTypeGroup.getValue();
+    }
+    const checked = [];
+    searchResultSourceTypeInputs.forEach((input) => {
+      if (!input || !input.checked) {
+        return;
+      }
+      checked.push(input.getAttribute('data-search-result-source-type'));
+    });
+    return checked.filter(Boolean);
+  }
+
+  function setSearchResultSourceTypeState(value) {
+    const normalized = normalizeSearchResultSourceTypes(value);
+    if (searchResultSourceTypeGroup && typeof searchResultSourceTypeGroup.setValue === 'function') {
+      searchResultSourceTypeGroup.setValue(normalized);
+      return;
+    }
+    const selected = new Set(normalized);
+    searchResultSourceTypeInputs.forEach((input) => {
+      const type = input.getAttribute('data-search-result-source-type');
+      input.checked = selected.has(type);
+    });
+  }
+
+  function persistSearchResultSourceTypes(value) {
+    const normalized = normalizeSearchResultSourceTypes(value);
+    setSearchResultSourceTypeState(normalized);
+    if (!storageArea) {
+      return;
+    }
+    storageArea.set({ [SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY]: normalized });
+  }
+
+  if (searchResultSourceTypeInputs.length > 0 && typeof CHECKBOX.createRequiredGroup === 'function') {
+    searchResultSourceTypeGroup = CHECKBOX.createRequiredGroup(searchResultSourceTypeInputs, {
+      getValue: (input) => input && input.getAttribute('data-search-result-source-type'),
+      normalizeValue: normalizeSearchResultSourceTypes,
+      onChange: persistSearchResultSourceTypes
+    });
   }
 
   function updateInlineTabsIndicator(wrapper, indicator, activeSelector) {
@@ -953,7 +1036,7 @@
       const message = getMessage(key, fallback);
       node.setAttribute('data-tooltip', message);
       if (node.getAttribute('title')) {
-        node.setAttribute('title', message);
+        node.removeAttribute('title');
       }
       if (node.getAttribute('aria-label')) {
         node.setAttribute('aria-label', message);
@@ -974,340 +1057,45 @@
     }
   }
 
-  function ensureTooltipElement() {
-    if (tooltipEl) {
-      return tooltipEl;
-    }
-    tooltipEl = document.createElement('div');
-    tooltipEl.className = '_x_extension_tooltip_2024_unique_';
-    tooltipEl.setAttribute('data-show', 'false');
-    document.body.appendChild(tooltipEl);
-    return tooltipEl;
-  }
-
   function showTooltipFor(target) {
-    if (!target) {
+    if (!tooltipController || !target) {
       return;
     }
     const text = target.getAttribute('data-tooltip');
     if (!text) {
       return;
     }
-    const el = ensureTooltipElement();
-    const lines = String(text)
-      .split('\n')
-      .map((line) => line.trimEnd());
-    el.replaceChildren();
-    lines.forEach((line) => {
-      const node = document.createElement('span');
-      if (line === '────────') {
-        node.className = '_x_extension_tooltip_divider_2026_unique_';
-      } else {
-        node.className = '_x_extension_tooltip_line_2026_unique_';
-        node.textContent = line;
-      }
-      el.appendChild(node);
+    tooltipController.show(target, text, {
+      maxWidth: 'min(360px, calc(100vw - 24px))',
+      spacing: 8
     });
-    const rect = target.getBoundingClientRect();
-    const tooltipRect = el.getBoundingClientRect();
-    const spacing = 8;
-    let top = rect.top - tooltipRect.height - spacing;
-    let left = rect.left + (rect.width - tooltipRect.width) / 2;
-    if (top < 8) {
-      top = rect.bottom + spacing;
-    }
-    if (left < 8) {
-      left = 8;
-    }
-    const maxLeft = window.innerWidth - tooltipRect.width - 8;
-    if (left > maxLeft) {
-      left = Math.max(8, maxLeft);
-    }
-    el.style.top = `${Math.round(top)}px`;
-    el.style.left = `${Math.round(left)}px`;
-    el.setAttribute('data-show', 'true');
   }
 
   function hideTooltip() {
-    if (!tooltipEl) {
+    if (!tooltipController) {
       return;
     }
-    tooltipEl.setAttribute('data-show', 'false');
+    tooltipController.hide();
   }
 
   function initTooltips() {
+    if (!tooltipController) {
+      return;
+    }
     const nodes = Array.from(document.querySelectorAll('[data-tooltip]'));
     nodes.forEach((node) => {
-      if (node.dataset.tooltipBound === 'true') {
-        return;
-      }
-      node.dataset.tooltipBound = 'true';
-      node.classList.add('_x_extension_tooltip_host_2024_unique_');
-      node.addEventListener('mouseenter', () => showTooltipFor(node));
-      node.addEventListener('mouseleave', hideTooltip);
-      node.addEventListener('focus', () => showTooltipFor(node));
-      node.addEventListener('blur', hideTooltip);
-    });
-  }
-
-  function getCustomSelectElements(wrapper) {
-    if (!wrapper) {
-      return {};
-    }
-    const selectId = wrapper.getAttribute('data-select');
-    const select = selectId ? document.getElementById(selectId) : wrapper.querySelector('select');
-    const trigger = wrapper.querySelector('._x_extension_select_trigger_2024_unique_');
-    const menu = wrapper.querySelector('._x_extension_select_menu_2024_unique_');
-    return { select, trigger, menu };
-  }
-
-  function setCustomSelectActiveIndex(wrapper, nextIndex) {
-    const { menu } = getCustomSelectElements(wrapper);
-    if (!menu) {
-      return;
-    }
-    const items = Array.from(menu.children);
-    if (items.length === 0) {
-      return;
-    }
-    let index = Number.isFinite(nextIndex) ? nextIndex : 0;
-    if (index < 0) {
-      index = items.length - 1;
-    }
-    if (index >= items.length) {
-      index = 0;
-    }
-    wrapper.setAttribute('data-active-index', String(index));
-    items.forEach((item, itemIndex) => {
-      if (itemIndex === index) {
-        item.setAttribute('data-active', 'true');
-      } else {
-        item.removeAttribute('data-active');
-      }
-    });
-  }
-
-  function getCustomSelectActiveIndex(wrapper) {
-    if (!wrapper) {
-      return 0;
-    }
-    const raw = wrapper.getAttribute('data-active-index');
-    const parsed = Number.parseInt(raw, 10);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-
-  function getCustomSelectMenuWidthMode(wrapper) {
-    const raw = wrapper
-      ? String(wrapper.getAttribute('data-menu-width') || '').trim().toLowerCase()
-      : '';
-    if (raw === 'content' || raw === 'trigger') {
-      return raw;
-    }
-    return 'auto';
-  }
-
-  function getCustomSelectMenuAlign(wrapper, options) {
-    const settings = options || {};
-    const raw = wrapper
-      ? String(wrapper.getAttribute('data-menu-align') || '').trim().toLowerCase()
-      : '';
-    if (raw === 'left' || raw === 'right' || raw === 'middle') {
-      return raw;
-    }
-    if (settings.preferRight) {
-      return 'right';
-    }
-    if (wrapper && wrapper.classList.contains('_x_extension_select_align_left_2024_unique_')) {
-      return 'left';
-    }
-    if (wrapper && wrapper.classList.contains('_x_extension_select_align_middle_2024_unique_')) {
-      return 'middle';
-    }
-    return 'right';
-  }
-
-  function applyCustomSelectMenuAlign(wrapper, menu, align) {
-    if (!menu) {
-      return 'right';
-    }
-    const nextAlign = align || getCustomSelectMenuAlign(wrapper);
-    if (wrapper) {
-      wrapper.setAttribute('data-menu-align-current', nextAlign);
-    }
-    if (nextAlign === 'left') {
-      menu.style.left = '0';
-      menu.style.right = 'auto';
-      return nextAlign;
-    }
-    if (nextAlign === 'middle') {
-      menu.style.left = '50%';
-      menu.style.right = 'auto';
-      return nextAlign;
-    }
-    menu.style.left = 'auto';
-    menu.style.right = '0';
-    return nextAlign;
-  }
-
-  function setCustomSelectEffectiveMenuWidth(wrapper, widthMode) {
-    if (wrapper) {
-      wrapper.setAttribute('data-menu-width-current', widthMode);
-    }
-  }
-
-  function applyCustomSelectTriggerMenuWidth(wrapper, menu, width, align) {
-    setCustomSelectEffectiveMenuWidth(wrapper, 'trigger');
-    applyCustomSelectMenuAlign(wrapper, menu, align);
-    menu.style.minWidth = `${width}px`;
-    menu.style.width = `${width}px`;
-    menu.style.maxWidth = '';
-  }
-
-  function applyCustomSelectContentMenuWidth(wrapper, menu, align) {
-    setCustomSelectEffectiveMenuWidth(wrapper, 'content');
-    applyCustomSelectMenuAlign(wrapper, menu, align);
-    menu.style.minWidth = '0';
-    menu.style.width = 'max-content';
-    menu.style.maxWidth = 'calc(100vw - 32px)';
-  }
-
-  function getHorizontalBoxSpace(element) {
-    if (!element) {
-      return 0;
-    }
-    const style = window.getComputedStyle(element);
-    return (Number.parseFloat(style.paddingLeft) || 0) +
-      (Number.parseFloat(style.paddingRight) || 0) +
-      (Number.parseFloat(style.borderLeftWidth) || 0) +
-      (Number.parseFloat(style.borderRightWidth) || 0);
-  }
-
-  function measureTextWidth(element) {
-    if (!element || !element.ownerDocument || !element.childNodes || element.childNodes.length === 0) {
-      return 0;
-    }
-    const range = element.ownerDocument.createRange();
-    range.selectNodeContents(element);
-    const rect = range.getBoundingClientRect();
-    range.detach();
-    return Math.ceil(rect.width || 0);
-  }
-
-  function getCustomSelectContentMetrics(menu, trigger) {
-    const metrics = {
-      naturalMenuWidth: 0
-    };
-    if (!menu) {
-      return metrics;
-    }
-    const menuBoxSpace = getHorizontalBoxSpace(menu);
-    Array.from(menu.children).forEach((item) => {
-      const textWidth = measureTextWidth(item);
-      const itemWidth = textWidth + getHorizontalBoxSpace(item);
-      metrics.naturalMenuWidth = Math.max(metrics.naturalMenuWidth, itemWidth + menuBoxSpace);
-    });
-    return metrics;
-  }
-
-  function closeCustomSelect() {
-    if (!openCustomSelect) {
-      return;
-    }
-    openCustomSelect.setAttribute('data-open', 'false');
-    const trigger = openCustomSelect.querySelector('._x_extension_select_trigger_2024_unique_');
-    if (trigger) {
-      trigger.setAttribute('aria-expanded', 'false');
-    }
-    openCustomSelect = null;
-  }
-
-  function setCustomSelectOpen(wrapper, nextOpen) {
-    if (!wrapper) {
-      return;
-    }
-    if (nextOpen) {
-      if (openCustomSelect && openCustomSelect !== wrapper) {
-        closeCustomSelect();
-      }
-      wrapper.setAttribute('data-open', 'true');
-      const trigger = wrapper.querySelector('._x_extension_select_trigger_2024_unique_');
-      if (trigger) {
-        trigger.setAttribute('aria-expanded', 'true');
-      }
-      const { select, menu } = getCustomSelectElements(wrapper);
-      if (select && menu) {
-        const selectedIndex = select.selectedIndex >= 0 ? select.selectedIndex : 0;
-        setCustomSelectActiveIndex(wrapper, selectedIndex);
-      }
-      requestAnimationFrame(() => updateCustomSelectMenuWidth(wrapper));
-      openCustomSelect = wrapper;
-    } else if (openCustomSelect === wrapper) {
-      closeCustomSelect();
-    }
-  }
-
-  function syncCustomSelectUI(select, wrapper) {
-    if (!select || !wrapper) {
-      return;
-    }
-    const { trigger, menu } = getCustomSelectElements(wrapper);
-    if (!trigger || !menu) {
-      return;
-    }
-    const selected = select.options[select.selectedIndex];
-    const label = selected ? (selected.label || selected.textContent || '') : '';
-    let labelEl = trigger.querySelector('._x_extension_select_label_2024_unique_');
-    if (!labelEl) {
-      labelEl = document.createElement('span');
-      labelEl.className = '_x_extension_select_label_2024_unique_';
-      trigger.insertBefore(labelEl, trigger.firstChild);
-    }
-    labelEl.textContent = label;
-    Array.from(menu.children).forEach((item) => {
-      const value = item.getAttribute('data-value');
-      const isSelected = value === select.value;
-      item.setAttribute('data-selected', isSelected ? 'true' : 'false');
-      item.setAttribute('aria-selected', isSelected ? 'true' : 'false');
-    });
-  }
-
-  function buildCustomSelectMenu(select, wrapper) {
-    if (!select || !wrapper) {
-      return;
-    }
-    const { menu } = getCustomSelectElements(wrapper);
-    if (!menu) {
-      return;
-    }
-    menu.innerHTML = '';
-    Array.from(select.options).forEach((option) => {
-      const item = document.createElement('div');
-      item.className = '_x_extension_select_option_2024_unique_';
-      item.setAttribute('role', 'option');
-      item.setAttribute('data-value', option.value);
-      item.textContent = option.label || option.textContent || '';
-      item.addEventListener('click', () => {
-        if (select.value !== option.value) {
-          select.value = option.value;
-          select.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-        syncCustomSelectUI(select, wrapper);
-        setCustomSelectOpen(wrapper, false);
+      tooltipController.bind(node, () => node.getAttribute('data-tooltip'), {
+        maxWidth: 'min(360px, calc(100vw - 24px))',
+        spacing: 8
       });
-      menu.appendChild(item);
     });
-    syncCustomSelectUI(select, wrapper);
-    updateCustomSelectMenuWidth(wrapper);
   }
 
   function refreshCustomSelects() {
-    customSelectWraps.forEach((wrapper) => {
-      const { select } = getCustomSelectElements(wrapper);
-      if (!select) {
-        return;
-      }
-      buildCustomSelectMenu(select, wrapper);
-    });
+    if (customSelectController) {
+      customSelectController.refresh(customSelectWraps);
+      return;
+    }
     syncFallbackShortcutWrapWidth();
   }
 
@@ -1353,47 +1141,12 @@
     }
   }
 
-  function updateCustomSelectMenuWidth(wrapper) {
-    const { menu, trigger } = getCustomSelectElements(wrapper);
-    if (!menu || !trigger) {
-      return;
-    }
-    const widthMode = getCustomSelectMenuWidthMode(wrapper);
-    if (widthMode === 'content') {
-      applyCustomSelectContentMenuWidth(
-        wrapper,
-        menu,
-        getCustomSelectMenuAlign(wrapper, { preferRight: true })
-      );
-      return;
-    }
-    const triggerRect = trigger.getBoundingClientRect();
-    const baseWidth = Math.round(triggerRect.width);
-    if (!Number.isFinite(baseWidth) || baseWidth <= 0) {
-      return;
-    }
-    applyCustomSelectTriggerMenuWidth(wrapper, menu, baseWidth, getCustomSelectMenuAlign(wrapper));
-
-    if (widthMode === 'trigger') {
-      return;
-    }
-
-    const contentMetrics = getCustomSelectContentMetrics(menu, trigger);
-    if (contentMetrics.naturalMenuWidth > baseWidth + 1) {
-      applyCustomSelectContentMenuWidth(
-        wrapper,
-        menu,
-        getCustomSelectMenuAlign(wrapper, { preferRight: true })
-      );
-    }
-  }
-
   function updateBuiltinResetTooltip() {
     if (!builtinResetButton) {
       return;
     }
     const text = getMessage('shortcuts_reset_builtin', '重置为初始列表');
-    builtinResetButton.title = text;
+    builtinResetButton.removeAttribute('title');
     builtinResetButton.setAttribute('aria-label', text);
     builtinResetButton.setAttribute('data-tooltip', text);
   }
@@ -1403,7 +1156,7 @@
       return;
     }
     const text = getMessage('shortcuts_clear_custom', '清空自定义');
-    customClearButton.title = text;
+    customClearButton.removeAttribute('title');
     customClearButton.setAttribute('aria-label', text);
     customClearButton.setAttribute('data-tooltip', text);
   }
@@ -1413,7 +1166,7 @@
       return;
     }
     const text = getMessage('blacklist_clear', '清空黑名单');
-    blacklistClearButton.title = text;
+    blacklistClearButton.removeAttribute('title');
     blacklistClearButton.setAttribute('aria-label', text);
     blacklistClearButton.setAttribute('data-tooltip', text);
   }
@@ -2655,6 +2408,7 @@
     FALLBACK_SHORTCUT_STORAGE_KEY,
     SITE_SEARCH_STORAGE_KEY,
     SITE_SEARCH_DISABLED_STORAGE_KEY,
+    SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY,
     SEARCH_BLACKLIST_STORAGE_KEY,
     DEFAULT_SEARCH_ENGINE_STORAGE_KEY
   ]);
@@ -2899,6 +2653,13 @@
           return;
         }
         storageArea.set({ [SEARCH_RESULT_PRIORITY_STORAGE_KEY]: nextPriority });
+      });
+    });
+  }
+  if (!searchResultSourceTypeGroup && searchResultSourceTypeInputs.length > 0) {
+    searchResultSourceTypeInputs.forEach((input) => {
+      input.addEventListener('change', () => {
+        persistSearchResultSourceTypes(collectCheckedSearchResultSourceTypes());
       });
     });
   }
@@ -3440,6 +3201,14 @@
       }
       refreshCustomSelects();
     });
+    storageArea.get([SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY], (result) => {
+      const stored = result[SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY];
+      const sourceTypes = normalizeSearchResultSourceTypes(stored);
+      setSearchResultSourceTypeState(sourceTypes);
+      if (!Array.isArray(stored) || JSON.stringify(stored) !== JSON.stringify(sourceTypes)) {
+        storageArea.set({ [SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY]: sourceTypes });
+      }
+    });
     storageArea.get([RECENT_MODE_STORAGE_KEY], (result) => {
       const stored = result[RECENT_MODE_STORAGE_KEY];
       const hasStored = stored === 'latest' || stored === 'most';
@@ -3548,76 +3317,7 @@
     });
   }
 
-  customSelectWraps.forEach((wrapper) => {
-    const { select, trigger } = getCustomSelectElements(wrapper);
-    if (!select || !trigger) {
-      return;
-    }
-    trigger.addEventListener('click', () => {
-      const isOpen = wrapper.getAttribute('data-open') === 'true';
-      setCustomSelectOpen(wrapper, !isOpen);
-    });
-    trigger.addEventListener('keydown', (event) => {
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        event.preventDefault();
-        setCustomSelectOpen(wrapper, true);
-        const delta = event.key === 'ArrowDown' ? 1 : -1;
-        const nextIndex = getCustomSelectActiveIndex(wrapper) + delta;
-        setCustomSelectActiveIndex(wrapper, nextIndex);
-      }
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        const isOpen = wrapper.getAttribute('data-open') === 'true';
-        if (!isOpen) {
-          setCustomSelectOpen(wrapper, true);
-          return;
-        }
-        const { menu } = getCustomSelectElements(wrapper);
-        const activeIndex = getCustomSelectActiveIndex(wrapper);
-        const item = menu && menu.children ? menu.children[activeIndex] : null;
-        if (item) {
-          item.click();
-        }
-      }
-    });
-    select.addEventListener('change', () => {
-      syncCustomSelectUI(select, wrapper);
-    });
-  });
-
-  document.addEventListener('click', (event) => {
-    if (!openCustomSelect) {
-      return;
-    }
-    if (openCustomSelect.contains(event.target)) {
-      return;
-    }
-    closeCustomSelect();
-  });
-
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') {
-      closeCustomSelect();
-    }
-    if (!openCustomSelect) {
-      return;
-    }
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault();
-      const delta = event.key === 'ArrowDown' ? 1 : -1;
-      const nextIndex = getCustomSelectActiveIndex(openCustomSelect) + delta;
-      setCustomSelectActiveIndex(openCustomSelect, nextIndex);
-    }
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      const { menu } = getCustomSelectElements(openCustomSelect);
-      const activeIndex = getCustomSelectActiveIndex(openCustomSelect);
-      const item = menu && menu.children ? menu.children[activeIndex] : null;
-      if (item) {
-        item.click();
-      }
-    }
-  });
+  refreshCustomSelects();
 
   document.addEventListener('click', (event) => {
     if (!activePopconfirm) {
@@ -3738,7 +3438,7 @@
         duplicateTag.type = 'button';
         duplicateTag.className = '_x_extension_shortcut_badge_2024_unique_ _x_extension_shortcut_badge_warn_2024_unique_';
         duplicateTag.setAttribute('data-template', normalizedTemplate);
-        duplicateTag.setAttribute('title', getMessage('shortcuts_duplicate_action', '定位内置项'));
+        duplicateTag.setAttribute('data-tooltip', getMessage('shortcuts_duplicate_action', '定位内置项'));
         duplicateTag.setAttribute('aria-label', getMessage('shortcuts_duplicate_action', '定位内置项'));
         duplicateTag.innerHTML = `${getRiSvg('ri-question-line', 'ri-size-12')}${getMessage('shortcuts_duplicate_tag', '与内置重复')}`;
         duplicateTag.addEventListener('click', (event) => {
@@ -4273,11 +3973,13 @@
       matchLabel.className = '_x_extension_shortcut_label_2024_unique_';
       matchLabel.textContent = getMessage('blacklist_match_label', '匹配方式');
       const matchModes = document.createElement('div');
-      matchModes.className = '_x_extension_blacklist_match_modes_2026_unique_';
+      matchModes.className = CHECKBOX_GROUP_CLASS_NAME;
+      matchModes.setAttribute('data-align', 'start');
+      matchModes.setAttribute('data-gap', 'wide');
 
       function createModeOption(mode, textKey, fallback, tooltipKey, tooltipFallback) {
         const wrap = document.createElement('label');
-        wrap.className = '_x_extension_blacklist_match_mode_2026_unique_';
+        wrap.className = CHECKBOX_CLASS_NAME;
         const input = document.createElement('input');
         input.type = 'checkbox';
         const text = document.createElement('span');
@@ -4757,6 +4459,7 @@
         changes[NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY] ||
         changes[RESTRICTED_ACTION_STORAGE_KEY] ||
         changes[SEARCH_RESULT_PRIORITY_STORAGE_KEY] ||
+        changes[SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY] ||
         changes[FALLBACK_SHORTCUT_STORAGE_KEY] ||
         changes[SITE_SEARCH_STORAGE_KEY] ||
         changes[SITE_SEARCH_DISABLED_STORAGE_KEY] ||
@@ -4796,6 +4499,9 @@
       }
       setSearchResultPriorityTabState(nextValue);
       refreshCustomSelects();
+    }
+    if (changes[SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY]) {
+      setSearchResultSourceTypeState(changes[SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY].newValue);
     }
     if (changes[RECENT_MODE_STORAGE_KEY] && recentModeSelect) {
       const nextValue = changes[RECENT_MODE_STORAGE_KEY].newValue;

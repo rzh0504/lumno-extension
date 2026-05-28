@@ -104,6 +104,9 @@
   "settings_search_result_priority_title": {
     "message": "搜尋結果首位優先級"
   },
+  "settings_search_result_sources_title": {
+    "message": "顯示結果類型"
+  },
   "search_result_priority_autocomplete": {
     "message": "補全優先"
   },
@@ -463,6 +466,24 @@
   },
   "newtab_ai_quick_jump_feature_hint_close": {
     "message": "關閉 AI 跳轉提示"
+  },
+  "newtab_bookmark_cascade_debug_enable": {
+    "message": "顯示書籤選單安全三角"
+  },
+  "newtab_bookmark_cascade_debug_disable": {
+    "message": "隱藏書籤選單安全三角"
+  },
+  "newtab_bookmark_cascade_debug_open_label": {
+    "message": "開啟"
+  },
+  "newtab_bookmark_cascade_debug_switch_label": {
+    "message": "切換"
+  },
+  "newtab_bookmark_cascade_debug_safe_label": {
+    "message": "保護"
+  },
+  "newtab_bookmark_cascade_debug_close_label": {
+    "message": "關閉"
   },
   "newtab_feedback_button_aria": {
     "message": "回饋"
@@ -886,6 +907,15 @@
   },
   "bookmarks_heading": {
     "message": "書籤"
+  },
+  "display_mode_title": {
+    "message": "顯示模式"
+  },
+  "bookmark_view_mode_folder": {
+    "message": "多層資料夾檢視"
+  },
+  "bookmark_view_mode_list": {
+    "message": "多層級列表檢視"
   },
   "bookmarks_empty_folder": {
     "message": "暫無內容"

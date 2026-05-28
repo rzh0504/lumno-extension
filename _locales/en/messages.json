@@ -104,6 +104,9 @@
   "settings_search_result_priority_title": {
     "message": "First Search Result Priority"
   },
+  "settings_search_result_sources_title": {
+    "message": "Visible Result Types"
+  },
   "search_result_priority_autocomplete": {
     "message": "Autocomplete First"
   },
@@ -463,6 +466,24 @@
   },
   "newtab_ai_quick_jump_feature_hint_close": {
     "message": "Dismiss AI quick jump tip"
+  },
+  "newtab_bookmark_cascade_debug_enable": {
+    "message": "Show bookmark menu safe triangle"
+  },
+  "newtab_bookmark_cascade_debug_disable": {
+    "message": "Hide bookmark menu safe triangle"
+  },
+  "newtab_bookmark_cascade_debug_open_label": {
+    "message": "Open"
+  },
+  "newtab_bookmark_cascade_debug_switch_label": {
+    "message": "Switch"
+  },
+  "newtab_bookmark_cascade_debug_safe_label": {
+    "message": "Safe"
+  },
+  "newtab_bookmark_cascade_debug_close_label": {
+    "message": "Close"
   },
   "newtab_feedback_button_aria": {
     "message": "Send feedback"
@@ -886,6 +907,15 @@
   },
   "bookmarks_heading": {
     "message": "Bookmarks"
+  },
+  "display_mode_title": {
+    "message": "Display mode"
+  },
+  "bookmark_view_mode_folder": {
+    "message": "Multi-layer folder view"
+  },
+  "bookmark_view_mode_list": {
+    "message": "Multi-level list view"
   },
   "bookmarks_empty_folder": {
     "message": "No content"

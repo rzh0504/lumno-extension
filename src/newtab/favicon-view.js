@@ -76,6 +76,9 @@
     const faviconSoftRevalidateDelayMs = Number.isFinite(config.faviconSoftRevalidateDelayMs)
       ? config.faviconSoftRevalidateDelayMs
       : 900;
+    const faviconCandidateLoadTimeoutMs = Number.isFinite(config.faviconCandidateLoadTimeoutMs)
+      ? Math.max(0, config.faviconCandidateLoadTimeoutMs)
+      : 2600;
     let themeFaviconRescueTimer = null;
 
     function createImage() {
@@ -231,6 +234,7 @@
       if (!img) {
         return;
       }
+      clearThemeAwareCandidateLoadTimer(img);
       const fallbackNode = findFallbackIconNode(img);
       if (fallbackNode) {
         setFallbackNodeVisible(fallbackNode, false);
@@ -270,6 +274,7 @@
       if (!img) {
         return;
       }
+      clearThemeAwareCandidateLoadTimer(img);
       const node = ensureFallbackIconNode(img);
       img.removeAttribute('data-favicon-placeholder');
       img.setAttribute('data-fallback-icon', 'true');
@@ -435,6 +440,53 @@
       };
     }
 
+    function clearThemeAwareCandidateLoadTimer(img) {
+      if (!img || img._xThemeFaviconLoadTimer === null || img._xThemeFaviconLoadTimer === undefined) {
+        return;
+      }
+      clearTimer(img._xThemeFaviconLoadTimer);
+      img._xThemeFaviconLoadTimer = null;
+    }
+
+    function isThemeAwareCandidateLoaded(img, nextSrc) {
+      if (!img || !nextSrc) {
+        return false;
+      }
+      const resolvedSrc = img.getAttribute('data-favicon-current-src') || '';
+      if (resolvedSrc === nextSrc) {
+        return true;
+      }
+      return Boolean(img.complete && img.naturalWidth > 0);
+    }
+
+    function scheduleThemeAwareCandidateLoadTimer(img, state, nextSrc) {
+      if (!img || !state || !nextSrc || faviconCandidateLoadTimeoutMs <= 0) {
+        return;
+      }
+      clearThemeAwareCandidateLoadTimer(img);
+      const expectedToken = img._xFaviconLoadToken || 0;
+      const expectedSrc = String(nextSrc);
+      img._xThemeFaviconLoadTimer = setTimer(() => {
+        img._xThemeFaviconLoadTimer = null;
+        if (!img || !state.isSessionCurrent()) {
+          return;
+        }
+        if ((img._xFaviconLoadToken || 0) !== expectedToken) {
+          return;
+        }
+        const currentRenderedSrc = String(img.getAttribute('src') || img.src || '');
+        if (currentRenderedSrc && currentRenderedSrc !== expectedSrc) {
+          return;
+        }
+        if (isThemeAwareCandidateLoaded(img, expectedSrc)) {
+          return;
+        }
+        if (typeof img._xThemeFaviconErrorHandler === 'function') {
+          img._xThemeFaviconErrorHandler();
+        }
+      }, faviconCandidateLoadTimeoutMs);
+    }
+
     function syncThemeAwareFaviconAttributes(img, state) {
       img.setAttribute('data-x-nt-theme-favicon', '1');
       img.setAttribute('data-x-nt-favicon-page-url', state.url);
@@ -489,24 +541,25 @@
       const shouldPreferPersistedSiteFavicon = Boolean(persistedSiteFavicon) &&
         !state.shouldPreferDarkTokenUpgrades &&
         !shouldSkipThemeUpgradeCandidate(persistedSiteFavicon, state.preferredTheme, '');
+      const proxyFallbackCandidates = [
+        persistedProxyFavicon,
+        state.googleFavicon,
+        state.faviconIsFavicon
+      ];
       const primaryCandidates = state.shouldPreferDarkTokenUpgrades
         ? [
           ...knownThemedCandidates,
           ...genericRootCandidates,
-          persistedSiteFavicon,
-          state.googleFavicon
+          persistedSiteFavicon
         ]
         : (shouldPreferPersistedSiteFavicon
           ? [
             persistedSiteFavicon,
             ...knownThemedCandidates,
-            state.googleFavicon,
             ...genericRootCandidates
           ]
           : [
             ...knownThemedCandidates,
-            state.googleFavicon,
-            persistedProxyFavicon,
             persistedSiteFavicon,
             ...genericRootCandidates
           ]);
@@ -514,8 +567,7 @@
       return {
         localCandidates: dedupeFaviconCandidateUrls([
           ...primaryCandidates,
-          persistedProxyFavicon,
-          state.faviconIsFavicon
+          ...proxyFallbackCandidates
         ])
       };
     }
@@ -528,11 +580,13 @@
         return false;
       }
       tried.add(nextSrc);
+      clearThemeAwareCandidateLoadTimer(img);
 
+      const isProxyCandidate = config.isFaviconProxyUrl(nextSrc);
       const shouldPersist = !(
         (state.persistedFavicon && nextSrc === state.persistedFavicon) ||
         isChromeMonogramFaviconUrl(nextSrc) ||
-        config.isFaviconProxyUrl(nextSrc)
+        isProxyCandidate
       );
       const applied = setFaviconSrcWithAnimation(img, nextSrc, { persist: shouldPersist });
       const reused = !applied && canReuseCurrentFavicon(img, nextSrc);
@@ -541,6 +595,8 @@
       }
       if (reused) {
         showResolvedFavicon(img);
+      } else if (applied) {
+        scheduleThemeAwareCandidateLoadTimer(img, state, nextSrc);
       }
 
       const shouldKeepTokenizedSource = state.preferredTheme === 'dark' &&
@@ -549,6 +605,7 @@
       if (
         !nextSrc.startsWith('data:') &&
         !isChromeMonogramFaviconUrl(nextSrc) &&
+        !isProxyCandidate &&
         !shouldKeepTokenizedSource
       ) {
         attachFaviconData(img, nextSrc, state.hostKey);
@@ -608,6 +665,9 @@
           return false;
         }
         if (isChromeMonogramFaviconUrl(candidate)) {
+          return false;
+        }
+        if (config.isFaviconProxyUrl(candidate)) {
           return false;
         }
         if (state.shouldPreferDarkTokenUpgrades && !hasThemeTokenInUrl(candidate, 'dark')) {
@@ -693,6 +753,7 @@
         img.removeEventListener('error', img._xThemeFaviconErrorHandler);
         img._xThemeFaviconErrorHandler = null;
       }
+      clearThemeAwareCandidateLoadTimer(img);
 
       const tryNextAvailableCandidate = () => {
         const candidatePool = dedupeFaviconCandidateUrls([
@@ -708,6 +769,7 @@
       };
 
       const finalizeFailure = (iconUrl) => {
+        clearThemeAwareCandidateLoadTimer(img);
         finalizeThemeAwareFaviconFailure(
           img,
           state,

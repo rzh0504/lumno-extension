@@ -104,6 +104,9 @@
   "settings_search_result_priority_title": {
     "message": "搜索结果首位优先级"
   },
+  "settings_search_result_sources_title": {
+    "message": "显示结果类型"
+  },
   "search_result_priority_autocomplete": {
     "message": "补全优先"
   },
@@ -463,6 +466,24 @@
   },
   "newtab_ai_quick_jump_feature_hint_close": {
     "message": "关闭 AI 跳转提示"
+  },
+  "newtab_bookmark_cascade_debug_enable": {
+    "message": "显示书签菜单安全三角"
+  },
+  "newtab_bookmark_cascade_debug_disable": {
+    "message": "隐藏书签菜单安全三角"
+  },
+  "newtab_bookmark_cascade_debug_open_label": {
+    "message": "打开"
+  },
+  "newtab_bookmark_cascade_debug_switch_label": {
+    "message": "切换"
+  },
+  "newtab_bookmark_cascade_debug_safe_label": {
+    "message": "保护"
+  },
+  "newtab_bookmark_cascade_debug_close_label": {
+    "message": "关闭"
   },
   "newtab_feedback_button_aria": {
     "message": "反馈"
@@ -886,6 +907,15 @@
   },
   "bookmarks_heading": {
     "message": "书签"
+  },
+  "display_mode_title": {
+    "message": "显示模式"
+  },
+  "bookmark_view_mode_folder": {
+    "message": "多层文件夹视图"
+  },
+  "bookmark_view_mode_list": {
+    "message": "多级列表视图"
   },
   "bookmarks_empty_folder": {
     "message": "暂无内容"

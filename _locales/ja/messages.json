@@ -18,7 +18,7 @@
     "message": "コマンドバー"
   },
   "newtab_theme_scope_label": {
-    "message": "ライト/ダークの適用範囲"
+    "message": "テーマの適用先"
   },
   "newtab_theme_scope_global": {
     "message": "全体"
@@ -27,16 +27,16 @@
     "message": "新しいタブ"
   },
   "newtab_theme_scope_select_label": {
-    "message": "テーマ変更を{scope}に適用"
+    "message": "{scope}にテーマを適用"
   },
   "newtab_theme_scope_help_label": {
-    "message": "テーマ適用範囲の説明"
+    "message": "テーマ適用先の説明"
   },
   "newtab_theme_scope_help": {
-    "message": "「全体」は既定のテーマを設定します。「新しいタブ」は新しいタブだけに適用され、「全体に合わせる」で全体設定を継承できます。"
+    "message": "「全体」は既定のテーマです。「新しいタブ」は新しいタブだけに適用され、「全体に合わせる」で全体設定を引き継ぎます。"
   },
   "newtab_theme_follow_global": {
-    "message": "「全体」に合わせる"
+    "message": "全体に合わせる"
   },
   "newtab_search_width_title": {
     "message": "検索ボックスの幅"
@@ -104,6 +104,9 @@
   "settings_search_result_priority_title": {
     "message": "検索結果の先頭優先度"
   },
+  "settings_search_result_sources_title": {
+    "message": "表示する結果タイプ"
+  },
   "search_result_priority_autocomplete": {
     "message": "補完を優先"
   },
@@ -129,7 +132,7 @@
     "message": "ページ内の一部を切り出して浮かせて表示。参照や比較に使えます"
   },
   "settings_auto_pip_title": {
-    "message": "動画の自動ピクチャーインピクチャー"
+    "message": "動画を自動で小窓表示"
   },
   "settings_auto_pip_desc": {
     "message": "動画再生中に別タブへ移動すると、再生中の動画を小窓で表示します"
@@ -162,16 +165,16 @@
     "message": "この範囲は小さな要素です。安定させるにはホイールで親要素へ切り替えてください。"
   },
   "document_pip_picker_guidance_interactive": {
-    "message": "この範囲はボタン群のようです。PiP内でクリックできない場合は、背景のある大きめのコンテナへ切り替えてください。"
+    "message": "この範囲はボタン群のようです。小窓内でクリックできない場合は、背景のある大きめのコンテナへ切り替えてください。"
   },
   "document_pip_picker_guidance_toolbar": {
-    "message": "この範囲はナビゲーション/ツールバーのようです。PiPでは複雑なメニューがうまく動かない場合があります。必要に応じて外側のコンテナへ切り替えてください。"
+    "message": "この範囲はナビゲーション/ツールバーのようです。小窓では複雑なメニューがうまく動かない場合があります。必要に応じて外側のコンテナへ切り替えてください。"
   },
   "document_pip_picker_unsupported": {
-    "message": "このページではDocument PiPを利用できません"
+    "message": "このページではページクリップを利用できません"
   },
   "document_pip_picker_conflict_video_pip": {
-    "message": "動画のピクチャーインピクチャーが開いています。先に閉じてからページクリップを使ってください"
+    "message": "動画の小窓表示が開いています。先に閉じてからページクリップを使ってください"
   },
   "document_pip_picker_invalid": {
     "message": "この範囲は小窓表示できません。より大きな内容範囲を選んでください"
@@ -354,13 +357,13 @@
     "message": "オン"
   },
   "settings_theme_title": {
-    "message": "ライト/ダークモード"
+    "message": "テーマ"
   },
   "settings_theme_desc": {
-    "message": "システムに合わせるか、テーマを手動で選択"
+    "message": "自動または手動でテーマを選択"
   },
   "settings_theme_system": {
-    "message": "システム/サイトに合わせる"
+    "message": "自動"
   },
   "settings_theme_light": {
     "message": "ライト"
@@ -463,6 +466,24 @@
   },
   "newtab_ai_quick_jump_feature_hint_close": {
     "message": "AIジャンプヒントを閉じる"
+  },
+  "newtab_bookmark_cascade_debug_enable": {
+    "message": "ブックマークメニューの安全三角形を表示"
+  },
+  "newtab_bookmark_cascade_debug_disable": {
+    "message": "ブックマークメニューの安全三角形を非表示"
+  },
+  "newtab_bookmark_cascade_debug_open_label": {
+    "message": "開く"
+  },
+  "newtab_bookmark_cascade_debug_switch_label": {
+    "message": "切替"
+  },
+  "newtab_bookmark_cascade_debug_safe_label": {
+    "message": "保護"
+  },
+  "newtab_bookmark_cascade_debug_close_label": {
+    "message": "閉じる"
   },
   "newtab_feedback_button_aria": {
     "message": "フィードバック"
@@ -887,6 +908,15 @@
   "bookmarks_heading": {
     "message": "ブックマーク"
   },
+  "display_mode_title": {
+    "message": "表示モード"
+  },
+  "bookmark_view_mode_folder": {
+    "message": "多層フォルダ表示"
+  },
+  "bookmark_view_mode_list": {
+    "message": "多階層リスト表示"
+  },
   "bookmarks_empty_folder": {
     "message": "内容はありません"
   },
@@ -948,7 +978,7 @@
     "message": "ライト"
   },
   "theme_label_system": {
-    "message": "システムに合わせる"
+    "message": "自動"
   },
   "command_newtab": {
     "message": "新しいタブを開く"
@@ -966,7 +996,7 @@
     "message": "現在のページURLをコピー"
   },
   "mode_switch_title": {
-    "message": "{name}：{mode}モードに切替"
+    "message": "{name}：テーマを{mode}に切り替え"
   },
   "switch_to_tab": {
     "message": "切替"
@@ -1143,19 +1173,19 @@
     "message": "設定ファイルが無効です"
   },
   "document_pip_picker_unsupported_policy": {
-    "message": "このサイトはサイトポリシーによりピクチャーインピクチャーを無効にしています。"
+    "message": "このサイトでは、小窓表示が無効になっています。"
   },
   "document_pip_picker_unsupported_iframe": {
-    "message": "Document Picture-in-Pictureはトップレベルページでのみ使用できます。"
+    "message": "ページクリップはトップレベルページでのみ使用できます。"
   },
   "document_pip_picker_unsupported_insecure": {
-    "message": "Document Picture-in-PictureはHTTPSページでのみ使用できます。"
+    "message": "ページクリップはHTTPSページでのみ使用できます。"
   },
   "document_pip_picker_open_failed_not_allowed": {
-    "message": "サイトまたはブラウザによりDocument Picture-in-Pictureの起動がブロックされました。"
+    "message": "サイトまたはブラウザにより、ページクリップの起動がブロックされました。"
   },
   "document_pip_picker_open_failed_not_supported": {
-    "message": "現在選択した内容は、このページではDocument Picture-in-Pictureで開けません。"
+    "message": "現在選択した内容は、このページでは小窓で開けません。"
   },
   "document_pip_picker_open_failed_invalid_state": {
     "message": "すでに小窓が開いているか、ページ状態が変わりました。再試行してください。"

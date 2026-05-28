@@ -92,6 +92,7 @@
     appendStylesheet(doc, styleRoot, '_x_extension_open_sans_shadow_css_2026_unique_', settings.openSansCssUrl);
     appendStylesheet(doc, styleRoot, '_x_extension_remixicon_shadow_css_2026_unique_', settings.remixIconCssUrl);
     appendStylesheet(doc, styleRoot, '_x_extension_input_component_style_2026_unique_', settings.searchInputCssUrl);
+    appendStylesheet(doc, styleRoot, '_x_extension_tooltip_component_style_2026_unique_', settings.tooltipCssUrl);
     appendStylesheet(doc, styleRoot, '_x_extension_overlay_suggestions_style_2026_unique_', settings.overlaySuggestionsCssUrl);
 
     if (findById(styleRoot, '_x_extension_scrollbar_style_2024_unique_') ||
@@ -232,6 +233,7 @@
       openSansCssUrl: settings.openSansCssUrl,
       remixIconCssUrl: settings.remixIconCssUrl,
       searchInputCssUrl: settings.searchInputCssUrl,
+      tooltipCssUrl: settings.tooltipCssUrl,
       overlaySuggestionsCssUrl: settings.overlaySuggestionsCssUrl
     });
     const panel = createOverlayElement(doc, settings);

@@ -333,6 +333,36 @@
     return list;
   }
 
+  function getThemeFaviconCandidateUrls(urls, options) {
+    const includeProxy = !options || options.includeProxy !== false;
+    const includeChrome = Boolean(options && options.includeChrome);
+    const concrete = [];
+    const proxy = [];
+    const seen = new Set();
+    (Array.isArray(urls) ? urls : []).forEach((item) => {
+      const value = String(item || '').trim();
+      if (!value || seen.has(value) || isBlockedLocalFaviconUrl(value)) {
+        return;
+      }
+      if (isChromeMonogramFaviconUrl(value)) {
+        if (includeChrome) {
+          seen.add(value);
+          concrete.push(value);
+        }
+        return;
+      }
+      seen.add(value);
+      if (isFaviconProxyUrl(value)) {
+        if (includeProxy) {
+          proxy.push(value);
+        }
+        return;
+      }
+      concrete.push(value);
+    });
+    return concrete.concat(proxy);
+  }
+
   function parseCssThemeColor(color) {
     const value = String(color || '').trim().toLowerCase();
     if (!value || value === 'transparent') {
@@ -654,6 +684,7 @@
     getRootFaviconCandidateScores,
     getRootFaviconCandidateUrls,
     getThemeHintScore,
+    getThemeFaviconCandidateUrls,
     getThemeColorConfidence,
     getThemeMediaScore,
     hasThemeTokenInUrl,

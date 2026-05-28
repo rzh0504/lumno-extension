@@ -100,10 +100,14 @@
     const shouldDelayHoverFromRecent = getFunction(options, 'shouldDelayHoverFromRecent', function() {
       return false;
     });
+    const bindCursorTooltip = getFunction(options, 'bindCursorTooltip');
+    const hideCursorTooltip = getFunction(options, 'hideCursorTooltip');
     const openFolder = getFunction(options, 'openFolder');
+    const openFolderMenu = getFunction(options, 'openFolderMenu');
     const navigateToUrl = getFunction(options, 'navigateToUrl');
 
     function clear() {
+      hideCursorTooltip();
       if (grid) {
         grid.innerHTML = '';
       }
@@ -132,10 +136,23 @@
       }
     }
 
-    function buildCard(item, index) {
+    function isBookmarkTitleTruncated(titleElement) {
+      if (!titleElement) {
+        return false;
+      }
+      const scrollWidth = Number(titleElement.scrollWidth);
+      const clientWidth = Number(titleElement.clientWidth);
+      return Number.isFinite(scrollWidth) &&
+        Number.isFinite(clientWidth) &&
+        clientWidth > 0 &&
+        scrollWidth > clientWidth + 1;
+    }
+
+    function buildCard(item, index, state) {
       if (!item || (!item.url && item.type !== 'folder') || !documentObj) {
         return null;
       }
+      const menuMode = Boolean(state && state.menuMode);
       const isFolder = item.type === 'folder';
       const themeUrl = item.themeUrl || item.url || '';
       const host = item.host || getHostFromUrl(themeUrl) || '';
@@ -146,9 +163,14 @@
       card.className = 'x-nt-bookmark-card';
       if (isFolder) {
         card.classList.add('x-nt-bookmark-card--folder');
+        if (menuMode) {
+          card.setAttribute('aria-haspopup', 'menu');
+          card.setAttribute('aria-expanded', 'false');
+        }
       }
       card.title = titleText;
       card._xTitleText = titleText;
+      card.setAttribute('data-cursor-tooltip', titleText);
       card.setAttribute('aria-label', formatMessage('open_prefix', '打开 {title}', {
         title: titleText
       }));
@@ -280,8 +302,17 @@
         clearHoverIntentTimer();
         setHoverVisualActive(true);
       });
+      bindCursorTooltip(card, () => card._xTitleText || titleText, {
+        maxWidth: 460,
+        shouldShow: () => isBookmarkTitleTruncated(title)
+      });
       card.addEventListener('click', () => {
+        hideCursorTooltip();
         if (isFolder) {
+          if (menuMode) {
+            openFolderMenu(item, card);
+            return;
+          }
           openFolder(item.id);
           return;
         }
@@ -291,6 +322,10 @@
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
           if (isFolder) {
+            if (menuMode) {
+              openFolderMenu(item, card);
+              return;
+            }
             openFolder(item.id);
             return;
           }
@@ -305,8 +340,10 @@
       const previousSignature = state && typeof state.signature === 'string' ? state.signature : '';
       const folderId = state && state.folderId ? String(state.folderId) : '';
       const rootFolderId = state && state.rootFolderId ? String(state.rootFolderId) : '1';
+      const viewMode = state && state.viewMode === 'list' ? 'list' : 'folder';
+      const menuMode = Boolean(state && state.menuMode);
       const isAtRoot = String(folderId || '') === String(rootFolderId || '1');
-      const nextSignature = `${folderId}##${getBookmarksSignature(normalizedItems)}`;
+      const nextSignature = `${folderId}##${viewMode}##${getBookmarksSignature(normalizedItems)}`;
       if (nextSignature === previousSignature) {
         if (normalizedItems.length === 0 && !isAtRoot) {
           clear();
@@ -332,10 +369,10 @@
         };
       }
       normalizedItems.forEach((item, index) => {
-        const cacheKey = getBookmarkCacheKey(item);
+        const cacheKey = `${viewMode}::${getBookmarkCacheKey(item)}`;
         let card = cacheKey && cardElementCache ? cardElementCache.get(cacheKey) : null;
         if (!card) {
-          card = buildCard(item, index);
+          card = buildCard(item, index, { viewMode, menuMode });
           if (card && cacheKey && cardElementCache) {
             cardElementCache.set(cacheKey, card);
           }

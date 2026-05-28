@@ -1656,6 +1656,50 @@
     return suggestions.slice(0, limit);
   }
 
+  function normalizeSearchSuggestionSourceFilterType(value) {
+    if (value === 'topSite' || value === 'topSites' || value === 'frequent' || value === 'common') {
+      return 'topSite';
+    }
+    if (value === 'bookmark' || value === 'bookmarks') {
+      return 'bookmark';
+    }
+    if (value === 'history') {
+      return 'history';
+    }
+    return '';
+  }
+
+  function getSearchSuggestionFilterType(suggestion) {
+    if (!suggestion) {
+      return '';
+    }
+    if (suggestion.type === 'topSite' || suggestion.isTopSite) {
+      return 'topSite';
+    }
+    if (suggestion.type === 'bookmark') {
+      return 'bookmark';
+    }
+    if (suggestion.type === 'history') {
+      return 'history';
+    }
+    return '';
+  }
+
+  function filterSearchSuggestionsBySourceTypes(list, sourceTypes) {
+    const suggestions = Array.isArray(list) ? list : [];
+    const selectedTypes = Array.isArray(sourceTypes)
+      ? sourceTypes.map(normalizeSearchSuggestionSourceFilterType).filter(Boolean)
+      : [];
+    if (selectedTypes.length <= 0) {
+      return suggestions.slice();
+    }
+    const selected = new Set(selectedTypes);
+    return suggestions.filter((suggestion) => {
+      const filterType = getSearchSuggestionFilterType(suggestion);
+      return !filterType || selected.has(filterType);
+    });
+  }
+
   function getTitlePinyinMatchResult(item, context, options) {
     const settings = options && typeof options === 'object' ? options : {};
     if (!context || !context.useTitlePinyinMatch || !item || !item.title ||
@@ -2318,6 +2362,7 @@
     findSiteSearchProvider,
     findSiteSearchProviderByInput,
     findSiteSearchProviderByKey,
+    filterSearchSuggestionsBySourceTypes,
     mergeCustomProviders,
     mergeItemsByUrl,
     matchesSearchQueryText,

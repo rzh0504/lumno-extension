@@ -1,0 +1,15 @@
+._x_extension_tooltip_2026_unique_[data-tooltip-kind="cursor"] {
+  transform: translate3d(0, 4px, 0);
+}
+
+._x_extension_tooltip_2026_unique_[data-tooltip-kind="cursor"][data-visible="true"] {
+  transform: translate3d(0, 0, 0);
+}
+
+._x_extension_cursor_tooltip_host_2026_unique_[data-cursor-tooltip]::after {
+  content: none;
+}
+
+._x_extension_cursor_tooltip_host_2026_unique_[data-cursor-tooltip] {
+  cursor: pointer;
+}

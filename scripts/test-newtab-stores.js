@@ -1,6 +1,10 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const recentStore = require('../src/newtab/recent-sites-store.js');
 const bookmarkStore = require('../src/newtab/bookmarks-store.js');
+
+const repoRoot = path.resolve(__dirname, '..');
 
 function createMemoryStorage(initialData) {
   const data = { ...(initialData || {}) };
@@ -133,9 +137,47 @@ function testBookmarkStore() {
   );
 }
 
+function testBookmarkCacheHydrationGuard() {
+  assert.strictEqual(
+    bookmarkStore.shouldApplyBookmarkCacheHydration(
+      { loadToken: 2 },
+      { loadToken: 2, loadedOnce: false, dataDirty: true }
+    ),
+    true
+  );
+  assert.strictEqual(
+    bookmarkStore.shouldApplyBookmarkCacheHydration(
+      { loadToken: 2 },
+      { loadToken: 3, loadedOnce: false, dataDirty: true }
+    ),
+    false
+  );
+  assert.strictEqual(
+    bookmarkStore.shouldApplyBookmarkCacheHydration(
+      { loadToken: 2 },
+      { loadToken: 2, loadedOnce: true, dataDirty: false }
+    ),
+    false
+  );
+}
+
+function testNewtabUsesBookmarkCacheHydrationGuard() {
+  const newtabJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/newtab.js'), 'utf8');
+  assert.ok(
+    newtabJs.includes('shouldApplyBookmarkCacheHydration'),
+    'newtab should guard bookmark cache hydration against live loads'
+  );
+  assert.ok(
+    newtabJs.includes('bookmarkCacheHydrationLoadToken'),
+    'newtab should compare bookmark cache hydration against the load token captured at scheduling time'
+  );
+}
+
 testRecentStore()
   .then(() => {
     testBookmarkStore();
+    testBookmarkCacheHydrationGuard();
+    testNewtabUsesBookmarkCacheHydrationGuard();
     console.log('newtab store tests passed');
   })
   .catch((error) => {

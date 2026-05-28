@@ -467,6 +467,7 @@ const DOCUMENT_PIP_ENABLED_STORAGE_KEY = '_x_extension_document_pip_enabled_2026
 const PINNED_TAB_RECOVERY_ENABLED_STORAGE_KEY = '_x_extension_pinned_tab_recovery_enabled_2026_unique_';
 const FALLBACK_SHORTCUT_STORAGE_KEY = '_x_extension_fallback_hotkey_2024_unique_';
 const SEARCH_RESULT_PRIORITY_STORAGE_KEY = '_x_extension_search_result_priority_2026_unique_';
+const SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY = '_x_extension_search_result_source_types_2026_unique_';
 const SEARCH_SELECTION_STATS_STORAGE_KEY = '_x_extension_search_selection_stats_2026_unique_';
 const FAVICON_VISIT_DIRTY_STORAGE_KEY = '_x_extension_favicon_visit_dirty_2026_unique_';
 const FAVICON_VISIT_DIRTY_TTL_MS = 1000 * 60 * 60 * 24;
@@ -1356,6 +1357,7 @@ function openOverlayOnTab(activeTab, tabs, source) {
     'src/shared/suggestion-navigation.js',
     'src/shared/search-input-ui.js',
     'src/shared/search-input-mode.js',
+    'src/shared/tooltip.js',
     'src/overlay/runtime.js',
     'src/shared/favicon-utils.js',
     'src/shared/favicon-cache.js',
@@ -2586,6 +2588,8 @@ let siteSearchCache = null;
 let siteSearchPromise = null;
 let searchBlacklistCache = null;
 let searchBlacklistPromise = null;
+let searchResultSourceTypesCache = null;
+let searchResultSourceTypesPromise = null;
 let searchSelectionStatsCache = null;
 let searchSelectionStatsPromise = null;
 const SEARCH_ENGINE_SUGGEST_TIMEOUT_MS = 180;
@@ -2647,6 +2651,7 @@ migrateStorageIfNeeded([
   RESTRICTED_ACTION_STORAGE_KEY,
   FALLBACK_SHORTCUT_STORAGE_KEY,
   SEARCH_RESULT_PRIORITY_STORAGE_KEY,
+  SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY,
   SITE_SEARCH_STORAGE_KEY,
   SITE_SEARCH_DISABLED_STORAGE_KEY,
   SEARCH_BLACKLIST_STORAGE_KEY
@@ -3969,6 +3974,66 @@ function normalizeSearchBlacklistItems(items) {
   return [];
 }
 
+function normalizeSearchResultSourceTypes(value) {
+  const settings = globalThis.LumnoSettings || {};
+  if (typeof settings.normalizeSearchResultSourceTypes === 'function') {
+    return settings.normalizeSearchResultSourceTypes(value);
+  }
+  const rawItems = Array.isArray(value) ? value : [];
+  const selected = [];
+  rawItems.forEach((item) => {
+    const raw = String(item || '').trim();
+    const type = raw === 'topSite' || raw === 'bookmark' || raw === 'history' ? raw : '';
+    if (type && !selected.includes(type)) {
+      selected.push(type);
+    }
+  });
+  return selected.length > 0 ? selected : ['topSite', 'bookmark', 'history'];
+}
+
+function areStringArraysEqual(a, b) {
+  const left = Array.isArray(a) ? a : [];
+  const right = Array.isArray(b) ? b : [];
+  if (left.length !== right.length) {
+    return false;
+  }
+  for (let i = 0; i < left.length; i += 1) {
+    if (String(left[i]) !== String(right[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function loadSearchResultSourceTypes() {
+  if (searchResultSourceTypesCache) {
+    return Promise.resolve(searchResultSourceTypesCache);
+  }
+  if (searchResultSourceTypesPromise) {
+    return searchResultSourceTypesPromise;
+  }
+  searchResultSourceTypesPromise = new Promise((resolve) => {
+    if (!storageArea) {
+      const defaults = normalizeSearchResultSourceTypes(null);
+      searchResultSourceTypesCache = defaults;
+      resolve(defaults);
+      return;
+    }
+    storageArea.get([SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY], (result) => {
+      const raw = result && result[SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY];
+      const normalized = normalizeSearchResultSourceTypes(raw);
+      searchResultSourceTypesCache = normalized;
+      if (!areStringArraysEqual(raw, normalized)) {
+        storageArea.set({ [SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY]: normalized });
+      }
+      resolve(normalized);
+    });
+  }).finally(() => {
+    searchResultSourceTypesPromise = null;
+  });
+  return searchResultSourceTypesPromise;
+}
+
 function loadSearchBlacklistItems() {
   if (searchBlacklistCache) {
     return Promise.resolve(searchBlacklistCache);
@@ -4303,6 +4368,10 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (changes[SEARCH_BLACKLIST_STORAGE_KEY]) {
     searchBlacklistCache = null;
     searchBlacklistPromise = null;
+  }
+  if (changes[SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY]) {
+    searchResultSourceTypesCache = null;
+    searchResultSourceTypesPromise = null;
   }
 });
 
@@ -4702,6 +4771,11 @@ async function getSearchSuggestions(query) {
     isLocalNetworkHost: shouldBlockFaviconForHost,
     isOwnExtensionUrl
   };
+  const sourceTypes = await loadSearchResultSourceTypes();
+  const sourceTypeSet = new Set(sourceTypes);
+  const allowTopSites = sourceTypeSet.has('topSite');
+  const allowBookmarks = sourceTypeSet.has('bookmark');
+  const allowHistory = sourceTypeSet.has('history');
 
   try {
     const [
@@ -4721,20 +4795,24 @@ async function getSearchSuggestions(query) {
         SEARCH_ENGINE_SUGGEST_TIMEOUT_MS,
         []
       ),
-      callChromeApiWithTimeout((done) => {
-        chrome.history.search({
-          text: context.lookupQuery,
-          maxResults: lookupMaxResults,
-          startTime: lookupStartTime,
-          endTime: lookupEndTime
-        }, done);
-      }, [], LOCAL_SUGGEST_SOURCE_TIMEOUT_MS),
-      getTopSitesCached(),
-      callChromeApiWithTimeout((done) => {
-        chrome.bookmarks.search({ query: context.lookupQuery }, done);
-      }, [], LOCAL_SUGGEST_SOURCE_TIMEOUT_MS),
-      getFallbackHistoryItemsCached(),
-      getAllBookmarksCached(),
+      allowHistory
+        ? callChromeApiWithTimeout((done) => {
+          chrome.history.search({
+            text: context.lookupQuery,
+            maxResults: lookupMaxResults,
+            startTime: lookupStartTime,
+            endTime: lookupEndTime
+          }, done);
+        }, [], LOCAL_SUGGEST_SOURCE_TIMEOUT_MS)
+        : Promise.resolve([]),
+      allowTopSites ? getTopSitesCached() : Promise.resolve([]),
+      allowBookmarks
+        ? callChromeApiWithTimeout((done) => {
+          chrome.bookmarks.search({ query: context.lookupQuery }, done);
+        }, [], LOCAL_SUGGEST_SOURCE_TIMEOUT_MS)
+        : Promise.resolve([]),
+      allowHistory ? getFallbackHistoryItemsCached() : Promise.resolve([]),
+      allowBookmarks ? getAllBookmarksCached() : Promise.resolve([]),
       loadSearchBlacklistItems(),
       loadSearchSelectionStats()
     ]);
@@ -5021,6 +5099,9 @@ async function getSearchSuggestions(query) {
     }
 
     let finalSuggestions = filterBlacklistedSuggestions(uniqueSuggestions, searchBlacklistItems, context.lookupQuery);
+    if (typeof searchUtils.filterSearchSuggestionsBySourceTypes === 'function') {
+      finalSuggestions = searchUtils.filterSearchSuggestionsBySourceTypes(finalSuggestions, sourceTypes);
+    }
     if (typeof searchUtils.applySearchSuggestionHostDiversity === 'function') {
       finalSuggestions = searchUtils.applySearchSuggestionHostDiversity(finalSuggestions);
     } else {

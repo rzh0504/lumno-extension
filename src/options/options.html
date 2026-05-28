@@ -6,6 +6,10 @@
     <title data-i18n="options_page_title">Lumno 设置</title>
     <link rel="stylesheet" href="../../assets/fonts/open-sans/open-sans.css" />
     <link rel="stylesheet" href="../../assets/remixicon/fonts/remixicon.css" />
+    <link rel="stylesheet" href="../shared/tooltip.css" />
+    <link rel="stylesheet" href="../shared/menu-surface.css" />
+    <link rel="stylesheet" href="../shared/custom-select.css" />
+    <link rel="stylesheet" href="../shared/checkbox.css" />
     <!-- Thanks to the Remix Icon project; this extension uses its icon set: https://remixicon.com/ -->
     <style>
       html {
@@ -457,88 +461,6 @@
       ._x_extension_setting_desc_compact_2026_unique_ {
         font-size: 13px;
         margin: -2px 0 0;
-      }
-      ._x_extension_blacklist_match_modes_2026_unique_ {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px 24px;
-        align-items: center;
-      }
-      ._x_extension_blacklist_match_mode_2026_unique_ {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        color: var(--panel-text);
-        font-size: 13px;
-      }
-      ._x_extension_blacklist_match_mode_2026_unique_ input[type="checkbox"] {
-        appearance: none;
-        -webkit-appearance: none;
-        margin: 0;
-        width: 17px;
-        height: 17px;
-        border: 1.5px solid rgba(17, 17, 17, 0.4);
-        border-radius: 5px;
-        background: #ffffff;
-        display: inline-grid;
-        place-items: center;
-        cursor: pointer;
-        transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
-      }
-      ._x_extension_blacklist_match_mode_2026_unique_ input[type="checkbox"]::after {
-        content: "";
-        width: 8px;
-        height: 4px;
-        border-left: 1.75px solid #ffffff;
-        border-bottom: 1.75px solid #ffffff;
-        transform: rotate(-45deg) scale(0);
-        transform-origin: center;
-        transition: transform 120ms ease;
-        position: relative;
-        top: -1.5px;
-      }
-      ._x_extension_blacklist_match_mode_2026_unique_ input[type="checkbox"]:checked {
-        background: #111111;
-        border-color: #111111;
-      }
-      ._x_extension_blacklist_match_mode_2026_unique_ input[type="checkbox"]:checked::after {
-        transform: rotate(-45deg) scale(1);
-      }
-      ._x_extension_blacklist_match_mode_2026_unique_ input[type="checkbox"]:hover,
-      ._x_extension_blacklist_match_mode_2026_unique_ input[type="checkbox"]:focus-visible {
-        cursor: pointer;
-        border-color: #111111;
-        box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.08);
-        outline: none;
-      }
-      ._x_extension_blacklist_match_mode_2026_unique_ input[type="checkbox"]:disabled {
-        cursor: not-allowed;
-        opacity: 0.45;
-      }
-      #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_blacklist_match_mode_2026_unique_ input[type="checkbox"] {
-        background: rgba(255, 255, 255, 0.02);
-        border-color: rgba(255, 255, 255, 0.38);
-      }
-      #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_blacklist_match_mode_2026_unique_ input[type="checkbox"]:checked {
-        background: #f3f4f6;
-        border-color: #f3f4f6;
-      }
-      #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_blacklist_match_mode_2026_unique_ input[type="checkbox"]:checked::after {
-        border-left-color: #111111;
-        border-bottom-color: #111111;
-      }
-      #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_blacklist_match_mode_2026_unique_ input[type="checkbox"]:hover,
-      #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_blacklist_match_mode_2026_unique_ input[type="checkbox"]:focus-visible {
-        border-color: #f3f4f6;
-        box-shadow: 0 0 0 3px rgba(243, 244, 246, 0.12);
-      }
-      ._x_extension_blacklist_match_mode_2026_unique_[data-disabled="true"] {
-        opacity: 0.5;
-      }
-      ._x_extension_blacklist_match_mode_2026_unique_ ._x_extension_shortcut_hint_2024_unique_ {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
       }
       ._x_extension_shortcut_input_affix_2026_unique_ {
         display: flex;
@@ -1142,74 +1064,30 @@
         position: absolute;
         top: -32px;
         right: 0;
-        background: #0f172a;
-        color: #f9fafb;
+        background: #ffffff;
+        color: #334155;
         padding: 9px 12px;
+        border: 1px solid rgba(15, 23, 42, 0.12);
         border-radius: 8px;
         font-size: var(--tooltip-font-size);
         white-space: pre-line;
         max-width: min(360px, calc(100vw - 24px));
         line-height: 1.4;
         overflow-wrap: anywhere;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
         opacity: 0;
         pointer-events: none;
         transform: translateY(4px);
         transition: opacity 120ms ease, transform 120ms ease;
         z-index: 3;
       }
+      ._x_extension_tooltip_host_2026_unique_[data-tooltip]::after,
       ._x_extension_tooltip_host_2024_unique_[data-tooltip]::after {
         content: none;
       }
+      ._x_extension_tooltip_host_2026_unique_[data-tooltip],
       ._x_extension_tooltip_host_2024_unique_[data-tooltip] {
         cursor: pointer;
-      }
-      ._x_extension_tooltip_2024_unique_ {
-        position: fixed;
-        max-width: min(360px, calc(100vw - 24px));
-        padding: 10px 12px;
-        border-radius: 8px;
-        background: #0f172a;
-        color: #f9fafb;
-        font-size: var(--tooltip-font-size);
-        line-height: 1.4;
-        white-space: pre-line;
-        overflow-wrap: anywhere;
-        box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
-        z-index: 9999;
-        pointer-events: none;
-        opacity: 0;
-        transform: translateY(4px);
-        transition: opacity 120ms ease, transform 120ms ease;
-      }
-      ._x_extension_tooltip_line_2026_unique_ {
-        display: block;
-        width: 100%;
-      }
-      ._x_extension_tooltip_divider_2026_unique_ {
-        display: block;
-        width: 100%;
-        height: 1px;
-        margin: 6px 0 5px;
-        background: rgba(255, 255, 255, 0.12);
-      }
-      ._x_extension_tooltip_2024_unique_[data-show="true"] {
-        opacity: 1;
-        transform: translateY(0);
-      }
-      #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_shortcut_group_action_2024_unique_[data-tooltip]::after {
-        background: #020617;
-        color: #f8fafc;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        box-shadow: 0 12px 26px rgba(0, 0, 0, 0.42);
-      }
-      body[data-theme="dark"] ._x_extension_tooltip_2024_unique_ {
-        background: #020617;
-        color: #f8fafc;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
-      }
-      body[data-theme="dark"] ._x_extension_tooltip_divider_2026_unique_ {
-        background: rgba(255, 255, 255, 0.14);
       }
       ._x_extension_shortcut_group_action_2024_unique_[data-tooltip]:hover::after {
         opacity: 1;
@@ -1900,7 +1778,7 @@
       }
       ._x_extension_theme_gallery_2026_unique_ {
         display: grid;
-        grid-template-columns: repeat(3, 90px);
+        grid-template-columns: repeat(3, minmax(0, 90px));
         gap: 10px;
         width: auto;
         max-width: none;
@@ -1922,6 +1800,8 @@
         flex-direction: column;
         align-items: center;
         gap: 8px;
+        width: 100%;
+        min-width: 0;
         padding: 0;
         border: none;
         border-radius: 0;
@@ -2026,13 +1906,21 @@
       }
       ._x_extension_theme_label_2026_unique_ {
         font-size: 13px;
-        line-height: 1.15;
+        line-height: 1.25;
         font-weight: 400;
         width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        min-height: 2.5em;
         text-align: left;
-        padding-left: 2px;
+        padding: 0 2px;
         box-sizing: border-box;
-        white-space: nowrap;
+        display: -webkit-box;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        white-space: normal;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
       }
       ._x_extension_theme_gallery_2026_unique_ ._x_extension_theme_option_2024_unique_[data-active="true"] ._x_extension_theme_label_2026_unique_ {
         font-weight: 500;
@@ -2056,189 +1944,6 @@
           grid-template-columns: 120px;
           justify-content: end;
         }
-      }
-      ._x_extension_select_2024_unique_ {
-        position: absolute;
-        inset: 0;
-        opacity: 0;
-        pointer-events: none;
-      }
-      ._x_extension_select_wrap_2024_unique_ {
-        position: relative;
-        display: inline-flex;
-        align-items: center;
-      }
-      ._x_extension_select_wrap_auto_2024_unique_ {
-        min-width: max-content;
-        padding-right: 0;
-      }
-      ._x_extension_select_wrap_auto_2024_unique_ ._x_extension_select_trigger_2024_unique_ {
-        width: 100%;
-        min-width: 0;
-        white-space: nowrap;
-      }
-      ._x_extension_select_wrap_auto_2024_unique_ ._x_extension_select_menu_2024_unique_ {
-        width: 100%;
-      }
-      ._x_extension_select_wrap_auto_2024_unique_ ._x_extension_select_option_2024_unique_ {
-        white-space: nowrap;
-      }
-      ._x_extension_select_wrap_auto_2024_unique_ ._x_extension_select_icon_2024_unique_ {
-        right: 8px;
-      }
-      ._x_extension_select_align_left_2024_unique_ ._x_extension_select_menu_2024_unique_ {
-        left: 0;
-        right: auto;
-      }
-      ._x_extension_select_align_middle_2024_unique_ ._x_extension_select_menu_2024_unique_ {
-        left: 50%;
-        right: auto;
-        transform: translate(-50%, -6px) scale(0.96, 0.86);
-      }
-      ._x_extension_select_wrap_2024_unique_[data-open="true"]._x_extension_select_align_middle_2024_unique_ ._x_extension_select_menu_2024_unique_ {
-        transform: translate(-50%, 0) scale(1, 1);
-      }
-      ._x_extension_select_align_right_2024_unique_ ._x_extension_select_menu_2024_unique_ {
-        left: auto;
-        right: 0;
-      }
-      ._x_extension_select_wrap_2024_unique_[data-menu-width="content"] ._x_extension_select_menu_2024_unique_,
-      ._x_extension_select_wrap_2024_unique_[data-menu-width-current="content"] ._x_extension_select_menu_2024_unique_ {
-        width: max-content;
-        min-width: 0;
-        max-width: calc(100vw - 32px);
-      }
-      ._x_extension_select_wrap_2024_unique_[data-menu-width="content"] ._x_extension_select_option_2024_unique_,
-      ._x_extension_select_wrap_2024_unique_[data-menu-width-current="content"] ._x_extension_select_option_2024_unique_ {
-        max-width: calc(100vw - 56px);
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      ._x_extension_select_wrap_2024_unique_[data-menu-align="left"] ._x_extension_select_menu_2024_unique_,
-      ._x_extension_select_wrap_2024_unique_[data-menu-align-current="left"] ._x_extension_select_menu_2024_unique_ {
-        left: 0;
-        right: auto;
-        transform-origin: top left;
-      }
-      ._x_extension_select_wrap_2024_unique_[data-menu-align="right"] ._x_extension_select_menu_2024_unique_,
-      ._x_extension_select_wrap_2024_unique_[data-menu-align-current="right"] ._x_extension_select_menu_2024_unique_ {
-        left: auto;
-        right: 0;
-        transform-origin: top right;
-      }
-      ._x_extension_custom_select_2024_unique_ {
-        min-width: 180px;
-      }
-      ._x_extension_select_trigger_2024_unique_ {
-        all: unset;
-        box-sizing: border-box;
-        width: 100%;
-        min-width: 180px;
-        height: 36px;
-        padding: 8px 32px 8px 10px;
-        border-radius: 10px;
-        border: 1px solid var(--tab-border);
-        background: var(--control-bg);
-        color: var(--panel-text);
-        font-size: 13px;
-        font-weight: 500;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        position: relative;
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-        transition: border-color 160ms ease, background-color 160ms ease, box-shadow 180ms ease;
-      }
-      ._x_extension_select_wrap_2024_unique_:hover ._x_extension_select_trigger_2024_unique_ {
-        background: var(--control-hover-bg);
-      }
-      ._x_extension_select_wrap_2024_unique_[data-open="true"] ._x_extension_select_trigger_2024_unique_ {
-        background: var(--control-open-bg);
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08);
-      }
-      body[data-theme="dark"] ._x_extension_select_wrap_2024_unique_[data-open="true"] ._x_extension_select_trigger_2024_unique_ {
-        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.14);
-      }
-      ._x_extension_select_label_2024_unique_ {
-        display: block;
-        flex: 1 1 auto;
-        min-width: 0;
-        padding-right: 6px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      ._x_extension_select_menu_2024_unique_ {
-        position: absolute;
-        left: 0;
-        right: 0;
-        top: calc(100% + 6px);
-        background: var(--menu-bg);
-        border: 1px solid var(--tab-border);
-        border-radius: 12px;
-        padding: 6px;
-        box-sizing: border-box;
-        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
-        opacity: 0;
-        transform: translateY(-6px) scale(0.96, 0.86);
-        transform-origin: top center;
-        pointer-events: none;
-        will-change: transform, opacity;
-        transition: opacity 170ms ease, transform 360ms cubic-bezier(0.2, 1.45, 0.35, 1);
-        z-index: 10;
-      }
-      ._x_extension_select_wrap_2024_unique_[data-open="true"] ._x_extension_select_menu_2024_unique_ {
-        opacity: 1;
-        transform: translateY(0) scale(1, 1);
-        pointer-events: auto;
-      }
-      ._x_extension_select_option_2024_unique_ {
-        padding: 10px 12px;
-        border-radius: 10px;
-        font-size: 13px;
-        font-weight: 500;
-        color: var(--panel-text);
-        cursor: pointer;
-      }
-      ._x_extension_select_option_2024_unique_ + ._x_extension_select_option_2024_unique_ {
-        margin-top: 4px;
-      }
-      ._x_extension_select_option_2024_unique_[data-selected="true"],
-      ._x_extension_select_option_2024_unique_[data-selected="true"] {
-        background: var(--select-selected-bg);
-        color: var(--select-selected-text);
-      }
-      ._x_extension_select_option_2024_unique_[data-active="true"]:not([data-selected="true"]),
-      ._x_extension_select_option_2024_unique_:hover:not([data-selected="true"]) {
-        background: var(--select-hover-bg);
-        color: var(--panel-text);
-      }
-      ._x_extension_select_icon_2024_unique_ {
-        position: absolute;
-        right: 10px;
-        top: 50%;
-        transform: translateY(-50%);
-        color: var(--panel-subtext);
-        width: 14px;
-        height: 14px;
-        display: block;
-        pointer-events: none;
-        transition: color 160ms ease, transform 180ms ease;
-      }
-      ._x_extension_select_wrap_2024_unique_:hover ._x_extension_select_icon_2024_unique_ {
-        color: rgba(0, 0, 0, 0.9);
-      }
-      ._x_extension_select_wrap_2024_unique_[data-open="true"] ._x_extension_select_icon_2024_unique_ {
-        color: rgba(0, 0, 0, 0.98);
-        transform: translateY(-50%) rotate(180deg);
-      }
-      body[data-theme="dark"] ._x_extension_select_wrap_2024_unique_:hover ._x_extension_select_icon_2024_unique_ {
-        color: rgba(255, 255, 255, 0.92);
-      }
-      body[data-theme="dark"] ._x_extension_select_wrap_2024_unique_[data-open="true"] ._x_extension_select_icon_2024_unique_ {
-        color: rgba(255, 255, 255, 1);
       }
       .ri-icon {
         width: var(--ri-size, 16px);
@@ -2423,6 +2128,27 @@
                 <option value="autocomplete" data-i18n="search_result_priority_autocomplete" selected>补全优先</option>
                 <option value="search" data-i18n="search_result_priority_search">搜索优先</option>
               </select>
+            </div>
+          </div>
+          <div class="_x_extension_setting_row_2024_unique_ _x_extension_setting_row_compact_2024_unique_">
+            <div>
+              <p class="_x_extension_setting_title_2024_unique_">
+                <span data-i18n="settings_search_result_sources_title">显示结果类型</span>
+              </p>
+            </div>
+            <div id="_x_extension_search_result_source_types_2026_unique_" class="_x_extension_checkbox_group_2026_unique_" role="group" aria-label="search result types" data-i18n-aria-label="settings_search_result_sources_title">
+              <label class="_x_extension_checkbox_2026_unique_">
+                <input id="_x_extension_search_result_source_top_site_2026_unique_" type="checkbox" data-search-result-source-type="topSite" checked>
+                <span data-i18n="search_tag_top_site">常用</span>
+              </label>
+              <label class="_x_extension_checkbox_2026_unique_">
+                <input id="_x_extension_search_result_source_bookmark_2026_unique_" type="checkbox" data-search-result-source-type="bookmark" checked>
+                <span data-i18n="search_tag_bookmark">书签</span>
+              </label>
+              <label class="_x_extension_checkbox_2026_unique_">
+                <input id="_x_extension_search_result_source_history_2026_unique_" type="checkbox" data-search-result-source-type="history" checked>
+                <span data-i18n="search_tag_history">历史</span>
+              </label>
             </div>
           </div>
           <div class="_x_extension_setting_divider_wrap_2024_unique_" role="presentation">
@@ -2674,7 +2400,7 @@
             <div class="_x_extension_shortcut_group_2024_unique_">
               <div class="_x_extension_shortcut_group_header_2024_unique_">
                 <div class="_x_extension_shortcut_group_title_2024_unique_ _x_extension_section_title_2024_unique_" data-i18n="shortcuts_group_custom">自定义</div>
-                <button id="_x_extension_custom_clear_2024_unique_" class="_x_extension_shortcut_group_action_2024_unique_" title="清空自定义" aria-label="清空自定义" data-tooltip="清空自定义" data-i18n-tooltip="shortcuts_clear_custom">
+                <button id="_x_extension_custom_clear_2024_unique_" class="_x_extension_shortcut_group_action_2024_unique_" aria-label="清空自定义" data-tooltip="清空自定义" data-i18n-tooltip="shortcuts_clear_custom">
                   <i class="ri-icon ri-size-14 ri-delete-bin-4-line" aria-hidden="true"></i>
                 </button>
               </div>
@@ -2728,7 +2454,7 @@
             <div class="_x_extension_shortcut_group_2024_unique_">
               <div class="_x_extension_shortcut_group_header_2024_unique_">
                 <div class="_x_extension_shortcut_group_title_2024_unique_ _x_extension_section_title_2024_unique_" data-i18n="shortcuts_group_builtin">内置</div>
-                <button id="_x_extension_builtin_reset_2024_unique_" class="_x_extension_shortcut_group_action_2024_unique_" title="重置为初始列表" aria-label="重置为初始列表" data-tooltip="重置为初始列表" data-i18n-tooltip="shortcuts_reset_builtin">
+                <button id="_x_extension_builtin_reset_2024_unique_" class="_x_extension_shortcut_group_action_2024_unique_" aria-label="重置为初始列表" data-tooltip="重置为初始列表" data-i18n-tooltip="shortcuts_reset_builtin">
                   <i class="ri-icon ri-size-14 ri-refresh-line" aria-hidden="true"></i>
                 </button>
               </div>
@@ -2748,7 +2474,7 @@
             <div class="_x_extension_shortcut_group_2024_unique_">
               <div class="_x_extension_shortcut_group_header_2024_unique_">
                 <div class="_x_extension_shortcut_group_title_2024_unique_ _x_extension_section_title_2024_unique_" data-i18n="blacklist_group_custom">URL 列表</div>
-                <button id="_x_extension_blacklist_clear_2026_unique_" class="_x_extension_shortcut_group_action_2024_unique_" title="清空黑名单" aria-label="清空黑名单" data-tooltip="清空黑名单" data-i18n-tooltip="blacklist_clear">
+                <button id="_x_extension_blacklist_clear_2026_unique_" class="_x_extension_shortcut_group_action_2024_unique_" aria-label="清空黑名单" data-tooltip="清空黑名单" data-i18n-tooltip="blacklist_clear">
                   <i class="ri-icon ri-size-14 ri-delete-bin-4-line" aria-hidden="true"></i>
                 </button>
               </div>
@@ -2774,22 +2500,22 @@
                 </div>
                 <div class="_x_extension_shortcut_field_2024_unique_">
                   <div class="_x_extension_shortcut_label_2024_unique_" data-i18n="blacklist_match_label">匹配方式</div>
-                  <div class="_x_extension_blacklist_match_modes_2026_unique_">
-                    <label class="_x_extension_blacklist_match_mode_2026_unique_" id="_x_extension_blacklist_match_suffix_wrap_2026_unique_">
+                  <div class="_x_extension_checkbox_group_2026_unique_" data-align="start" data-gap="wide">
+                    <label class="_x_extension_checkbox_2026_unique_" id="_x_extension_blacklist_match_suffix_wrap_2026_unique_">
                       <input id="_x_extension_blacklist_match_suffix_2026_unique_" type="checkbox" checked />
                       <span data-i18n="blacklist_match_suffix">整个网站</span>
                       <span class="_x_extension_shortcut_hint_2024_unique_ _x_extension_tooltip_host_2024_unique_" data-i18n-tooltip="blacklist_match_suffix_tooltip" data-tooltip="屏蔽这个网站的所有页面，也包括它的子网站&#10;────────&#10;例如，填 baidu.com 后，baidu.com/search 和 tieba.baidu.com 都不会出现">
                         <i class="ri-icon ri-size-14 ri-question-line" aria-hidden="true"></i>
                       </span>
                     </label>
-                    <label class="_x_extension_blacklist_match_mode_2026_unique_" id="_x_extension_blacklist_match_exact_wrap_2026_unique_">
+                    <label class="_x_extension_checkbox_2026_unique_" id="_x_extension_blacklist_match_exact_wrap_2026_unique_">
                       <input id="_x_extension_blacklist_match_exact_2026_unique_" type="checkbox" />
                       <span data-i18n="blacklist_match_exact">当前页面</span>
                       <span class="_x_extension_shortcut_hint_2024_unique_ _x_extension_tooltip_host_2024_unique_" data-i18n-tooltip="blacklist_match_exact_tooltip" data-tooltip="只屏蔽这一页&#10;────────&#10;例如，填 x.com/home 后，只有这一页不会出现，其他页面不受影响">
                         <i class="ri-icon ri-size-14 ri-question-line" aria-hidden="true"></i>
                       </span>
                     </label>
-                    <label class="_x_extension_blacklist_match_mode_2026_unique_" id="_x_extension_blacklist_match_prefix_wrap_2026_unique_">
+                    <label class="_x_extension_checkbox_2026_unique_" id="_x_extension_blacklist_match_prefix_wrap_2026_unique_">
                       <input id="_x_extension_blacklist_match_prefix_2026_unique_" type="checkbox" />
                       <span data-i18n="blacklist_match_prefix">当前站点路径</span>
                       <span class="_x_extension_shortcut_hint_2024_unique_ _x_extension_tooltip_host_2024_unique_" data-i18n-tooltip="blacklist_match_prefix_tooltip" data-tooltip="只屏蔽这个站点下这一路径的页面&#10;────────&#10;例如，填 baidu.com/search 后，baidu.com/search 和 baidu.com/search/1 不会出现，但 baidu.com/news 不受影响">
@@ -2877,6 +2603,10 @@
     <script src="../shared/blacklist-utils.js"></script>
     <script src="../shared/settings.js"></script>
     <script src="../shared/search-utils.js"></script>
+    <script src="../shared/tooltip.js"></script>
+    <script src="../shared/menu-surface.js"></script>
+    <script src="../shared/custom-select.js"></script>
+    <script src="../shared/checkbox.js"></script>
     <script src="options.js"></script>
   </body>
 </html>

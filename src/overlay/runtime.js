@@ -13,6 +13,7 @@
     siteSearchCustom: '_x_extension_site_search_custom_2024_unique_',
     siteSearchDisabled: '_x_extension_site_search_disabled_2024_unique_',
     searchResultPriority: '_x_extension_search_result_priority_2026_unique_',
+    searchResultSourceTypes: '_x_extension_search_result_source_types_2026_unique_',
     searchBlacklist: '_x_extension_search_blacklist_2026_unique_',
     overlaySizeMode: '_x_extension_overlay_size_mode_2026_unique_',
     overlayTabPriority: '_x_extension_overlay_tab_priority_2024_unique_',

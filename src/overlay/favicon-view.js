@@ -474,7 +474,8 @@
           resolvedFaviconUrlCache.set(state.cacheKey, nextUrl);
         }
       }
-      if (!nextUrl.startsWith('data:') && !isChromeMonogramFaviconUrl(nextUrl)) {
+      const isProxyCandidate = isFaviconProxyUrl(nextUrl);
+      if (!nextUrl.startsWith('data:') && !isChromeMonogramFaviconUrl(nextUrl) && !isProxyCandidate) {
         attachFaviconData(img, nextUrl, state.hostKey);
       }
       return true;
@@ -511,7 +512,7 @@
     function tryUpgradeOverlayThemeAwareFaviconCandidates(img, state, candidateUrls) {
       const currentSrc = img && img.src ? String(img.src) : '';
       const upgrades = dedupeOverlayFaviconCandidateUrls(candidateUrls).filter((candidate) => {
-        if (!candidate || candidate === currentSrc || isChromeMonogramFaviconUrl(candidate)) {
+        if (!candidate || candidate === currentSrc || isChromeMonogramFaviconUrl(candidate) || isFaviconProxyUrl(candidate)) {
           return false;
         }
         if (state.shouldPreferDarkTokenUpgrades && !/(^|[._/-])dark([._/-]|$)/i.test(String(candidate || ''))) {
@@ -542,7 +543,7 @@
           if (state.cacheKey && !isFaviconProxyUrl(candidate)) {
             resolvedFaviconUrlCache.set(state.cacheKey, candidate);
           }
-          if (!candidate.startsWith('data:') && !isChromeMonogramFaviconUrl(candidate)) {
+          if (!candidate.startsWith('data:') && !isChromeMonogramFaviconUrl(candidate) && !isFaviconProxyUrl(candidate)) {
             attachFaviconData(img, candidate, state.hostKey);
           }
         };

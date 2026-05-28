@@ -115,6 +115,18 @@ assert.deepStrictEqual(
   ['Result 1', 'Result 2', 'Result 3'],
   'display suggestion limiting should preserve ranking order'
 );
+assert.deepStrictEqual(
+  search.filterSearchSuggestionsBySourceTypes([
+    { type: 'topSite', title: 'Frequent', url: 'https://frequent.example.com/' },
+    { type: 'bookmark', title: 'Bookmark', url: 'https://bookmark.example.com/' },
+    { type: 'history', title: 'History', url: 'https://history.example.com/' },
+    { type: 'googleSuggest', title: 'Search Suggestion', url: 'https://google.example.com/' },
+    { type: 'newtab', title: 'Search', url: 'https://search.example.com/' },
+    { type: 'directUrl', title: 'Direct', url: 'https://direct.example.com/' }
+  ], ['bookmark']).map((item) => item.type),
+  ['bookmark', 'googleSuggest', 'newtab', 'directUrl'],
+  'source filtering should only remove disabled local result types'
+);
 
 const navList = [
   { type: 'history', title: 'Example Blog Detail', url: 'https://example.com/blog/detail' },

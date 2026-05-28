@@ -75,6 +75,21 @@ assert.strictEqual(htmlIconCandidates[0].score, 88);
 assert.ok(htmlIconCandidates.some((candidate) => candidate.url === 'https://example.com/favicon-dark.svg' && candidate.score === 102));
 assert.ok(htmlIconCandidates.some((candidate) => candidate.url === 'https://example.com/assets/favicon-dark.svg'));
 
+assert.strictEqual(
+  utils.getThemeFaviconCandidateUrls([
+    'https://www.google.com/s2/favicons?domain=mp.weixin.qq.com&sz=128',
+    'chrome://favicon2/?url=https%3A%2F%2Fmp.weixin.qq.com%2F',
+    'https://res.wx.qq.com/a/wx_fed/assets/res/OTE0YTAw.png',
+    'https://favicon.is/mp.weixin.qq.com',
+    'https://res.wx.qq.com/a/wx_fed/assets/res/OTE0YTAw.png'
+  ]).join('\n'),
+  [
+    'https://res.wx.qq.com/a/wx_fed/assets/res/OTE0YTAw.png',
+    'https://www.google.com/s2/favicons?domain=mp.weixin.qq.com&sz=128',
+    'https://favicon.is/mp.weixin.qq.com'
+  ].join('\n')
+);
+
 assert.strictEqual(utils.parseCssThemeColor('#0f8').join(','), '0,255,136');
 assert.strictEqual(utils.parseCssThemeColor('rgba(10, 20, 30, 0.5)').join(','), '10,20,30');
 assert.strictEqual(utils.parseCssThemeColor('transparent'), null);
