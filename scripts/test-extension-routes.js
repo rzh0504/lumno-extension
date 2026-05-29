@@ -26,6 +26,12 @@ assert.strictEqual(
 );
 
 assert.strictEqual(
+  routes.buildExtensionUrl(chromeApi, routes.ROUTE_PATHS.onboarding),
+  'chrome-extension://abc/src/onboarding/onboarding.html',
+  'onboarding URL should use the extension route'
+);
+
+assert.strictEqual(
   routes.classifyExtensionUrl('chrome-extension://abc/src/newtab/newtab.html?focus=1'),
   'newtab',
   'newtab URLs should be classified'
@@ -35,6 +41,12 @@ assert.strictEqual(
   routes.classifyExtensionUrl('chrome-extension://abc/src/options/options.html#appearance'),
   'options',
   'options URLs should be classified'
+);
+
+assert.strictEqual(
+  routes.classifyExtensionUrl('chrome-extension://abc/src/onboarding/onboarding.html?entry=ext'),
+  'onboarding',
+  'onboarding URLs should be classified'
 );
 
 assert.strictEqual(

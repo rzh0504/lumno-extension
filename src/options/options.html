@@ -900,11 +900,11 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background: linear-gradient(180deg, #c7c7c7 0%, #f9f9f9 100%);
-        border: 0.5px solid #dedede;
+        background: linear-gradient(180deg, #e1e1e1 0%, #f4f4f4 100%);
+        border: 0.5px solid #dadada;
         box-shadow:
-          inset 0 -1px 1px rgba(255, 255, 255, 0.08),
-          inset 0 1px 2px rgba(0, 0, 0, 0.34);
+          inset 0 -1px 1px rgba(255, 255, 255, 0.32),
+          inset 0 1px 1.5px rgba(0, 0, 0, 0.14);
         border-radius: 999px;
         overflow: hidden;
         z-index: 0;
@@ -1570,10 +1570,12 @@
       }
       ._x_extension_shortcut_submit_2024_unique_ {
         all: unset;
+        box-sizing: border-box;
         cursor: pointer;
         align-self: flex-start;
         padding: 8px 14px;
         border-radius: 999px;
+        border: none;
         background: var(--tab-active-bg);
         color: var(--tab-active-text);
         font-size: 12px;
@@ -1612,25 +1614,25 @@
         outline-offset: 2px;
       }
       ._x_extension_shortcut_secondary_2024_unique_ {
-        all: unset;
-        cursor: pointer;
-        align-self: flex-start;
-        padding: 8px 14px;
-        border-radius: 999px;
-        border: none;
-        color: var(--panel-text);
-        font-size: 12px;
-        font-weight: 500;
-        background: var(--tab-bg);
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        transition: background-color 160ms ease, color 160ms ease, transform 120ms ease, filter 120ms ease;
+        border: 1px solid rgba(15, 23, 42, 0.06);
+        color: #1f2937;
+        background: #ffffff;
+        box-shadow:
+          0 2px 2px rgba(15, 23, 42, 0.025),
+          0 1px 1px rgba(15, 23, 42, 0.035),
+          0 0 1px rgba(15, 23, 42, 0.06),
+          inset 0 1px 0 rgba(255, 255, 255, 0.75);
+        transition:
+          background-color 160ms ease,
+          border-color 160ms ease,
+          box-shadow 160ms ease,
+          color 160ms ease,
+          transform 120ms ease,
+          filter 120ms ease;
       }
       ._x_extension_settings_tab_button_2024_unique_:active,
       ._x_extension_theme_option_2024_unique_:active,
-      ._x_extension_shortcut_submit_2024_unique_:active,
-      ._x_extension_shortcut_secondary_2024_unique_:active {
+      ._x_extension_shortcut_submit_2024_unique_:active {
         transform: translateY(1px) scale(0.98);
         filter: brightness(0.95);
       }
@@ -1638,17 +1640,32 @@
         opacity: 0.5;
       }
       ._x_extension_shortcut_secondary_2024_unique_:hover {
-        background: rgba(0, 0, 0, 0.05);
-        box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+        background: #ffffff;
+        border-color: rgba(15, 23, 42, 0.08);
+        box-shadow:
+          0 2px 3px rgba(15, 23, 42, 0.032),
+          0 1px 1px rgba(15, 23, 42, 0.045),
+          0 0 1px rgba(15, 23, 42, 0.07),
+          inset 0 1px 0 rgba(255, 255, 255, 0.8);
       }
       #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_shortcut_secondary_2024_unique_ {
-        background: #353535;
-        color: var(--panel-text);
-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+        background: #ffffff;
+        color: #1f2937;
+        border-color: rgba(15, 23, 42, 0.07);
+        box-shadow:
+          0 2px 2px rgba(0, 0, 0, 0.075),
+          0 1px 1px rgba(0, 0, 0, 0.095),
+          0 0 1px rgba(0, 0, 0, 0.14),
+          inset 0 1px 0 rgba(255, 255, 255, 0.78);
       }
       #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_shortcut_secondary_2024_unique_:hover {
-        background: #3d3d3d;
-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+        background: #ffffff;
+        border-color: rgba(15, 23, 42, 0.09);
+        box-shadow:
+          0 2px 3px rgba(0, 0, 0, 0.085),
+          0 1px 1px rgba(0, 0, 0, 0.105),
+          0 0 1px rgba(0, 0, 0, 0.15),
+          inset 0 1px 0 rgba(255, 255, 255, 0.82);
       }
       ._x_extension_shortcut_actions_row_2024_unique_ {
         display: inline-flex;
@@ -2086,11 +2103,11 @@
             </div>
             <div class="_x_extension_sync_actions_2024_unique_">
               <div class="_x_extension_sync_buttons_2024_unique_">
-                <button id="_x_extension_sync_export_2024_unique_" class="_x_extension_sync_button_2024_unique_ _x_extension_shortcut_secondary_2024_unique_ _x_extension_sync_icon_faded_2024_unique_" type="button">
+                <button id="_x_extension_sync_export_2024_unique_" class="_x_extension_sync_button_2024_unique_ _x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_secondary_2024_unique_ _x_extension_sync_icon_faded_2024_unique_" type="button">
                   <i class="ri-icon ri-size-16 ri-upload-line" aria-hidden="true"></i>
                   <span data-i18n="sync_action_export">导出配置</span>
                 </button>
-                <button id="_x_extension_sync_import_2024_unique_" class="_x_extension_sync_button_2024_unique_ _x_extension_shortcut_secondary_2024_unique_ _x_extension_sync_icon_faded_2024_unique_" type="button">
+                <button id="_x_extension_sync_import_2024_unique_" class="_x_extension_sync_button_2024_unique_ _x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_secondary_2024_unique_ _x_extension_sync_icon_faded_2024_unique_" type="button">
                   <i class="ri-icon ri-size-16 ri-download-line" aria-hidden="true"></i>
                   <span data-i18n="sync_action_import">导入配置</span>
                 </button>
@@ -2442,7 +2459,7 @@
                   <input id="_x_extension_site_search_alias_2024_unique_" class="_x_extension_shortcut_input_2024_unique_" placeholder="选填，例如 小破站、油管等" data-i18n-placeholder="shortcuts_placeholder_alias" />
                 </div>
                 <div class="_x_extension_shortcut_actions_row_2024_unique_">
-                  <button id="_x_extension_site_search_cancel_2024_unique_" class="_x_extension_shortcut_secondary_2024_unique_" style="display:none;" data-i18n="shortcuts_cancel">取消编辑</button>
+                  <button id="_x_extension_site_search_cancel_2024_unique_" class="_x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_secondary_2024_unique_" style="display:none;" data-i18n="shortcuts_cancel">取消编辑</button>
                   <button id="_x_extension_site_search_add_2024_unique_" class="_x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_submit_primary_2024_unique_" data-i18n="shortcuts_add">添加站内搜索</button>
                 </div>
                 <div id="_x_extension_site_search_error_2024_unique_" class="_x_extension_shortcut_error_2024_unique_" style="display:none;"></div>
@@ -2525,7 +2542,7 @@
                   </div>
                 </div>
                 <div class="_x_extension_shortcut_actions_row_2024_unique_">
-                  <button id="_x_extension_blacklist_cancel_2026_unique_" class="_x_extension_shortcut_secondary_2024_unique_" style="display:none;" type="button" data-i18n="shortcuts_cancel">取消</button>
+                  <button id="_x_extension_blacklist_cancel_2026_unique_" class="_x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_secondary_2024_unique_" style="display:none;" type="button" data-i18n="shortcuts_cancel">取消</button>
                   <button id="_x_extension_blacklist_add_2026_unique_" type="button" class="_x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_submit_primary_2024_unique_" data-i18n="blacklist_add">添加到黑名单</button>
                 </div>
                 <div id="_x_extension_blacklist_error_2026_unique_" class="_x_extension_shortcut_error_2024_unique_" style="display:none;"></div>
@@ -2594,7 +2611,7 @@
       <div class="_x_extension_confirm_dialog_2024_unique_">
         <div id="_x_extension_confirm_message_2024_unique_" class="_x_extension_confirm_message_2024_unique_"></div>
         <div class="_x_extension_confirm_actions_2024_unique_">
-          <button id="_x_extension_confirm_cancel_2024_unique_" class="_x_extension_shortcut_secondary_2024_unique_" data-i18n="confirm_cancel">取消</button>
+          <button id="_x_extension_confirm_cancel_2024_unique_" class="_x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_secondary_2024_unique_" data-i18n="confirm_cancel">取消</button>
           <button id="_x_extension_confirm_ok_2024_unique_" class="_x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_submit_primary_2024_unique_" data-i18n="confirm_ok">确认</button>
         </div>
       </div>

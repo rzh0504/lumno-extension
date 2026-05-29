@@ -1786,7 +1786,7 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
   const reason = String(details.reason || '');
   if (reason === 'install') {
-    openOnboardingPage();
+    openOnboardingPage({ reason: 'install' });
     schedulePersistPinnedTabSnapshot();
     return;
   }
@@ -2052,6 +2052,7 @@ const BACKGROUND_MESSAGE_ROUTE_GROUPS = Object.freeze({
   extensionPages: {
     actions: [
       'openOptionsPage',
+      'openOnboardingPage',
       'openExtensionShortcutsPage',
       'openBookmarkManager',
       'createTab',
@@ -2475,6 +2476,12 @@ function handleExtensionPageMessage(request, sender, sendResponse) {
   switch (request.action) {
     case 'openOptionsPage': {
       openExtensionOptionsPage((ok) => {
+        sendResponse({ ok: ok !== false });
+      });
+      return true;
+    }
+    case 'openOnboardingPage': {
+      openOnboardingPage({ reason: 'manual' }, (ok) => {
         sendResponse({ ok: ok !== false });
       });
       return true;

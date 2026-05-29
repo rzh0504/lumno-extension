@@ -628,6 +628,9 @@
       const anchorToRestore = bookmarkCascadeAnchor;
       if (anchorToRestore) {
         anchorToRestore.setAttribute('aria-expanded', 'false');
+        if (typeof anchorToRestore._xSetBookmarkMenuVisualActive === 'function') {
+          anchorToRestore._xSetBookmarkMenuVisualActive(false);
+        }
       }
       bookmarkCascadeAnchor = null;
       bookmarkCascadeLevels = [];
@@ -1004,7 +1007,25 @@
       return icon;
     }
 
-    function renderBookmarkCascadeMenuLevel(folderId, levelIndex, triggerElement, parentLevelElement) {
+    function appendBookmarkCascadeLevelTitle(levelElement, folderTitle) {
+      const rawTitle = folderTitle == null ? '' : String(folderTitle).trim();
+      if (!rawTitle || !documentObj) {
+        return null;
+      }
+      const titleText = sanitizeDisplayText(rawTitle);
+      if (!titleText) {
+        return null;
+      }
+      const titleElement = documentObj.createElement('div');
+      titleElement.className = 'x-nt-bookmark-cascade-title';
+      titleElement.setAttribute('role', 'presentation');
+      titleElement.textContent = titleText;
+      titleElement.title = titleText;
+      levelElement.appendChild(titleElement);
+      return titleElement;
+    }
+
+    function renderBookmarkCascadeMenuLevel(folderId, levelIndex, triggerElement, parentLevelElement, folderTitle) {
       if (!bookmarkCascadeMenu || !documentObj) {
         return;
       }
@@ -1019,6 +1040,7 @@
       levelElement.setAttribute('data-level', String(safeLevelIndex));
       levelElement.setAttribute('role', 'menu');
 
+      appendBookmarkCascadeLevelTitle(levelElement, folderTitle);
       const items = getBookmarkCascadeItems(folderId);
       if (items.length === 0) {
         const emptyItem = documentObj.createElement('div');
@@ -1067,7 +1089,7 @@
           }
           setBookmarkCascadeLevelActiveItem(levelElement, itemButton);
           itemButton.setAttribute('aria-expanded', 'true');
-          const childEntry = renderBookmarkCascadeMenuLevel(item.id, safeLevelIndex + 1, itemButton, levelElement);
+          const childEntry = renderBookmarkCascadeMenuLevel(item.id, safeLevelIndex + 1, itemButton, levelElement, item.title);
           if (openOptions && openOptions.focusChild && childEntry) {
             selectFirstBookmarkCascadeItemInLevel(childEntry.levelIndex, { focus: true });
           }
@@ -1183,18 +1205,24 @@
       }
       Promise.resolve(ensureReady(false)).then((ready) => {
         if (!ready || !anchorElement.isConnected) {
+          if (typeof anchorElement._xSetBookmarkMenuVisualActive === 'function') {
+            anchorElement._xSetBookmarkMenuVisualActive(false);
+          }
           return;
         }
         close();
         bookmarkCascadeAnchor = anchorElement;
         bookmarkCascadeAnchor.setAttribute('aria-expanded', 'true');
+        if (typeof bookmarkCascadeAnchor._xSetBookmarkMenuVisualActive === 'function') {
+          bookmarkCascadeAnchor._xSetBookmarkMenuVisualActive(true);
+        }
         bookmarkCascadeMenu = documentObj.createElement('div');
         bookmarkCascadeMenu.className = 'x-nt-bookmark-cascade-menu';
         bookmarkCascadeMenu.setAttribute('role', 'menu');
         documentObj.body.appendChild(bookmarkCascadeMenu);
         ensureBookmarkCascadeDebugElements();
         bookmarkCascadeKeyboardLevelIndex = 0;
-        renderBookmarkCascadeMenuLevel(folderId, 0, anchorElement, null);
+        renderBookmarkCascadeMenuLevel(folderId, 0, anchorElement, null, item.title);
         selectFirstBookmarkCascadeItemInLevel(0, { focus: true });
       });
     }

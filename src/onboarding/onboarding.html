@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en" class="notranslate" translate="no" notranslate data-no-translate="true">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lumno Quick Start</title>
+    <link rel="stylesheet" href="../../assets/fonts/open-sans/open-sans.css" />
+    <link rel="stylesheet" href="../../assets/remixicon/fonts/remixicon.css" />
+    <style>
+      :root {
+        --page-bg: #f6f8fb;
+        --page-ink: #101620;
+        --page-muted: #647084;
+        --surface: rgba(255, 255, 255, 0.86);
+        --surface-strong: #ffffff;
+        --surface-border: rgba(22, 31, 45, 0.1);
+        --shadow-soft: 0 18px 48px rgba(24, 36, 56, 0.1);
+        --accent: #2563eb;
+        --accent-ink: #ffffff;
+        --accent-soft: #dbeafe;
+        --green: #059669;
+        --amber: #d97706;
+        --rose: #e11d48;
+        --radius: 8px;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --page-bg: #111111;
+          --page-ink: #edf2f7;
+          --page-muted: #a5afbe;
+          --surface: rgba(31, 31, 31, 0.82);
+          --surface-strong: #202020;
+          --surface-border: rgba(255, 255, 255, 0.12);
+          --shadow-soft: 0 22px 54px rgba(0, 0, 0, 0.42);
+          --accent: #93c5fd;
+          --accent-ink: #0f172a;
+          --accent-soft: rgba(147, 197, 253, 0.16);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+      }
+
+      body {
+        margin: 0;
+        background: linear-gradient(180deg, #fbfcff 0%, var(--page-bg) 46%, var(--page-bg) 100%);
+        color: var(--page-ink);
+        font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        letter-spacing: 0;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: linear-gradient(180deg, #181818 0%, var(--page-bg) 48%, var(--page-bg) 100%);
+        }
+      }
+
+      .page-shell {
+        width: min(1120px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 40px;
+      }
+
+      .topbar {
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: clamp(36px, 8vh, 72px);
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .brand-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        box-shadow: 0 10px 28px rgba(37, 99, 235, 0.18);
+      }
+
+      .brand-name {
+        width: 104px;
+        height: auto;
+        display: block;
+        opacity: 0.92;
+      }
+
+      .version-chip {
+        min-height: 32px;
+        padding: 0 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--surface-border);
+        border-radius: 999px;
+        background: var(--surface);
+        color: var(--page-muted);
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.02fr) minmax(320px, 0.98fr);
+        gap: clamp(28px, 6vw, 68px);
+        align-items: start;
+      }
+
+      .hero-copy {
+        min-width: 0;
+        padding-top: 8px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0 0 16px;
+        color: var(--green);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .hero h1 {
+        max-width: 700px;
+        margin: 0;
+        font-size: 64px;
+        line-height: 0.98;
+        font-weight: 760;
+        letter-spacing: 0;
+      }
+
+      .hero-body {
+        max-width: 620px;
+        margin: 22px 0 0;
+        color: var(--page-muted);
+        font-size: 16px;
+        line-height: 1.75;
+      }
+
+      .hero-actions {
+        margin-top: 28px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .action-button {
+        all: unset;
+        box-sizing: border-box;
+        min-height: 42px;
+        padding: 0 16px;
+        border-radius: var(--radius);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.25;
+        text-align: center;
+        white-space: normal;
+        transition: transform 140ms ease, background-color 160ms ease, color 160ms ease,
+          border-color 160ms ease;
+      }
+
+      .action-button span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .action-button:focus-visible {
+        outline: 2px solid rgba(37, 99, 235, 0.42);
+        outline-offset: 3px;
+      }
+
+      .action-button:active {
+        transform: translateY(1px) scale(0.99);
+      }
+
+      .action-button--primary {
+        background: var(--accent);
+        color: var(--accent-ink);
+      }
+
+      .action-button--secondary {
+        border: 1px solid var(--surface-border);
+        background: var(--surface);
+        color: var(--page-ink);
+      }
+
+      .action-button--text {
+        min-height: 34px;
+        padding: 0 8px;
+        color: var(--page-muted);
+      }
+
+      .action-button:hover {
+        transform: translateY(-1px);
+      }
+
+      .steps-section,
+      .features-section {
+        min-width: 0;
+      }
+
+      .section-title {
+        margin: 0 0 14px;
+        font-size: 14px;
+        font-weight: 760;
+        color: var(--page-muted);
+      }
+
+      .steps-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .step-card,
+      .feature-card {
+        border: 1px solid var(--surface-border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        box-shadow: var(--shadow-soft);
+        backdrop-filter: blur(20px) saturate(150%);
+        -webkit-backdrop-filter: blur(20px) saturate(150%);
+      }
+
+      .step-card {
+        min-height: 132px;
+        padding: 16px;
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr);
+        gap: 12px;
+        align-items: start;
+      }
+
+      .step-icon,
+      .feature-icon {
+        width: 34px;
+        height: 34px;
+        border-radius: var(--radius);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .step-card:nth-child(2) .step-icon,
+      .feature-card:nth-child(2) .feature-icon {
+        background: rgba(5, 150, 105, 0.13);
+        color: var(--green);
+      }
+
+      .step-card:nth-child(3) .step-icon,
+      .feature-card:nth-child(3) .feature-icon {
+        background: rgba(217, 119, 6, 0.13);
+        color: var(--amber);
+      }
+
+      .step-card:nth-child(5) .step-icon {
+        background: rgba(225, 29, 72, 0.11);
+        color: var(--rose);
+      }
+
+      .step-copy,
+      .feature-copy {
+        min-width: 0;
+      }
+
+      .step-title,
+      .feature-title {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 760;
+        line-height: 1.35;
+      }
+
+      .step-body,
+      .feature-body {
+        margin: 6px 0 0;
+        color: var(--page-muted);
+        font-size: 13px;
+        line-height: 1.58;
+      }
+
+      .step-action {
+        margin-top: 12px;
+      }
+
+      .features-section {
+        margin-top: 26px;
+      }
+
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .feature-card {
+        min-height: 132px;
+        padding: 15px;
+      }
+
+      .feature-icon {
+        margin-bottom: 12px;
+      }
+
+      .footer-note {
+        margin-top: 28px;
+        padding: 16px 0 0;
+        border-top: 1px solid var(--surface-border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        color: var(--page-muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .toast {
+        position: fixed;
+        left: 50%;
+        bottom: 24px;
+        z-index: 10;
+        max-width: min(360px, calc(100vw - 32px));
+        min-height: 38px;
+        padding: 0 14px;
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(17, 24, 39, 0.94);
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 700;
+        box-shadow: 0 18px 44px rgba(15, 23, 42, 0.24);
+        opacity: 0;
+        pointer-events: none;
+        transform: translate(-50%, 8px);
+        transition: opacity 160ms ease, transform 180ms ease;
+      }
+
+      .toast[data-visible="true"] {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+
+      @media (max-width: 860px) {
+        .page-shell {
+          width: min(100% - 24px, 680px);
+          padding-top: 22px;
+        }
+
+        .topbar {
+          margin-bottom: 34px;
+        }
+
+        .hero {
+          grid-template-columns: 1fr;
+        }
+
+        .hero h1 {
+          font-size: 44px;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .brand-name {
+          width: 92px;
+        }
+
+        .hero-actions,
+        .footer-note {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .action-button {
+          width: 100%;
+        }
+
+        .features-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 380px) {
+        .hero h1 {
+          font-size: 34px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <div class="brand" aria-label="Lumno">
+          <img class="brand-icon" src="../../assets/images/lumno.png" alt="" aria-hidden="true" />
+          <img class="brand-name" src="../../assets/images/lumno-wordmark.svg" alt="Lumno" />
+        </div>
+        <div class="version-chip" id="onboarding-version-chip">
+          <i class="ri-icon ri-price-tag-3-line" aria-hidden="true"></i>
+          <span id="onboarding-version-text">v</span>
+        </div>
+      </header>
+
+      <main class="hero">
+        <section class="hero-copy" aria-labelledby="onboarding-title">
+          <p class="eyebrow">
+            <i class="ri-icon ri-checkbox-circle-line" aria-hidden="true"></i>
+            <span id="onboarding-eyebrow"></span>
+          </p>
+          <h1 id="onboarding-title"></h1>
+          <p class="hero-body" id="onboarding-body"></p>
+          <div class="hero-actions">
+            <button class="action-button action-button--primary" type="button" data-action-slot="primary">
+              <i class="ri-icon ri-keyboard-line" aria-hidden="true"></i>
+              <span></span>
+            </button>
+            <button class="action-button action-button--secondary" type="button" data-action-slot="secondary">
+              <i class="ri-icon ri-window-line" aria-hidden="true"></i>
+              <span></span>
+            </button>
+          </div>
+        </section>
+
+        <section class="steps-section" aria-labelledby="onboarding-steps-title">
+          <h2 class="section-title" id="onboarding-steps-title"></h2>
+          <div class="steps-list" id="onboarding-steps"></div>
+        </section>
+      </main>
+
+      <section class="features-section" aria-labelledby="onboarding-features-title">
+        <h2 class="section-title" id="onboarding-features-title"></h2>
+        <div class="features-grid" id="onboarding-features"></div>
+      </section>
+
+      <footer class="footer-note">
+        <span id="onboarding-footer-note"></span>
+        <button class="action-button action-button--text" type="button" data-action-slot="release">
+          <i class="ri-icon ri-file-list-3-line" aria-hidden="true"></i>
+          <span></span>
+        </button>
+      </footer>
+    </div>
+
+    <div class="toast" id="onboarding-toast" role="status" aria-live="polite"></div>
+    <script src="onboarding-content.js"></script>
+    <script src="onboarding.js"></script>
+  </body>
+</html>

@@ -159,6 +159,7 @@
   const CHECKBOX = globalThis.LumnoCheckbox || {};
   const CHECKBOX_CLASS_NAME = CHECKBOX.className || '_x_extension_checkbox_2026_unique_';
   const CHECKBOX_GROUP_CLASS_NAME = CHECKBOX.groupClassName || '_x_extension_checkbox_group_2026_unique_';
+  const SECONDARY_BUTTON_CLASS_NAME = '_x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_secondary_2024_unique_';
   const DEFAULT_SEARCH_ENGINE_STORAGE_KEY = '_x_extension_default_search_engine_2024_unique_';
   const SYNC_META_KEY = '_x_extension_sync_meta_2024_unique_';
   const SYNC_KEYS = [
@@ -1414,7 +1415,7 @@
     const popActions = document.createElement('div');
     popActions.className = '_x_extension_popconfirm_actions_2024_unique_';
     const popCancel = document.createElement('button');
-    popCancel.className = '_x_extension_shortcut_secondary_2024_unique_';
+    popCancel.className = SECONDARY_BUTTON_CLASS_NAME;
     popCancel.setAttribute('data-i18n', 'confirm_cancel');
     popCancel.textContent = getMessage('confirm_cancel', '取消');
     const popOk = document.createElement('button');
@@ -3487,7 +3488,7 @@
       const popActions = document.createElement('div');
       popActions.className = '_x_extension_popconfirm_actions_2024_unique_';
       const popCancel = document.createElement('button');
-      popCancel.className = '_x_extension_shortcut_secondary_2024_unique_';
+      popCancel.className = SECONDARY_BUTTON_CLASS_NAME;
       popCancel.textContent = getMessage('confirm_cancel', '取消');
       const popOk = document.createElement('button');
       popOk.className = '_x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_submit_primary_2024_unique_ _x_extension_shortcut_save_2024_unique_';
@@ -3597,7 +3598,7 @@
       saveButton.className = '_x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_submit_primary_2024_unique_ _x_extension_shortcut_save_2024_unique_';
       saveButton.textContent = getMessage('shortcuts_save', '保存修改');
       const cancelButton = document.createElement('button');
-      cancelButton.className = '_x_extension_shortcut_secondary_2024_unique_';
+      cancelButton.className = SECONDARY_BUTTON_CLASS_NAME;
       cancelButton.textContent = getMessage('shortcuts_cancel', '取消');
       editorActions.appendChild(cancelButton);
       editorActions.appendChild(saveButton);
@@ -3923,7 +3924,7 @@
       const popActions = document.createElement('div');
       popActions.className = '_x_extension_popconfirm_actions_2024_unique_';
       const popCancel = document.createElement('button');
-      popCancel.className = '_x_extension_shortcut_secondary_2024_unique_';
+      popCancel.className = SECONDARY_BUTTON_CLASS_NAME;
       popCancel.textContent = getMessage('confirm_cancel', '取消');
       const popOk = document.createElement('button');
       popOk.className = '_x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_submit_primary_2024_unique_ _x_extension_shortcut_save_2024_unique_';
@@ -4076,7 +4077,7 @@
       const editorActions = document.createElement('div');
       editorActions.className = '_x_extension_shortcut_editor_actions_2024_unique_';
       const cancelButton = document.createElement('button');
-      cancelButton.className = '_x_extension_shortcut_secondary_2024_unique_';
+      cancelButton.className = SECONDARY_BUTTON_CLASS_NAME;
       cancelButton.textContent = getMessage('shortcuts_cancel', '取消');
       const saveButton = document.createElement('button');
       saveButton.className = '_x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_submit_primary_2024_unique_ _x_extension_shortcut_save_2024_unique_';

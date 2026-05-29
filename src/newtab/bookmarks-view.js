@@ -250,12 +250,18 @@
       }
       let hoverIntentTimer = null;
       let isHoverVisualActive = false;
+      let isMenuVisualLocked = false;
       const clearHoverIntentTimer = () => {
         if (hoverIntentTimer !== null && windowObj) {
           windowObj.clearTimeout(hoverIntentTimer);
           hoverIntentTimer = null;
         }
       };
+      const shouldKeepMenuVisualActive = () => Boolean(
+        isFolder &&
+        menuMode &&
+        (isMenuVisualLocked || card.getAttribute('aria-expanded') === 'true')
+      );
       const setHoverVisualActive = (active) => {
         if (isHoverVisualActive === active) {
           return;
@@ -266,6 +272,29 @@
           playFolderPathMorph(folderIcon, active);
         }
       };
+      const setMenuVisualLocked = (active) => {
+        const nextActive = Boolean(active);
+        if (isMenuVisualLocked === nextActive) {
+          if (nextActive) {
+            setHoverVisualActive(true);
+          }
+          return;
+        }
+        isMenuVisualLocked = nextActive;
+        clearHoverIntentTimer();
+        setHoverVisualActive(nextActive);
+      };
+      const deactivateBookmarkHoverVisual = () => {
+        clearHoverIntentTimer();
+        if (shouldKeepMenuVisualActive()) {
+          setHoverVisualActive(true);
+          return;
+        }
+        setHoverVisualActive(false);
+      };
+      if (isFolder && menuMode) {
+        card._xSetBookmarkMenuVisualActive = setMenuVisualLocked;
+      }
       const activateBookmarkHoverVisual = (event) => {
         const pointerType = event && typeof event.pointerType === 'string' ? event.pointerType : '';
         if (!shouldDelayHoverFromRecent(pointerType)) {
@@ -283,20 +312,17 @@
         activateBookmarkHoverVisual(event);
       });
       card.addEventListener('pointerleave', () => {
-        clearHoverIntentTimer();
-        setHoverVisualActive(false);
+        deactivateBookmarkHoverVisual();
       });
       card.addEventListener('pointercancel', () => {
-        clearHoverIntentTimer();
-        setHoverVisualActive(false);
+        deactivateBookmarkHoverVisual();
       });
       card.addEventListener('focus', () => {
         clearHoverIntentTimer();
         setHoverVisualActive(true);
       });
       card.addEventListener('blur', () => {
-        clearHoverIntentTimer();
-        setHoverVisualActive(false);
+        deactivateBookmarkHoverVisual();
       });
       card.addEventListener('pointerdown', () => {
         clearHoverIntentTimer();
@@ -310,6 +336,7 @@
         hideCursorTooltip();
         if (isFolder) {
           if (menuMode) {
+            setMenuVisualLocked(true);
             openFolderMenu(item, card);
             return;
           }
@@ -323,6 +350,7 @@
           event.preventDefault();
           if (isFolder) {
             if (menuMode) {
+              setMenuVisualLocked(true);
               openFolderMenu(item, card);
               return;
             }

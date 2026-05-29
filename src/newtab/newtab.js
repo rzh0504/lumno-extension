@@ -1305,15 +1305,44 @@
     feedbackDetail.setAttribute('data-channel', channel);
 
     const title = document.createElement('div');
+    const header = document.createElement('div');
+    const collapseButton = document.createElement('button');
+
+    header.className = 'x-nt-feedback-detail-header';
+    collapseButton.type = 'button';
+    collapseButton.className = 'x-nt-feedback-action x-nt-feedback-detail-collapse';
+    collapseButton.setAttribute(
+      'aria-label',
+      t('newtab_feedback_wechat_collapse_aria', 'Collapse WeChat group')
+    );
+    collapseButton.setAttribute('role', 'menuitem');
+    collapseButton.innerHTML = getRiSvg('ri-arrow-down-s-line', 'ri-size-16');
+    collapseButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      hideTopActionTooltip();
+      setFeedbackDetailOpen(false);
+      if (feedbackCommunityButton) {
+        try {
+          feedbackCommunityButton.focus({ preventScroll: true });
+        } catch (error) {
+          feedbackCommunityButton.focus();
+        }
+      }
+    });
     title.className = 'x-nt-feedback-detail-title';
     title.textContent = channel === 'wechat'
-      ? t('newtab_feedback_wechat_qr_title', 'WeChat group QR code')
+      ? t('newtab_feedback_wechat_panel_title', 'Bug reports & feature requests')
       : t('newtab_feedback_discord_label', 'Discord');
-    feedbackDetail.appendChild(title);
+    header.appendChild(collapseButton);
+    header.appendChild(title);
+    feedbackDetail.appendChild(header);
 
     if (channel === 'wechat') {
       const image = document.createElement('img');
       image.className = 'x-nt-feedback-qr-image';
+      image.width = 1080;
+      image.height = 1596;
       image.src = links.wechatQr || LUMNO_FEEDBACK_LINKS_FALLBACK.wechatQr;
       image.alt = t('newtab_feedback_wechat_qr_alt', 'Lumno WeChat group QR code');
       image.loading = 'lazy';
@@ -1324,6 +1353,12 @@
   function setFeedbackDetailOpen(open) {
     if (!feedbackDetail || !feedbackCommunityButton) {
       return;
+    }
+    if (feedbackControl) {
+      feedbackControl.setAttribute('data-detail-open', open ? 'true' : 'false');
+    }
+    if (feedbackPopover) {
+      feedbackPopover.setAttribute('data-detail-open', open ? 'true' : 'false');
     }
     feedbackDetail.hidden = !open;
     feedbackCommunityButton.setAttribute('data-active', open ? 'true' : 'false');
@@ -1469,6 +1504,7 @@
     feedbackControl = document.createElement('div');
     feedbackControl.className = 'x-nt-feedback-control';
     feedbackControl.setAttribute('data-menu-open', 'false');
+    feedbackControl.setAttribute('data-detail-open', 'false');
 
     feedbackButton = document.createElement('button');
     feedbackButton.type = 'button';

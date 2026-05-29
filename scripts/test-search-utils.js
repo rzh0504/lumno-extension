@@ -191,10 +191,22 @@ assert.deepStrictEqual(
   { messageKey: 'site_search_name_juejin', fallback: 'Juejin' },
   'legacy juejin key should resolve from shared mapping'
 );
+assert.deepStrictEqual(
+  search.getSiteSearchProviderDisplayNameMessage({ key: 'wx' }),
+  { messageKey: 'site_search_name_wechat', fallback: 'WeChat Official Accounts' },
+  'wechat provider display name should describe WeChat Official Accounts search'
+);
 assert.strictEqual(
   search.getSiteSearchProviderDisplayNameMessage({ key: 'unknown' }),
   null,
   'unknown provider display names should fall back to caller-owned name'
+);
+
+const wechatProvider = search.getDefaultSiteSearchProviders().find((provider) => provider.key === 'wx');
+assert.strictEqual(
+  wechatProvider && wechatProvider.name,
+  'WeChat Official Accounts',
+  'default wechat provider name should describe WeChat Official Accounts search'
 );
 
 assert.strictEqual(

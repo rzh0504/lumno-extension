@@ -515,6 +515,12 @@
   "newtab_feedback_wechat_tooltip": {
     "message": "WeChatグループに参加"
   },
+  "newtab_feedback_wechat_panel_title": {
+    "message": "バグ報告・新機能リクエスト"
+  },
+  "newtab_feedback_wechat_collapse_aria": {
+    "message": "フィードバックパネルを折りたたむ"
+  },
   "newtab_feedback_discord_label": {
     "message": "Discord"
   },
@@ -1050,7 +1056,7 @@
     "message": "Tmall"
   },
   "site_search_name_wechat": {
-    "message": "WeChat"
+    "message": "WeChat公式アカウント"
   },
   "site_search_name_wikipedia": {
     "message": "Wikipedia"

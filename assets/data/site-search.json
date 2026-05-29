@@ -142,7 +142,7 @@
     {
       "key": "wx",
       "aliases": ["weixin", "wechat"],
-      "name": "WeChat",
+      "name": "WeChat Official Accounts",
       "template": "https://weixin.sogou.com/weixin?query={query}"
     },
     {

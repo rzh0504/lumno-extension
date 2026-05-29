@@ -5,7 +5,8 @@
   }
   root.LumnoBackgroundPages = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function() {
-  const ONBOARDING_URL = 'https://lumno.kubai.design/onboarding/';
+  const ONBOARDING_WEB_URL = 'https://lumno.kubai.design/onboarding/';
+  const ONBOARDING_ROUTE_PATH = 'src/onboarding/onboarding.html';
   const RELEASE_URL = 'https://lumno.kubai.design/release/';
   const RELEASE_PAGE_OPENED_STORAGE_KEY = '_x_lumno_release_page_opened_2026_unique_';
 
@@ -59,14 +60,52 @@
     });
   }
 
-  function openOnboardingPage(callback) {
+  function buildExtensionPageUrl(path) {
     const chromeApi = getChromeApi();
-    const done = typeof callback === 'function' ? callback : () => {};
+    const routes = getRoutesApi();
+    if (routes && typeof routes.buildExtensionUrl === 'function') {
+      return routes.buildExtensionUrl(chromeApi, path);
+    }
+    if (chromeApi && chromeApi.runtime && typeof chromeApi.runtime.getURL === 'function') {
+      return chromeApi.runtime.getURL(path);
+    }
+    return path;
+  }
+
+  function buildOnboardingUrl(options) {
+    const params = new URLSearchParams();
+    params.set('entry', 'ext');
+    const reason = options && typeof options.reason === 'string'
+      ? String(options.reason).trim().toLowerCase()
+      : '';
+    if (reason) {
+      params.set('reason', reason);
+    }
+    const version = getExtensionVersionTag();
+    if (version) {
+      params.set('version', version);
+    }
+    const url = new URL(
+      buildExtensionPageUrl(ONBOARDING_ROUTE_PATH),
+      'chrome-extension://lumno/'
+    );
+    params.forEach((value, key) => {
+      url.searchParams.set(key, value);
+    });
+    return url.toString();
+  }
+
+  function openOnboardingPage(options, callback) {
+    const chromeApi = getChromeApi();
+    const openOptions = typeof options === 'function' ? {} : (options || {});
+    const done = typeof options === 'function'
+      ? options
+      : (typeof callback === 'function' ? callback : () => {});
     if (!chromeApi || !chromeApi.tabs) {
       done(false);
       return;
     }
-    chromeApi.tabs.create({ url: ONBOARDING_URL }, () => {
+    chromeApi.tabs.create({ url: buildOnboardingUrl(openOptions) }, () => {
       done(!(chromeApi.runtime && chromeApi.runtime.lastError));
     });
   }
@@ -278,6 +317,9 @@
 
   return Object.freeze({
     buildReleaseUrl,
+    buildOnboardingUrl,
+    ONBOARDING_WEB_URL,
+    ONBOARDING_ROUTE_PATH,
     RELEASE_PAGE_OPENED_STORAGE_KEY,
     getBookmarkManagerUrls,
     getExtensionDetailsUrl,

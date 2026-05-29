@@ -26,6 +26,10 @@
   width: 100%;
 }
 
+._x_extension_select_wrap_auto_2024_unique_ ._x_extension_select_menu_2024_unique_[data-menu-surface-width="content"] {
+  width: max-content;
+}
+
 ._x_extension_select_wrap_auto_2024_unique_ ._x_extension_select_option_2024_unique_ {
   white-space: nowrap;
 }

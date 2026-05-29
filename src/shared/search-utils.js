@@ -1909,7 +1909,7 @@
     { key: 'jj', aliases: ['juejin'], name: 'Juejin', template: 'https://juejin.cn/search?query={query}' },
     { key: 'tb', aliases: ['taobao'], name: 'Taobao', template: 'https://s.taobao.com/search?q={query}' },
     { key: 'tm', aliases: ['tmall'], name: 'Tmall', template: 'https://list.tmall.com/search_product.htm?q={query}' },
-    { key: 'wx', aliases: ['weixin', 'wechat'], name: 'WeChat', template: 'https://weixin.sogou.com/weixin?query={query}' },
+    { key: 'wx', aliases: ['weixin', 'wechat'], name: 'WeChat Official Accounts', template: 'https://weixin.sogou.com/weixin?query={query}' },
     { key: 'tw', aliases: ['twitter', 'x'], name: 'X', template: 'https://x.com/search?q={query}' },
     { key: 'rd', aliases: ['reddit'], name: 'Reddit', template: 'https://www.reddit.com/search/?q={query}' },
     { key: 'wk', aliases: ['wiki', 'wikipedia'], name: 'Wikipedia', template: 'https://en.wikipedia.org/wiki/Special:Search?search={query}' },
@@ -1932,7 +1932,7 @@
     jj: ['site_search_name_juejin', 'Juejin'],
     tb: ['site_search_name_taobao', 'Taobao'],
     tm: ['site_search_name_tmall', 'Tmall'],
-    wx: ['site_search_name_wechat', 'WeChat'],
+    wx: ['site_search_name_wechat', 'WeChat Official Accounts'],
     zw: ['site_search_name_wikipedia', 'Wikipedia']
   });
 

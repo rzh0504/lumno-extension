@@ -1021,8 +1021,24 @@
       .x-nt-bookmark-cascade-submenu {
         margin-top: 0;
       }
+      .x-nt-bookmark-cascade-title {
+        flex: 0 0 auto;
+        max-width: 100%;
+        padding: 4px 8px 2px;
+        overflow: hidden;
+        box-sizing: border-box;
+        color: #7a8491;
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        cursor: default;
+        user-select: none;
+      }
       .x-nt-bookmark-cascade-item {
         all: unset;
+        flex: 0 0 auto;
         width: 100%;
         min-height: 32px;
         padding: 0 8px;
@@ -1072,7 +1088,7 @@
         flex: 1 1 auto;
         overflow: hidden;
         text-overflow: ellipsis;
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 500;
         line-height: 1.25;
       }
@@ -1111,6 +1127,9 @@
         background: rgba(15, 23, 42, 0.92);
         border-color: rgba(96, 165, 250, 0.44);
         box-shadow: 0 8px 18px rgba(2, 6, 23, 0.32);
+      }
+      body[data-theme="dark"] .x-nt-bookmark-cascade-title {
+        color: #94a3b8;
       }
       body[data-theme="dark"] .x-nt-bookmark-cascade-item {
         color: #d6dbe3;
@@ -1939,8 +1958,9 @@
         position: absolute;
         right: 0;
         bottom: 46px;
-        width: max-content;
-        max-width: min(210px, calc(100vw - 28px));
+        width: 170px;
+        max-width: min(264px, calc(100vw - 28px));
+        height: 50px;
         padding: 8px;
         border-radius: 14px;
         background: rgba(255, 255, 255, 0.92);
@@ -1952,14 +1972,15 @@
         backdrop-filter: blur(18px) saturate(135%);
         -webkit-backdrop-filter: blur(18px) saturate(135%);
         box-sizing: border-box;
+        contain: layout paint;
         color: #212733;
         opacity: 0;
+        overflow: hidden;
         pointer-events: none;
-        transform: translate3d(0, 6px, 0) scale(0.98);
+        transform: translate3d(0, 6px, 0) scale(0.97);
         transform-origin: right bottom;
-        transition:
-          opacity 140ms ease,
-          transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+        will-change: transform, opacity, width, height;
+        transition: opacity 170ms ease, transform 360ms cubic-bezier(0.2, 1.45, 0.35, 1), width 260ms cubic-bezier(0.22, 1, 0.36, 1), height 260ms cubic-bezier(0.22, 1, 0.36, 1), padding 180ms ease;
       }
       .x-nt-feedback-popover[hidden] {
         display: none;
@@ -1969,10 +1990,28 @@
         pointer-events: auto;
         transform: translate3d(0, 0, 0) scale(1);
       }
+      .x-nt-feedback-control[data-detail-open="true"] .x-nt-feedback-popover {
+        width: 264px;
+        height: min(422px, calc(100dvh - 78px));
+        padding: 10px;
+        border-radius: 16px;
+      }
       .x-nt-feedback-menu {
         display: grid;
         grid-template-columns: repeat(4, 34px);
         gap: 6px;
+        transition:
+          opacity 140ms ease,
+          transform 180ms ease,
+          visibility 140ms ease;
+      }
+      .x-nt-feedback-control[data-detail-open="true"] .x-nt-feedback-menu {
+        height: 0;
+        opacity: 0;
+        overflow: hidden;
+        pointer-events: none;
+        transform: translateY(4px) scale(0.98);
+        visibility: hidden;
       }
       .x-nt-feedback-action {
         all: unset;
@@ -2019,6 +2058,9 @@
           0 2px 3px rgba(15, 23, 42, 0.04),
           inset 0 -4px 3px rgba(255, 255, 255, 0.64);
       }
+      .x-nt-feedback-detail-collapse:hover {
+        transform: none;
+      }
       .x-nt-feedback-action:active {
         transform: translateY(1px);
         background: linear-gradient(180deg, #ffffff 0%, #ecedef 100%);
@@ -2062,29 +2104,47 @@
           0 0 1px rgba(0, 0, 0, 0.09);
       }
       .x-nt-feedback-detail {
-        width: 164px;
-        margin-top: 8px;
-        padding-top: 8px;
-        border-top: 1px solid rgba(210, 216, 223, 0.74);
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+        transition:
+          opacity 170ms ease,
+          transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
       }
       .x-nt-feedback-detail[hidden] {
         display: none;
       }
+      .x-nt-feedback-control[data-detail-open="true"] .x-nt-feedback-detail {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+      .x-nt-feedback-detail-header {
+        min-height: 30px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
       .x-nt-feedback-detail-title {
-        margin: 0 0 7px;
+        min-width: 0;
+        margin: 0;
         color: #212733;
-        font-size: 12px;
+        font-size: 14px;
         line-height: 1.25;
-        font-weight: 600;
+        font-weight: 700;
+        overflow: hidden;
+        text-overflow: ellipsis;
         white-space: nowrap;
       }
       .x-nt-feedback-qr-image {
         display: block;
-        width: 164px;
+        width: 100%;
         height: auto;
-        max-height: calc(100vh - 190px);
-        max-height: calc(100dvh - 190px);
-        border-radius: 10px;
+        max-height: min(360px, calc(100vh - 142px));
+        max-height: min(360px, calc(100dvh - 142px));
+        border-radius: 12px;
         object-fit: contain;
         background: #f2f4f8;
       }
@@ -2108,7 +2168,7 @@
         border-color: rgba(255, 255, 255, 0.18);
       }
       body[data-theme="dark"] .x-nt-feedback-detail {
-        border-top-color: rgba(255, 255, 255, 0.12);
+        color: #f4f4f5;
       }
       body[data-theme="dark"] .x-nt-feedback-detail-title {
         color: #f4f4f5;
@@ -2119,6 +2179,8 @@
       @media (prefers-reduced-motion: reduce) {
         .x-nt-feedback-popover,
         .x-nt-feedback-action,
+        .x-nt-feedback-menu,
+        .x-nt-feedback-detail,
         .x-nt-section-mode-select ._x_extension_select_trigger_2024_unique_ {
           transition: none;
           transform: none;
@@ -2455,11 +2517,11 @@
         position: absolute;
         cursor: pointer;
         inset: 0;
-        background: linear-gradient(180deg, #c7c7c7 0%, #f9f9f9 100%);
-        border: 0.5px solid #dedede;
+        background: linear-gradient(180deg, #e1e1e1 0%, #f4f4f4 100%);
+        border: 0.5px solid #dadada;
         box-shadow:
-          inset 0 -1px 1px rgba(255, 255, 255, 0.08),
-          inset 0 1px 2px rgba(0, 0, 0, 0.34);
+          inset 0 -1px 1px rgba(255, 255, 255, 0.32),
+          inset 0 1px 1.5px rgba(0, 0, 0, 0.14);
         border-radius: 999px;
         overflow: hidden;
         z-index: 0;

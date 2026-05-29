@@ -7,6 +7,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function() {
   const ROUTE_PATHS = Object.freeze({
     newtab: 'src/newtab/newtab.html',
+    onboarding: 'src/onboarding/onboarding.html',
     options: 'src/options/options.html',
     optionsAppearance: 'src/options/options.html#appearance'
   });
@@ -92,12 +93,19 @@
     return pathMatchesRoute(getPathname(url), ROUTE_PATHS.options);
   }
 
+  function isOnboardingUrl(url) {
+    return pathMatchesRoute(getPathname(url), ROUTE_PATHS.onboarding);
+  }
+
   function classifyExtensionUrl(url) {
     if (isNewtabUrl(url)) {
       return 'newtab';
     }
     if (isOptionsUrl(url)) {
       return 'options';
+    }
+    if (isOnboardingUrl(url)) {
+      return 'onboarding';
     }
     return 'other';
   }
@@ -109,6 +117,7 @@
     buildOptionsUrl,
     isNewtabUrl,
     isOptionsUrl,
+    isOnboardingUrl,
     classifyExtensionUrl
   });
 });

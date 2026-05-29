@@ -111,6 +111,16 @@ assertContains(
 );
 assertContains(
   customSelectCss,
+  '._x_extension_select_wrap_auto_2024_unique_ ._x_extension_select_menu_2024_unique_[data-menu-surface-width="content"]',
+  'auto custom select menus should let content-width mode override trigger-width sizing'
+);
+assertContains(
+  customSelectCss,
+  'width: max-content;',
+  'auto custom select content-width menus should size to their option content instead of the trigger'
+);
+assertContains(
+  customSelectCss,
   '[data-icon-only="true"]',
   'shared custom select CSS should style icon-only triggers'
 );
@@ -615,6 +625,28 @@ assertContains(
   newtabHtml,
   '.x-nt-bookmark-cascade-submenu',
   'new tab should style nested bookmark submenus'
+);
+assertContains(
+  cascadeMenuJs,
+  'x-nt-bookmark-cascade-title',
+  'bookmark cascade runtime should render folder titles inside menu levels'
+);
+assertContains(
+  newtabHtml,
+  '.x-nt-bookmark-cascade-title',
+  'new tab should style bookmark cascade folder titles'
+);
+const bookmarkCascadeTitleCss = getCssRuleBody(newtabHtml, '.x-nt-bookmark-cascade-title');
+assertContains(
+  bookmarkCascadeTitleCss,
+  'flex: 0 0 auto;',
+  'bookmark cascade titles should not shrink inside scrollable cascade levels'
+);
+const bookmarkCascadeItemCss = getCssRuleBody(newtabHtml, '.x-nt-bookmark-cascade-item');
+assertContains(
+  bookmarkCascadeItemCss,
+  'flex: 0 0 auto;',
+  'bookmark cascade rows should not shrink inside scrollable cascade levels'
 );
 const bookmarkCascadeLevelCss = getCssRuleBody(newtabHtml, '.x-nt-bookmark-cascade-level');
 assertContains(

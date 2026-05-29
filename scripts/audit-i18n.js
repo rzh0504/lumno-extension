@@ -12,6 +12,7 @@ const STRING_RE = /(['"`])((?:\\.|(?!\1)[\s\S])*?)\1/g;
 const ALLOWLIST = [
   'brand/provider names in assets/data/site-search.json and provider defaults',
   'AI provider remote page selector probes in src/background/ai-provider-submit.js',
+  'localized onboarding content model in src/onboarding/onboarding-content.js',
   'browser built-in bookmark folder aliases used only for folder detection',
   'debug-only score reason strings when the debug flag is disabled by default',
   'Chinese search-intent tokens in src/shared/search-utils.js scoring dictionaries'
@@ -100,6 +101,12 @@ function isAllowlistedLine(file, line) {
     return true;
   }
   if (file === 'src/shared/search-utils.js') {
+    return true;
+  }
+  if (file === 'src/onboarding/onboarding-content.js') {
+    return true;
+  }
+  if (file === 'src/onboarding/onboarding.js' && /\b(?:error|copied):\s*['"`]/.test(line)) {
     return true;
   }
   if (/title === 'bookmarks bar'/.test(line) ||

@@ -515,6 +515,12 @@
   "newtab_feedback_wechat_tooltip": {
     "message": "加入微信群"
   },
+  "newtab_feedback_wechat_panel_title": {
+    "message": "Bug 反馈 & 新功能提需"
+  },
+  "newtab_feedback_wechat_collapse_aria": {
+    "message": "收起反馈面板"
+  },
   "newtab_feedback_discord_label": {
     "message": "Discord"
   },
@@ -1050,7 +1056,7 @@
     "message": "天猫"
   },
   "site_search_name_wechat": {
-    "message": "微信"
+    "message": "微信公众号"
   },
   "site_search_name_wikipedia": {
     "message": "维基百科"

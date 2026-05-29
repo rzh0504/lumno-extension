@@ -515,6 +515,12 @@
   "newtab_feedback_wechat_tooltip": {
     "message": "Joining WeChat group"
   },
+  "newtab_feedback_wechat_panel_title": {
+    "message": "Bug reports & feature requests"
+  },
+  "newtab_feedback_wechat_collapse_aria": {
+    "message": "Collapse feedback panel"
+  },
   "newtab_feedback_discord_label": {
     "message": "Discord"
   },
@@ -1050,7 +1056,7 @@
     "message": "Tmall"
   },
   "site_search_name_wechat": {
-    "message": "WeChat"
+    "message": "WeChat Official Accounts"
   },
   "site_search_name_wikipedia": {
     "message": "Wikipedia"

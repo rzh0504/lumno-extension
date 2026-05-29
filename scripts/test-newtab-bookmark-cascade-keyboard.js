@@ -236,6 +236,11 @@ function getMenuItems(levelElement) {
   return levelElement ? levelElement.querySelectorAll('.x-nt-bookmark-cascade-item') : [];
 }
 
+function getLevelTitle(levelElement) {
+  const title = levelElement && levelElement.querySelector('.x-nt-bookmark-cascade-title');
+  return title ? title.textContent : '';
+}
+
 function getActiveLabel(levelElement) {
   const active = levelElement && levelElement.querySelector('.x-nt-bookmark-cascade-item[data-active="true"]');
   return active ? active.textContent : '';
@@ -256,6 +261,10 @@ async function flushPromises() {
 (async () => {
   const documentObj = createFakeDocument();
   const anchor = documentObj.createElement('button');
+  const anchorVisualStates = [];
+  anchor._xSetBookmarkMenuVisualActive = (active) => {
+    anchorVisualStates.push(Boolean(active));
+  };
   anchor.setRect({ left: 20, top: 20, width: 120, height: 40 });
   documentObj.body.appendChild(anchor);
 
@@ -317,12 +326,19 @@ async function flushPromises() {
     navigateToUrl() {}
   });
 
-  runtime.open({ id: 'root' }, anchor);
+  runtime.open({ id: 'root', title: 'Root' }, anchor);
   await flushPromises();
+  assert.deepStrictEqual(
+    anchorVisualStates,
+    [true],
+    'opening the cascade menu should keep the trigger folder card visually active'
+  );
 
   let levels = documentObj.body.querySelectorAll('.x-nt-bookmark-cascade-level');
   assert.strictEqual(levels.length, 1, 'opening a cascade should render the root menu level');
   let rootItems = getMenuItems(levels[0]);
+  assert.strictEqual(getLevelTitle(levels[0]), 'Root', 'opening a cascade should render the trigger folder title');
+  assert.strictEqual(rootItems.length, 3, 'folder titles should not be counted as keyboard menu items');
   assert.strictEqual(getActiveLabel(levels[0]), 'Research', 'opening a cascade should select the first menu item');
   assert.strictEqual(documentObj.activeElement, rootItems[0], 'opening a cascade should move keyboard focus into the menu');
 
@@ -338,6 +354,8 @@ async function flushPromises() {
   levels = documentObj.body.querySelectorAll('.x-nt-bookmark-cascade-level');
   assert.strictEqual(levels.length, 2, 'ArrowRight on a folder should open its submenu');
   assert.strictEqual(rootItems[0].getAttribute('aria-expanded'), 'true', 'ArrowRight should mark the selected folder expanded');
+  assert.strictEqual(getLevelTitle(levels[1]), 'Research', 'opening a submenu should render the nested folder title');
+  assert.strictEqual(getMenuItems(levels[1]).length, 2, 'nested folder titles should not be counted as keyboard menu items');
   assert.strictEqual(getActiveLabel(levels[1]), 'Amazon Menu Aim', 'opening a submenu from keyboard should select its first item');
   assert.strictEqual(documentObj.activeElement, getMenuItems(levels[1])[0], 'ArrowRight should move focus into the submenu');
 
@@ -355,11 +373,17 @@ async function flushPromises() {
   dispatchKey(documentObj, 'ArrowRight');
   levels = documentObj.body.querySelectorAll('.x-nt-bookmark-cascade-level');
   assert.strictEqual(levels.length, 2, 'ArrowRight should enter the newly selected sibling folder');
+  assert.strictEqual(getLevelTitle(levels[1]), 'Patterns', 'sibling submenus should render their own folder title');
   assert.strictEqual(getActiveLabel(levels[1]), 'Pattern Library', 'the newly opened submenu should select its first child');
 
   dispatchKey(documentObj, 'Escape');
   assert.strictEqual(runtime.isOpen(), false, 'Escape should close the cascade menu');
   assert.strictEqual(documentObj.activeElement, anchor, 'Escape should restore focus to the trigger');
+  assert.strictEqual(
+    anchorVisualStates[anchorVisualStates.length - 1],
+    false,
+    'closing the cascade menu should release the trigger folder card visual active state'
+  );
 
   console.log('newtab bookmark cascade keyboard tests passed');
 })();

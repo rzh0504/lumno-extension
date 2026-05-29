@@ -23,8 +23,12 @@ function createChromeApi(localStore, syncStore, createdTabs, version) {
   return {
     runtime: {
       lastError: null,
+      id: 'lumno-test-id',
       getManifest() {
         return { version };
+      },
+      getURL(path) {
+        return `chrome-extension://lumno-test-id/${path}`;
       }
     },
     storage: {
@@ -48,15 +52,45 @@ function openReleasePage(options) {
   });
 }
 
+function openOnboardingPage(options) {
+  return new Promise((resolve) => {
+    pages.openOnboardingPage(options, resolve);
+  });
+}
+
 (async () => {
   const localStore = {};
   const syncStore = {};
   const createdTabs = [];
   global.chrome = createChromeApi(localStore, syncStore, createdTabs, '0.9.9');
 
+  assert.strictEqual(typeof pages.buildOnboardingUrl, 'function', 'onboarding URL builder should be exported');
+  const builtOnboardingUrl = new URL(pages.buildOnboardingUrl({ reason: 'manual' }));
+  assert.strictEqual(
+    `${builtOnboardingUrl.protocol}//${builtOnboardingUrl.host}${builtOnboardingUrl.pathname}`,
+    'chrome-extension://lumno-test-id/src/onboarding/onboarding.html',
+    'built onboarding URL should point to the extension-local page'
+  );
+  assert.strictEqual(builtOnboardingUrl.searchParams.get('entry'), 'ext', 'built onboarding URL should include extension entry context');
+  assert.strictEqual(builtOnboardingUrl.searchParams.get('reason'), 'manual', 'built onboarding URL should include open reason');
+  assert.strictEqual(builtOnboardingUrl.searchParams.get('version'), 'v0.9.9', 'built onboarding URL should include extension version');
+
+  const onboardingOpened = await openOnboardingPage({ reason: 'manual' });
+  assert.strictEqual(onboardingOpened, true, 'manual onboarding should open a tab');
+  assert.strictEqual(createdTabs.length, 1, 'manual onboarding should create one tab');
+  const onboardingUrl = new URL(createdTabs[0]);
+  assert.strictEqual(
+    `${onboardingUrl.protocol}//${onboardingUrl.host}${onboardingUrl.pathname}`,
+    'chrome-extension://lumno-test-id/src/onboarding/onboarding.html',
+    'onboarding should open the extension-local page'
+  );
+  assert.strictEqual(onboardingUrl.searchParams.get('entry'), 'ext', 'onboarding should include extension entry context');
+  assert.strictEqual(onboardingUrl.searchParams.get('reason'), 'manual', 'onboarding should include open reason');
+  assert.strictEqual(onboardingUrl.searchParams.get('version'), 'v0.9.9', 'onboarding should include extension version');
+
   const firstOpened = await openReleasePage({ reason: 'update', oncePerVersion: true });
   assert.strictEqual(firstOpened, true, 'first update should open the release page');
-  assert.strictEqual(createdTabs.length, 1, 'first update should create one release tab');
+  assert.strictEqual(createdTabs.length, 2, 'first update should create one release tab');
   assert.strictEqual(
     syncStore[pages.RELEASE_PAGE_OPENED_STORAGE_KEY].version,
     'v0.9.9',
@@ -70,12 +104,12 @@ function openReleasePage(options) {
 
   const secondOpened = await openReleasePage({ reason: 'update', oncePerVersion: true });
   assert.strictEqual(secondOpened, false, 'same version should not reopen the release page');
-  assert.strictEqual(createdTabs.length, 1, 'same version should not create another release tab');
+  assert.strictEqual(createdTabs.length, 2, 'same version should not create another release tab');
 
   global.chrome = createChromeApi(localStore, syncStore, createdTabs, '0.10.0');
   const nextVersionOpened = await openReleasePage({ reason: 'update', oncePerVersion: true });
   assert.strictEqual(nextVersionOpened, true, 'new version should open the release page again');
-  assert.strictEqual(createdTabs.length, 2, 'new version should create a new release tab');
+  assert.strictEqual(createdTabs.length, 3, 'new version should create a new release tab');
   assert.strictEqual(
     syncStore[pages.RELEASE_PAGE_OPENED_STORAGE_KEY].version,
     'v0.10.0',
