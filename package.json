@@ -18,6 +18,7 @@
     "test:extension-routes": "node scripts/test-extension-routes.js",
     "test:extension-pages": "node scripts/test-extension-pages.js",
     "test:onboarding-content": "node scripts/test-onboarding-content.js",
+    "test:onboarding-shell": "node scripts/test-onboarding-shell.js",
     "test:feature-hints": "node scripts/test-feature-hints.js",
     "test:pip-main-world": "node scripts/test-pip-main-world.js",
     "test:menu-surface": "node scripts/test-menu-surface.js",
