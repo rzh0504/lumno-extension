@@ -143,6 +143,7 @@
     const onDeleteHistory = typeof config.onDeleteHistory === 'function'
       ? config.onDeleteHistory
       : noop;
+    let openInCurrentTabModifierActive = false;
     const showTopActionTooltip = typeof config.showTopActionTooltip === 'function'
       ? config.showTopActionTooltip
       : noop;
@@ -281,6 +282,7 @@
 
       tag.appendChild(label);
       tag.appendChild(keycap);
+      tag._xActionLabel = label;
       return tag;
     }
 
@@ -388,6 +390,46 @@
         hasActionTags: false,
         hasSwitchAction: false
       };
+    }
+
+    function getModifierAdjustedAction(action) {
+      if (actionModel && typeof actionModel.getModifierAdjustedAction === 'function') {
+        return actionModel.getModifierAdjustedAction(action, {
+          openInCurrentTab: openInCurrentTabModifierActive
+        });
+      }
+      return openInCurrentTabModifierActive && action === 'openNewTab' ? 'go' : action;
+    }
+
+    function setSuggestionActionTagContent(tag, action, suggestion) {
+      if (!tag || !tag._xActionLabel) {
+        return;
+      }
+      tag._xActionLabel.textContent = getSuggestionActionLabel(getModifierAdjustedAction(action), suggestion);
+    }
+
+    function setSuggestionVisitButtonContent(button, action, suggestion) {
+      setInlineLabelWithIcon(
+        button,
+        getSuggestionActionLabel(getModifierAdjustedAction(action), suggestion),
+        getRiSvg('ri-arrow-right-line', 'ri-size-12')
+      );
+    }
+
+    function updateModifierActionLabels() {
+      items.forEach((item) => {
+        if (!item || !item._xIsSearchSuggestion) {
+          return;
+        }
+        if (item._xVisitButton && item._xVisitButtonAction) {
+          setSuggestionVisitButtonContent(item._xVisitButton, item._xVisitButtonAction, item._xSuggestion);
+        }
+        if (Array.isArray(item._xActionTags)) {
+          item._xActionTags.forEach((tag) => {
+            setSuggestionActionTagContent(tag, tag._xAction, tag._xSuggestion);
+          });
+        }
+      });
     }
 
     function renderHighlightedText(target, text, query) {
@@ -920,11 +962,16 @@
           shouldSwitchMatchedTab: false,
           enterAction: 'go'
         });
+        const actionTagNodes = [];
         itemActionModel.actionTags.forEach((tag) => {
-          actionTags.appendChild(createActionTag(
-            getSuggestionActionLabel(tag.action, suggestion),
+          const actionTag = createActionTag(
+            getSuggestionActionLabel(getModifierAdjustedAction(tag.action), suggestion),
             tag.keyLabel || 'Enter'
-          ));
+          );
+          actionTag._xAction = tag.action;
+          actionTag._xSuggestion = suggestion;
+          actionTags.appendChild(actionTag);
+          actionTagNodes.push(actionTag);
         });
 
         const visitButton = documentRef.createElement('button');
@@ -932,16 +979,15 @@
         visitButton.className = 'x-nt-suggestion-action-button x-nt-suggestion-visit-button';
         setSuggestionActionButtonVisible(visitButton, !itemActionModel.alwaysHideVisitButton);
         setSuggestionActionButtonPalette(visitButton, 'var(--x-nt-subtext, #9CA3AF)', 'transparent', 'transparent');
-        setInlineLabelWithIcon(
-          visitButton,
-          getSuggestionActionLabel(itemActionModel.visitButtonAction, suggestion),
-          getRiSvg('ri-arrow-right-line', 'ri-size-12')
-        );
+        setSuggestionVisitButtonContent(visitButton, itemActionModel.visitButtonAction, suggestion);
 
         suggestionItem._xTagContainer = actionTags;
         suggestionItem._xActionModel = itemActionModel;
         suggestionItem._xHasActionTags = itemActionModel.hasActionTags;
         suggestionItem._xVisitButton = visitButton;
+        suggestionItem._xVisitButtonAction = itemActionModel.visitButtonAction;
+        suggestionItem._xActionTags = actionTagNodes;
+        suggestionItem._xSuggestion = suggestion;
         suggestionItem._xAlwaysHideVisitButton = itemActionModel.alwaysHideVisitButton;
         suggestionItem._xHasSwitchAction = itemActionModel.hasSwitchAction;
 
@@ -1067,6 +1113,14 @@
       render,
       renderTabs,
       updateSelection,
+      setOpenInCurrentTabModifierActive(active) {
+        const nextActive = Boolean(active);
+        if (openInCurrentTabModifierActive === nextActive) {
+          return;
+        }
+        openInCurrentTabModifierActive = nextActive;
+        updateModifierActionLabels();
+      },
       clear,
       destroy,
       getAutoHighlightIndex,

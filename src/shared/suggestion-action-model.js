@@ -62,6 +62,24 @@
     return 'openNewTab';
   }
 
+  function getModifierAdjustedAction(action, options) {
+    const rawAction = String(action || '');
+    const config = options || {};
+    if (config.openInCurrentTab && rawAction === 'openNewTab') {
+      return 'go';
+    }
+    return rawAction;
+  }
+
+  function shouldOpenNewTabActionInCurrentTab(suggestion, options) {
+    const config = options || {};
+    if (!config.openInCurrentTab) {
+      return false;
+    }
+    const action = config.action || getVisitButtonAction(suggestion, config);
+    return action === 'openNewTab';
+  }
+
   function createSearchActionModel(options) {
     const config = options || {};
     const suggestion = config.suggestion || null;
@@ -139,6 +157,8 @@
   return {
     createSearchActionModel,
     getVisitButtonAction,
+    getModifierAdjustedAction,
+    shouldOpenNewTabActionInCurrentTab,
     shouldShowVisitButton,
     getActionContextKey
   };

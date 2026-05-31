@@ -24,6 +24,12 @@ try {
 }
 
 try {
+  importScripts(chrome.runtime.getURL('src/background/command-target-policy.js'));
+} catch (error) {
+  console.warn('Lumno: failed to load command target policy.', error);
+}
+
+try {
   importScripts(chrome.runtime.getURL('src/shared/settings.js'));
 } catch (error) {
   console.warn('Lumno: failed to load settings utils.', error);
@@ -98,6 +104,7 @@ const openBookmarkManagerPage = BACKGROUND_PAGES.openBookmarkManagerPage;
 const openExtensionShortcutsPage = BACKGROUND_PAGES.openExtensionShortcutsPage;
 const BACKGROUND_MESSAGE_ROUTER = globalThis.LumnoBackgroundMessageRouter || {};
 const EXTENSION_ROUTES = globalThis.LumnoExtensionRoutes || {};
+const COMMAND_TARGET_POLICY = globalThis.LumnoCommandTargetPolicy || {};
 const FAVICON_UTILS = globalThis.LumnoFaviconUtils || {};
 const BACKGROUND_NEWTAB_FALLBACK = globalThis.LumnoBackgroundNewtabFallback || {};
 const isLocalFileLikeTargetUrl = BACKGROUND_NEWTAB_FALLBACK.isLocalFileLikeTargetUrl;
@@ -299,6 +306,67 @@ function isOwnExtensionUrl(url) {
   } catch (e) {
     return false;
   }
+}
+
+function isLumnoOnboardingUrl(url) {
+  return typeof EXTENSION_ROUTES.isOnboardingUrl === 'function' &&
+    EXTENSION_ROUTES.isOnboardingUrl(url) &&
+    isOwnExtensionUrl(url);
+}
+
+function shouldSuppressRestrictedCommandFallback(source, url) {
+  if (COMMAND_TARGET_POLICY && typeof COMMAND_TARGET_POLICY.shouldSuppressRestrictedCommandFallback === 'function') {
+    return COMMAND_TARGET_POLICY.shouldSuppressRestrictedCommandFallback(source, url, {
+      isOwnExtensionUrl,
+      isOnboardingUrl: isLumnoOnboardingUrl
+    });
+  }
+  return false;
+}
+
+function shouldTriggerOnboardingOverlayFromCommand(source, url) {
+  if (COMMAND_TARGET_POLICY && typeof COMMAND_TARGET_POLICY.shouldTriggerOnboardingOverlayFromCommand === 'function') {
+    return COMMAND_TARGET_POLICY.shouldTriggerOnboardingOverlayFromCommand(source, url, {
+      isOwnExtensionUrl,
+      isOnboardingUrl: isLumnoOnboardingUrl
+    });
+  }
+  return shouldSuppressRestrictedCommandFallback(source, url);
+}
+
+function triggerOnboardingOverlayFromCommand(activeTab, source) {
+  if (!activeTab || typeof activeTab.id !== 'number') {
+    return;
+  }
+  const action = COMMAND_TARGET_POLICY.ONBOARDING_SEARCH_OVERLAY_COMMAND_ACTION ||
+    'triggerOnboardingSearchOverlayFromCommand';
+  if (!chrome || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') {
+    logHotkeyDebug('onboarding-command-forward-missed', {
+      tabId: activeTab.id,
+      source: source || '',
+      reason: 'runtime-send-message-unavailable'
+    });
+    return;
+  }
+  chrome.runtime.sendMessage({
+    action,
+    tabId: activeTab.id,
+    source: source || ''
+  }, (response) => {
+    if (chrome.runtime && chrome.runtime.lastError) {
+      logHotkeyDebug('onboarding-command-forward-failed', {
+        tabId: activeTab.id,
+        source: source || '',
+        error: chrome.runtime.lastError.message || 'unknown'
+      });
+      return;
+    }
+    logHotkeyDebug('onboarding-command-forwarded', {
+      tabId: activeTab.id,
+      source: source || '',
+      handled: Boolean(response && response.ok)
+    });
+  });
 }
 
 function getOwnExtensionFaviconUrl() {
@@ -1327,6 +1395,11 @@ function openOverlayOnTab(activeTab, tabs, source) {
       requestFocusVisibleNewtabInput(source, activeTab.id);
       return;
     }
+    if (shouldTriggerOnboardingOverlayFromCommand(source, activeUrl)) {
+      triggerOnboardingOverlayFromCommand(activeTab, source);
+      logHotkeyDebug('suppressed', { reason: 'restricted_onboarding_command', source: source || '' });
+      return;
+    }
     if (recoverOverlayTargetFromCommandNewtab(activeTab, tabs, source)) {
       return;
     }
@@ -2113,9 +2186,12 @@ function handleTabMessage(request, sender, sendResponse) {
       ensureTabSwitchStatsLoaded()
         .catch(() => {})
         .finally(() => {
+          const requestedCurrentTabId = Number.isFinite(Number(request && request.currentTabId))
+            ? Number(request.currentTabId)
+            : null;
           const currentTabId = sender && sender.tab && typeof sender.tab.id === 'number'
             ? sender.tab.id
-            : null;
+            : requestedCurrentTabId;
           chrome.tabs.query({}, (tabs) => {
             const normalizedTabs = (Array.isArray(tabs) ? tabs : [])
               .map((tab) => {
@@ -2505,6 +2581,29 @@ function handleExtensionPageMessage(request, sender, sendResponse) {
       if (!targetUrl) {
         sendResponse({ ok: false });
         return;
+      }
+      if (request.disposition === 'currentTab') {
+        const senderTabId = sender && sender.tab && typeof sender.tab.id === 'number'
+          ? sender.tab.id
+          : null;
+        const updateTab = (tabId) => {
+          chrome.tabs.update(tabId, { url: targetUrl, active: true }, () => {
+            sendResponse({ ok: !(chrome.runtime && chrome.runtime.lastError) });
+          });
+        };
+        if (typeof senderTabId === 'number') {
+          updateTab(senderTabId);
+          return true;
+        }
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          const activeTab = Array.isArray(tabs) && tabs.length > 0 ? tabs[0] : null;
+          if (activeTab && typeof activeTab.id === 'number') {
+            updateTab(activeTab.id);
+            return;
+          }
+          sendResponse({ ok: false });
+        });
+        return true;
       }
       chrome.tabs.create({ url: targetUrl }, () => {
         sendResponse({ ok: !(chrome.runtime && chrome.runtime.lastError) });

@@ -436,10 +436,80 @@ async function testAiProviderVisitButtonUsesWebAppLabel() {
   );
 }
 
+async function testOpenNewTabVisitButtonReflectsCurrentTabModifier() {
+  const document = createFakeDocument();
+  const container = document.createElement('div');
+  container.setConnected(true);
+  const items = [];
+  const defaultTheme = faviconTheme.createDefaultTheme();
+
+  const view = suggestionsView.createSuggestionsView({
+    document,
+    container,
+    items,
+    t: (key, fallback) => fallback || key,
+    formatMessage: (key, fallback, params) => String(fallback || key).replace('{name}', params && params.name ? params.name : ''),
+    getRiSvg: () => '',
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl,
+    getThemeHostForSuggestion: (suggestion) => getHostFromUrl(suggestion && suggestion.url),
+    shouldBlockFaviconForHost,
+    getImmediateThemeForSuggestion: () => defaultTheme,
+    getThemeForSuggestion: () => Promise.resolve(defaultTheme),
+    getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    getHoverColors: (theme) => faviconTheme.getHoverColors(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
+    applyMarkVariables: () => {},
+    actionModel: globalThis.LumnoSuggestionActionModel,
+    defaultTheme
+  });
+
+  view.render({
+    query: 'lumno',
+    primaryHighlightIndex: -1,
+    primaryHighlightReason: 'none',
+    suggestions: [{
+      type: 'history',
+      title: 'Lumno docs',
+      url: 'https://docs.example/lumno',
+      favicon: ''
+    }]
+  });
+
+  const item = view.getItems()[0];
+  assert.ok(item && item._xVisitButton, 'history suggestion should render a visit button');
+  assert.strictEqual(
+    item._xVisitButton.textContent,
+    '新开',
+    'default open-new-tab result should show the new-tab action label'
+  );
+
+  view.setOpenInCurrentTabModifierActive(true);
+  assert.strictEqual(
+    item._xVisitButton.textContent,
+    '前往',
+    'Alt/Option state should change open-new-tab visit button copy to current-tab navigation'
+  );
+
+  view.setOpenInCurrentTabModifierActive(false);
+  assert.strictEqual(
+    item._xVisitButton.textContent,
+    '新开',
+    'releasing Alt/Option should restore the new-tab action label'
+  );
+}
+
 testLocalUrlSuggestionUsesFallbackTheme()
   .then(testGoogleFallbackFaviconUsesFallbackTheme)
   .then(testVisitButtonAndEnterTagShareOverlayVisibilityRules)
   .then(testAiProviderVisitButtonUsesWebAppLabel)
+  .then(testOpenNewTabVisitButtonReflectsCurrentTabModifier)
   .then(() => {
     console.log('newtab suggestions view tests passed');
   })

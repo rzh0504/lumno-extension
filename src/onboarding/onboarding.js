@@ -6,11 +6,14 @@
 
   const LANGUAGE_STORAGE_KEY = '_x_extension_language_2024_unique_';
   const SHOW_SEARCH_COMMAND_NAME = 'show-search';
+  const ONBOARDING_SEARCH_OVERLAY_COMMAND_ACTION = 'triggerOnboardingSearchOverlayFromCommand';
   const SHORTCUT_PLACEHOLDER = '{shortcut}';
   const TITLE_CYCLE_INTERVAL_MS = 1900;
+  const TITLE_CYCLE_FIRST_DELAY_MS = 520;
   const TEXT_SWAP_FALLBACK_DURATION_MS = 200;
   const ACTION_MESSAGE_BY_ID = Object.freeze({
     openShortcuts: 'openExtensionShortcutsPage',
+    openExtensionDetails: 'openExtensionDetailsPage',
     openNewtab: 'openNewTab',
     openOptions: 'openOptionsPage'
   });
@@ -62,12 +65,183 @@
       visitButtonLabel: '打开'
     })
   ]);
+  const NEWTAB_PREVIEW_QUERY = '';
+  const NEWTAB_PREVIEW_RECENT_SITES = Object.freeze([
+    Object.freeze({
+      title: 'Lumno - Chrome Web Store',
+      siteName: 'Chrome Web Store',
+      url: 'https://chromewebstore.google.com/detail/lumno/kjlmmioocdppajifeahkddchikgnjcnc',
+      urlText: 'chromewebstore.google.com',
+      accentRgb: Object.freeze([66, 133, 244])
+    }),
+    Object.freeze({
+      title: 'kubai087/lumno-extension',
+      siteName: 'GitHub',
+      url: 'https://github.com/kubai087/lumno-extension',
+      urlText: 'github.com',
+      accentRgb: Object.freeze([36, 41, 46])
+    }),
+    Object.freeze({
+      title: 'Tailwind CSS Docs',
+      siteName: 'Tailwind CSS',
+      url: 'https://tailwindcss.com/docs',
+      urlText: 'tailwindcss.com',
+      accentRgb: Object.freeze([6, 182, 212])
+    }),
+    Object.freeze({
+      title: 'New tab polish',
+      siteName: 'Figma',
+      url: 'https://www.figma.com/',
+      urlText: 'figma.com',
+      accentRgb: Object.freeze([162, 89, 255])
+    })
+  ]);
+  const NEWTAB_PREVIEW_BOOKMARKS = Object.freeze([
+    Object.freeze({
+      title: '工作台',
+      type: 'folder',
+      previewUrls: Object.freeze([
+        'https://developer.chrome.com/docs/extensions/',
+        'https://chromewebstore.google.com/category/extensions',
+        'https://github.com/',
+        'https://figma.com/'
+      ])
+    }),
+    Object.freeze({
+      title: '设计素材',
+      type: 'folder',
+      previewUrls: Object.freeze([
+        'https://www.figma.com/',
+        'https://www.framer.com/',
+        'https://dribbble.com/',
+        'https://mobbin.com/'
+      ])
+    }),
+    Object.freeze({
+      title: '开发文档',
+      type: 'folder',
+      previewUrls: Object.freeze([
+        'https://developer.chrome.com/docs/extensions/',
+        'https://developer.mozilla.org/',
+        'https://github.com/',
+        'https://web.dev/'
+      ])
+    })
+  ]);
+  const LUMNO_WEB_WORDMARK_SRC = '../../assets/images/lumno-web-textlogo.svg';
+  const LUMNO_WEB_BUTTERFLY_REST_PATH = 'M4.3248 17.7823C1.22382 14.6398 -0.116749 10.2475 0.824858 6.7097C1.02033 5.97529 1.95363 5.98287 2.27212 6.67289L4.16024 10.7637C4.38415 11.2488 4.50011 11.7767 4.50011 12.311L4.50011 16L6.24277 16C7.66705 16 9.01155 16.6576 9.88596 17.7819L11.0831 19.3211C11.5044 19.8627 11.2076 20.6668 10.5235 20.7201C8.63849 20.8671 6.85452 20.3459 4.3248 17.7823Z';
+  const LUMNO_WEB_BUTTERFLY_FLUTTER_PATH = 'M4.32468 17.7823C-1.04106 11.6456 2.30784 4.56298 5.14393 1.13518C5.48929 0.717757 6.11849 0.734355 6.47527 1.14207L10.4328 5.66451C11.4105 6.78177 11.6239 8.37593 10.9745 9.71102L8.61264 14.567L11.5238 13.9636C13.2202 13.612 14.9706 14.24 16.0565 15.5899L18.7241 18.9056C19.0394 19.2975 18.9857 19.8717 18.5688 20.1531C15.6258 22.1399 9.6385 23.8596 4.32468 17.7823Z';
+  const LUMNO_WEB_BUTTERFLY_D_VALUES = `${LUMNO_WEB_BUTTERFLY_FLUTTER_PATH};${LUMNO_WEB_BUTTERFLY_REST_PATH};${LUMNO_WEB_BUTTERFLY_FLUTTER_PATH}`;
+  const LUMNO_OVERLAY_HOVER_LEAD_MS = 1040;
+  const LUMNO_OVERLAY_HOVER_START_MS = 4240 - LUMNO_OVERLAY_HOVER_LEAD_MS;
+  const LUMNO_OVERLAY_HOVER_STEP_MS = 1600;
+  const LUMNO_OVERLAY_HOVER_WRAP_STEP_MS = 1600;
+  const NEWTAB_PREVIEW_HOVER_START_MS = 1500;
+  const NEWTAB_PREVIEW_HOVER_HOLD_MS = 1200;
+  const NEWTAB_PREVIEW_HOVER_MOVE_MS = 520;
+  const NEWTAB_PREVIEW_HOVER_RESET_MS = 620;
+  const NEWTAB_PREVIEW_HOVER_RETURN_MS = 520;
+  const VISUAL_CANVAS_WIDTH = 704;
+  const VISUAL_CANVAS_HEIGHT = 680;
+
+  function getNewtabPreviewFaviconUrl(url) {
+    const value = String(url || '').trim();
+    return value
+      ? `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(value)}&sz=64`
+      : '';
+  }
+
+  function getNewtabPreviewFolderSvg(idSuffix) {
+    const suffix = String(idSuffix || 'preview').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const lowerGradientId = `x-nt-preview-folder-lower-${suffix}`;
+    const upperGradientId = `x-nt-preview-folder-upper-${suffix}`;
+    return [
+      '<svg viewBox="0 0 31 29" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">',
+      '<g data-folder-layer="lower">',
+      `<path d="M7.24 2C6.082 2 5.503 2 5.064 2.232C4.71 2.42 4.42 2.71 4.232 3.064C4 3.503 4 4.082 4 5.24V19.76C4 20.918 4 21.497 4.232 21.936C4.42 22.29 4.71 22.58 5.064 22.768C5.503 23 6.082 23 7.24 23H23.76C24.918 23 25.497 23 25.936 22.768C26.29 22.58 26.58 22.29 26.768 21.936C27 21.497 27 20.918 27 19.76V8.24C27 7.082 27 6.503 26.768 6.064C26.58 5.71 26.29 5.42 25.936 5.232C25.497 5 24.918 5 23.76 5H16.287C15.767 5 15.507 5 15.263 4.938C15.065 4.887 14.875 4.806 14.701 4.698C14.488 4.565 14.308 4.377 13.948 4.002L12.986 2.998C12.626 2.623 12.446 2.435 12.233 2.302C12.059 2.194 11.869 2.113 11.671 2.062C11.427 2 11.167 2 10.647 2H7.24Z" fill="url(#${lowerGradientId})"/>`,
+      '<path d="M7.24 2.5H10.647C11.192 2.5 11.379 2.504 11.547 2.547C11.696 2.585 11.838 2.645 11.969 2.727C12.116 2.818 12.248 2.95 12.625 3.344L13.587 4.348C13.929 4.705 14.158 4.949 14.438 5.123C14.655 5.258 14.892 5.359 15.14 5.422C15.458 5.503 15.792 5.5 16.287 5.5H23.76C24.347 5.5 24.757 5.5 25.075 5.527C25.388 5.554 25.567 5.603 25.702 5.675C25.968 5.815 26.185 6.032 26.325 6.298C26.397 6.433 26.446 6.612 26.473 6.925C26.5 7.243 26.5 7.653 26.5 8.24V19.76C26.5 20.347 26.5 20.757 26.473 21.075C26.446 21.388 26.397 21.567 26.325 21.702C26.185 21.968 25.968 22.185 25.702 22.325C25.567 22.397 25.388 22.446 25.075 22.473C24.757 22.5 24.347 22.5 23.76 22.5H7.24C6.653 22.5 6.243 22.5 5.925 22.473C5.612 22.446 5.433 22.397 5.298 22.325C5.032 22.185 4.815 21.968 4.675 21.702C4.603 21.567 4.554 21.388 4.527 21.075C4.5 20.757 4.5 20.347 4.5 19.76V5.24C4.5 4.653 4.5 4.243 4.527 3.925C4.554 3.612 4.603 3.433 4.675 3.298C4.815 3.032 5.032 2.815 5.298 2.675C5.433 2.603 5.612 2.554 5.925 2.527C6.243 2.5 6.653 2.5 7.24 2.5Z" stroke="#5393FF"/>',
+      '</g>',
+      '<g data-folder-layer="file">',
+      '<path d="M7 10C7 9.448 7.448 9 8 9H23C23.552 9 24 9.448 24 10V17C24 17.552 23.552 18 23 18H8C7.448 18 7 17.552 7 17V10Z" fill="white"/>',
+      '<path d="M13 11H18" stroke="#DDE8FB" stroke-linecap="round"/>',
+      '</g>',
+      '<g data-folder-layer="upper">',
+      `<path d="M7.24 5C6.082 5 5.503 5 5.064 5.232C4.71 5.42 4.42 5.71 4.232 6.064C4 6.503 4 7.082 4 8.24V19.76C4 20.918 4 21.497 4.232 21.936C4.42 22.29 4.71 22.58 5.064 22.768C5.503 23 6.082 23 7.24 23H23.76C24.918 23 25.497 23 25.936 22.768C26.29 22.58 26.58 22.29 26.768 21.936C27 21.497 27 20.918 27 19.76V8.24C27 7.082 27 6.503 26.768 6.064C26.58 5.71 26.29 5.42 25.936 5.232C25.497 5 24.918 5 23.76 5H7.24Z" fill="url(#${upperGradientId})"/>`,
+      '<path d="M7.24 5.5H23.76C24.347 5.5 24.757 5.5 25.075 5.527C25.388 5.554 25.567 5.603 25.702 5.675C25.968 5.815 26.185 6.032 26.325 6.298C26.397 6.433 26.446 6.612 26.473 6.925C26.5 7.243 26.5 7.653 26.5 8.24V19.76C26.5 20.347 26.5 20.757 26.473 21.075C26.446 21.388 26.397 21.567 26.325 21.702C26.185 21.968 25.968 22.185 25.702 22.325C25.567 22.397 25.388 22.446 25.075 22.473C24.757 22.5 24.347 22.5 23.76 22.5H7.24C6.653 22.5 6.243 22.5 5.925 22.473C5.612 22.446 5.433 22.397 5.298 22.325C5.032 22.185 4.815 21.968 4.675 21.702C4.603 21.567 4.554 21.388 4.527 21.075C4.5 20.757 4.5 20.347 4.5 19.76V8.24C4.5 7.653 4.5 7.243 4.527 6.925C4.554 6.612 4.603 6.433 4.675 6.298C4.815 6.032 5.032 5.815 5.298 5.675C5.433 5.603 5.612 5.554 5.925 5.527C6.243 5.5 6.653 5.5 7.24 5.5Z" stroke="#5393FF"/>',
+      '</g>',
+      '<defs>',
+      `<linearGradient id="${lowerGradientId}" x1="15.5" y1="2" x2="15.5" y2="23" gradientUnits="userSpaceOnUse">`,
+      '<stop stop-color="#93BBFF"/><stop offset="0.884515" stop-color="#81B0FF"/><stop offset="0.884615" stop-color="#4389FF"/><stop offset="1" stop-color="#97BEFF"/>',
+      '</linearGradient>',
+      `<linearGradient id="${upperGradientId}" x1="15.5" y1="2" x2="15.5" y2="23" gradientUnits="userSpaceOnUse">`,
+      '<stop stop-color="#CCDFFF"/><stop offset="0.884515" stop-color="#B2CEFF"/><stop offset="0.884615" stop-color="#89B5FF"/><stop offset="1" stop-color="#97BEFF"/>',
+      '</linearGradient>',
+      '</defs>',
+      '</svg>'
+    ].join('');
+  }
+
+  function mixNewtabPreviewColor(color, target, amount) {
+    return [
+      Math.round(color[0] + (target[0] - color[0]) * amount),
+      Math.round(color[1] + (target[1] - color[1]) * amount),
+      Math.round(color[2] + (target[2] - color[2]) * amount)
+    ];
+  }
+
+  function newtabPreviewRgbToCss(rgb) {
+    return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+  }
+
+  function newtabPreviewRgbToCssAlpha(rgb, alpha) {
+    return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
+  }
+
+  function newtabPreviewRgbToCssParts(rgb) {
+    return `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`;
+  }
+
+  function getNewtabPreviewAccentRgb(item) {
+    return item && Array.isArray(item.accentRgb) && item.accentRgb.length === 3
+      ? item.accentRgb
+      : [59, 130, 246];
+  }
+
+  function applyNewtabPreviewRecentTheme(card, item) {
+    const accentRgb = getNewtabPreviewAccentRgb(item);
+    const accentEmphasis = mixNewtabPreviewColor(accentRgb, [0, 0, 0], 0.18);
+    const base = mixNewtabPreviewColor(accentRgb, [255, 255, 255], 0.82);
+    const border = mixNewtabPreviewColor(base, [0, 0, 0], 0.1);
+    const innerTint = mixNewtabPreviewColor(accentRgb, [255, 255, 255], 0.82);
+    card.style.setProperty('--x-nt-recent-card-color', newtabPreviewRgbToCss(base));
+    card.style.setProperty('--x-nt-recent-card-border-color', newtabPreviewRgbToCss(border));
+    card.style.setProperty('--x-nt-recent-inner-tint-rgb', newtabPreviewRgbToCssParts(innerTint));
+    card.style.setProperty('--x-nt-recent-accent-color', newtabPreviewRgbToCss(accentEmphasis));
+    card.style.setProperty('--x-nt-recent-accent-soft', newtabPreviewRgbToCssAlpha(accentRgb, 0.12));
+    card.style.setProperty('--x-nt-recent-accent-border', newtabPreviewRgbToCssAlpha(accentRgb, 0.18));
+  }
+
+  function applyNewtabPreviewBookmarkTheme(card, item) {
+    if (!item || item.type === 'folder') {
+      card.style.setProperty('--x-nt-bookmark-shadow-rgb', '86, 138, 220');
+      return;
+    }
+    const accentRgb = getNewtabPreviewAccentRgb(item);
+    const base = mixNewtabPreviewColor(accentRgb, [255, 255, 255], 0.94);
+    const border = mixNewtabPreviewColor(base, [0, 0, 0], 0.07);
+    const icon = mixNewtabPreviewColor(accentRgb, [255, 255, 255], 0.96);
+    const hover = mixNewtabPreviewColor(accentRgb, [255, 255, 255], 0.9);
+    const shadow = mixNewtabPreviewColor(accentRgb, [138, 146, 160], 0.46);
+    card.style.setProperty('--x-nt-bookmark-card-color', newtabPreviewRgbToCss(base));
+    card.style.setProperty('--x-nt-bookmark-card-hover-color', newtabPreviewRgbToCssAlpha(hover, 0.86));
+    card.style.setProperty('--x-nt-bookmark-card-border-color', newtabPreviewRgbToCss(border));
+    card.style.setProperty('--x-nt-bookmark-icon-color', newtabPreviewRgbToCss(icon));
+    card.style.setProperty('--x-nt-bookmark-shadow-rgb', newtabPreviewRgbToCssParts(shadow));
+  }
 
   const params = new URLSearchParams(window.location.search || '');
   const root = document.querySelector('[data-onboarding-shell]');
   const versionText = document.getElementById('onboarding-version-text');
-  const progressLabel = document.getElementById('onboarding-progress-label');
-  const progressDots = document.getElementById('onboarding-progress-dots');
   const copyPanel = document.getElementById('onboarding-copy-panel');
   const eyebrow = document.getElementById('onboarding-eyebrow');
   const title = document.getElementById('onboarding-title');
@@ -75,27 +249,49 @@
   const bodyPrefix = document.getElementById('onboarding-body-prefix');
   const shortcutLabel = document.getElementById('onboarding-shortcut-label');
   const bodySuffix = document.getElementById('onboarding-body-suffix');
+  const bodyNote = document.getElementById('onboarding-body-note');
+  const pageStrip = document.getElementById('onboarding-page-strip');
   const interactionSlots = document.getElementById('onboarding-interaction-slots');
+  const visualSlot = document.getElementById('onboarding-visual-slot');
+  const visualPanel = document.getElementById('onboarding-visual-panel');
+  const visualCanvas = document.getElementById('onboarding-visual-canvas');
   const visualStage = document.getElementById('onboarding-visual-stage');
   const cursorLayer = document.getElementById('onboarding-cursor-layer');
   const copyActions = document.querySelector('.onboarding-copy-actions');
   const primaryActionButton = document.querySelector('.onboarding-action-button--primary');
   const secondaryActionButton = document.querySelector('.onboarding-action-button--secondary');
   const ghostActionButton = document.querySelector('.onboarding-action-button--ghost');
-  const prevButton = document.querySelector('[data-onboarding-prev]');
-  const nextButton = document.querySelector('[data-onboarding-next]');
   let blueprint = null;
   let state = null;
   let currentShortcutValue = getDefaultShortcutValue();
   let currentShortcutLabel = getDefaultShortcutLabel();
   let titleCycleInterval = 0;
+  let titleCycleFirstTimeout = 0;
   let titleCycleSwapTimeout = 0;
+  let titleFitFrame = 0;
   let copySwapTimeout = 0;
+  let visualScaleFrame = 0;
   let titleCycleIndex = 0;
+  let expandedInteractionAccordionId = '';
+  let overlayHoverStartTimeout = 0;
+  let overlayHoverStepTimeout = 0;
+  let overlayHoverIndex = 0;
+  let newtabPreviewHoverStartTimeout = 0;
+  let newtabPreviewHoverStepTimeout = 0;
+  let newtabPreviewHoverStepIndex = 0;
+  let visualResizeObserver = null;
   const onboardingInfoTooltipController = globalThis.LumnoTooltip &&
       typeof globalThis.LumnoTooltip.createController === 'function'
     ? globalThis.LumnoTooltip.createController({
       id: '_x_extension_onboarding_info_tooltip_2026_unique_',
+      className: 'onboarding-info-tooltip',
+      maxWidth: 360
+    })
+    : null;
+  const actionTooltipController = globalThis.LumnoTooltip &&
+      typeof globalThis.LumnoTooltip.createController === 'function'
+    ? globalThis.LumnoTooltip.createController({
+      id: '_x_extension_onboarding_action_tooltip_2026_unique_',
       className: 'onboarding-info-tooltip',
       maxWidth: 360
     })
@@ -276,6 +472,149 @@
     } catch (error) {
       callback(fallback);
     }
+  }
+
+  function shortcutHotkeyMatchesEvent(shortcut, event) {
+    if (typeof MODEL.shortcutHotkeyMatchesEvent === 'function') {
+      return MODEL.shortcutHotkeyMatchesEvent(shortcut, event);
+    }
+    return false;
+  }
+
+  function isEditableTarget(target) {
+    const element = target && target.nodeType === 1
+      ? target
+      : (target && target.parentElement ? target.parentElement : null);
+    if (!element || !element.closest) {
+      return false;
+    }
+    return Boolean(element.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]'));
+  }
+
+  function updateCurrentShortcut(shortcut, shouldRender) {
+    const value = shortcut || getDefaultShortcutValue();
+    const nextShortcutLabel = formatShortcutForDisplay(value) || getDefaultShortcutLabel();
+    const changed = value !== currentShortcutValue || nextShortcutLabel !== currentShortcutLabel;
+    currentShortcutValue = value;
+    currentShortcutLabel = nextShortcutLabel;
+    if (changed && shouldRender && blueprint && state) {
+      render();
+    }
+  }
+
+  function refreshCurrentShortcut(shouldRender) {
+    loadCurrentShortcut((shortcut) => {
+      updateCurrentShortcut(shortcut, shouldRender);
+    });
+  }
+
+  function getCurrentOnboardingTab(callback) {
+    const chromeApi = getChromeApi();
+    const done = typeof callback === 'function' ? callback : () => {};
+    if (!chromeApi || !chromeApi.tabs || typeof chromeApi.tabs.getCurrent !== 'function') {
+      done(null);
+      return;
+    }
+    try {
+      chromeApi.tabs.getCurrent((tab) => {
+        if (chromeApi.runtime && chromeApi.runtime.lastError) {
+          done(null);
+          return;
+        }
+        done(tab || null);
+      });
+    } catch (error) {
+      done(null);
+    }
+  }
+
+  function getOnboardingTabZoomFactor(tabId, callback) {
+    const chromeApi = getChromeApi();
+    const done = typeof callback === 'function' ? callback : () => {};
+    if (!chromeApi || !chromeApi.tabs || typeof chromeApi.tabs.getZoom !== 'function' || typeof tabId !== 'number') {
+      done(1);
+      return;
+    }
+    try {
+      chromeApi.tabs.getZoom(tabId, (zoomFactor) => {
+        if (chromeApi.runtime && chromeApi.runtime.lastError) {
+          done(1);
+          return;
+        }
+        const zoom = Number(zoomFactor);
+        done(Number.isFinite(zoom) && zoom > 0 ? zoom : 1);
+      });
+    } catch (error) {
+      done(1);
+    }
+  }
+
+  function getOnboardingOverlayTabs(currentTabId, callback) {
+    const chromeApi = getChromeApi();
+    const done = typeof callback === 'function' ? callback : () => {};
+    if (!chromeApi || !chromeApi.runtime || typeof chromeApi.runtime.sendMessage !== 'function') {
+      done([], currentTabId);
+      return;
+    }
+    const request = { action: 'getTabsForOverlay' };
+    if (typeof currentTabId === 'number') {
+      request.currentTabId = currentTabId;
+    }
+    try {
+      chromeApi.runtime.sendMessage(request, (response) => {
+        if (chromeApi.runtime && chromeApi.runtime.lastError) {
+          done([], currentTabId);
+          return;
+        }
+        const tabs = response && Array.isArray(response.tabs) ? response.tabs : [];
+        const responseCurrentTabId = response && typeof response.currentTabId === 'number'
+          ? response.currentTabId
+          : currentTabId;
+        done(tabs, responseCurrentTabId);
+      });
+    } catch (error) {
+      done([], currentTabId);
+    }
+  }
+
+  function triggerOnboardingSearchOverlay() {
+    const toggleOverlay = window._x_extension_toggleSearchOverlay_2026_unique_;
+    if (typeof toggleOverlay !== 'function') {
+      return;
+    }
+    getCurrentOnboardingTab((tab) => {
+      const currentTabId = tab && typeof tab.id === 'number' ? tab.id : null;
+      getOnboardingTabZoomFactor(currentTabId, (tabZoomFactor) => {
+        getOnboardingOverlayTabs(currentTabId, (tabs, responseCurrentTabId) => {
+          toggleOverlay(tabs, {
+            tabZoomFactor,
+            currentTabId: typeof responseCurrentTabId === 'number' ? responseCurrentTabId : currentTabId,
+            currentTabUrl: window.location && window.location.href ? window.location.href : ''
+          });
+        });
+      });
+    });
+  }
+
+  function handleOnboardingCommandMessage(request, sender, sendResponse) {
+    if (!request || request.action !== ONBOARDING_SEARCH_OVERLAY_COMMAND_ACTION) {
+      return false;
+    }
+    const requestedTabId = Number.isFinite(Number(request.tabId)) ? Number(request.tabId) : null;
+    getCurrentOnboardingTab((tab) => {
+      const currentTabId = tab && typeof tab.id === 'number' ? tab.id : null;
+      if (typeof requestedTabId === 'number' && typeof currentTabId === 'number' && currentTabId !== requestedTabId) {
+        if (typeof sendResponse === 'function') {
+          sendResponse({ ok: false, reason: 'tab-mismatch' });
+        }
+        return;
+      }
+      triggerOnboardingSearchOverlay();
+      if (typeof sendResponse === 'function') {
+        sendResponse({ ok: true });
+      }
+    });
+    return true;
   }
 
   function getRuntimeLocale(callback) {
@@ -475,6 +814,48 @@
     onboardingInfoTooltipController.hide();
   }
 
+  function getActionButtonTooltipMaxWidth(button) {
+    const value = Number.parseInt(button && button.dataset && button.dataset.tooltipMaxWidth || '', 10);
+    return Number.isFinite(value) && value > 0 ? value : 360;
+  }
+
+  function showActionButtonTooltip(button) {
+    const text = String(button && button.dataset && button.dataset.tooltip || '').trim();
+    if (!actionTooltipController || !button || !text) {
+      return;
+    }
+    const maxWidth = getActionButtonTooltipMaxWidth(button);
+    actionTooltipController.show(button, text, {
+      placement: 'top',
+      maxWidth,
+      spacing: 8
+    });
+  }
+
+  function hideActionButtonTooltip() {
+    if (!actionTooltipController) {
+      return;
+    }
+    actionTooltipController.hide();
+  }
+
+  function bindActionButtonTooltip(button) {
+    if (!button || button.dataset.tooltipBound === 'true') {
+      return;
+    }
+    button.dataset.tooltipBound = 'true';
+    button.addEventListener('mouseenter', () => showActionButtonTooltip(button));
+    button.addEventListener('mouseleave', hideActionButtonTooltip);
+    button.addEventListener('focus', () => showActionButtonTooltip(button));
+    button.addEventListener('blur', hideActionButtonTooltip);
+    button.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        hideActionButtonTooltip();
+        button.blur();
+      }
+    });
+  }
+
   function createInteractionInfoButton(infoTooltip, browserAvatars) {
     const text = String(infoTooltip && infoTooltip.text || getBrowserTooltipText(browserAvatars) || '').trim();
     const button = document.createElement('button');
@@ -540,18 +921,161 @@
     return label;
   }
 
+  function getInteractionAccordionId(slot) {
+    return String(slot && (slot.accordionId || slot.id) || '').trim();
+  }
+
+  function isInteractionAccordionExpanded(slot) {
+    const accordionId = getInteractionAccordionId(slot);
+    if (!slot || !slot.accordion || !accordionId) {
+      return false;
+    }
+    if (expandedInteractionAccordionId) {
+      return accordionId === expandedInteractionAccordionId;
+    }
+    return slot.accordion.expandedByDefault === true;
+  }
+
+  function createInteractionAccordionChevron(accordion) {
+    const chevron = document.createElement('span');
+    chevron.className = 'interaction-accordion-chevron';
+    chevron.setAttribute('aria-hidden', 'true');
+    chevron.appendChild(createIcon(String(accordion && accordion.icon || 'ri-arrow-left-s-line')));
+    return chevron;
+  }
+
+  function createInteractionAccordionTrigger(slot) {
+    const trigger = document.createElement('button');
+    const isExpanded = isInteractionAccordionExpanded(slot);
+    trigger.className = 'interaction-accordion-trigger';
+    trigger.type = 'button';
+    trigger.dataset.action = slot.actionId;
+    trigger.dataset.accordionId = getInteractionAccordionId(slot);
+    trigger.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+    trigger.setAttribute('aria-controls', `${slot.id}-accordion`);
+    trigger.id = `${slot.id}-accordion-trigger`;
+    trigger.appendChild(createInteractionLabel(slot));
+    trigger.appendChild(createInteractionAccordionChevron(slot.accordion));
+    return trigger;
+  }
+
+  function appendLinkedText(target, text, links) {
+    const sourceText = String(text || '');
+    if (!target) {
+      return;
+    }
+    const linkItems = (Array.isArray(links) ? links : [])
+      .map((link) => {
+        const label = String(link && link.label || '').trim();
+        const href = String(link && link.href || '').trim();
+        const actionId = String(link && link.actionId || '').trim();
+        const index = label ? sourceText.indexOf(label) : -1;
+        if (!label || !href || index < 0) {
+          return null;
+        }
+        return { label, href, actionId, index };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.index - b.index);
+    let cursor = 0;
+    linkItems.forEach(({ label, href, actionId, index }) => {
+      if (index < cursor) {
+        return;
+      }
+      if (index > cursor) {
+        target.appendChild(document.createTextNode(sourceText.slice(cursor, index)));
+      }
+      const anchor = document.createElement('a');
+      anchor.className = 'interaction-accordion-link';
+      anchor.href = href;
+      if (actionId) {
+        anchor.dataset.action = actionId;
+      }
+      anchor.textContent = label;
+      target.appendChild(anchor);
+      cursor = index + label.length;
+    });
+    if (cursor < sourceText.length) {
+      target.appendChild(document.createTextNode(sourceText.slice(cursor)));
+    }
+  }
+
+  function createInteractionAccordionPanel(slot, isExpanded) {
+    const text = String(slot && slot.accordion && slot.accordion.text || '').trim();
+    if (!text) {
+      return null;
+    }
+    const panel = document.createElement('span');
+    panel.id = `${slot.id}-accordion`;
+    panel.className = 'interaction-accordion-panel';
+    panel.dataset.open = isExpanded ? 'true' : 'false';
+    panel.setAttribute('aria-labelledby', `${slot.id}-accordion-trigger`);
+
+    const textNode = document.createElement('span');
+    textNode.className = 'interaction-accordion-text t-panel-slide';
+    textNode.dataset.open = isExpanded ? 'true' : 'false';
+    textNode.setAttribute('aria-hidden', isExpanded ? 'false' : 'true');
+    appendLinkedText(textNode, text, slot.accordion.links);
+
+    panel.appendChild(textNode);
+    return panel;
+  }
+
+  function updateInteractionAccordionRows() {
+    if (!interactionSlots) {
+      return;
+    }
+    interactionSlots
+      .querySelectorAll('.interaction-slot--accordion[data-accordion-id]')
+      .forEach((item) => {
+        const expanded = item.dataset.accordionId === expandedInteractionAccordionId ? 'true' : 'false';
+        item.dataset.expanded = expanded;
+        const trigger = item.querySelector('.interaction-accordion-trigger');
+        if (trigger) {
+          trigger.setAttribute('aria-expanded', expanded);
+        }
+        const panel = item.querySelector('.interaction-accordion-panel');
+        if (panel) {
+          panel.dataset.open = expanded;
+        }
+        const textNode = item.querySelector('.interaction-accordion-text');
+        if (textNode) {
+          textNode.dataset.open = expanded;
+          textNode.setAttribute('aria-hidden', expanded === 'true' ? 'false' : 'true');
+        }
+      });
+  }
+
+  function toggleInteractionAccordion(accordionId) {
+    const id = String(accordionId || '').trim();
+    if (!id) {
+      return;
+    }
+    expandedInteractionAccordionId = expandedInteractionAccordionId === id ? '' : id;
+    updateInteractionAccordionRows();
+  }
+
   function createInteractionSlot(slot) {
     const hasAction = Boolean(slot.actionId);
     const hasInfoTooltip = Boolean(slot.infoTooltip && (slot.infoTooltip.text || slot.infoTooltip.type));
     const hasLinkButton = Boolean(slot.linkButton && slot.linkButton.href);
+    const hasAccordion = Boolean(slot.accordion && slot.accordion.text);
     const hasInlineAffordance = hasInfoTooltip || hasLinkButton;
-    const item = document.createElement(hasAction ? 'button' : 'div');
-    item.className = `interaction-slot${hasAction ? '' : ' interaction-slot--static'}`;
-    if (hasAction) {
+    const accordionId = getInteractionAccordionId(slot);
+    const isAccordionExpanded = hasAccordion && isInteractionAccordionExpanded(slot);
+    const itemHasAction = hasAction && !hasAccordion;
+    const item = document.createElement(itemHasAction ? 'button' : 'div');
+    item.className = `interaction-slot${itemHasAction ? '' : ' interaction-slot--static'}`;
+    if (itemHasAction) {
       item.type = 'button';
       item.dataset.action = slot.actionId;
     }
     item.dataset.interactionKind = slot.kind;
+    if (hasAccordion) {
+      item.classList.add('interaction-slot--accordion');
+      item.dataset.accordionId = accordionId;
+      item.dataset.expanded = isAccordionExpanded ? 'true' : 'false';
+    }
     if (hasInlineAffordance) {
       item.classList.add('interaction-slot--with-info');
     }
@@ -561,7 +1085,9 @@
     if (hasInlineAffordance) {
       copy.classList.add('interaction-copy--with-info');
     }
-    if (slot.label) {
+    if (slot.label && hasAccordion) {
+      copy.appendChild(createInteractionAccordionTrigger(slot));
+    } else if (slot.label) {
       copy.appendChild(createInteractionLabel(slot));
     } else {
       copy.appendChild(createSkeletonLine('skeleton-line skeleton-line--label'));
@@ -579,6 +1105,10 @@
       item.appendChild(icon);
     }
     item.appendChild(copy);
+    const accordionPanel = createInteractionAccordionPanel(slot, isAccordionExpanded);
+    if (accordionPanel) {
+      item.appendChild(accordionPanel);
+    }
     return item;
   }
 
@@ -587,6 +1117,8 @@
       return;
     }
     hideOnboardingInfoTooltip();
+    const hasAccordion = slide.left.interactionSlots.some((slot) => slot.accordion && slot.accordion.text);
+    interactionSlots.dataset.accordion = hasAccordion ? 'true' : 'false';
     interactionSlots.textContent = '';
     slide.left.interactionSlots.forEach((slot) => {
       interactionSlots.appendChild(createInteractionSlot(slot));
@@ -749,6 +1281,9 @@
     item.dataset.active = result.active ? 'true' : 'false';
     item.dataset.type = result.type || '';
     item.dataset.last = index === total - 1 ? 'true' : 'false';
+    item.dataset.demoIndex = String(index);
+    item.dataset.hasActionTags = result.actionTagLabel ? 'true' : 'false';
+    item.dataset.historyDeletable = result.historyDeletable ? 'true' : 'false';
     item.style.setProperty('--result-index', String(index));
 
     const leftSide = document.createElement('div');
@@ -836,13 +1371,17 @@
 
     const searchIcon = document.createElement('span');
     searchIcon.className = 'x-lumno-search-input__icon';
-    searchIcon.appendChild(createIcon('ri-search-2-line'));
+    searchIcon.appendChild(createIcon('ri-search-line'));
 
     const query = document.createElement('div');
     query.className = 'x-lumno-search-input__field lumno-overlay-query';
     query.setAttribute('role', 'searchbox');
     query.setAttribute('aria-label', 'Search Lumno demo');
-    query.appendChild(document.createTextNode(LUMNO_OVERLAY_QUERY));
+
+    const queryText = document.createElement('span');
+    queryText.className = 'lumno-overlay-query-text';
+    queryText.textContent = LUMNO_OVERLAY_QUERY;
+    query.appendChild(queryText);
 
     const caret = document.createElement('span');
     caret.className = 'lumno-overlay-query-caret';
@@ -860,12 +1399,6 @@
     rightIcon.setAttribute('aria-label', 'Settings');
     rightIcon.appendChild(createIcon('ri-settings-line'));
 
-    const closeOtherTabsButton = document.createElement('button');
-    closeOtherTabsButton.type = 'button';
-    closeOtherTabsButton.className = 'x-ov-close-other-tabs';
-    closeOtherTabsButton.setAttribute('aria-label', '清理本页外的其他标签页（除置顶与群组）');
-    closeOtherTabsButton.appendChild(createIcon('ri-brush-2-line'));
-
     const divider = document.createElement('span');
     divider.className = 'x-lumno-search-input__divider';
 
@@ -873,7 +1406,6 @@
     inputRoot.appendChild(query);
     inputRoot.appendChild(divider);
     inputRoot.appendChild(rightIcon);
-    inputRoot.appendChild(closeOtherTabsButton);
     inputRoot.appendChild(modeBadge);
 
     const results = document.createElement('div');
@@ -884,7 +1416,156 @@
 
     panel.appendChild(inputRoot);
     panel.appendChild(results);
+    setLumnoOverlayDemoActiveIndex(panel, -1);
     return panel;
+  }
+
+  function setLumnoOverlayDemoActiveIndex(container, activeIndex) {
+    if (!container) {
+      return;
+    }
+    const results = Array.from(container.querySelectorAll('.lumno-overlay-result'));
+    results.forEach((item, index) => {
+      const isActive = index === activeIndex;
+      const hasActionTags = item.dataset.hasActionTags === 'true';
+      item.dataset.active = isActive ? 'true' : 'false';
+
+      const actionTags = item.querySelector('.x-ov-suggestion-action-tags');
+      if (actionTags) {
+        actionTags.dataset.visible = isActive && hasActionTags ? 'true' : 'false';
+      }
+
+      const visitButton = item.querySelector('.x-ov-suggestion-visit-button');
+      if (visitButton) {
+        visitButton.dataset.visible = isActive && hasActionTags ? 'false' : 'true';
+      }
+
+      const historyDeleteSlot = item.querySelector('.x-ov-history-delete-slot');
+      const historyDeleteButton = item.querySelector('.x-ov-history-delete-button');
+      if (historyDeleteSlot) {
+        historyDeleteSlot.dataset.visible = 'false';
+      }
+      if (historyDeleteButton) {
+        historyDeleteButton.dataset.visible = 'false';
+      }
+    });
+  }
+
+  function stopLumnoOverlayHoverLoop() {
+    if (overlayHoverStartTimeout) {
+      window.clearTimeout(overlayHoverStartTimeout);
+      overlayHoverStartTimeout = 0;
+    }
+    if (overlayHoverStepTimeout) {
+      window.clearTimeout(overlayHoverStepTimeout);
+      overlayHoverStepTimeout = 0;
+    }
+    overlayHoverIndex = 0;
+  }
+
+  function scheduleLumnoOverlayHoverStep(panel, resultCount, firstStepDelay) {
+    if (!panel || resultCount <= 0) {
+      return;
+    }
+    const isWrapping = overlayHoverIndex >= resultCount - 1;
+    const hasFirstStepDelay = Number.isFinite(firstStepDelay) && firstStepDelay > 0;
+    const stepDelay = hasFirstStepDelay
+      ? firstStepDelay
+      : isWrapping
+      ? LUMNO_OVERLAY_HOVER_STEP_MS + LUMNO_OVERLAY_HOVER_WRAP_STEP_MS
+      : LUMNO_OVERLAY_HOVER_STEP_MS;
+    overlayHoverStepTimeout = window.setTimeout(() => {
+      overlayHoverStepTimeout = 0;
+      overlayHoverIndex = isWrapping ? 0 : overlayHoverIndex + 1;
+      setLumnoOverlayDemoActiveIndex(panel, overlayHoverIndex);
+      scheduleLumnoOverlayHoverStep(panel, resultCount);
+    }, stepDelay);
+  }
+
+  function startLumnoOverlayHoverLoop(container) {
+    stopLumnoOverlayHoverLoop();
+    if (!container || prefersReducedMotion()) {
+      setLumnoOverlayDemoActiveIndex(container, 0);
+      return;
+    }
+    const panel = container.querySelector('.lumno-overlay-panel');
+    const results = Array.from(container.querySelectorAll('.lumno-overlay-result'));
+    if (!panel || results.length === 0) {
+      return;
+    }
+    setLumnoOverlayDemoActiveIndex(panel, -1);
+    overlayHoverStartTimeout = window.setTimeout(() => {
+      overlayHoverStartTimeout = 0;
+      overlayHoverIndex = 0;
+      setLumnoOverlayDemoActiveIndex(panel, overlayHoverIndex);
+      scheduleLumnoOverlayHoverStep(panel, results.length, LUMNO_OVERLAY_HOVER_STEP_MS + LUMNO_OVERLAY_HOVER_LEAD_MS);
+    }, LUMNO_OVERLAY_HOVER_START_MS);
+  }
+
+  function setNewtabPreviewHoverState(container, targetKind) {
+    const surface = container && container.querySelector
+      ? container
+      : null;
+    if (!surface) {
+      return;
+    }
+    const recentCards = Array.from(surface.querySelectorAll('.newtab-preview-section--recent .x-nt-recent-card'));
+    const bookmarkCards = Array.from(surface.querySelectorAll('.newtab-preview-section--bookmarks .x-nt-bookmark-card--folder'));
+    recentCards.forEach((card, index) => {
+      card.classList.toggle('x-nt-recent-card--hover', targetKind === 'recent' && index === 0);
+    });
+    bookmarkCards.forEach((card, index) => {
+      card.classList.toggle('x-nt-bookmark-card--hover', targetKind === 'bookmark' && index === 0);
+    });
+    surface.dataset.previewHover = targetKind || 'idle';
+  }
+
+  function stopNewtabPreviewHoverLoop(container) {
+    if (newtabPreviewHoverStartTimeout) {
+      window.clearTimeout(newtabPreviewHoverStartTimeout);
+      newtabPreviewHoverStartTimeout = 0;
+    }
+    if (newtabPreviewHoverStepTimeout) {
+      window.clearTimeout(newtabPreviewHoverStepTimeout);
+      newtabPreviewHoverStepTimeout = 0;
+    }
+    newtabPreviewHoverStepIndex = 0;
+    if (container) {
+      setNewtabPreviewHoverState(container, '');
+    }
+  }
+
+  function scheduleNewtabPreviewHoverStep(container) {
+    if (!container || !container.isConnected) {
+      return;
+    }
+    const steps = [
+      { target: 'recent', duration: NEWTAB_PREVIEW_HOVER_HOLD_MS },
+      { target: '', duration: NEWTAB_PREVIEW_HOVER_MOVE_MS },
+      { target: 'bookmark', duration: NEWTAB_PREVIEW_HOVER_HOLD_MS },
+      { target: '', duration: NEWTAB_PREVIEW_HOVER_RESET_MS },
+      { target: '', duration: NEWTAB_PREVIEW_HOVER_RETURN_MS }
+    ];
+    const step = steps[newtabPreviewHoverStepIndex % steps.length];
+    setNewtabPreviewHoverState(container, step.target);
+    newtabPreviewHoverStepIndex += 1;
+    newtabPreviewHoverStepTimeout = window.setTimeout(() => {
+      newtabPreviewHoverStepTimeout = 0;
+      scheduleNewtabPreviewHoverStep(container);
+    }, step.duration);
+  }
+
+  function startNewtabPreviewHoverLoop(container) {
+    stopNewtabPreviewHoverLoop(container);
+    if (!container || prefersReducedMotion()) {
+      setNewtabPreviewHoverState(container, '');
+      return;
+    }
+    newtabPreviewHoverStartTimeout = window.setTimeout(() => {
+      newtabPreviewHoverStartTimeout = 0;
+      newtabPreviewHoverStepIndex = 0;
+      scheduleNewtabPreviewHoverStep(container);
+    }, NEWTAB_PREVIEW_HOVER_START_MS);
   }
 
   function createBrowserPageSection(className, lineClasses) {
@@ -958,25 +1639,37 @@
     return actions;
   }
 
-  function createBookmarkFocusSurface() {
-    const rootNode = document.createElement('div');
-    rootNode.className = 'bookmark-focus-ui';
-
-    const browserWindow = document.createElement('div');
-    browserWindow.className = 'browser-window';
-
+  function createBrowserBar() {
     const browserBar = document.createElement('div');
     browserBar.className = 'browser-bar';
     browserBar.appendChild(createSurfaceRail());
     browserBar.appendChild(createBrowserTabs());
     browserBar.appendChild(createSkeletonLine('browser-address'));
     browserBar.appendChild(createBrowserActions());
+    return browserBar;
+  }
 
-    browserWindow.appendChild(browserBar);
+  function createBrowserWindowClip(browserWindow) {
+    const clip = document.createElement('div');
+    clip.className = 'browser-window-clip';
+    if (browserWindow) {
+      clip.appendChild(browserWindow);
+    }
+    return clip;
+  }
+
+  function createBookmarkFocusSurface() {
+    const rootNode = document.createElement('div');
+    rootNode.className = 'bookmark-focus-ui';
+
+    const browserWindow = document.createElement('div');
+    browserWindow.className = 'browser-window';
+    browserWindow.appendChild(createBrowserBar());
     browserWindow.appendChild(createBrowserPageSkeleton());
 
-    rootNode.appendChild(browserWindow);
+    rootNode.appendChild(createBrowserWindowClip(browserWindow));
     rootNode.appendChild(createLumnoOverlaySurface());
+    startLumnoOverlayHoverLoop(rootNode);
     return rootNode;
   }
 
@@ -987,7 +1680,7 @@
     svg.setAttribute('viewBox', '0 0 48 58');
     svg.setAttribute('aria-hidden', 'true');
     svg.setAttribute('focusable', 'false');
-    const cursorPath = 'M8.3 5.9 C7.0 5.0 5.7 6.1 6.3 7.7 L17.1 52.1 C17.7 54.7 21.1 55.0 22.2 52.5 L28.8 36.9 C29.2 36.0 29.9 35.4 30.8 35.1 L43.0 30.5 C45.9 29.5 46.2 25.7 43.5 24.2 L8.3 5.9 Z';
+    const cursorPath = 'M8.5 6.5 L43.5 28.7 L29.3 33 L20.8 50 Z';
 
     const outline = document.createElementNS(namespace, 'path');
     outline.setAttribute('class', 'figma-cursor__outline');
@@ -1000,7 +1693,7 @@
     fill.setAttribute('d', cursorPath);
     fill.setAttribute('stroke-linejoin', 'round');
     fill.setAttribute('stroke-linecap', 'round');
-    fill.setAttribute('stroke-width', '3');
+    fill.setAttribute('stroke-width', '2');
     fill.setAttribute('fill', '#303030');
     fill.setAttribute('stroke', '#303030');
 
@@ -1009,25 +1702,727 @@
     return svg;
   }
 
+  function createLumnoWebButterflyWing(className, options) {
+    const namespace = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(namespace, 'svg');
+    svg.setAttribute('class', className);
+    svg.setAttribute('viewBox', '0 0 23 25');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('xmlns', namespace);
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+
+    const path = document.createElementNS(namespace, 'path');
+    path.setAttribute('class', 'logo-butterfly-path');
+    path.setAttribute('opacity', '0.2');
+    path.setAttribute('fill', '#79C3F2');
+    path.setAttribute('d', LUMNO_WEB_BUTTERFLY_REST_PATH);
+
+    const shapeMotion = document.createElementNS(namespace, 'animate');
+    shapeMotion.setAttribute('attributeName', 'd');
+    shapeMotion.setAttribute('dur', '2800ms');
+    if (options && options.begin) {
+      shapeMotion.setAttribute('begin', options.begin);
+    }
+    shapeMotion.setAttribute('repeatCount', 'indefinite');
+    shapeMotion.setAttribute('calcMode', 'spline');
+    shapeMotion.setAttribute('keyTimes', '0;0.5;1');
+    shapeMotion.setAttribute('keySplines', '0.42 0 0.58 1;0.42 0 0.58 1');
+    shapeMotion.setAttribute('values', LUMNO_WEB_BUTTERFLY_D_VALUES);
+    path.appendChild(shapeMotion);
+
+    if (options && options.transformMotion) {
+      const transformMotion = document.createElementNS(namespace, 'animateTransform');
+      transformMotion.setAttribute('attributeName', 'transform');
+      transformMotion.setAttribute('type', 'rotate');
+      transformMotion.setAttribute('dur', '2800ms');
+      transformMotion.setAttribute('repeatCount', 'indefinite');
+      transformMotion.setAttribute('calcMode', 'spline');
+      transformMotion.setAttribute('keyTimes', '0;0.5;1');
+      transformMotion.setAttribute('keySplines', '0.42 0 0.58 1;0.42 0 0.58 1');
+      transformMotion.setAttribute('values', '-1.5 5.5 15.5;0 5.5 15.5;-1.5 5.5 15.5');
+      path.appendChild(transformMotion);
+    }
+
+    svg.appendChild(path);
+    return svg;
+  }
+
+  function createLumnoWebWordmarkSurface() {
+    const surface = document.createElement('div');
+    surface.className = 'lumno-web-wordmark-surface';
+    surface.setAttribute('aria-label', 'Lumno');
+
+    const wordmarkWrap = document.createElement('span');
+    wordmarkWrap.className = 'logo-wordmark-wrap';
+    wordmarkWrap.setAttribute('aria-hidden', 'true');
+
+    const wordmark = document.createElement('img');
+    wordmark.className = 'logo-wordmark mark-svg';
+    wordmark.src = LUMNO_WEB_WORDMARK_SRC;
+    wordmark.alt = '';
+    wordmark.draggable = false;
+
+    const butterflyStage = document.createElement('span');
+    butterflyStage.className = 'logo-butterfly-stage';
+    butterflyStage.setAttribute('aria-hidden', 'true');
+    butterflyStage.appendChild(createLumnoWebButterflyWing(
+      'logo-butterfly logo-butterfly-wing logo-butterfly-wing-back mark-svg',
+      { begin: '120ms' }
+    ));
+    butterflyStage.appendChild(createLumnoWebButterflyWing(
+      'logo-butterfly logo-butterfly-wing logo-butterfly-wing-front mark-svg',
+      { transformMotion: true }
+    ));
+
+    const seoText = document.createElement('span');
+    seoText.className = 'seo-wordmark-text';
+    seoText.textContent = 'Lumno';
+
+    wordmarkWrap.appendChild(wordmark);
+    wordmarkWrap.appendChild(butterflyStage);
+    surface.appendChild(wordmarkWrap);
+    surface.appendChild(seoText);
+    return surface;
+  }
+
+  function createNewtabPreviewWordmark() {
+    const wordmark = document.createElement('div');
+    wordmark.id = '_x_extension_newtab_wordmark_2026_unique_';
+    wordmark.className = 'newtab-preview-wordmark';
+    wordmark.dataset.enter = 'done';
+    wordmark.setAttribute('aria-hidden', 'true');
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.tabIndex = -1;
+
+    const image = document.createElement('img');
+    image.src = '../../assets/images/lumno-wordmark.svg';
+    image.alt = '';
+    image.decoding = 'async';
+    image.draggable = false;
+
+    button.appendChild(image);
+    wordmark.appendChild(button);
+    return wordmark;
+  }
+
+  function createNewtabPreviewSearchPanel() {
+    const rootNode = document.createElement('div');
+    rootNode.id = '_x_extension_newtab_root_2024_unique_';
+    rootNode.className = 'newtab-preview-search-panel';
+
+    const searchLayer = document.createElement('div');
+    searchLayer.id = '_x_extension_newtab_search_layer_2024_unique_';
+    searchLayer.className = 'newtab-preview-search-layer';
+
+    const inputRoot = document.createElement('div');
+    inputRoot.id = '_x_extension_newtab_input_container_2024_unique_';
+    inputRoot.className = 'x-lumno-search-input x-lumno-search-input__container';
+
+    const searchIcon = document.createElement('span');
+    searchIcon.id = '_x_extension_newtab_search_icon_2024_unique_';
+    searchIcon.className = 'x-lumno-search-input__icon';
+    searchIcon.appendChild(createIcon('ri-search-line'));
+
+    const field = document.createElement('input');
+    field.id = '_x_extension_newtab_search_input_2024_unique_';
+    field.className = 'x-lumno-search-input__field';
+    field.type = 'text';
+    field.value = NEWTAB_PREVIEW_QUERY;
+    field.placeholder = '搜索或输入网址...';
+    field.readOnly = true;
+    field.tabIndex = -1;
+    field.setAttribute('aria-label', 'Lumno newtab search preview');
+
+    const rightIcon = document.createElement('button');
+    rightIcon.type = 'button';
+    rightIcon.className = 'x-lumno-search-input__right-icon';
+    rightIcon.setAttribute('aria-label', 'Settings');
+    rightIcon.tabIndex = -1;
+    rightIcon.appendChild(createIcon('ri-settings-3-line'));
+
+    const divider = document.createElement('span');
+    divider.className = 'x-lumno-search-input__divider';
+    divider.dataset.visible = 'false';
+
+    const modeBadge = document.createElement('div');
+    modeBadge.id = '_x_extension_newtab_mode_badge_2024_unique_';
+    modeBadge.className = 'x-lumno-search-input-mode__badge';
+    modeBadge.dataset.surface = 'newtab';
+    modeBadge.dataset.visible = 'false';
+
+    inputRoot.appendChild(searchIcon);
+    inputRoot.appendChild(field);
+    inputRoot.appendChild(rightIcon);
+    inputRoot.appendChild(divider);
+    inputRoot.appendChild(modeBadge);
+    searchLayer.appendChild(inputRoot);
+    rootNode.appendChild(searchLayer);
+    return rootNode;
+  }
+
+  function createNewtabPreviewFaviconImage(className, item, fallbackIconClass) {
+    if (item && item.type === 'folder') {
+      const folderIcon = document.createElement('span');
+      folderIcon.className = className;
+      folderIcon.innerHTML = getNewtabPreviewFolderSvg(item.title);
+      return folderIcon;
+    }
+    const source = String((item && item.iconSrc) || getNewtabPreviewFaviconUrl(item && item.url) || '').trim();
+    if (source) {
+      const image = document.createElement('img');
+      image.className = className;
+      image.src = source;
+      image.alt = '';
+      image.decoding = 'async';
+      image.loading = 'eager';
+      image.draggable = false;
+      image.referrerPolicy = 'no-referrer';
+      return image;
+    }
+    const icon = document.createElement('span');
+    icon.className = `${className} newtab-preview-glyph-favicon`.trim();
+    icon.appendChild(createIcon((item && item.iconClass) || fallbackIconClass || 'ri-link'));
+    return icon;
+  }
+
+  function appendNewtabPreviewHighlightedText(target, text, query) {
+    const value = String(text || '');
+    const needle = String(query || '').trim();
+    if (!target || !needle) {
+      if (target) {
+        target.textContent = value;
+      }
+      return;
+    }
+    const parts = value.split(new RegExp(`(${escapeRegExp(needle)})`, 'gi'));
+    parts.forEach((part) => {
+      if (!part) {
+        return;
+      }
+      if (part.toLowerCase() === needle.toLowerCase()) {
+        const mark = document.createElement('mark');
+        mark.className = 'x-nt-suggestion-mark';
+        mark.textContent = part;
+        target.appendChild(mark);
+        return;
+      }
+      target.appendChild(document.createTextNode(part));
+    });
+  }
+
+  function createNewtabPreviewSuggestionIcon(item, index) {
+    const slot = document.createElement('span');
+    slot.className = 'x-nt-suggestion-icon-slot';
+    slot.dataset.favicon = item.iconSrc ? 'true' : 'false';
+    slot.dataset.emphasis = item.active ? 'true' : 'false';
+
+    if (item.iconSrc) {
+      const image = document.createElement('img');
+      image.id = `_x_extension_newtab_suggestion_icon_${index}_2024_unique_`;
+      image.className = 'x-nt-suggestion-favicon';
+      image.setAttribute('data-x-nt-suggestion-icon', '1');
+      image.src = item.iconSrc;
+      image.alt = '';
+      image.decoding = 'async';
+      image.loading = 'eager';
+      image.draggable = false;
+      slot.appendChild(image);
+      return slot;
+    }
+
+    const inlineIcon = document.createElement('span');
+    inlineIcon.className = 'x-nt-suggestion-inline-icon';
+    inlineIcon.dataset.tone = 'subtext';
+    inlineIcon.appendChild(createIcon(item.iconClass || 'ri-search-line'));
+    slot.appendChild(inlineIcon);
+    return slot;
+  }
+
+  function createNewtabPreviewActionTag(labelText, keyLabel) {
+    const tag = document.createElement('span');
+    tag.className = 'x-nt-suggestion-action-tag';
+
+    const label = document.createElement('span');
+    label.className = 'x-nt-suggestion-action-tag__label';
+    label.textContent = labelText || '新开';
+
+    const key = document.createElement('span');
+    key.className = 'x-nt-suggestion-action-tag__key';
+    key.textContent = keyLabel || 'Enter';
+
+    tag.appendChild(label);
+    tag.appendChild(key);
+    return tag;
+  }
+
+  function appendNewtabPreviewActionButtonLabel(button, labelText) {
+    const label = document.createElement('span');
+    label.className = 'x-nt-suggestion-action-button__label';
+    label.textContent = labelText || '新开';
+
+    const icon = document.createElement('span');
+    icon.className = 'x-nt-suggestion-action-button__icon';
+    icon.appendChild(createIcon('ri-arrow-right-line'));
+
+    button.appendChild(label);
+    button.appendChild(icon);
+  }
+
+  function createNewtabPreviewSuggestion(item, index, total) {
+    const suggestionItem = document.createElement('div');
+    suggestionItem.id = `_x_extension_newtab_suggestion_item_${index}_2024_unique_`;
+    suggestionItem.className = 'x-nt-suggestion-item';
+    suggestionItem.dataset.last = index === total - 1 ? 'true' : 'false';
+    suggestionItem.dataset.rowState = item.active ? 'active' : '';
+    suggestionItem.dataset.historyDeleteVisible = item.historyDeletable ? 'true' : 'false';
+
+    const leftSide = document.createElement('div');
+    leftSide.className = 'x-nt-suggestion-left';
+    leftSide.appendChild(createNewtabPreviewSuggestionIcon(item, index));
+
+    const textWrapper = document.createElement('div');
+    textWrapper.className = 'x-nt-suggestion-text';
+
+    const title = document.createElement('span');
+    title.className = 'x-nt-suggestion-title';
+    appendNewtabPreviewHighlightedText(title, item.title, NEWTAB_PREVIEW_QUERY);
+    textWrapper.appendChild(title);
+
+    if (item.path) {
+      const path = document.createElement('span');
+      path.className = 'x-nt-suggestion-bookmark-path';
+      path.textContent = item.path;
+      textWrapper.appendChild(path);
+    } else if (item.url) {
+      const urlLine = document.createElement('span');
+      urlLine.className = 'x-nt-suggestion-url-line';
+      urlLine.textContent = item.url.replace(/^https?:\/\//, '');
+      textWrapper.appendChild(urlLine);
+    }
+
+    if (item.tag) {
+      const tag = document.createElement('span');
+      tag.className = 'x-nt-suggestion-tag';
+      tag.dataset.tagType = item.tagType || '';
+      tag.textContent = item.tag;
+      textWrapper.appendChild(tag);
+    }
+
+    leftSide.appendChild(textWrapper);
+
+    const rightSide = document.createElement('div');
+    rightSide.className = 'x-nt-suggestion-right';
+
+    const actionTags = document.createElement('div');
+    actionTags.className = 'x-nt-suggestion-action-tags';
+    actionTags.dataset.visible = item.active && item.actionLabel ? 'true' : 'false';
+    if (item.actionLabel) {
+      actionTags.appendChild(createNewtabPreviewActionTag(item.actionLabel, item.actionKey));
+    }
+
+    const visitButton = document.createElement('button');
+    visitButton.type = 'button';
+    visitButton.className = 'x-nt-suggestion-action-button x-nt-suggestion-visit-button';
+    visitButton.tabIndex = -1;
+    visitButton.dataset.visible = item.active && item.actionLabel ? 'false' : 'true';
+    appendNewtabPreviewActionButtonLabel(visitButton, item.visitLabel || item.actionLabel);
+
+    rightSide.appendChild(actionTags);
+    rightSide.appendChild(visitButton);
+
+    if (item.historyDeletable) {
+      const deleteSlot = document.createElement('div');
+      deleteSlot.className = 'x-nt-history-delete-slot';
+      const deleteButton = document.createElement('button');
+      deleteButton.type = 'button';
+      deleteButton.className = 'x-nt-history-delete-button';
+      deleteButton.tabIndex = -1;
+      deleteButton.setAttribute('aria-label', '移除该历史');
+      deleteButton.appendChild(createIcon('ri-delete-bin-6-line'));
+      deleteSlot.appendChild(deleteButton);
+      rightSide.appendChild(deleteSlot);
+    }
+
+    suggestionItem.appendChild(leftSide);
+    suggestionItem.appendChild(rightSide);
+    return suggestionItem;
+  }
+
+  function createNewtabPreviewSuggestionsStack() {
+    const stack = document.createElement('div');
+    stack.className = 'newtab-preview-suggestions-stack';
+
+    const surface = document.createElement('div');
+    surface.id = '_x_extension_newtab_suggestions_surface_2026_unique_';
+    surface.dataset.visible = 'false';
+
+    const outline = document.createElement('div');
+    outline.id = '_x_extension_newtab_suggestions_outline_2026_unique_';
+    outline.dataset.visible = 'false';
+
+    const container = document.createElement('div');
+    container.id = '_x_extension_newtab_suggestions_container_2024_unique_';
+    container.dataset.visible = 'false';
+
+    stack.appendChild(surface);
+    stack.appendChild(outline);
+    stack.appendChild(container);
+    return stack;
+  }
+
+  function createNewtabPreviewRecentCard(item) {
+    const card = document.createElement('div');
+    card.className = `x-nt-recent-card${item.alt ? ' x-nt-recent-card--alt' : ''}`;
+    card.tabIndex = -1;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', `打开 ${item.title}`);
+    applyNewtabPreviewRecentTheme(card, item);
+
+    const inner = document.createElement('div');
+    inner.className = 'x-nt-recent-inner';
+
+    const header = document.createElement('div');
+    header.className = 'x-nt-recent-header';
+    header.appendChild(createNewtabPreviewFaviconImage('x-nt-recent-favicon', item, 'ri-global-line'));
+
+    const name = document.createElement('div');
+    name.className = 'x-nt-recent-name';
+    name.textContent = item.siteName;
+    header.appendChild(name);
+
+    const dismissButton = document.createElement('button');
+    dismissButton.type = 'button';
+    dismissButton.className = 'x-nt-recent-dismiss';
+    dismissButton.tabIndex = -1;
+    dismissButton.appendChild(createIcon('ri-close-line'));
+    header.appendChild(dismissButton);
+
+    const title = document.createElement('span');
+    title.className = 'x-nt-recent-title';
+    title.textContent = item.title;
+
+    inner.appendChild(header);
+    inner.appendChild(title);
+
+    const urlLine = document.createElement('div');
+    urlLine.className = 'x-nt-recent-url';
+
+    const actionLine = document.createElement('div');
+    actionLine.className = 'x-nt-recent-action';
+    const actionText = document.createElement('span');
+    actionText.textContent = '前往';
+    actionLine.appendChild(actionText);
+    actionLine.appendChild(createIcon('ri-arrow-right-line'));
+
+    const url = document.createElement('span');
+    url.className = 'x-nt-recent-url-text';
+    url.textContent = item.urlText;
+
+    const pinButton = document.createElement('button');
+    pinButton.type = 'button';
+    pinButton.className = 'x-nt-recent-pin';
+    pinButton.tabIndex = -1;
+    pinButton.appendChild(createIcon('ri-pushpin-line'));
+
+    urlLine.appendChild(actionLine);
+    urlLine.appendChild(url);
+    urlLine.appendChild(pinButton);
+
+    card.appendChild(inner);
+    card.appendChild(urlLine);
+    return card;
+  }
+
+  function createNewtabPreviewBookmarkCard(item) {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.tabIndex = -1;
+    card.className = item.type === 'folder'
+      ? 'x-nt-bookmark-card x-nt-bookmark-card--folder'
+      : 'x-nt-bookmark-card';
+    card.setAttribute('aria-label', `打开 ${item.title}`);
+    card.title = item.title;
+    card.setAttribute('data-cursor-tooltip', item.title);
+    applyNewtabPreviewBookmarkTheme(card, item);
+
+    const iconClassName = item.type === 'folder'
+      ? 'x-nt-bookmark-icon x-nt-bookmark-icon--figma newtab-preview-folder-glyph'
+      : 'x-nt-bookmark-icon';
+    card.appendChild(createNewtabPreviewFaviconImage(iconClassName, item, 'ri-bookmark-3-line'));
+
+    const title = document.createElement('span');
+    title.className = 'x-nt-bookmark-title';
+    title.textContent = item.title;
+    card.appendChild(title);
+    if (item.type === 'folder' && Array.isArray(item.previewUrls) && item.previewUrls.length > 0) {
+      const previewWrap = document.createElement('span');
+      previewWrap.className = 'x-nt-folder-preview';
+      item.previewUrls.slice(0, 4).forEach((url, index) => {
+        const previewFavicon = document.createElement('img');
+        previewFavicon.className = 'x-nt-folder-preview-favicon';
+        previewFavicon.src = getNewtabPreviewFaviconUrl(url);
+        previewFavicon.alt = '';
+        previewFavicon.decoding = 'async';
+        previewFavicon.loading = 'eager';
+        previewFavicon.setAttribute('aria-hidden', 'true');
+        previewFavicon.style.setProperty('--x-nt-folder-favicon-rot', `${(index - 1.5) * 2}deg`);
+        previewWrap.appendChild(previewFavicon);
+      });
+      card.appendChild(previewWrap);
+    }
+    return card;
+  }
+
+  function createNewtabPreviewSectionModeSelect(kind) {
+    const label = kind === 'recent' ? '最近访问显示模式' : '书签显示模式';
+    const control = document.createElement('div');
+    control.className = 'x-nt-section-mode-select _x_extension_select_wrap_2024_unique_';
+    control.dataset.iconOnly = 'true';
+    control.dataset.menuAlign = 'left';
+    control.dataset.menuWidth = 'content';
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.tabIndex = -1;
+    trigger.className = '_x_extension_select_trigger_2024_unique_';
+    trigger.setAttribute('aria-label', label);
+    trigger.setAttribute('data-tooltip', label);
+
+    const labelNode = document.createElement('span');
+    labelNode.className = '_x_extension_select_label_2024_unique_';
+    labelNode.textContent = label;
+    const icon = document.createElement('span');
+    icon.className = '_x_extension_select_icon_2024_unique_';
+    icon.appendChild(createIcon('ri-more-line'));
+
+    trigger.appendChild(labelNode);
+    trigger.appendChild(icon);
+    control.appendChild(trigger);
+    return control;
+  }
+
+  function createNewtabPreviewPager(label, includeManager) {
+    const pager = document.createElement('div');
+    pager.className = 'x-nt-bookmarks-pager';
+    const buttons = [
+      ['ri-arrow-left-s-line', `${label} previous`, true],
+      ['ri-arrow-right-s-line', `${label} next`, false]
+    ];
+    if (includeManager) {
+      buttons.push(['ri-bookmark-line', '打开书签管理页', false]);
+    }
+    buttons.forEach(([iconClass, ariaLabel, disabled]) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'x-nt-bookmarks-pager-btn';
+      button.tabIndex = -1;
+      button.setAttribute('aria-label', ariaLabel);
+      button.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+      button.appendChild(createIcon(iconClass));
+      pager.appendChild(button);
+    });
+    return pager;
+  }
+
+  function createNewtabPreviewSection(kind, titleText, items) {
+    const section = document.createElement('section');
+    section.id = kind === 'recent'
+      ? '_x_extension_newtab_recent_sites_2024_unique_'
+      : '_x_extension_newtab_bookmarks_2024_unique_';
+    section.className = `newtab-preview-section newtab-preview-section--${kind}`;
+    section.dataset.visible = 'true';
+
+    const header = document.createElement('div');
+    header.className = kind === 'recent' ? 'x-nt-recent-header-bar' : 'x-nt-bookmarks-header';
+
+    if (kind === 'recent') {
+      const title = document.createElement('span');
+      title.className = 'x-nt-recent-heading';
+      title.textContent = titleText;
+      header.appendChild(title);
+      header.appendChild(createNewtabPreviewSectionModeSelect('recent'));
+    } else {
+      const titleWrap = document.createElement('div');
+      titleWrap.className = 'x-nt-bookmarks-title-wrap';
+      const title = document.createElement('span');
+      title.className = 'x-nt-bookmarks-heading';
+      title.textContent = titleText;
+      titleWrap.appendChild(title);
+      titleWrap.appendChild(createNewtabPreviewSectionModeSelect('bookmarks'));
+      const breadcrumb = document.createElement('div');
+      breadcrumb.className = 'x-nt-bookmarks-breadcrumb';
+      breadcrumb.style.setProperty('display', 'none');
+      titleWrap.appendChild(breadcrumb);
+      header.appendChild(titleWrap);
+      header.appendChild(createNewtabPreviewPager(titleText, true));
+    }
+
+    const grid = document.createElement('div');
+    grid.id = kind === 'recent'
+      ? '_x_extension_newtab_recent_sites_grid_2024_unique_'
+      : '_x_extension_newtab_bookmarks_grid_2024_unique_';
+    grid.className = `newtab-preview-grid newtab-preview-grid--${kind}`;
+    items.forEach((item) => {
+      grid.appendChild(kind === 'recent'
+        ? createNewtabPreviewRecentCard(item)
+        : createNewtabPreviewBookmarkCard(item));
+    });
+
+    section.appendChild(header);
+    section.appendChild(grid);
+    return section;
+  }
+
+  function createNewtabPreviewControls() {
+    const controls = document.createElement('div');
+    controls.className = 'newtab-preview-controls';
+
+    const debugControl = document.createElement('div');
+    debugControl.className = 'x-nt-bookmark-cascade-debug-control';
+    const debugButton = document.createElement('button');
+    debugButton.type = 'button';
+    debugButton.className = 'x-nt-bookmark-cascade-debug-button';
+    debugButton.tabIndex = -1;
+    debugButton.setAttribute('aria-label', 'Debug bookmark cascade');
+    debugButton.appendChild(createIcon('ri-bug-line'));
+    debugControl.appendChild(debugButton);
+
+    const feedbackControl = document.createElement('div');
+    feedbackControl.className = 'x-nt-feedback-control';
+    const feedbackButton = document.createElement('button');
+    feedbackButton.type = 'button';
+    feedbackButton.className = 'x-nt-feedback-button';
+    feedbackButton.tabIndex = -1;
+    feedbackButton.setAttribute('aria-label', 'Feedback');
+    feedbackButton.appendChild(createIcon('ri-message-3-line'));
+    feedbackControl.appendChild(feedbackButton);
+
+    const wallpaperControl = document.createElement('div');
+    wallpaperControl.className = 'x-nt-wallpaper-control';
+    const wallpaperButton = document.createElement('button');
+    wallpaperButton.type = 'button';
+    wallpaperButton.className = 'x-nt-wallpaper-button';
+    wallpaperButton.tabIndex = -1;
+    wallpaperButton.dataset.active = 'false';
+    wallpaperButton.setAttribute('aria-label', 'Wallpaper');
+    wallpaperButton.appendChild(createIcon('ri-image-edit-line'));
+    wallpaperControl.appendChild(wallpaperButton);
+
+    controls.appendChild(debugControl);
+    controls.appendChild(feedbackControl);
+    controls.appendChild(wallpaperControl);
+    return controls;
+  }
+
+  function createNewtabPreviewViewport() {
+    const viewport = document.createElement('div');
+    viewport.className = 'newtab-preview-viewport x-nt-bottom-layout';
+    viewport.dataset.ntReady = '1';
+    viewport.dataset.ntSuggestionsOpen = 'false';
+    viewport.dataset.wallpaperActive = 'false';
+
+    const bottomDock = document.createElement('div');
+    bottomDock.id = '_x_extension_newtab_bottom_dock_2024_unique_';
+    bottomDock.className = 'newtab-preview-bottom-dock';
+    const bottomDockScroller = document.createElement('div');
+    bottomDockScroller.id = '_x_extension_newtab_bottom_dock_scroller_2024_unique_';
+    const sectionSafeCorridor = document.createElement('div');
+    sectionSafeCorridor.id = '_x_extension_newtab_section_safe_corridor_2026_unique_';
+    bottomDockScroller.appendChild(createNewtabPreviewSection('bookmarks', '书签', NEWTAB_PREVIEW_BOOKMARKS));
+    bottomDockScroller.appendChild(sectionSafeCorridor);
+    bottomDockScroller.appendChild(createNewtabPreviewSection('recent', '最近访问', NEWTAB_PREVIEW_RECENT_SITES));
+    bottomDock.appendChild(bottomDockScroller);
+
+    viewport.appendChild(createNewtabPreviewWordmark());
+    viewport.appendChild(createNewtabPreviewSearchPanel());
+    viewport.appendChild(createNewtabPreviewSuggestionsStack());
+    viewport.appendChild(bottomDock);
+    return viewport;
+  }
+
+  function createNewtabPreviewSurface() {
+    const surface = document.createElement('div');
+    surface.className = 'newtab-preview-surface';
+    surface.setAttribute('aria-label', 'Lumno new tab preview');
+
+    const browserBackdrop = document.createElement('div');
+    browserBackdrop.className = 'browser-window newtab-preview-browser-backdrop';
+    browserBackdrop.appendChild(createBrowserBar());
+
+    const backdropClip = createBrowserWindowClip(browserBackdrop);
+    backdropClip.classList.add('newtab-preview-browser-backdrop-clip');
+
+    const browserForeground = document.createElement('div');
+    browserForeground.className = 'newtab-preview-browser-foreground';
+    const page = document.createElement('div');
+    page.className = 'newtab-preview-browser-page';
+    page.appendChild(createNewtabPreviewViewport());
+    browserForeground.appendChild(page);
+
+    const foregroundClip = createBrowserWindowClip(browserForeground);
+    foregroundClip.classList.add('newtab-preview-browser-foreground-clip');
+
+    surface.appendChild(backdropClip);
+    surface.appendChild(foregroundClip);
+    return surface;
+  }
+
   function renderVisualSurface(slide) {
     if (!visualStage) {
       return;
+    }
+    stopLumnoOverlayHoverLoop();
+    stopNewtabPreviewHoverLoop();
+    visualStage.classList.remove('is-visual-exit');
+    if (cursorLayer) {
+      cursorLayer.classList.remove('is-visual-exit');
     }
     visualStage.textContent = '';
     visualStage.dataset.visualKind = slide.visual.kind;
     if (cursorLayer) {
       cursorLayer.textContent = '';
       cursorLayer.dataset.cursorEnabled = 'false';
+      cursorLayer.dataset.cursorMode = '';
     }
-    if (!slide.visual.visible) {
-      return;
-    }
-    if (slide.visual.kind === 'bookmark-focus-surface') {
-      visualStage.appendChild(createBookmarkFocusSurface());
-    } else {
-      visualStage.appendChild(createGenericVisualSurface());
+    if (slide.visual.visible) {
+      if (slide.visual.kind === 'bookmark-focus-surface') {
+        visualStage.appendChild(createBookmarkFocusSurface());
+      } else if (slide.visual.kind === 'lumno-web-wordmark-surface') {
+        visualStage.appendChild(createLumnoWebWordmarkSurface());
+      } else if (slide.visual.kind === 'newtab-preview-surface') {
+        const surface = createNewtabPreviewSurface();
+        visualStage.appendChild(surface);
+        startNewtabPreviewHoverLoop(surface);
+      } else {
+        visualStage.appendChild(createGenericVisualSurface());
+      }
     }
     renderCursor(slide);
+  }
+
+  function prepareVisualExit(nextState) {
+    if (!blueprint || !state || !nextState || !visualStage || prefersReducedMotion()) {
+      return;
+    }
+    const currentSlide = MODEL.getSlideByIndex(blueprint, state.index);
+    const nextSlide = MODEL.getSlideByIndex(blueprint, nextState.index);
+    const shouldBlurOut =
+      currentSlide &&
+      nextSlide &&
+      currentSlide.visual &&
+      nextSlide.visual &&
+      currentSlide.visual.kind === 'bookmark-focus-surface' &&
+      nextSlide.visual.kind === 'lumno-web-wordmark-surface';
+    if (!shouldBlurOut) {
+      return;
+    }
+    visualStage.classList.add('is-visual-exit');
+    if (cursorLayer) {
+      cursorLayer.classList.add('is-visual-exit');
+    }
   }
 
   function renderActionButton(button, action) {
@@ -1040,10 +2435,24 @@
     if (!normalizedAction) {
       button.removeAttribute('data-action');
       button.removeAttribute('aria-label');
+      button.removeAttribute('data-tooltip');
+      button.removeAttribute('data-tooltip-max-width');
       return false;
     }
     button.dataset.action = normalizedAction.actionId;
     button.setAttribute('aria-label', normalizedAction.label);
+    const tooltip = String(normalizedAction.tooltip || '').trim();
+    if (tooltip) {
+      button.dataset.tooltip = tooltip;
+    } else {
+      button.removeAttribute('data-tooltip');
+    }
+    const tooltipMaxWidth = Number(normalizedAction.tooltipMaxWidth);
+    if (Number.isFinite(tooltipMaxWidth) && tooltipMaxWidth > 0) {
+      button.dataset.tooltipMaxWidth = String(tooltipMaxWidth);
+    } else {
+      button.removeAttribute('data-tooltip-max-width');
+    }
     const labelNode = button.querySelector('span');
     if (labelNode) {
       labelNode.textContent = normalizedAction.label;
@@ -1076,9 +2485,7 @@
     }
     cursorLayer.textContent = '';
     cursorLayer.dataset.cursorEnabled = slide.cursor.enabled ? 'true' : 'false';
-    if (!slide.cursor.enabled) {
-      return;
-    }
+    cursorLayer.dataset.cursorMode = slide.cursor.enabled ? slide.id : '';
     const cursor = document.createElement('span');
     cursor.className = 'demo-cursor';
     cursor.setAttribute('aria-hidden', 'true');
@@ -1086,42 +2493,16 @@
     cursorLayer.appendChild(cursor);
   }
 
-  function updateProgress() {
-    if (!blueprint || !state) {
-      return;
-    }
-    const current = state.index + 1;
-    const total = blueprint.slides.length;
-    if (progressLabel) {
-      progressLabel.textContent = `${current} / ${total}`;
-    }
-    if (progressDots) {
-      progressDots.textContent = '';
-      blueprint.slides.forEach((slide, index) => {
-        const dot = document.createElement('button');
-        dot.className = 'progress-dot';
-        dot.type = 'button';
-        dot.dataset.slideTarget = String(index);
-        dot.dataset.active = index === state.index ? 'true' : 'false';
-        dot.setAttribute('aria-label', `Go to slide ${index + 1}`);
-        dot.appendChild(createSkeletonLine('progress-dot-mark'));
-        progressDots.appendChild(dot);
-      });
-    }
-    if (prevButton) {
-      prevButton.disabled = state.index <= 0;
-    }
-    if (nextButton) {
-      nextButton.disabled = state.index >= total - 1;
-    }
-  }
-
   function renderBodyCopy(slide) {
     const value = String(slide.copy.body || '');
     if (!body) {
       return;
     }
-    body.dataset.empty = value ? 'false' : 'true';
+    const note = String(slide.copy.note || '');
+    body.dataset.empty = value || note ? 'false' : 'true';
+    if (bodyNote) {
+      bodyNote.textContent = String(slide.copy.note || '');
+    }
     if (!bodyPrefix || !shortcutLabel || !bodySuffix) {
       setText(body, value.replace(SHORTCUT_PLACEHOLDER, currentShortcutLabel));
       return;
@@ -1165,16 +2546,148 @@
     });
   }
 
+  function renderPageStrip() {
+    if (!pageStrip || !blueprint || !state) {
+      return;
+    }
+    const wasPageStripHidden = pageStrip.hidden;
+    pageStrip.hidden = state.index <= 0;
+    pageStrip.dataset.entering = wasPageStripHidden && !pageStrip.hidden ? 'true' : 'false';
+    pageStrip.textContent = '';
+    const pageCount = Math.max(1, blueprint.slides.length - 1);
+    const currentPageIndex = Math.max(0, state.index - 1);
+    pageStrip.style.setProperty('--page-strip-count', String(pageCount));
+    pageStrip.setAttribute('aria-label', `引导页导航，第 ${currentPageIndex + 1} / ${pageCount} 页`);
+    if (pageStrip.hidden) {
+      return;
+    }
+    for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+      const slideIndex = pageIndex + 1;
+      const segment = document.createElement('button');
+      segment.className = 'page-strip-segment';
+      segment.type = 'button';
+      segment.dataset.active = pageIndex === currentPageIndex ? 'true' : 'false';
+      segment.dataset.slideTarget = String(slideIndex);
+      segment.style.setProperty('--page-strip-segment-index', String(pageIndex));
+      segment.setAttribute('aria-label', `第 ${pageIndex + 1} 页`);
+      if (pageIndex === currentPageIndex) {
+        segment.setAttribute('aria-current', 'step');
+      }
+      pageStrip.appendChild(segment);
+    }
+  }
+
   function stopTitleCycle() {
     if (titleCycleInterval) {
       window.clearInterval(titleCycleInterval);
       titleCycleInterval = 0;
+    }
+    if (titleCycleFirstTimeout) {
+      window.clearTimeout(titleCycleFirstTimeout);
+      titleCycleFirstTimeout = 0;
     }
     if (titleCycleSwapTimeout) {
       window.clearTimeout(titleCycleSwapTimeout);
       titleCycleSwapTimeout = 0;
     }
     titleCycleIndex = 0;
+  }
+
+  function getTitleFitLines() {
+    if (!title) {
+      return [];
+    }
+    const lines = Array.from(title.querySelectorAll('.title-line'));
+    return lines.length > 0 ? lines : [title];
+  }
+
+  function updateTitleFitScale() {
+    if (!title) {
+      return;
+    }
+    title.style.setProperty('--title-fit-scale', '1');
+    if (title.dataset.empty === 'true') {
+      return;
+    }
+    const availableWidth = title.clientWidth;
+    if (!availableWidth) {
+      return;
+    }
+    const widestLine = getTitleFitLines().reduce((maxWidth, line) => {
+      return Math.max(maxWidth, line.scrollWidth || line.getBoundingClientRect().width || 0);
+    }, 0);
+    if (!widestLine) {
+      return;
+    }
+    const scale = Math.max(0.78, Math.min(1, availableWidth / widestLine));
+    title.style.setProperty('--title-fit-scale', scale.toFixed(3));
+  }
+
+  function scheduleTitleFitUpdate() {
+    if (!title || typeof window.requestAnimationFrame !== 'function') {
+      updateTitleFitScale();
+      return;
+    }
+    if (titleFitFrame) {
+      window.cancelAnimationFrame(titleFitFrame);
+    }
+    titleFitFrame = window.requestAnimationFrame(() => {
+      titleFitFrame = 0;
+      updateTitleFitScale();
+    });
+  }
+
+  function isStackedOnboardingLayout() {
+    return typeof window.matchMedia === 'function' &&
+      window.matchMedia('(max-width: 900px)').matches;
+  }
+
+  function resetStackedLayoutScroll() {
+    if (!root || !isStackedOnboardingLayout()) {
+      return;
+    }
+    root.scrollTop = 0;
+    if (typeof window.requestAnimationFrame !== 'function') {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      if (!root || !isStackedOnboardingLayout()) {
+        return;
+      }
+      root.scrollTop = 0;
+    });
+  }
+
+  function updateVisualCanvasScale() {
+    if (!root || !visualSlot || !visualPanel || !visualCanvas) {
+      return;
+    }
+    const rect = visualSlot.getBoundingClientRect();
+    const availableWidth = visualSlot.clientWidth || rect.width || 0;
+    const isStackedLayout = isStackedOnboardingLayout();
+    const availableHeight = isStackedLayout
+      ? VISUAL_CANVAS_HEIGHT
+      : (visualSlot.clientHeight || rect.height || 0);
+    if (!availableWidth || !availableHeight) {
+      return;
+    }
+    const scale = Math.max(0.1, Math.min(1, availableWidth / VISUAL_CANVAS_WIDTH, availableHeight / VISUAL_CANVAS_HEIGHT));
+    root.style.setProperty('--onboarding-visual-scale', scale.toFixed(3));
+    root.style.setProperty('--onboarding-visual-rendered-width', `${(VISUAL_CANVAS_WIDTH * scale).toFixed(2)}px`);
+  }
+
+  function scheduleVisualCanvasScaleUpdate() {
+    if (!visualCanvas || typeof window.requestAnimationFrame !== 'function') {
+      updateVisualCanvasScale();
+      return;
+    }
+    if (visualScaleFrame) {
+      window.cancelAnimationFrame(visualScaleFrame);
+    }
+    visualScaleFrame = window.requestAnimationFrame(() => {
+      visualScaleFrame = 0;
+      updateVisualCanvasScale();
+    });
   }
 
   function getTitleCycleItems(titleCycle) {
@@ -1193,6 +2706,7 @@
     setTitleCycleWidth(rotator, item.label);
     rotator.dataset.tone = item.tone;
     textNode.textContent = item.label;
+    scheduleTitleFitUpdate();
   }
 
   function getTitleCycleMeasureNode(rotator) {
@@ -1246,6 +2760,7 @@
       titleCycleSwapTimeout = 0;
     }
     setTitleCycleWidth(rotator, item.label);
+    scheduleTitleFitUpdate();
     textNode.classList.add('is-exit');
     titleCycleSwapTimeout = window.setTimeout(() => {
       titleCycleSwapTimeout = 0;
@@ -1258,7 +2773,17 @@
       textNode.classList.add('is-enter-start');
       void textNode.offsetHeight;
       textNode.classList.remove('is-enter-start');
+      scheduleTitleFitUpdate();
     }, getTextSwapDurationMs());
+  }
+
+  function advanceTitleCycle(rotator, items) {
+    if (!rotator || !rotator.isConnected || !Array.isArray(items) || items.length < 2) {
+      return false;
+    }
+    titleCycleIndex = (titleCycleIndex + 1) % items.length;
+    swapTitleCycleItem(rotator, items[titleCycleIndex]);
+    return true;
   }
 
   function startTitleCycle(rotator, items) {
@@ -1268,10 +2793,13 @@
       return;
     }
     titleCycleIndex = 0;
-    titleCycleInterval = window.setInterval(() => {
-      titleCycleIndex = (titleCycleIndex + 1) % safeItems.length;
-      swapTitleCycleItem(rotator, safeItems[titleCycleIndex]);
-    }, TITLE_CYCLE_INTERVAL_MS);
+    titleCycleFirstTimeout = window.setTimeout(() => {
+      titleCycleFirstTimeout = 0;
+      advanceTitleCycle(rotator, safeItems);
+      titleCycleInterval = window.setInterval(() => {
+        advanceTitleCycle(rotator, safeItems);
+      }, TITLE_CYCLE_INTERVAL_MS);
+    }, TITLE_CYCLE_FIRST_DELAY_MS);
   }
 
   function createTitleLogoMark(titleLogo) {
@@ -1340,6 +2868,7 @@
     }
 
     startTitleCycle(rotator, items);
+    scheduleTitleFitUpdate();
     return true;
   }
 
@@ -1358,6 +2887,7 @@
     }
     if (lines.length === 0) {
       title.textContent = text;
+      scheduleTitleFitUpdate();
       return;
     }
     lines.forEach((line, index) => {
@@ -1369,6 +2899,7 @@
       }
       appendTitleLine(String(line || ''), index === lines.length - 1 ? slide.copy.titleLogo : null);
     });
+    scheduleTitleFitUpdate();
   }
 
   function render() {
@@ -1390,13 +2921,14 @@
     if (copyPanel) {
       copyPanel.dataset.slideId = slide.id;
     }
+    renderPageStrip();
     setText(eyebrow, slide.copy.eyebrow);
     renderTitleCopy(slide);
     renderBodyCopy(slide);
     renderInteractions(slide);
     renderCopyActions(slide);
     renderVisualSurface(slide);
-    updateProgress();
+    scheduleVisualCanvasScaleUpdate();
   }
 
   function getCopySwapTargets() {
@@ -1409,9 +2941,64 @@
     });
   }
 
+  function clearCursorTransitionStart() {
+    if (!root) {
+      return;
+    }
+    root.style.removeProperty('--onboarding-cursor-transition-left');
+    root.style.removeProperty('--onboarding-cursor-transition-top');
+    root.style.removeProperty('--onboarding-cursor-transition-transform');
+  }
+
+  function captureCursorTransitionStart(nextState) {
+    if (!root || !blueprint || !state || !nextState || !cursorLayer) {
+      clearCursorTransitionStart();
+      return;
+    }
+    const currentSlide = MODEL.getSlideByIndex(blueprint, state.index);
+    const nextSlide = MODEL.getSlideByIndex(blueprint, nextState.index);
+    const shouldCapture =
+      currentSlide &&
+      nextSlide &&
+      (
+        (currentSlide.id === 'intro' && nextSlide.id === 'setup') ||
+        (currentSlide.id === 'setup' && nextSlide.id === 'search')
+      ) &&
+      nextState.direction === 'forward';
+    if (!shouldCapture) {
+      clearCursorTransitionStart();
+      return;
+    }
+    const cursor = cursorLayer.querySelector('.demo-cursor');
+    if (!cursor) {
+      clearCursorTransitionStart();
+      return;
+    }
+    const style = getComputedStyle(cursor);
+    const leftPx = Number.parseFloat(style.left);
+    const topPx = Number.parseFloat(style.top);
+    const layerWidth = cursorLayer.clientWidth;
+    const layerHeight = cursorLayer.clientHeight;
+    if (!Number.isFinite(leftPx) || !Number.isFinite(topPx) || !layerWidth || !layerHeight) {
+      clearCursorTransitionStart();
+      return;
+    }
+    const left = (leftPx / layerWidth) * 100;
+    const top = (topPx / layerHeight) * 100;
+    const transform = String(style.transform || '').trim();
+    root.style.setProperty('--onboarding-cursor-transition-left', `${Math.max(0, Math.min(100, left)).toFixed(2)}%`);
+    root.style.setProperty('--onboarding-cursor-transition-top', `${Math.max(0, Math.min(100, top)).toFixed(2)}%`);
+    if (transform && transform !== 'none') {
+      root.style.setProperty('--onboarding-cursor-transition-transform', transform);
+    } else {
+      root.style.removeProperty('--onboarding-cursor-transition-transform');
+    }
+  }
+
   function commitState(nextState) {
     state = nextState;
     render();
+    resetStackedLayoutScroll();
   }
 
   function animateCopySwap(nextState) {
@@ -1422,9 +3009,11 @@
     const targets = getCopySwapTargets();
     if (targets.length === 0 || prefersReducedMotion()) {
       clearCopySwapClasses();
+      captureCursorTransitionStart(nextState);
       commitState(nextState);
       return;
     }
+    prepareVisualExit(nextState);
     targets.forEach((element) => {
       element.classList.add('t-copy-swap');
       element.classList.remove('is-enter-start');
@@ -1432,6 +3021,7 @@
     });
     copySwapTimeout = window.setTimeout(() => {
       copySwapTimeout = 0;
+      captureCursorTransitionStart(nextState);
       commitState(nextState);
       const nextTargets = getCopySwapTargets();
       nextTargets.forEach((element) => {
@@ -1459,8 +3049,11 @@
     animateCopySwap(nextState);
   }
 
-  function runExtensionAction(actionId) {
-    const id = String(actionId || '');
+  function runExtensionAction(actionTarget) {
+    const target = typeof actionTarget === 'string' ? null : actionTarget;
+    const id = typeof actionTarget === 'string'
+      ? String(actionTarget || '')
+      : String(target && target.dataset && target.dataset.action || '');
     if (!id) {
       return;
     }
@@ -1470,6 +3063,10 @@
     }
     if (id === 'prev') {
       dispatch({ type: 'PREV' });
+      return;
+    }
+    if (id === 'toggleInteractionAccordion') {
+      toggleInteractionAccordion(target && target.dataset && target.dataset.accordionId);
       return;
     }
 
@@ -1482,30 +3079,42 @@
   }
 
   document.addEventListener('click', (event) => {
+    const accordionLinkTarget = event.target && event.target.closest
+      ? event.target.closest('.interaction-accordion-link[data-action]')
+      : null;
+    if (accordionLinkTarget) {
+      event.preventDefault();
+      runExtensionAction(accordionLinkTarget);
+      return;
+    }
+    if (event.target && event.target.closest && event.target.closest('.interaction-accordion-panel')) {
+      return;
+    }
     const target = event.target && event.target.closest
-      ? event.target.closest('[data-action], [data-slide-target], [data-onboarding-prev], [data-onboarding-next]')
+      ? event.target.closest('[data-action], [data-slide-target]')
       : null;
     if (!target) {
       return;
     }
     event.preventDefault();
-    if (target.hasAttribute('data-onboarding-prev')) {
-      dispatch({ type: 'PREV' });
-      return;
-    }
-    if (target.hasAttribute('data-onboarding-next')) {
-      dispatch({ type: 'NEXT' });
-      return;
-    }
     if (target.dataset.slideTarget) {
       dispatch({ type: 'GOTO', index: Number(target.dataset.slideTarget) });
       return;
     }
-    runExtensionAction(target.dataset.action);
+    runExtensionAction(target);
   });
 
   document.addEventListener('keydown', (event) => {
     if (!event || event.defaultPrevented) {
+      return;
+    }
+    if (shortcutHotkeyMatchesEvent(currentShortcutValue, event)) {
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      triggerOnboardingSearchOverlay();
       return;
     }
     if (event.key === 'ArrowRight') {
@@ -1523,19 +3132,39 @@
     }
   });
 
+  const initialChromeApi = getChromeApi();
+  if (initialChromeApi &&
+      initialChromeApi.runtime &&
+      initialChromeApi.runtime.onMessage &&
+      typeof initialChromeApi.runtime.onMessage.addListener === 'function') {
+    initialChromeApi.runtime.onMessage.addListener(handleOnboardingCommandMessage);
+  }
+
+  [primaryActionButton, secondaryActionButton, ghostActionButton].forEach(bindActionButtonTooltip);
+  scheduleTitleFitUpdate();
+  scheduleVisualCanvasScaleUpdate();
+  window.addEventListener('resize', () => {
+    scheduleTitleFitUpdate();
+    scheduleVisualCanvasScaleUpdate();
+  });
+  if (visualSlot && typeof ResizeObserver === 'function') {
+    visualResizeObserver = new ResizeObserver(scheduleVisualCanvasScaleUpdate);
+    visualResizeObserver.observe(visualSlot);
+  }
+
   getRuntimeLocale((locale) => {
     blueprint = MODEL.getOnboardingBlueprint(locale);
     const requestedIndex = Number(params.get('slide') || 0);
     state = MODEL.createOnboardingState(blueprint.slides.length, requestedIndex);
     updateVersionChip();
     render();
-    loadCurrentShortcut((shortcut) => {
-      const nextShortcutLabel = formatShortcutForDisplay(shortcut) || getDefaultShortcutLabel();
-      if (shortcut && nextShortcutLabel !== currentShortcutLabel) {
-        currentShortcutValue = shortcut;
-        currentShortcutLabel = nextShortcutLabel;
-        render();
-      }
-    });
+    refreshCurrentShortcut(true);
   });
+
+  window.addEventListener('focus', () => refreshCurrentShortcut(true), true);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      refreshCurrentShortcut(true);
+    }
+  }, true);
 })();

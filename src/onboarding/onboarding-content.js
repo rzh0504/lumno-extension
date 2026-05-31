@@ -33,10 +33,16 @@
     title: '原生聚焦搜索体验',
     body: '在任意网站按下快捷键{shortcut}，唤起聚焦搜索悬浮窗。'
   });
+  const DIA_BROWSER_DISCLOSURE_TEXT =
+    '在 Dia 中，若聚焦搜索浮窗的快捷键不可用，请进入浏览器的快捷键设置页面，将“Open command bar”从“In Dia”改为“Global”。';
+  const SHORTCUTS_PAGE_URL = 'chrome://extensions/shortcuts';
+  const LOCAL_FILE_ACCORDION_TEXT =
+    '请前往扩展程序详情页，为 Lumno 开启“允许访问文件网址”，开启后刷新对应标签页。';
+  const EXTENSION_DETAILS_URL = 'chrome://extensions/?id=nkbkcafoocmnnconoijmhloecgamfcai';
   const NEWTAB_COPY = Object.freeze({
     eyebrow: '',
-    title: '绝美新标签页',
-    body: '支持海量自定义样式。轻松管理你的书签、访问记录。'
+    title: '精美新标签页',
+    body: '支持海量自定义样式，轻松管理你的书签、访问记录。'
   });
   const BROWSER_AVATAR_ROW = Object.freeze({
     prefix: '支持',
@@ -96,10 +102,10 @@
     Object.freeze({
       id: 'intro',
       copy: FIRST_SLIDE_COPY,
-      visualKind: 'empty-surface',
-      visualVisible: false,
+      visualKind: 'lumno-web-wordmark-surface',
+      visualVisible: true,
       interactionRows: FIRST_SLIDE_ROWS,
-      cursorEnabled: false,
+      cursorEnabled: true,
       actions: Object.freeze({
         primary: Object.freeze({
           actionId: 'next',
@@ -113,6 +119,46 @@
       copy: FOCUS_SEARCH_COPY,
       visualKind: 'bookmark-focus-surface',
       visualVisible: true,
+      interactionRows: Object.freeze([
+        Object.freeze({
+          kind: 'accordion-row',
+          actionId: 'toggleInteractionAccordion',
+          accordionId: 'dia-browser',
+          icon: 'ri-question-fill',
+          label: '致 Dia 浏览器用户',
+          accordion: Object.freeze({
+            icon: 'ri-arrow-left-s-line',
+            text: DIA_BROWSER_DISCLOSURE_TEXT,
+            links: Object.freeze([
+              Object.freeze({
+                label: '快捷键设置页面',
+                href: SHORTCUTS_PAGE_URL,
+                actionId: 'openShortcuts'
+              })
+            ]),
+            expandedByDefault: false
+          })
+        }),
+        Object.freeze({
+          kind: 'accordion-row',
+          actionId: 'toggleInteractionAccordion',
+          accordionId: 'local-file-search',
+          icon: 'ri-question-fill',
+          label: '在本地 PDF/HTML 标签页中使用聚焦搜索',
+          accordion: Object.freeze({
+            icon: 'ri-arrow-left-s-line',
+            text: LOCAL_FILE_ACCORDION_TEXT,
+            links: Object.freeze([
+              Object.freeze({
+                label: '扩展程序详情页',
+                href: EXTENSION_DETAILS_URL,
+                actionId: 'openExtensionDetails'
+              })
+            ]),
+            expandedByDefault: false
+          })
+        })
+      ]),
       cursorEnabled: true,
       actions: Object.freeze({
         primary: Object.freeze({
@@ -122,37 +168,45 @@
         }),
         secondary: Object.freeze({
           actionId: 'prev',
-          label: '上一步',
-          icon: 'ri-arrow-left-line'
+          label: '返回'
         }),
         ghost: Object.freeze({
           actionId: 'openShortcuts',
-          label: '快捷键',
-          icon: 'ri-external-link-line'
+          label: '更换快捷键',
+          icon: 'ri-external-link-line',
+          tooltip: '由于浏览器的限制，请在 扩展程序/键盘快捷键 页面修改插件的所有快捷键，点击前往',
+          tooltipMaxWidth: 260
         })
       })
     }),
     Object.freeze({
       id: 'search',
       copy: NEWTAB_COPY,
-      visualKind: 'empty-surface',
-      visualVisible: false,
+      visualKind: 'newtab-preview-surface',
+      visualVisible: true,
       interactionKinds: Object.freeze(['segmented-control', 'inline-action']),
-      cursorEnabled: false
+      cursorEnabled: true,
+      actions: Object.freeze({
+        primary: Object.freeze({
+          actionId: 'next',
+          label: '下一步',
+          icon: 'ri-arrow-right-line'
+        })
+      })
     }),
     Object.freeze({
       id: 'newtab',
       visualKind: 'empty-surface',
       visualVisible: false,
       interactionKinds: Object.freeze(['choice-list', 'inline-action']),
-      cursorEnabled: false
+      cursorEnabled: true
     }),
     Object.freeze({
       id: 'finish',
       visualKind: 'empty-surface',
       visualVisible: false,
       interactionKinds: Object.freeze(['checklist', 'final-action']),
-      cursorEnabled: false
+      cursorEnabled: true
     })
   ]);
 
@@ -310,6 +364,156 @@
     return tokens.join(shouldUseCompactSymbols ? '' : '+');
   }
 
+  function parseShortcutHotkey(shortcut) {
+    const value = normalizeShortcutValue(shortcut);
+    if (!value) {
+      return null;
+    }
+    const parts = value.split('+').map((item) => String(item || '').trim()).filter(Boolean);
+    if (parts.length === 0) {
+      return null;
+    }
+    const keyToken = parts[parts.length - 1];
+    const modifierTokens = parts.slice(0, -1);
+    const spec = {
+      ctrl: false,
+      alt: false,
+      shift: false,
+      meta: false,
+      key: ''
+    };
+
+    modifierTokens.forEach((token) => {
+      const lower = token.toLowerCase();
+      if (lower === 'ctrl' || lower === 'control' || lower === 'macctrl' || token === '⌃') {
+        spec.ctrl = true;
+      } else if (lower === 'alt' || lower === 'option' || token === '⌥') {
+        spec.alt = true;
+      } else if (lower === 'shift' || token === '⇧') {
+        spec.shift = true;
+      } else if (lower === 'command' || lower === 'cmd' || lower === 'meta' || lower === 'super' || token === '⌘') {
+        spec.meta = true;
+      }
+    });
+
+    const keyLower = keyToken.toLowerCase();
+    const specialMap = {
+      tab: 'Tab',
+      enter: 'Enter',
+      return: 'Enter',
+      esc: 'Escape',
+      escape: 'Escape',
+      space: ' ',
+      spacebar: ' ',
+      up: 'ArrowUp',
+      down: 'ArrowDown',
+      left: 'ArrowLeft',
+      right: 'ArrowRight',
+      arrowup: 'ArrowUp',
+      arrowdown: 'ArrowDown',
+      arrowleft: 'ArrowLeft',
+      arrowright: 'ArrowRight',
+      comma: ',',
+      period: '.',
+      slash: '/',
+      semicolon: ';',
+      quote: '\'',
+      minus: '-',
+      plus: '+',
+      equal: '+',
+      backslash: '\\',
+      backquote: '`',
+      bracketleft: '[',
+      bracketright: ']'
+    };
+    if (specialMap[keyLower]) {
+      spec.key = specialMap[keyLower];
+      return spec;
+    }
+    if (/^f\d{1,2}$/.test(keyLower)) {
+      spec.key = keyLower.toUpperCase();
+      return spec;
+    }
+    if (keyLower.length === 1) {
+      spec.key = keyLower;
+      return spec;
+    }
+    spec.key = keyToken;
+    return spec;
+  }
+
+  function getShortcutKeyTokenFromCode(rawCode) {
+    const code = String(rawCode || '').trim();
+    if (!code) {
+      return '';
+    }
+    if (/^Key[A-Z]$/.test(code)) {
+      return code.slice(3).toLowerCase();
+    }
+    if (/^Digit[0-9]$/.test(code)) {
+      return code.slice(5);
+    }
+    const codeMap = {
+      Backquote: '`',
+      Minus: '-',
+      Equal: '+',
+      BracketLeft: '[',
+      BracketRight: ']',
+      Backslash: '\\',
+      Semicolon: ';',
+      Quote: '\'',
+      Comma: ',',
+      Period: '.',
+      Slash: '/',
+      Space: ' ',
+      Tab: 'Tab',
+      Enter: 'Enter',
+      Escape: 'Escape',
+      ArrowUp: 'ArrowUp',
+      ArrowDown: 'ArrowDown',
+      ArrowLeft: 'ArrowLeft',
+      ArrowRight: 'ArrowRight'
+    };
+    if (codeMap[code]) {
+      return codeMap[code];
+    }
+    if (/^F\d{1,2}$/.test(code)) {
+      return code.toUpperCase();
+    }
+    return '';
+  }
+
+  function getShortcutKeyTokenFromEvent(event) {
+    if (!event) {
+      return '';
+    }
+    return getShortcutKeyTokenFromCode(event.code) || String(event.key || '');
+  }
+
+  function shortcutHotkeySpecMatchesEvent(spec, event) {
+    if (!spec || !event) {
+      return false;
+    }
+    if (Boolean(event.ctrlKey) !== spec.ctrl ||
+        Boolean(event.altKey) !== spec.alt ||
+        Boolean(event.shiftKey) !== spec.shift ||
+        Boolean(event.metaKey) !== spec.meta) {
+      return false;
+    }
+    const eventKey = getShortcutKeyTokenFromEvent(event);
+    if (spec.key.length === 1) {
+      return eventKey.toLowerCase() === spec.key;
+    }
+    if (spec.key.startsWith('F')) {
+      return eventKey.toUpperCase() === spec.key;
+    }
+    return eventKey === spec.key;
+  }
+
+  function shortcutHotkeyMatchesEvent(shortcut, event) {
+    return shortcutHotkeySpecMatchesEvent(parseShortcutHotkey(shortcut), event);
+  }
+
   function cloneCopy(copy) {
     const source = copy || EMPTY_COPY;
     const cloned = {
@@ -317,6 +521,9 @@
       title: source.title || '',
       body: source.body || ''
     };
+    if (source.note) {
+      cloned.note = String(source.note || '');
+    }
     if (Array.isArray(source.titleLines) && source.titleLines.length > 0) {
       cloned.titleLines = Object.freeze(source.titleLines.map((line) => String(line || '')));
     }
@@ -369,11 +576,20 @@
     if (!label || !actionId) {
       return null;
     }
-    return Object.freeze({
+    const cloned = {
       actionId,
       label,
       icon: String(action.icon || '').trim()
-    });
+    };
+    const tooltip = String(action.tooltip || '').trim();
+    if (tooltip) {
+      cloned.tooltip = tooltip;
+    }
+    const tooltipMaxWidth = Number(action.tooltipMaxWidth);
+    if (Number.isFinite(tooltipMaxWidth) && tooltipMaxWidth > 0) {
+      cloned.tooltipMaxWidth = Math.round(tooltipMaxWidth);
+    }
+    return Object.freeze(cloned);
   }
 
   function cloneActions(actions) {
@@ -435,13 +651,35 @@
     };
   }
 
+  function cloneAccordionLinks(links) {
+    if (!Array.isArray(links)) {
+      return [];
+    }
+    return links
+      .map((link) => {
+        const label = String(link && link.label || '').trim();
+        const href = String(link && link.href || '').trim();
+        const actionId = String(link && link.actionId || '').trim();
+        if (!label || !href || !/^(?:https?:\/\/|chrome:\/\/)/i.test(href)) {
+          return null;
+        }
+        const clonedLink = { label, href };
+        if (actionId) {
+          clonedLink.actionId = actionId;
+        }
+        return Object.freeze(clonedLink);
+      })
+      .filter(Boolean);
+  }
+
   function createInteractionSlots(slot, slideId) {
     if (Array.isArray(slot.interactionRows)) {
       return slot.interactionRows.map((row, index) => {
         const interactionSlot = {
           id: `${slideId}-interaction-${index + 1}`,
           kind: row.kind || 'info-row',
-          actionId: '',
+          actionId: String(row.actionId || ''),
+          accordionId: String(row.accordionId || '').trim(),
           icon: row.icon || '',
           label: row.label || '',
           description: ''
@@ -461,6 +699,18 @@
         const linkButton = cloneLinkButton(row.linkButton);
         if (linkButton) {
           interactionSlot.linkButton = Object.freeze(linkButton);
+        }
+        if (row.accordion && typeof row.accordion === 'object') {
+          const accordionLinks = cloneAccordionLinks(row.accordion.links);
+          const accordion = {
+            icon: String(row.accordion.icon || 'ri-arrow-left-s-line').trim() || 'ri-arrow-left-s-line',
+            text: String(row.accordion.text || ''),
+            expandedByDefault: row.accordion.expandedByDefault === true
+          };
+          if (accordionLinks.length > 0) {
+            accordion.links = Object.freeze(accordionLinks);
+          }
+          interactionSlot.accordion = Object.freeze(accordion);
         }
         return Object.freeze(interactionSlot);
       });
@@ -590,6 +840,8 @@
     normalizeLocale,
     getShortcutDisplayTokens,
     formatShortcutForDisplay,
+    parseShortcutHotkey,
+    shortcutHotkeyMatchesEvent,
     getSupportedLocales,
     getOnboardingBlueprint,
     getOnboardingContent: getOnboardingBlueprint,

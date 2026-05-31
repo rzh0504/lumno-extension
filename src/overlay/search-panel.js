@@ -16,10 +16,13 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   let overlayPageThemeSyncRaf = null;
   let siteSearchStorageListener = null;
   let keydownHandler = null;
+  let keyupHandler = null;
   let overlayKeyCaptureHandler = null;
+  let overlayModifierBlurHandler = null;
   let clickOutsideHandler = null;
   let overlayScrollPauseHandler = null;
   let overlayRevealGate = null;
+  let openInCurrentTabModifierActive = false;
   const OVERLAY_HOST_ID = '_x_extension_overlay_host_2026_unique_';
   const OVERLAY_PANEL_ID = '_x_extension_overlay_2024_unique_';
   const SETTINGS = window.LumnoSettings || {};
@@ -745,6 +748,10 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       document.removeEventListener('keydown', keydownHandler);
       keydownHandler = null;
     }
+    if (keyupHandler) {
+      document.removeEventListener('keyup', keyupHandler);
+      keyupHandler = null;
+    }
     if (clickOutsideHandler) {
       document.removeEventListener('click', clickOutsideHandler);
       clickOutsideHandler = null;
@@ -752,6 +759,10 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     if (overlayKeyCaptureHandler) {
       window.removeEventListener('keydown', overlayKeyCaptureHandler, true);
       overlayKeyCaptureHandler = null;
+    }
+    if (overlayModifierBlurHandler) {
+      window.removeEventListener('blur', overlayModifierBlurHandler);
+      overlayModifierBlurHandler = null;
     }
     if (overlayThemeStorageListener) {
       chrome.storage.onChanged.removeListener(overlayThemeStorageListener);
@@ -2643,6 +2654,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
 
       tag.appendChild(label);
       tag.appendChild(keycap);
+      tag._xActionLabel = label;
       return tag;
     }
 
@@ -2682,9 +2694,70 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     function setSuggestionVisitButtonContent(button, action, suggestion) {
       setInlineLabelWithIcon(
         button,
-        getSuggestionActionLabel(action, suggestion),
+        getSuggestionActionLabel(getModifierAdjustedAction(action), suggestion),
         getRiSvg('ri-arrow-right-line', 'ri-size-12')
       );
+    }
+
+    function getModifierAdjustedAction(action) {
+      if (SUGGESTION_ACTION_MODEL &&
+          typeof SUGGESTION_ACTION_MODEL.getModifierAdjustedAction === 'function') {
+        return SUGGESTION_ACTION_MODEL.getModifierAdjustedAction(action, {
+          openInCurrentTab: openInCurrentTabModifierActive
+        });
+      }
+      return openInCurrentTabModifierActive && action === 'openNewTab' ? 'go' : action;
+    }
+
+    function setSuggestionActionTagContent(tag, action, suggestion) {
+      if (!tag || !tag._xActionLabel) {
+        return;
+      }
+      setProtectedPlainText(tag._xActionLabel, getSuggestionActionLabel(getModifierAdjustedAction(action), suggestion));
+    }
+
+    function updateModifierActionLabels() {
+      suggestionItems.forEach((item) => {
+        if (!item || !item._xIsSearchSuggestion) {
+          return;
+        }
+        if (item._xVisitButton && item._xVisitButtonAction) {
+          setSuggestionVisitButtonContent(item._xVisitButton, item._xVisitButtonAction, item._xSuggestion);
+        }
+        if (Array.isArray(item._xActionTags)) {
+          item._xActionTags.forEach((tag) => {
+            setSuggestionActionTagContent(tag, tag._xAction, tag._xSuggestion);
+          });
+        }
+      });
+    }
+
+    function setOpenInCurrentTabModifierActive(active) {
+      const nextActive = Boolean(active);
+      if (openInCurrentTabModifierActive === nextActive) {
+        return;
+      }
+      openInCurrentTabModifierActive = nextActive;
+      updateModifierActionLabels();
+    }
+
+    function syncOpenInCurrentTabModifierFromEvent(event) {
+      setOpenInCurrentTabModifierActive(Boolean(event && event.altKey));
+    }
+
+    function shouldUseCurrentTabForOpenNewTabAction(suggestion, event, item) {
+      if (!event || !event.altKey) {
+        return false;
+      }
+      const action = item && item._xVisitButtonAction ? item._xVisitButtonAction : '';
+      if (SUGGESTION_ACTION_MODEL &&
+          typeof SUGGESTION_ACTION_MODEL.shouldOpenNewTabActionInCurrentTab === 'function') {
+        return SUGGESTION_ACTION_MODEL.shouldOpenNewTabActionInCurrentTab(suggestion, {
+          action,
+          openInCurrentTab: true
+        });
+      }
+      return action === 'openNewTab';
     }
 
     function createSuggestionActionModel(optionsArg) {
@@ -3783,6 +3856,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     document.addEventListener('keydown', captureTabHandler, true);
 
     searchInput.addEventListener('keydown', function(e) {
+      syncOpenInCurrentTabModifierFromEvent(e);
       if (!e.metaKey && !e.ctrlKey && !e.altKey) {
         e.stopPropagation();
       }
@@ -3829,6 +3903,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       }
     });
     searchInput.addEventListener('keyup', function(e) {
+      syncOpenInCurrentTabModifierFromEvent(e);
       if (!e.metaKey && !e.ctrlKey && !e.altKey) {
         e.stopPropagation();
       }
@@ -3856,6 +3931,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     }
 
     keydownHandler = function(e) {
+      syncOpenInCurrentTabModifierFromEvent(e);
       if (isImeCompositionEvent(e)) {
         return;
       }
@@ -3997,7 +4073,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
               recordSearchSuggestionSelectionFromSuggestion(selectedSuggestion, query, 'overlay');
               chrome.runtime.sendMessage({
                 action: 'createTab',
-                url: selectedSuggestion.url
+                url: selectedSuggestion.url,
+                disposition: shouldUseCurrentTabForOpenNewTabAction(selectedSuggestion, e, activeItem) ? 'currentTab' : 'newTab'
               });
             }
           } else if (!isSearchSuggestion) {
@@ -4087,6 +4164,10 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       }
     };
 
+    keyupHandler = function(e) {
+      syncOpenInCurrentTabModifierFromEvent(e);
+    };
+
     overlayKeyCaptureHandler = function(e) {
       if (!overlay || !overlay.isConnected) {
         return;
@@ -4114,6 +4195,11 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
 
     window.addEventListener('keydown', overlayKeyCaptureHandler, true);
     document.addEventListener('keydown', keydownHandler);
+    document.addEventListener('keyup', keyupHandler);
+    overlayModifierBlurHandler = function() {
+      setOpenInCurrentTabModifierActive(false);
+    };
+    window.addEventListener('blur', overlayModifierBlurHandler);
 
     function setSuggestionRowColors(item, bg, border) {
       if (!item) {
@@ -4747,7 +4833,11 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     }
 
     function requestTabsAndRender(filterQuery) {
-      chrome.runtime.sendMessage({ action: 'getTabsForOverlay' }, (response) => {
+      const request = { action: 'getTabsForOverlay' };
+      if (typeof currentOverlayTabId === 'number') {
+        request.currentTabId = currentOverlayTabId;
+      }
+      chrome.runtime.sendMessage(request, (response) => {
         const freshTabs = response && Array.isArray(response.tabs) ? response.tabs : [];
         currentOverlayTabId = (response && typeof response.currentTabId === 'number')
           ? response.currentTabId
@@ -5577,11 +5667,16 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             shouldSwitchMatchedTab,
             enterAction: 'openNewTab'
           });
+          const actionTagNodes = [];
           itemActionModel.actionTags.forEach((tag) => {
-            actionTags.appendChild(createActionTag(
-              getSuggestionActionLabel(tag.action, suggestion),
+            const actionTag = createActionTag(
+              getSuggestionActionLabel(getModifierAdjustedAction(tag.action), suggestion),
               tag.keyLabel || 'Enter'
-            ));
+            );
+            actionTag._xAction = tag.action;
+            actionTag._xSuggestion = suggestion;
+            actionTags.appendChild(actionTag);
+            actionTagNodes.push(actionTag);
           });
 
           // Create visit button
@@ -5759,7 +5854,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
               recordSearchSuggestionSelectionFromSuggestion(suggestion, query, 'overlay');
               chrome.runtime.sendMessage({
                 action: 'createTab',
-                url: suggestion.url
+                url: suggestion.url,
+                disposition: shouldUseCurrentTabForOpenNewTabAction(suggestion, e, suggestionItem) ? 'currentTab' : 'newTab'
               });
             }
             removeOverlay(overlay);
@@ -5769,7 +5865,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           });
 
           // Add click handler to select item
-          suggestionItem.addEventListener('click', function() {
+          suggestionItem.addEventListener('click', function(event) {
             if (suggestion.type === 'commandNewTab') {
               chrome.runtime.sendMessage({ action: 'openNewTab' });
               removeOverlay(overlay);
@@ -5825,7 +5921,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
               console.log('Opening URL:', suggestion.url);
               chrome.runtime.sendMessage({
                 action: 'createTab',
-                url: suggestion.url
+                url: suggestion.url,
+                disposition: shouldUseCurrentTabForOpenNewTabAction(suggestion, event, suggestionItem) ? 'currentTab' : 'newTab'
               });
             }
             removeOverlay(overlay);
@@ -5841,6 +5938,9 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           rightSide.appendChild(visitButton);
           suggestionItem.appendChild(rightSide);
           suggestionItem._xVisitButton = visitButton;
+          suggestionItem._xVisitButtonAction = itemActionModel.visitButtonAction;
+          suggestionItem._xActionTags = actionTagNodes;
+          suggestionItem._xSuggestion = suggestion;
           suggestionItem._xTagContainer = actionTags;
           suggestionItem._xActionModel = itemActionModel;
           suggestionItem._xHasActionTags = itemActionModel.hasActionTags;

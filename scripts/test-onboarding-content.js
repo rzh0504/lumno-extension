@@ -4,6 +4,14 @@ const onboarding = require('../src/onboarding/onboarding-content.js');
 const GITHUB_HOMEPAGE_URL = 'https://github.com/kubai087/lumno-extension';
 const COMPATIBILITY_TOOLTIP =
   '受 Chrome 限制，Lumno 无法提供单独关闭新标签页的入口，但它可以与其他新标签页插件同时使用。\n具体而言，安装 Lumno 后，再覆盖安装或重新启用你正在使用的新标签页插件，让它继续接管新标签页即可。';
+const SHORTCUT_ACTION_TOOLTIP =
+  '由于浏览器的限制，请在 扩展程序/键盘快捷键 页面修改插件的所有快捷键，点击前往';
+const DIA_BROWSER_DISCLOSURE_TEXT =
+  '在 Dia 中，若聚焦搜索浮窗的快捷键不可用，请进入浏览器的快捷键设置页面，将“Open command bar”从“In Dia”改为“Global”。';
+const SHORTCUTS_PAGE_URL = 'chrome://extensions/shortcuts';
+const LOCAL_FILE_ACCORDION_TEXT =
+  '请前往扩展程序详情页，为 Lumno 开启“允许访问文件网址”，开启后刷新对应标签页。';
+const EXTENSION_DETAILS_URL = 'chrome://extensions/?id=nkbkcafoocmnnconoijmhloecgamfcai';
 
 assert.strictEqual(typeof onboarding.getOnboardingBlueprint, 'function');
 assert.strictEqual(typeof onboarding.getSupportedLocales, 'function');
@@ -11,6 +19,8 @@ assert.strictEqual(typeof onboarding.createOnboardingState, 'function');
 assert.strictEqual(typeof onboarding.reduceOnboardingState, 'function');
 assert.strictEqual(typeof onboarding.getShortcutDisplayTokens, 'function');
 assert.strictEqual(typeof onboarding.formatShortcutForDisplay, 'function');
+assert.strictEqual(typeof onboarding.parseShortcutHotkey, 'function');
+assert.strictEqual(typeof onboarding.shortcutHotkeyMatchesEvent, 'function');
 
 const locales = onboarding.getSupportedLocales();
 assert.deepStrictEqual(locales, ['zh_CN', 'zh_TW', 'ja', 'en']);
@@ -130,9 +140,9 @@ assert.deepStrictEqual(
   },
   'compatibility row should expose a Lumno-style info tooltip'
 );
-assert.strictEqual(firstSlide.visual.kind, 'empty-surface');
-assert.strictEqual(firstSlide.visual.visible, false);
-assert.strictEqual(firstSlide.cursor.enabled, false);
+assert.strictEqual(firstSlide.visual.kind, 'lumno-web-wordmark-surface');
+assert.strictEqual(firstSlide.visual.visible, true);
+assert.strictEqual(firstSlide.cursor.enabled, true);
 assert.deepStrictEqual(
   firstSlide.actions,
   {
@@ -156,11 +166,64 @@ assert.deepStrictEqual(
     title: '原生聚焦搜索体验',
     body: '在任意网站按下快捷键{shortcut}，唤起聚焦搜索悬浮窗。'
   },
-  'second page should show the focus search title and the moved shortcut subtitle'
+  'second page should show the focus search title without the removed shortcut note'
+);
+assert.strictEqual(
+  Object.prototype.hasOwnProperty.call(secondSlide.copy, 'note'),
+  false,
+  'second page should not expose the removed shortcut-change note'
 );
 assert.strictEqual(secondSlide.visual.kind, 'bookmark-focus-surface');
 assert.strictEqual(secondSlide.visual.visible, true);
 assert.strictEqual(secondSlide.cursor.enabled, true);
+assert.deepStrictEqual(
+  secondSlide.left.interactionSlots,
+  [
+    {
+      id: 'setup-interaction-1',
+      kind: 'accordion-row',
+      actionId: 'toggleInteractionAccordion',
+      accordionId: 'dia-browser',
+      icon: 'ri-question-fill',
+      label: '致 Dia 浏览器用户',
+      description: '',
+      accordion: {
+        icon: 'ri-arrow-left-s-line',
+        text: DIA_BROWSER_DISCLOSURE_TEXT,
+        links: [
+          {
+            label: '快捷键设置页面',
+            href: SHORTCUTS_PAGE_URL,
+            actionId: 'openShortcuts'
+          }
+        ],
+        expandedByDefault: false
+      }
+    },
+    {
+      id: 'setup-interaction-2',
+      kind: 'accordion-row',
+      actionId: 'toggleInteractionAccordion',
+      accordionId: 'local-file-search',
+      icon: 'ri-question-fill',
+      label: '在本地 PDF/HTML 标签页中使用聚焦搜索',
+      description: '',
+      accordion: {
+        icon: 'ri-arrow-left-s-line',
+        text: LOCAL_FILE_ACCORDION_TEXT,
+        links: [
+          {
+            label: '扩展程序详情页',
+            href: EXTENSION_DETAILS_URL,
+            actionId: 'openExtensionDetails'
+          }
+        ],
+        expandedByDefault: false
+      }
+    }
+  ],
+  'second page should expose two shared accordion rows below the subtitle'
+);
 assert.deepStrictEqual(
   secondSlide.actions,
   {
@@ -171,13 +234,15 @@ assert.deepStrictEqual(
     },
     secondary: {
       actionId: 'prev',
-      label: '上一步',
-      icon: 'ri-arrow-left-line'
+      label: '返回',
+      icon: ''
     },
     ghost: {
       actionId: 'openShortcuts',
-      label: '快捷键',
-      icon: 'ri-external-link-line'
+      label: '更换快捷键',
+      icon: 'ri-external-link-line',
+      tooltip: SHORTCUT_ACTION_TOOLTIP,
+      tooltipMaxWidth: 260
     }
   },
   'second page should expose next, previous, and right-aligned shortcut actions'
@@ -189,10 +254,32 @@ assert.deepStrictEqual(
   thirdSlide.copy,
   {
     eyebrow: '',
-    title: '绝美新标签页',
-    body: '支持海量自定义样式。轻松管理你的书签、访问记录。'
+    title: '精美新标签页',
+    body: '支持海量自定义样式，轻松管理你的书签、访问记录。'
   },
   'third page should introduce the customizable new tab page'
+);
+assert.strictEqual(thirdSlide.visual.kind, 'newtab-preview-surface');
+assert.strictEqual(thirdSlide.visual.visible, true);
+assert.strictEqual(thirdSlide.cursor.enabled, true);
+assert.deepStrictEqual(
+  thirdSlide.actions,
+  {
+    primary: {
+      actionId: 'next',
+      label: '下一步',
+      icon: 'ri-arrow-right-line'
+    },
+    secondary: null,
+    ghost: null
+  },
+  'third page should expose a lower-left next action instead of a return action'
+);
+
+assert.deepStrictEqual(
+  blueprint.slides.map((slide) => slide.cursor.enabled),
+  [true, true, true, true, true],
+  'the animated cursor should remain available on every onboarding page'
 );
 
 blueprint.slides.slice(3).forEach((slide) => {
@@ -204,8 +291,8 @@ blueprint.slides.slice(3).forEach((slide) => {
 });
 assert.deepStrictEqual(
   blueprint.slides.map((slide) => slide.visual.visible),
-  [false, true, false, false, false],
-  'only the second page should show the right-side illustration'
+  [true, true, true, false, false],
+  'the first three pages should show the right-side visual area'
 );
 
 const fallback = onboarding.getOnboardingBlueprint('missing-locale');
@@ -233,6 +320,53 @@ assert.deepStrictEqual(
   onboarding.getShortcutDisplayTokens('Ctrl+T'),
   ['CTRL', 'T'],
   'non-mac shortcuts should keep textual modifier keycaps by default'
+);
+assert.deepStrictEqual(
+  onboarding.parseShortcutHotkey('Command+Shift+K'),
+  {
+    ctrl: false,
+    alt: false,
+    shift: true,
+    meta: true,
+    key: 'k'
+  },
+  'configured browser command shortcuts should parse into a keydown matcher spec'
+);
+assert.strictEqual(
+  onboarding.shortcutHotkeyMatchesEvent('Command+Shift+K', {
+    code: 'KeyK',
+    key: 'K',
+    ctrlKey: false,
+    altKey: false,
+    shiftKey: true,
+    metaKey: true
+  }),
+  true,
+  'onboarding should match the user-configured command shortcut from browser commands'
+);
+assert.strictEqual(
+  onboarding.shortcutHotkeyMatchesEvent('Ctrl+Shift+Space', {
+    code: 'Space',
+    key: ' ',
+    ctrlKey: true,
+    altKey: false,
+    shiftKey: true,
+    metaKey: false
+  }),
+  true,
+  'onboarding should match special keys returned by browser command shortcuts'
+);
+assert.strictEqual(
+  onboarding.shortcutHotkeyMatchesEvent('Ctrl+Shift+K', {
+    code: 'KeyK',
+    key: 'K',
+    ctrlKey: true,
+    altKey: false,
+    shiftKey: false,
+    metaKey: false
+  }),
+  false,
+  'onboarding should require all configured modifiers before opening the overlay'
 );
 assert.strictEqual(
   onboarding.formatShortcutForDisplay('⌘T'),

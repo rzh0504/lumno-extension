@@ -7557,6 +7557,22 @@
     urlHighlightTheme,
     openTabSuggestionLimit: NEWTAB_OPEN_TAB_SUGGESTION_LIMIT
   });
+  let openInCurrentTabModifierActive = false;
+
+  function setOpenInCurrentTabModifierActive(active) {
+    const nextActive = Boolean(active);
+    if (openInCurrentTabModifierActive === nextActive) {
+      return;
+    }
+    openInCurrentTabModifierActive = nextActive;
+    if (suggestionsView && typeof suggestionsView.setOpenInCurrentTabModifierActive === 'function') {
+      suggestionsView.setOpenInCurrentTabModifierActive(nextActive);
+    }
+  }
+
+  function syncOpenInCurrentTabModifierFromEvent(event) {
+    setOpenInCurrentTabModifierActive(Boolean(event && event.altKey));
+  }
 
   function getAutoHighlightIndex() {
     return suggestionsView.getAutoHighlightIndex();
@@ -8111,6 +8127,7 @@
       updateModeBadge('');
     },
     onKeyDown: function(event) {
+      syncOpenInCurrentTabModifierFromEvent(event);
       dismissAutocompletePreviewOnNonTabKey(event);
       if (event.key !== 'Backspace' && !event.metaKey && !event.ctrlKey && !event.altKey) {
         latestRawQuery = inputParts.input.value;
@@ -8934,6 +8951,7 @@
   };
 
   document.addEventListener('keydown', function(event) {
+    syncOpenInCurrentTabModifierFromEvent(event);
     if (event.key !== 'Tab') {
       return;
     }
@@ -8944,6 +8962,12 @@
       handleTabKey(event);
     }
   }, true);
+  document.addEventListener('keyup', function(event) {
+    syncOpenInCurrentTabModifierFromEvent(event);
+  }, true);
+  window.addEventListener('blur', function() {
+    setOpenInCurrentTabModifierActive(false);
+  });
 
   getSiteSearchProviders();
 
