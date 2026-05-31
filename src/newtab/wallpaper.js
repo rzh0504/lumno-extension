@@ -2,7 +2,6 @@
   const WALLPAPER_ADAPTIVE_TONE = globalThis.LumnoNewtabWallpaperAdaptiveTone || {};
   const WALLPAPER_EFFECTS = globalThis.LumnoNewtabWallpaperEffects || {};
   const WALLPAPER_LOCAL_STORE = globalThis.LumnoNewtabWallpaperLocalStore || {};
-  const FEATURE_HINTS = globalThis.LumnoFeatureHints || {};
   const DEFAULT_STORAGE_KEYS = {
     wallpaper: '_x_extension_newtab_wallpaper_2026_unique_',
     overlay: '_x_extension_newtab_wallpaper_overlay_2026_unique_',
@@ -224,7 +223,6 @@
     let initialWallpaperOverlayReadyPromise = null;
     let wallpaperControl = null;
     let wallpaperButton = null;
-    let wallpaperFeatureHintController = null;
     let wallpaperPanel = null;
     let wallpaperPanelHeader = null;
     let wallpaperPanelTitle = null;
@@ -2382,10 +2380,6 @@
         wallpaperButton.setAttribute('aria-label', label);
         wallpaperButton.removeAttribute('title');
       }
-      if (wallpaperFeatureHintController &&
-          typeof wallpaperFeatureHintController.updateLanguage === 'function') {
-        wallpaperFeatureHintController.updateLanguage();
-      }
     }
 
     function updateWallpaperAppearanceLanguageStrings() {
@@ -3152,7 +3146,6 @@
       if (!wallpaperPanel || !wallpaperButton) {
         return;
       }
-      dismissWallpaperFeatureHint();
       renderWallpaperPanel();
       wallpaperPanel.setAttribute('data-open', 'true');
       wallpaperButton.setAttribute('data-open', 'true');
@@ -3193,13 +3186,6 @@
       openWallpaperPanel();
     }
 
-    function dismissWallpaperFeatureHint() {
-      if (wallpaperFeatureHintController &&
-          typeof wallpaperFeatureHintController.dismiss === 'function') {
-        wallpaperFeatureHintController.dismiss();
-      }
-    }
-
     function createWallpaperControls() {
       wallpaperControl = document.createElement('div');
       wallpaperControl.className = 'x-nt-wallpaper-control';
@@ -3212,17 +3198,6 @@
       wallpaperButton.setAttribute('data-open', 'false');
       wallpaperButton.setAttribute('data-active', 'false');
       wallpaperButton.innerHTML = getRiSvg('ri-t-shirt-2-line', 'ri-size-20');
-      if (typeof FEATURE_HINTS.createFeatureHint === 'function') {
-        wallpaperFeatureHintController = FEATURE_HINTS.createFeatureHint({
-          documentObj,
-          definition: 'newtab-wallpaper',
-          t,
-          getRiSvg
-        });
-        if (wallpaperFeatureHintController && wallpaperFeatureHintController.textId) {
-          wallpaperButton.setAttribute('aria-describedby', wallpaperFeatureHintController.textId);
-        }
-      }
       wallpaperPanel = document.createElement('div');
       wallpaperPanel.className = 'x-nt-wallpaper-panel';
       wallpaperPanel.setAttribute('data-open', 'false');
@@ -3250,9 +3225,6 @@
       wallpaperButton.addEventListener('mouseleave', hideTopActionTooltip);
       wallpaperButton.addEventListener('focus', showWallpaperButtonTooltip);
       wallpaperButton.addEventListener('blur', hideTopActionTooltip);
-      if (wallpaperFeatureHintController && wallpaperFeatureHintController.element) {
-        wallpaperControl.appendChild(wallpaperFeatureHintController.element);
-      }
       wallpaperControl.appendChild(wallpaperPanel);
       wallpaperControl.appendChild(wallpaperButton);
       window.addEventListener('resize', scheduleWallpaperPanelTabIndicatorsRefresh, { passive: true });

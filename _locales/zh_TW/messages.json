@@ -68,6 +68,9 @@
   "settings_global_section_title": {
     "message": "全域設定"
   },
+  "settings_onboarding_tutorial_action": {
+    "message": "使用教學"
+  },
   "settings_language_title": {
     "message": "語言"
   },
@@ -466,6 +469,18 @@
   },
   "newtab_ai_quick_jump_feature_hint_close": {
     "message": "關閉 AI 跳轉提示"
+  },
+  "update_notice_badge": {
+    "message": "已更新至 {version}"
+  },
+  "update_notice_text_fallback": {
+    "message": "查看本次更新"
+  },
+  "update_notice_link": {
+    "message": "更新日誌"
+  },
+  "update_notice_close": {
+    "message": "關閉更新提示"
   },
   "newtab_bookmark_cascade_debug_enable": {
     "message": "顯示書籤選單安全三角"

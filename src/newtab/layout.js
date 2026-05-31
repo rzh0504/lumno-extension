@@ -214,7 +214,16 @@
       return Math.max(55, rootMinHeight, rootFrameHeight + searchLayerBaseHeight);
     }
 
-    function updateSearchEntryLayout() {
+    function getCurrentBodyPaddingTop(body) {
+      if (!body || !body.style) {
+        return null;
+      }
+      const rawValue = body.style.getPropertyValue('padding-top');
+      const value = Number.parseFloat(rawValue);
+      return Number.isFinite(value) ? Math.round(value) : null;
+    }
+
+    function updateSearchEntryLayout(layoutOptions) {
       const body = documentObj && documentObj.body;
       const root = getRoot();
       if (!body || !root) {
@@ -264,6 +273,9 @@
       }
       targetTop = Math.max(effectiveMinTopPx, Math.min(maxTop, targetTop));
       const nextTop = Math.round(targetTop);
+      if (layoutOptions && layoutOptions.preserveCurrentTop && getCurrentBodyPaddingTop(body) !== null) {
+        return;
+      }
       if (body.style.getPropertyValue('padding-top') === `${nextTop}px`) {
         return;
       }
@@ -304,7 +316,9 @@
       sectionSafeCorridor.style.setProperty('display', (bookmarkVisible && recentVisible) ? 'block' : 'none', 'important');
       bottomDock.style.setProperty('max-height', `${bottomDockMaxHeight}px`, 'important');
       bottomDock.style.setProperty('display', (bookmarkVisible || recentVisible) ? 'flex' : 'none', 'important');
-      updateSearchEntryLayout();
+      updateSearchEntryLayout({
+        preserveCurrentTop: Boolean(callbacks && callbacks.preserveSearchEntryLayout)
+      });
       updateSuggestionsFloatingLayout();
     }
 

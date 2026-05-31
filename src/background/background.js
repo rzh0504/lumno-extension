@@ -36,6 +36,12 @@ try {
 }
 
 try {
+  importScripts(chrome.runtime.getURL('src/shared/update-notice.js'));
+} catch (error) {
+  console.warn('Lumno: failed to load update notice utils.', error);
+}
+
+try {
   importScripts(chrome.runtime.getURL('src/shared/search-utils.js'));
 } catch (error) {
   console.warn('Lumno: failed to load search utils.', error);
@@ -102,8 +108,10 @@ const openOnboardingPage = BACKGROUND_PAGES.openOnboardingPage;
 const openReleasePage = BACKGROUND_PAGES.openReleasePage;
 const openBookmarkManagerPage = BACKGROUND_PAGES.openBookmarkManagerPage;
 const openExtensionShortcutsPage = BACKGROUND_PAGES.openExtensionShortcutsPage;
+const openSiteSearchOptionsPage = BACKGROUND_PAGES.openSiteSearchOptionsPage;
 const BACKGROUND_MESSAGE_ROUTER = globalThis.LumnoBackgroundMessageRouter || {};
 const EXTENSION_ROUTES = globalThis.LumnoExtensionRoutes || {};
+const UPDATE_NOTICE = globalThis.LumnoUpdateNotice || {};
 const COMMAND_TARGET_POLICY = globalThis.LumnoCommandTargetPolicy || {};
 const FAVICON_UTILS = globalThis.LumnoFaviconUtils || {};
 const BACKGROUND_NEWTAB_FALLBACK = globalThis.LumnoBackgroundNewtabFallback || {};
@@ -1430,6 +1438,8 @@ function openOverlayOnTab(activeTab, tabs, source) {
     'src/shared/suggestion-navigation.js',
     'src/shared/search-input-ui.js',
     'src/shared/search-input-mode.js',
+    'src/shared/feature-hints.js',
+    'src/shared/update-notice.js',
     'src/shared/tooltip.js',
     'src/overlay/runtime.js',
     'src/shared/favicon-utils.js',
@@ -1819,6 +1829,22 @@ function triggerCopyCurrentUrlForTab(activeTab, source) {
   });
 }
 
+function publishExtensionUpdateNotice(details) {
+  if (!UPDATE_NOTICE || typeof UPDATE_NOTICE.publishUpdateNotice !== 'function') {
+    return;
+  }
+  const version = typeof UPDATE_NOTICE.getCurrentVersionTag === 'function'
+    ? UPDATE_NOTICE.getCurrentVersionTag(chrome)
+    : '';
+  UPDATE_NOTICE.publishUpdateNotice({
+    chromeApi: chrome,
+    fetchImpl: typeof fetch === 'function' ? fetch : null,
+    version,
+    previousVersion: details && details.previousVersion ? details.previousVersion : '',
+    reason: 'update'
+  }).catch(() => {});
+}
+
 chrome.commands.onCommand.addListener(function(command) {
   if (
     command !== SHOW_SEARCH_COMMAND_NAME &&
@@ -1864,7 +1890,7 @@ chrome.runtime.onInstalled.addListener((details) => {
     return;
   }
   if (reason === 'update') {
-    openReleasePage({ reason: 'update', oncePerVersion: true });
+    publishExtensionUpdateNotice(details);
   }
   schedulePersistPinnedTabSnapshot();
 });
@@ -2127,6 +2153,8 @@ const BACKGROUND_MESSAGE_ROUTE_GROUPS = Object.freeze({
       'openOptionsPage',
       'openOnboardingPage',
       'openExtensionShortcutsPage',
+      'openSiteSearchOptionsPage',
+      'openReleasePage',
       'openBookmarkManager',
       'createTab',
       'openNewTab',
@@ -2562,8 +2590,21 @@ function handleExtensionPageMessage(request, sender, sendResponse) {
       });
       return true;
     }
+    case 'openReleasePage': {
+      const reason = typeof request.reason === 'string' ? request.reason : 'manual';
+      openReleasePage({ reason }, (ok) => {
+        sendResponse({ ok: ok !== false });
+      });
+      return true;
+    }
     case 'openExtensionShortcutsPage': {
       openExtensionShortcutsPage((ok) => {
+        sendResponse({ ok: ok !== false });
+      });
+      return true;
+    }
+    case 'openSiteSearchOptionsPage': {
+      openSiteSearchOptionsPage((ok) => {
         sendResponse({ ok: ok !== false });
       });
       return true;

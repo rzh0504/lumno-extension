@@ -11,11 +11,14 @@
   const TITLE_CYCLE_INTERVAL_MS = 1900;
   const TITLE_CYCLE_FIRST_DELAY_MS = 520;
   const TEXT_SWAP_FALLBACK_DURATION_MS = 200;
+  const SITE_SEARCH_OPTIONS_PAGE_PATH = 'src/options/options.html#shortcuts';
+  const LUMNO_CHROME_WEB_STORE_URL = 'https://chromewebstore.google.com/detail/lumno-%E8%81%9A%E7%84%A6%E6%90%9C%E7%B4%A2%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/nggfkkbmogmadfoikakkfegkoilfcfao?utm_source=item-share-cb';
   const ACTION_MESSAGE_BY_ID = Object.freeze({
     openShortcuts: 'openExtensionShortcutsPage',
     openExtensionDetails: 'openExtensionDetailsPage',
     openNewtab: 'openNewTab',
-    openOptions: 'openOptionsPage'
+    openOptions: 'openOptionsPage',
+    openSiteSearchOptions: 'openSiteSearchOptionsPage'
   });
   const BROWSER_AVATAR_CLASS_BY_ID = Object.freeze({
     chrome: 'browser-avatar--chrome',
@@ -23,111 +26,9 @@
     dia: 'browser-avatar--dia',
     comet: 'browser-avatar--comet'
   });
-  const LUMNO_OVERLAY_QUERY = 'extension';
-  const LUMNO_OVERLAY_FAKE_RESULTS = Object.freeze([
-    Object.freeze({
-      type: 'topSite',
-      title: 'Chrome Web Store - Extensions',
-      detail: 'https://chromewebstore.google.com/category/extensions',
-      sourceTag: '常用',
-      favicon: 'https://www.google.com/s2/favicons?domain=chromewebstore.google.com&sz=32',
-      actionTagLabel: '新开',
-      actionTagKey: 'Enter',
-      visitButtonLabel: '新开',
-      active: true
-    }),
-    Object.freeze({
-      type: 'bookmark',
-      title: 'Chrome Extensions API Reference',
-      detail: '书签 / 开发 / Browser extensions',
-      sourceTag: '书签',
-      sourceTagKind: 'bookmark',
-      favicon: 'https://www.google.com/s2/favicons?domain=developer.chrome.com&sz=32',
-      visitButtonLabel: '新开'
-    }),
-    Object.freeze({
-      type: 'history',
-      title: 'Extensions - Chrome for Developers',
-      detail: 'https://developer.chrome.com/docs/extensions',
-      sourceTag: '历史',
-      favicon: 'https://www.google.com/s2/favicons?domain=developer.chrome.com&sz=32',
-      visitButtonLabel: '新开',
-      historyDeletable: true
-    }),
-    Object.freeze({
-      type: 'newtab',
-      title: '搜索 "extension"',
-      visitButtonLabel: '搜索'
-    }),
-    Object.freeze({
-      type: 'browserPage',
-      title: '打开 chrome://extensions/',
-      visitButtonLabel: '打开'
-    })
-  ]);
-  const NEWTAB_PREVIEW_QUERY = '';
-  const NEWTAB_PREVIEW_RECENT_SITES = Object.freeze([
-    Object.freeze({
-      title: 'Lumno - Chrome Web Store',
-      siteName: 'Chrome Web Store',
-      url: 'https://chromewebstore.google.com/detail/lumno/kjlmmioocdppajifeahkddchikgnjcnc',
-      urlText: 'chromewebstore.google.com',
-      accentRgb: Object.freeze([66, 133, 244])
-    }),
-    Object.freeze({
-      title: 'kubai087/lumno-extension',
-      siteName: 'GitHub',
-      url: 'https://github.com/kubai087/lumno-extension',
-      urlText: 'github.com',
-      accentRgb: Object.freeze([36, 41, 46])
-    }),
-    Object.freeze({
-      title: 'Tailwind CSS Docs',
-      siteName: 'Tailwind CSS',
-      url: 'https://tailwindcss.com/docs',
-      urlText: 'tailwindcss.com',
-      accentRgb: Object.freeze([6, 182, 212])
-    }),
-    Object.freeze({
-      title: 'New tab polish',
-      siteName: 'Figma',
-      url: 'https://www.figma.com/',
-      urlText: 'figma.com',
-      accentRgb: Object.freeze([162, 89, 255])
-    })
-  ]);
-  const NEWTAB_PREVIEW_BOOKMARKS = Object.freeze([
-    Object.freeze({
-      title: '工作台',
-      type: 'folder',
-      previewUrls: Object.freeze([
-        'https://developer.chrome.com/docs/extensions/',
-        'https://chromewebstore.google.com/category/extensions',
-        'https://github.com/',
-        'https://figma.com/'
-      ])
-    }),
-    Object.freeze({
-      title: '设计素材',
-      type: 'folder',
-      previewUrls: Object.freeze([
-        'https://www.figma.com/',
-        'https://www.framer.com/',
-        'https://dribbble.com/',
-        'https://mobbin.com/'
-      ])
-    }),
-    Object.freeze({
-      title: '开发文档',
-      type: 'folder',
-      previewUrls: Object.freeze([
-        'https://developer.chrome.com/docs/extensions/',
-        'https://developer.mozilla.org/',
-        'https://github.com/',
-        'https://web.dev/'
-      ])
-    })
-  ]);
+  let runtimeCopy = typeof MODEL.getOnboardingRuntimeCopy === 'function'
+    ? MODEL.getOnboardingRuntimeCopy('en')
+    : Object.freeze({});
   const LUMNO_WEB_WORDMARK_SRC = '../../assets/images/lumno-web-textlogo.svg';
   const LUMNO_WEB_BUTTERFLY_REST_PATH = 'M4.3248 17.7823C1.22382 14.6398 -0.116749 10.2475 0.824858 6.7097C1.02033 5.97529 1.95363 5.98287 2.27212 6.67289L4.16024 10.7637C4.38415 11.2488 4.50011 11.7767 4.50011 12.311L4.50011 16L6.24277 16C7.66705 16 9.01155 16.6576 9.88596 17.7819L11.0831 19.3211C11.5044 19.8627 11.2076 20.6668 10.5235 20.7201C8.63849 20.8671 6.85452 20.3459 4.3248 17.7823Z';
   const LUMNO_WEB_BUTTERFLY_FLUTTER_PATH = 'M4.32468 17.7823C-1.04106 11.6456 2.30784 4.56298 5.14393 1.13518C5.48929 0.717757 6.11849 0.734355 6.47527 1.14207L10.4328 5.66451C11.4105 6.78177 11.6239 8.37593 10.9745 9.71102L8.61264 14.567L11.5238 13.9636C13.2202 13.612 14.9706 14.24 16.0565 15.5899L18.7241 18.9056C19.0394 19.2975 18.9857 19.8717 18.5688 20.1531C15.6258 22.1399 9.6385 23.8596 4.32468 17.7823Z';
@@ -139,10 +40,92 @@
   const NEWTAB_PREVIEW_HOVER_START_MS = 1500;
   const NEWTAB_PREVIEW_HOVER_HOLD_MS = 1200;
   const NEWTAB_PREVIEW_HOVER_MOVE_MS = 520;
-  const NEWTAB_PREVIEW_HOVER_RESET_MS = 620;
-  const NEWTAB_PREVIEW_HOVER_RETURN_MS = 520;
+  const NEWTAB_PREVIEW_HOVER_SETTLE_MS = 1140;
+  const HOMEPAGE_PIP_ART_SRC = '../../assets/images/onboarding-auto-pip.svg';
+  const NEWTAB_FILTERS_ART_SRC = '../../assets/images/onboarding-newtab-filters.webp';
+  const ONBOARDING_FRAME_WIDTH = 1240;
+  const ONBOARDING_FRAME_HEIGHT = 680;
   const VISUAL_CANVAS_WIDTH = 704;
   const VISUAL_CANVAS_HEIGHT = 680;
+
+  function getRuntimeSection(name) {
+    const copy = runtimeCopy || {};
+    const section = copy && copy[name];
+    return section && typeof section === 'object' ? section : {};
+  }
+
+  function getRuntimeMiscText(key, fallback) {
+    const misc = getRuntimeSection('misc');
+    const value = misc && misc[key];
+    const text = String(value || '').trim();
+    return text || fallback || '';
+  }
+
+  function formatRuntimeTemplate(template, values) {
+    const source = String(template || '');
+    const map = values || {};
+    return source.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, key) => (
+      Object.prototype.hasOwnProperty.call(map, key) ? String(map[key]) : match
+    ));
+  }
+
+  function resolveRuntimeUrl(value) {
+    const url = String(value || '').trim();
+    return url === 'chromeWebStore' ? LUMNO_CHROME_WEB_STORE_URL : url;
+  }
+
+  function getRuntimeArray(sectionName, key) {
+    const section = getRuntimeSection(sectionName);
+    const value = key ? section[key] : section;
+    return Array.isArray(value) ? value : [];
+  }
+
+  function getLumnoOverlayQuery() {
+    const section = getRuntimeSection('lumnoOverlay');
+    return String(section.query || 'extension');
+  }
+
+  function getLumnoOverlayResults() {
+    return getRuntimeArray('lumnoOverlay', 'results');
+  }
+
+  function getNewtabPreviewCopy() {
+    return getRuntimeSection('newtabPreview');
+  }
+
+  function getNewtabPreviewQuery() {
+    return String(getNewtabPreviewCopy().query || '');
+  }
+
+  function getNewtabPreviewBookmarks() {
+    return getRuntimeArray('newtabPreview', 'bookmarks');
+  }
+
+  function getNewtabPreviewRecentSites() {
+    return getRuntimeArray('newtabPreview', 'recentSites').map((item) => {
+      if (!item || typeof item !== 'object') {
+        return item;
+      }
+      return Object.assign({}, item, { url: resolveRuntimeUrl(item.url) });
+    });
+  }
+
+  function getNewtabPreviewSectionTitle(key, fallback) {
+    const sections = getNewtabPreviewCopy().sections || {};
+    return String(sections[key] || fallback || '');
+  }
+
+  function getSiteSearchDemoCases() {
+    return getRuntimeArray('siteSearchDemo', 'cases');
+  }
+
+  function getFeatureCards() {
+    return getRuntimeArray('featureCards');
+  }
+
+  function getFeatureAwards() {
+    return getRuntimeArray('featureAwards');
+  }
 
   function getNewtabPreviewFaviconUrl(url) {
     const value = String(url || '').trim();
@@ -299,6 +282,96 @@
 
   function getChromeApi() {
     return typeof chrome !== 'undefined' ? chrome : null;
+  }
+
+  function syncOnboardingSlideParam(index) {
+    if (!window.history || typeof window.history.replaceState !== 'function' || !window.location || !window.location.href) {
+      return;
+    }
+    const numericIndex = Number(index);
+    const safeIndex = Number.isFinite(numericIndex) ? Math.max(0, Math.floor(numericIndex)) : 0;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('slide', String(safeIndex));
+      const nextUrl = url.toString();
+      if (nextUrl === window.location.href) {
+        return;
+      }
+      window.history.replaceState(window.history.state, '', nextUrl);
+    } catch (error) {
+      // Ignore URL sync failures; onboarding state should still render normally.
+    }
+  }
+
+  function buildRuntimePageUrl(path) {
+    const value = String(path || '').trim();
+    if (!value) {
+      return '';
+    }
+    const chromeApi = getChromeApi();
+    const hashIndex = value.indexOf('#');
+    const pagePath = hashIndex >= 0 ? value.slice(0, hashIndex) : value;
+    const hash = hashIndex >= 0 ? value.slice(hashIndex + 1) : '';
+    const baseUrl = chromeApi &&
+        chromeApi.runtime &&
+        typeof chromeApi.runtime.getURL === 'function'
+      ? chromeApi.runtime.getURL(pagePath)
+      : pagePath;
+    return hash ? `${baseUrl}#${hash}` : baseUrl;
+  }
+
+  function openExtensionPageTab(path) {
+    const url = buildRuntimePageUrl(path);
+    if (!url) {
+      return false;
+    }
+    const chromeApi = getChromeApi();
+    if (chromeApi && chromeApi.tabs && typeof chromeApi.tabs.create === 'function') {
+      try {
+        chromeApi.tabs.create({ url });
+        return true;
+      } catch (error) {
+        // Fall through to window.open when the tabs API is unavailable.
+      }
+    }
+    if (typeof window.open === 'function') {
+      window.open(url, '_blank', 'noopener');
+      return true;
+    }
+    return false;
+  }
+
+  function openSiteSearchOptionsFallback() {
+    return openExtensionPageTab(SITE_SEARCH_OPTIONS_PAGE_PATH);
+  }
+
+  function openExternalTab(url) {
+    const targetUrl = String(url || '').trim();
+    if (!targetUrl) {
+      return false;
+    }
+    const chromeApi = getChromeApi();
+    if (chromeApi && chromeApi.runtime && typeof chromeApi.runtime.sendMessage === 'function') {
+      try {
+        chromeApi.runtime.sendMessage({ action: 'createTab', url: targetUrl }, (response) => {
+          const lastError = chromeApi.runtime && chromeApi.runtime.lastError;
+          if (!lastError && response && response.ok !== false) {
+            return;
+          }
+          if (typeof window.open === 'function') {
+            window.open(targetUrl, '_blank', 'noopener');
+          }
+        });
+        return true;
+      } catch (error) {
+        // Fall through to window.open when extension messaging is unavailable.
+      }
+    }
+    if (typeof window.open === 'function') {
+      window.open(targetUrl, '_blank', 'noopener');
+      return true;
+    }
+    return false;
   }
 
   function setText(element, value) {
@@ -625,12 +698,12 @@
       return;
     }
     if (!chromeApi || !chromeApi.storage) {
-      callback(MODEL.normalizeLocale(navigator.language || 'en'));
+      callback(MODEL.normalizeLocale(getBrowserLocale()));
       return;
     }
     const storageArea = chromeApi.storage.sync || chromeApi.storage.local;
     if (!storageArea || typeof storageArea.get !== 'function') {
-      callback(MODEL.normalizeLocale(navigator.language || 'en'));
+      callback(MODEL.normalizeLocale(getBrowserLocale()));
       return;
     }
     try {
@@ -639,12 +712,24 @@
         const stored = !runtimeError && result ? result[LANGUAGE_STORAGE_KEY] : '';
         const locale = stored && stored !== 'system'
           ? stored
-          : (navigator.language || 'en');
+          : getBrowserLocale();
         callback(MODEL.normalizeLocale(locale));
       });
     } catch (e) {
-      callback(MODEL.normalizeLocale(navigator.language || 'en'));
+      callback(MODEL.normalizeLocale(getBrowserLocale()));
     }
+  }
+
+  function getBrowserLocale() {
+    const chromeApi = getChromeApi();
+    if (chromeApi && chromeApi.i18n && typeof chromeApi.i18n.getUILanguage === 'function') {
+      try {
+        return chromeApi.i18n.getUILanguage() || navigator.language || 'en';
+      } catch (error) {
+        return navigator.language || 'en';
+      }
+    }
+    return navigator.language || 'en';
   }
 
   function updateVersionChip() {
@@ -715,7 +800,9 @@
     const group = document.createElement('span');
     group.className = 'browser-avatar-group';
     group.setAttribute('role', 'img');
-    group.setAttribute('aria-label', names.length > 0 ? `${names.join('、')} 等` : '');
+    const separator = getRuntimeMiscText('browserNameSeparator', ', ');
+    const suffix = getRuntimeMiscText('browserAvatarSuffix', 'and more');
+    group.setAttribute('aria-label', names.length > 0 ? `${names.join(separator)} ${suffix}`.trim() : '');
     items.forEach((browser) => {
       group.appendChild(createBrowserAvatar(browser));
     });
@@ -742,7 +829,8 @@
     const browsers = browserAvatars && Array.isArray(browserAvatars.browsers)
       ? browserAvatars.browsers
       : [];
-    return browsers.map((browser) => browser && browser.name).filter(Boolean).join('、');
+    return browsers.map((browser) => browser && browser.name).filter(Boolean)
+      .join(getRuntimeMiscText('browserNameSeparator', ', '));
   }
 
   function renderBrowserAvatarTooltip(element, browserAvatars) {
@@ -865,7 +953,7 @@
     if (infoTooltip && infoTooltip.type) {
       button.dataset.tooltipType = infoTooltip.type;
     }
-    button.setAttribute('aria-label', String(infoTooltip && infoTooltip.label || '说明'));
+    button.setAttribute('aria-label', String(infoTooltip && infoTooltip.label || getRuntimeMiscText('infoLabel', 'Info')));
     button.appendChild(createIcon(String(infoTooltip && infoTooltip.icon || 'ri-information-line')));
     const showTooltip = () => showOnboardingInfoTooltip(button, infoTooltip, browserAvatars);
     button.addEventListener('mouseenter', showTooltip);
@@ -888,7 +976,7 @@
 
   function createInteractionLinkButton(linkButton) {
     const href = String(linkButton && linkButton.href || '').trim();
-    const label = String(linkButton && linkButton.label || 'GitHub 仓库').trim() || 'GitHub 仓库';
+    const label = String(linkButton && linkButton.label || 'GitHub repo').trim() || 'GitHub repo';
     const tooltip = String(linkButton && linkButton.tooltip || label).trim() || label;
     const link = document.createElement('a');
     link.className = 'interaction-info-button interaction-link-button';
@@ -1198,6 +1286,10 @@
     image.referrerPolicy = 'no-referrer';
     image.addEventListener('error', () => {
       if (image.parentNode) {
+        const iconSlot = image.parentElement;
+        if (iconSlot) {
+          iconSlot.dataset.favicon = 'false';
+        }
         image.parentNode.replaceChild(createSuggestionInlineIcon('ri-link'), image);
       }
     });
@@ -1233,6 +1325,26 @@
     });
   }
 
+  function getTypingCharacters(text) {
+    return Array.from(String(text || ''));
+  }
+
+  function appendOnboardingTypingCharacters(target, text, durationMs) {
+    if (!target) {
+      return;
+    }
+    target.textContent = '';
+    const characters = getTypingCharacters(text);
+    const stepMs = Number(durationMs) / Math.max(1, characters.length);
+    characters.forEach((character, index) => {
+      const span = document.createElement('span');
+      span.className = 'onboarding-typing-char';
+      span.style.setProperty('--typing-char-delay', `${Math.round((index + 1) * stepMs)}ms`);
+      span.textContent = character;
+      target.appendChild(span);
+    });
+  }
+
   function createLumnoOverlaySourceTag(result) {
     const sourceTag = document.createElement('span');
     sourceTag.className = 'x-ov-suggestion-source-tag';
@@ -1251,7 +1363,7 @@
 
     const label = document.createElement('span');
     label.className = 'x-ov-action-tag__label';
-    label.textContent = labelText || '新开';
+    label.textContent = labelText || getRuntimeMiscText('openLabel', 'Open');
 
     const keycap = document.createElement('span');
     keycap.className = 'x-ov-action-tag__key';
@@ -1265,11 +1377,11 @@
   function appendInlineLabelWithIcon(container, labelText, iconClass) {
     const label = document.createElement('span');
     label.className = 'x-ov-inline-label';
-    label.textContent = labelText || '新开';
+    label.textContent = labelText || getRuntimeMiscText('openLabel', 'Open');
 
     const icon = document.createElement('span');
     icon.className = 'x-ov-inline-icon';
-    icon.appendChild(createIcon(iconClass || 'ri-arrow-right-line'));
+    icon.appendChild(createIcon(iconClass || 'ri-arrow-right-line ri-size-12'));
 
     container.appendChild(label);
     container.appendChild(icon);
@@ -1290,16 +1402,19 @@
     leftSide.className = 'x-ov-suggestion-left';
     leftSide.dataset.motion = 'true';
 
+    const iconNode = createLumnoOverlayFavicon(result);
     const iconSlot = document.createElement('span');
     iconSlot.className = 'x-ov-suggestion-icon-slot';
-    iconSlot.appendChild(createLumnoOverlayFavicon(result));
+    iconSlot.dataset.favicon = iconNode.tagName === 'IMG' ? 'true' : 'false';
+    iconSlot.dataset.emphasis = result.active ? 'true' : 'false';
+    iconSlot.appendChild(iconNode);
 
     const textWrapper = document.createElement('div');
     textWrapper.className = 'x-ov-suggestion-text';
 
     const titleNode = document.createElement('span');
     titleNode.className = 'x-ov-suggestion-title';
-    appendHighlightedQueryText(titleNode, result.title, LUMNO_OVERLAY_QUERY);
+    appendHighlightedQueryText(titleNode, result.title, getLumnoOverlayQuery());
     textWrapper.appendChild(titleNode);
 
     if (result.detail) {
@@ -1333,7 +1448,7 @@
     visitButton.type = 'button';
     visitButton.className = 'x-ov-suggestion-action-button x-ov-suggestion-visit-button';
     visitButton.dataset.visible = result.active && result.actionTagLabel ? 'false' : 'true';
-    appendInlineLabelWithIcon(visitButton, result.visitButtonLabel, 'ri-arrow-right-line');
+    appendInlineLabelWithIcon(visitButton, result.visitButtonLabel, 'ri-arrow-right-line ri-size-12');
 
     let historyDeleteSlot = null;
     if (result.historyDeletable) {
@@ -1344,7 +1459,7 @@
       historyDeleteButton.type = 'button';
       historyDeleteButton.className = 'x-ov-history-delete-button';
       historyDeleteButton.dataset.visible = 'false';
-      historyDeleteButton.setAttribute('aria-label', '移除该历史');
+      historyDeleteButton.setAttribute('aria-label', getRuntimeMiscText('removeHistoryLabel', 'Remove history item'));
       historyDeleteButton.appendChild(createIcon('ri-delete-bin-6-line'));
       historyDeleteSlot.appendChild(historyDeleteButton);
     }
@@ -1371,7 +1486,7 @@
 
     const searchIcon = document.createElement('span');
     searchIcon.className = 'x-lumno-search-input__icon';
-    searchIcon.appendChild(createIcon('ri-search-line'));
+    searchIcon.appendChild(createIcon('ri-search-line ri-size-16'));
 
     const query = document.createElement('div');
     query.className = 'x-lumno-search-input__field lumno-overlay-query';
@@ -1380,7 +1495,7 @@
 
     const queryText = document.createElement('span');
     queryText.className = 'lumno-overlay-query-text';
-    queryText.textContent = LUMNO_OVERLAY_QUERY;
+    appendOnboardingTypingCharacters(queryText, getLumnoOverlayQuery(), 1040);
     query.appendChild(queryText);
 
     const caret = document.createElement('span');
@@ -1396,8 +1511,8 @@
     const rightIcon = document.createElement('button');
     rightIcon.type = 'button';
     rightIcon.className = 'x-lumno-search-input__right-icon';
-    rightIcon.setAttribute('aria-label', 'Settings');
-    rightIcon.appendChild(createIcon('ri-settings-line'));
+    rightIcon.setAttribute('aria-label', getRuntimeMiscText('settingsLabel', 'Settings'));
+    rightIcon.appendChild(createIcon('ri-settings-line ri-size-16'));
 
     const divider = document.createElement('span');
     divider.className = 'x-lumno-search-input__divider';
@@ -1410,8 +1525,9 @@
 
     const results = document.createElement('div');
     results.className = 'x-ov-suggestions-container lumno-overlay-results';
-    LUMNO_OVERLAY_FAKE_RESULTS.forEach((result, index) => {
-      results.appendChild(createLumnoOverlayResult(result, index, LUMNO_OVERLAY_FAKE_RESULTS.length));
+    const overlayResults = getLumnoOverlayResults();
+    overlayResults.forEach((result, index) => {
+      results.appendChild(createLumnoOverlayResult(result, index, overlayResults.length));
     });
 
     panel.appendChild(inputRoot);
@@ -1429,6 +1545,11 @@
       const isActive = index === activeIndex;
       const hasActionTags = item.dataset.hasActionTags === 'true';
       item.dataset.active = isActive ? 'true' : 'false';
+
+      const iconSlot = item.querySelector('.x-ov-suggestion-icon-slot');
+      if (iconSlot) {
+        iconSlot.dataset.emphasis = isActive ? 'true' : 'false';
+      }
 
       const actionTags = item.querySelector('.x-ov-suggestion-action-tags');
       if (actionTags) {
@@ -1543,8 +1664,7 @@
       { target: 'recent', duration: NEWTAB_PREVIEW_HOVER_HOLD_MS },
       { target: '', duration: NEWTAB_PREVIEW_HOVER_MOVE_MS },
       { target: 'bookmark', duration: NEWTAB_PREVIEW_HOVER_HOLD_MS },
-      { target: '', duration: NEWTAB_PREVIEW_HOVER_RESET_MS },
-      { target: '', duration: NEWTAB_PREVIEW_HOVER_RETURN_MS }
+      { target: '', duration: NEWTAB_PREVIEW_HOVER_SETTLE_MS }
     ];
     const step = steps[newtabPreviewHoverStepIndex % steps.length];
     setNewtabPreviewHoverState(container, step.target);
@@ -1671,6 +1791,320 @@
     rootNode.appendChild(createLumnoOverlaySurface());
     startLumnoOverlayHoverLoop(rootNode);
     return rootNode;
+  }
+
+  function getSiteSearchDemoBrandAccentRgb(item) {
+    return item && Array.isArray(item.brandAccentRgb) && item.brandAccentRgb.length === 3
+      ? item.brandAccentRgb
+      : (item && Array.isArray(item.accentRgb) && item.accentRgb.length === 3 ? item.accentRgb : [59, 130, 246]);
+  }
+
+  function getSiteSearchDemoLuminance(rgb) {
+    if (!Array.isArray(rgb) || rgb.length !== 3) {
+      return 0;
+    }
+    const channels = rgb.map((value) => {
+      const channel = Number(value) / 255;
+      return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  }
+
+  function getSiteSearchDemoReadableTextColor(bgRgb) {
+    const darkText = [17, 24, 39];
+    const lightText = [248, 250, 252];
+    const bgLum = getSiteSearchDemoLuminance(bgRgb);
+    const darkLum = getSiteSearchDemoLuminance(darkText);
+    const lightLum = getSiteSearchDemoLuminance(lightText);
+    const contrastWithDark = (Math.max(bgLum, darkLum) + 0.05) / (Math.min(bgLum, darkLum) + 0.05);
+    const contrastWithLight = (Math.max(bgLum, lightLum) + 0.05) / (Math.min(bgLum, lightLum) + 0.05);
+    return contrastWithDark >= contrastWithLight ? '#111827' : '#F8FAFC';
+  }
+
+  function normalizeSiteSearchDemoAccentRgb(rgb) {
+    const accentRgb = Array.isArray(rgb) && rgb.length === 3
+      ? rgb
+      : [59, 130, 246];
+    const luminance = getSiteSearchDemoLuminance(accentRgb);
+    if (luminance < 0.12) {
+      return mixNewtabPreviewColor(accentRgb, [255, 255, 255], 0.55);
+    }
+    if (luminance > 0.9) {
+      return mixNewtabPreviewColor(accentRgb, [0, 0, 0], 0.2);
+    }
+    return accentRgb;
+  }
+
+  function getSiteSearchDemoTheme(item) {
+    const accentRgb = normalizeSiteSearchDemoAccentRgb(getSiteSearchDemoBrandAccentRgb(item));
+    const base = [255, 255, 255];
+    const markBg = mixNewtabPreviewColor(accentRgb, base, 0.78);
+    const tagBg = mixNewtabPreviewColor(accentRgb, base, 0.74);
+    const keyBg = mixNewtabPreviewColor(accentRgb, base, 0.9);
+    return {
+      accentRgb,
+      highlightBg: mixNewtabPreviewColor(accentRgb, base, 0.86),
+      highlightBorder: mixNewtabPreviewColor(accentRgb, base, 0.62),
+      markBg,
+      markText: getSiteSearchDemoReadableTextColor(markBg),
+      tagBg,
+      tagText: getSiteSearchDemoReadableTextColor(tagBg),
+      tagBorder: mixNewtabPreviewColor(accentRgb, base, 0.58),
+      keyBg,
+      keyText: getSiteSearchDemoReadableTextColor(keyBg),
+      keyBorder: mixNewtabPreviewColor(accentRgb, base, 0.18),
+      buttonText: getSiteSearchDemoLuminance(accentRgb) > 0.8
+        ? mixNewtabPreviewColor(accentRgb, [0, 0, 0], 0.6)
+        : accentRgb,
+      buttonBg: mixNewtabPreviewColor(accentRgb, base, 0.94),
+      buttonBorder: mixNewtabPreviewColor(accentRgb, base, 0.7)
+    };
+  }
+
+  function applySiteSearchDemoAccent(element, item) {
+    const theme = getSiteSearchDemoTheme(item);
+    const accentRgb = theme.accentRgb;
+    element.style.setProperty('--site-search-demo-accent-rgb', newtabPreviewRgbToCssParts(accentRgb));
+    element.style.setProperty('--site-search-demo-accent', newtabPreviewRgbToCss(accentRgb));
+    element.style.setProperty('--site-search-demo-accent-soft', newtabPreviewRgbToCssAlpha(accentRgb, 0.1));
+    element.style.setProperty('--site-search-demo-accent-border', newtabPreviewRgbToCssAlpha(accentRgb, 0.18));
+    element.style.setProperty('--x-ov-suggestion-row-bg', newtabPreviewRgbToCss(theme.highlightBg));
+    element.style.setProperty('--x-ov-suggestion-row-border', newtabPreviewRgbToCss(theme.highlightBorder));
+    element.style.setProperty('--x-ext-mark-bg', newtabPreviewRgbToCss(theme.markBg));
+    element.style.setProperty('--x-ext-mark-text', theme.markText);
+    element.style.setProperty('--x-ext-tag-bg', newtabPreviewRgbToCss(theme.buttonBg));
+    element.style.setProperty('--x-ext-tag-text', newtabPreviewRgbToCss(theme.buttonText));
+    element.style.setProperty('--x-ext-tag-border', newtabPreviewRgbToCss(theme.buttonBorder));
+    element.style.setProperty('--x-ov-suggestion-action-button-bg', newtabPreviewRgbToCss(theme.buttonBg));
+    element.style.setProperty('--x-ov-suggestion-action-button-text', newtabPreviewRgbToCss(theme.buttonText));
+    element.style.setProperty('--x-ov-suggestion-action-button-border', newtabPreviewRgbToCss(theme.buttonBorder));
+    element.style.setProperty('--x-ext-key-bg', newtabPreviewRgbToCss(theme.keyBg));
+    element.style.setProperty('--x-ext-key-text', theme.keyText);
+    element.style.setProperty('--x-ext-key-border', newtabPreviewRgbToCss(theme.keyBorder));
+  }
+
+  function createSiteSearchDemoProviderIcon(item, className) {
+    const iconSrc = String(item && item.favicon || '').trim();
+    if (iconSrc) {
+      const image = document.createElement('img');
+      image.className = className;
+      image.src = iconSrc;
+      image.alt = '';
+      image.decoding = 'async';
+      image.loading = 'eager';
+      image.referrerPolicy = 'no-referrer';
+      image.draggable = false;
+      image.addEventListener('error', () => {
+        if (image.parentNode) {
+          const fallback = document.createElement('span');
+          fallback.className = className;
+          fallback.appendChild(createIcon(item.iconClass || 'ri-link'));
+          image.parentNode.replaceChild(fallback, image);
+        }
+      });
+      return image;
+    }
+    const icon = document.createElement('span');
+    icon.className = className;
+    icon.appendChild(createIcon(item && item.iconClass || 'ri-search-line'));
+    return icon;
+  }
+
+  function setSiteSearchDemoTypingWidth(element, text, fallbackWidth) {
+    if (!element) {
+      return;
+    }
+    const characters = getTypingCharacters(text);
+    const hasWideCharacters = characters.some((character) => /[^\x00-\xff]/.test(character));
+    const widthUnit = hasWideCharacters ? 'em' : 'ch';
+    const width = String(fallbackWidth || '').trim() || `${Math.max(1, characters.length)}${widthUnit}`;
+    element.style.setProperty('--typed-width', `calc(${width} + var(--typed-width-buffer, 0.65em))`);
+    element.style.setProperty('--typing-steps', String(Math.max(1, characters.length)));
+  }
+
+  function createSiteSearchDemoTypedText(text, className, width, durationMs) {
+    const token = document.createElement('span');
+    token.className = `site-search-demo-query-token ${className || ''}`.trim();
+    appendOnboardingTypingCharacters(token, text, durationMs);
+    setSiteSearchDemoTypingWidth(token, text, width);
+    return token;
+  }
+
+  function createSiteSearchDemoModePrefix(item) {
+    const prefix = document.createElement('span');
+    prefix.className = 'x-lumno-search-input-mode__prefix site-search-demo-mode-prefix';
+    prefix.setAttribute('aria-hidden', 'true');
+
+    if (item && item.kind === 'ai') {
+      prefix.appendChild(createSiteSearchDemoProviderIcon(item, 'site-search-demo-mode-prefix__icon'));
+    }
+    const label = document.createElement('span');
+    label.className = 'site-search-demo-mode-prefix__label';
+    label.textContent = item.prefixLabel || item.modeLabel || '';
+
+    prefix.appendChild(label);
+    return prefix;
+  }
+
+  function createSiteSearchDemoTabHint(item) {
+    const hint = document.createElement('span');
+    hint.className = 'x-lumno-search-input-mode__tab-hint site-search-demo-tab-hint';
+    hint.setAttribute('aria-hidden', 'true');
+
+    const key = document.createElement('span');
+    key.className = 'site-search-demo-tab-hint__key';
+    key.textContent = 'Tab';
+
+    const label = document.createElement('span');
+    label.className = 'site-search-demo-tab-hint__label';
+    label.textContent = formatRuntimeTemplate(
+      String(getRuntimeSection('siteSearchDemo').tabHintTemplate || 'Search with {provider}'),
+      { provider: item.modeLabel || item.label || '' }
+    );
+
+    hint.appendChild(key);
+    hint.appendChild(label);
+    return hint;
+  }
+
+  function createSiteSearchDemoInput(item) {
+    const inputRoot = document.createElement('div');
+    inputRoot.className = 'x-lumno-search-input x-lumno-search-input__container';
+
+    const searchIcon = document.createElement('span');
+    searchIcon.className = 'x-lumno-search-input__icon';
+    searchIcon.appendChild(createIcon('ri-search-line ri-size-16'));
+
+    const query = document.createElement('div');
+    query.className = 'x-lumno-search-input__field site-search-demo-query';
+    query.setAttribute('role', 'searchbox');
+    query.setAttribute('aria-label', `${item.label || ''} demo query`);
+
+    const triggerText = createSiteSearchDemoTypedText(
+      item.triggerQuery,
+      'site-search-demo-query-token--trigger',
+      null,
+      760
+    );
+    const promptText = createSiteSearchDemoTypedText(
+      item.promptQuery,
+      'site-search-demo-query-token--prompt',
+      item.promptWidth,
+      900
+    );
+    const caret = document.createElement('span');
+    caret.className = 'site-search-demo-query-caret';
+    caret.setAttribute('aria-hidden', 'true');
+
+    query.appendChild(triggerText);
+    query.appendChild(promptText);
+    query.appendChild(caret);
+
+    const rightIcon = document.createElement('button');
+    rightIcon.type = 'button';
+    rightIcon.className = 'x-lumno-search-input__right-icon';
+    rightIcon.tabIndex = -1;
+    rightIcon.setAttribute('aria-label', getRuntimeMiscText('settingsLabel', 'Settings'));
+    rightIcon.appendChild(createIcon('ri-settings-line ri-size-16'));
+
+    const divider = document.createElement('span');
+    divider.className = 'x-lumno-search-input__divider';
+
+    inputRoot.appendChild(searchIcon);
+    inputRoot.appendChild(query);
+    inputRoot.appendChild(rightIcon);
+    inputRoot.appendChild(divider);
+    inputRoot.appendChild(createSiteSearchDemoModePrefix(item));
+    inputRoot.appendChild(createSiteSearchDemoTabHint(item));
+    return inputRoot;
+  }
+
+  function createSiteSearchDemoResult(item) {
+    const result = document.createElement('div');
+    result.className = 'x-ov-suggestion-item site-search-demo-result';
+    result.dataset.active = 'true';
+    result.dataset.type = item.kind || '';
+    result.dataset.last = 'true';
+    result.style.setProperty('--result-index', '0');
+
+    const leftSide = document.createElement('div');
+    leftSide.className = 'x-ov-suggestion-left';
+
+    const iconSlot = document.createElement('span');
+    iconSlot.className = 'x-ov-suggestion-icon-slot';
+    iconSlot.appendChild(createSiteSearchDemoProviderIcon(item, 'x-ov-suggestion-favicon'));
+
+    const textWrapper = document.createElement('div');
+    textWrapper.className = 'x-ov-suggestion-text';
+
+    const title = document.createElement('span');
+    title.className = 'x-ov-suggestion-title';
+    appendHighlightedQueryText(title, item.resultTitle, item.promptQuery);
+    textWrapper.appendChild(title);
+
+    if (item.resultDetail) {
+      const detail = document.createElement('span');
+      detail.className = 'x-ov-suggestion-url-line';
+      detail.textContent = item.resultDetail || '';
+      textWrapper.appendChild(detail);
+    }
+
+    if (item.resultTag) {
+      const tag = document.createElement('span');
+      tag.className = 'x-ov-suggestion-source-tag';
+      tag.dataset.visible = 'true';
+      tag.textContent = item.resultTag;
+      textWrapper.appendChild(tag);
+    }
+
+    leftSide.appendChild(iconSlot);
+    leftSide.appendChild(textWrapper);
+
+    const rightSide = document.createElement('div');
+    rightSide.className = 'x-ov-suggestion-right';
+    const visitButton = document.createElement('button');
+    visitButton.type = 'button';
+    visitButton.className = 'x-ov-suggestion-action-button x-ov-suggestion-visit-button';
+    visitButton.dataset.visible = 'true';
+    visitButton.tabIndex = -1;
+    appendInlineLabelWithIcon(visitButton, item.actionLabel, 'ri-arrow-right-line ri-size-12');
+    rightSide.appendChild(visitButton);
+
+    result.appendChild(leftSide);
+    result.appendChild(rightSide);
+    return result;
+  }
+
+  function createSiteSearchDemoCase(item, index) {
+    const card = document.createElement('section');
+    card.className = 'site-search-demo-card';
+    card.dataset.kind = item.kind || '';
+    card.setAttribute('aria-label', item.label || item.modeLabel || 'Site search demo');
+    card.style.setProperty('--case-delay', `${index * 760}ms`);
+    applySiteSearchDemoAccent(card, item);
+
+    const results = document.createElement('div');
+    results.className = 'site-search-demo-results';
+    results.appendChild(createSiteSearchDemoResult(item));
+
+    card.appendChild(createSiteSearchDemoInput(item));
+    card.appendChild(results);
+    return card;
+  }
+
+  function createSiteSearchDemoSurface() {
+    const surface = document.createElement('div');
+    surface.className = 'site-search-demo-surface';
+    surface.setAttribute('aria-label', getRuntimeMiscText('siteSearchDemoAriaLabel', 'Lumno site search demo'));
+
+    const stack = document.createElement('div');
+    stack.className = 'site-search-demo-stack';
+    getSiteSearchDemoCases().forEach((item, index) => {
+      stack.appendChild(createSiteSearchDemoCase(item, index));
+    });
+
+    surface.appendChild(stack);
+    return surface;
   }
 
   function createDemoCursorSvg() {
@@ -1830,16 +2264,16 @@
     field.id = '_x_extension_newtab_search_input_2024_unique_';
     field.className = 'x-lumno-search-input__field';
     field.type = 'text';
-    field.value = NEWTAB_PREVIEW_QUERY;
-    field.placeholder = '搜索或输入网址...';
+    field.value = getNewtabPreviewQuery();
+    field.placeholder = getRuntimeMiscText('newtabSearchPlaceholder', 'Search or enter URL...');
     field.readOnly = true;
     field.tabIndex = -1;
-    field.setAttribute('aria-label', 'Lumno newtab search preview');
+    field.setAttribute('aria-label', getRuntimeMiscText('newtabSearchPreviewAriaLabel', 'Lumno new tab search preview'));
 
     const rightIcon = document.createElement('button');
     rightIcon.type = 'button';
     rightIcon.className = 'x-lumno-search-input__right-icon';
-    rightIcon.setAttribute('aria-label', 'Settings');
+    rightIcon.setAttribute('aria-label', getRuntimeMiscText('settingsLabel', 'Settings'));
     rightIcon.tabIndex = -1;
     rightIcon.appendChild(createIcon('ri-settings-3-line'));
 
@@ -1947,7 +2381,7 @@
 
     const label = document.createElement('span');
     label.className = 'x-nt-suggestion-action-tag__label';
-    label.textContent = labelText || '新开';
+    label.textContent = labelText || getRuntimeMiscText('openLabel', 'Open');
 
     const key = document.createElement('span');
     key.className = 'x-nt-suggestion-action-tag__key';
@@ -1961,7 +2395,7 @@
   function appendNewtabPreviewActionButtonLabel(button, labelText) {
     const label = document.createElement('span');
     label.className = 'x-nt-suggestion-action-button__label';
-    label.textContent = labelText || '新开';
+    label.textContent = labelText || getRuntimeMiscText('openLabel', 'Open');
 
     const icon = document.createElement('span');
     icon.className = 'x-nt-suggestion-action-button__icon';
@@ -1988,7 +2422,7 @@
 
     const title = document.createElement('span');
     title.className = 'x-nt-suggestion-title';
-    appendNewtabPreviewHighlightedText(title, item.title, NEWTAB_PREVIEW_QUERY);
+    appendNewtabPreviewHighlightedText(title, item.title, getNewtabPreviewQuery());
     textWrapper.appendChild(title);
 
     if (item.path) {
@@ -2040,7 +2474,7 @@
       deleteButton.type = 'button';
       deleteButton.className = 'x-nt-history-delete-button';
       deleteButton.tabIndex = -1;
-      deleteButton.setAttribute('aria-label', '移除该历史');
+      deleteButton.setAttribute('aria-label', getRuntimeMiscText('removeHistoryLabel', 'Remove history item'));
       deleteButton.appendChild(createIcon('ri-delete-bin-6-line'));
       deleteSlot.appendChild(deleteButton);
       rightSide.appendChild(deleteSlot);
@@ -2078,7 +2512,10 @@
     card.className = `x-nt-recent-card${item.alt ? ' x-nt-recent-card--alt' : ''}`;
     card.tabIndex = -1;
     card.setAttribute('role', 'button');
-    card.setAttribute('aria-label', `打开 ${item.title}`);
+    card.setAttribute('aria-label', formatRuntimeTemplate(
+      getRuntimeMiscText('openItemAriaTemplate', 'Open {title}'),
+      { title: item.title }
+    ));
     applyNewtabPreviewRecentTheme(card, item);
 
     const inner = document.createElement('div');
@@ -2113,7 +2550,7 @@
     const actionLine = document.createElement('div');
     actionLine.className = 'x-nt-recent-action';
     const actionText = document.createElement('span');
-    actionText.textContent = '前往';
+    actionText.textContent = getRuntimeMiscText('goLabel', 'Visit');
     actionLine.appendChild(actionText);
     actionLine.appendChild(createIcon('ri-arrow-right-line'));
 
@@ -2143,7 +2580,10 @@
     card.className = item.type === 'folder'
       ? 'x-nt-bookmark-card x-nt-bookmark-card--folder'
       : 'x-nt-bookmark-card';
-    card.setAttribute('aria-label', `打开 ${item.title}`);
+    card.setAttribute('aria-label', formatRuntimeTemplate(
+      getRuntimeMiscText('openItemAriaTemplate', 'Open {title}'),
+      { title: item.title }
+    ));
     card.title = item.title;
     card.setAttribute('data-cursor-tooltip', item.title);
     applyNewtabPreviewBookmarkTheme(card, item);
@@ -2177,7 +2617,9 @@
   }
 
   function createNewtabPreviewSectionModeSelect(kind) {
-    const label = kind === 'recent' ? '最近访问显示模式' : '书签显示模式';
+    const label = kind === 'recent'
+      ? getRuntimeMiscText('sectionModeRecentLabel', 'Recent display mode')
+      : getRuntimeMiscText('sectionModeBookmarksLabel', 'Bookmarks display mode');
     const control = document.createElement('div');
     control.className = 'x-nt-section-mode-select _x_extension_select_wrap_2024_unique_';
     control.dataset.iconOnly = 'true';
@@ -2208,11 +2650,17 @@
     const pager = document.createElement('div');
     pager.className = 'x-nt-bookmarks-pager';
     const buttons = [
-      ['ri-arrow-left-s-line', `${label} previous`, true],
-      ['ri-arrow-right-s-line', `${label} next`, false]
+      ['ri-arrow-left-s-line', formatRuntimeTemplate(
+        getRuntimeMiscText('previousLabelTemplate', '{label} previous'),
+        { label }
+      ), true],
+      ['ri-arrow-right-s-line', formatRuntimeTemplate(
+        getRuntimeMiscText('nextLabelTemplate', '{label} next'),
+        { label }
+      ), false]
     ];
     if (includeManager) {
-      buttons.push(['ri-bookmark-line', '打开书签管理页', false]);
+      buttons.push(['ri-bookmark-line', getRuntimeMiscText('bookmarkManagerLabel', 'Open bookmark manager'), false]);
     }
     buttons.forEach(([iconClass, ariaLabel, disabled]) => {
       const button = document.createElement('button');
@@ -2286,7 +2734,7 @@
     debugButton.type = 'button';
     debugButton.className = 'x-nt-bookmark-cascade-debug-button';
     debugButton.tabIndex = -1;
-    debugButton.setAttribute('aria-label', 'Debug bookmark cascade');
+    debugButton.setAttribute('aria-label', getRuntimeMiscText('debugBookmarkCascadeLabel', 'Debug bookmark cascade'));
     debugButton.appendChild(createIcon('ri-bug-line'));
     debugControl.appendChild(debugButton);
 
@@ -2296,7 +2744,7 @@
     feedbackButton.type = 'button';
     feedbackButton.className = 'x-nt-feedback-button';
     feedbackButton.tabIndex = -1;
-    feedbackButton.setAttribute('aria-label', 'Feedback');
+    feedbackButton.setAttribute('aria-label', getRuntimeMiscText('feedbackLabel', 'Feedback'));
     feedbackButton.appendChild(createIcon('ri-message-3-line'));
     feedbackControl.appendChild(feedbackButton);
 
@@ -2307,7 +2755,7 @@
     wallpaperButton.className = 'x-nt-wallpaper-button';
     wallpaperButton.tabIndex = -1;
     wallpaperButton.dataset.active = 'false';
-    wallpaperButton.setAttribute('aria-label', 'Wallpaper');
+    wallpaperButton.setAttribute('aria-label', getRuntimeMiscText('wallpaperLabel', 'Wallpaper'));
     wallpaperButton.appendChild(createIcon('ri-image-edit-line'));
     wallpaperControl.appendChild(wallpaperButton);
 
@@ -2331,9 +2779,9 @@
     bottomDockScroller.id = '_x_extension_newtab_bottom_dock_scroller_2024_unique_';
     const sectionSafeCorridor = document.createElement('div');
     sectionSafeCorridor.id = '_x_extension_newtab_section_safe_corridor_2026_unique_';
-    bottomDockScroller.appendChild(createNewtabPreviewSection('bookmarks', '书签', NEWTAB_PREVIEW_BOOKMARKS));
+    bottomDockScroller.appendChild(createNewtabPreviewSection('bookmarks', getNewtabPreviewSectionTitle('bookmarks', 'Bookmarks'), getNewtabPreviewBookmarks()));
     bottomDockScroller.appendChild(sectionSafeCorridor);
-    bottomDockScroller.appendChild(createNewtabPreviewSection('recent', '最近访问', NEWTAB_PREVIEW_RECENT_SITES));
+    bottomDockScroller.appendChild(createNewtabPreviewSection('recent', getNewtabPreviewSectionTitle('recent', 'Recent'), getNewtabPreviewRecentSites()));
     bottomDock.appendChild(bottomDockScroller);
 
     viewport.appendChild(createNewtabPreviewWordmark());
@@ -2346,7 +2794,7 @@
   function createNewtabPreviewSurface() {
     const surface = document.createElement('div');
     surface.className = 'newtab-preview-surface';
-    surface.setAttribute('aria-label', 'Lumno new tab preview');
+    surface.setAttribute('aria-label', getRuntimeMiscText('newtabPreviewAriaLabel', 'Lumno new tab preview'));
 
     const browserBackdrop = document.createElement('div');
     browserBackdrop.className = 'browser-window newtab-preview-browser-backdrop';
@@ -2367,6 +2815,159 @@
 
     surface.appendChild(backdropClip);
     surface.appendChild(foregroundClip);
+    return surface;
+  }
+
+  function getFeatureArtworkSize(item) {
+    const size = item && item.artSize;
+    const width = size && Number(size.width) > 0 ? Number(size.width) : 298;
+    const height = size && Number(size.height) > 0 ? Number(size.height) : 120;
+    return { width, height };
+  }
+
+  function createHomepagePipArtwork() {
+    const art = document.createElement('div');
+    art.className = 'feature-card__art feature-card__art--pip';
+    art.dataset.art = 'homepage-pip';
+    art.setAttribute('aria-hidden', 'true');
+
+    const image = document.createElement('img');
+    image.className = 'feature-card__art-image';
+    image.src = HOMEPAGE_PIP_ART_SRC;
+    image.alt = '';
+    image.decoding = 'async';
+    image.loading = 'eager';
+    image.draggable = false;
+
+    art.appendChild(image);
+    return art;
+  }
+
+  function createNewtabFiltersArtwork() {
+    const art = document.createElement('div');
+    art.className = 'feature-card__art feature-card__art--newtab';
+    art.dataset.art = 'newtab-filters';
+    art.setAttribute('aria-hidden', 'true');
+
+    const image = document.createElement('img');
+    image.className = 'feature-card__art-image';
+    image.src = NEWTAB_FILTERS_ART_SRC;
+    image.alt = '';
+    image.decoding = 'async';
+    image.loading = 'eager';
+    image.draggable = false;
+
+    art.appendChild(image);
+    return art;
+  }
+
+  function createBlankFeatureArtwork(item) {
+    const size = getFeatureArtworkSize(item);
+    const art = document.createElement('div');
+    art.className = 'feature-card__art feature-card__art--blank';
+    art.dataset.art = 'blank';
+    art.dataset.artWidth = String(size.width);
+    art.dataset.artHeight = String(size.height);
+    art.setAttribute('aria-hidden', 'true');
+    return art;
+  }
+
+  function createFeatureCardArtwork(item) {
+    if (item && item.art === 'homepage-pip') {
+      return createHomepagePipArtwork();
+    }
+    if (item && item.art === 'newtab-filters') {
+      return createNewtabFiltersArtwork();
+    }
+    return createBlankFeatureArtwork(item);
+  }
+
+  function createFeatureCard(item, index) {
+    const titleText = String(item && item.title || '').trim();
+    const bodyText = String(item && item.body || '').trim();
+    const tone = String(item && item.tone || '').trim();
+
+    const card = document.createElement('article');
+    card.className = 'feature-card';
+    card.style.setProperty('--feature-card-index', String(index || 0));
+    card.style.setProperty('--feature-card-delay', `${260 + (index || 0) * 90}ms`);
+    if (tone) {
+      card.dataset.tone = tone;
+    }
+    if (titleText || bodyText) {
+      card.setAttribute('aria-label', bodyText
+        ? `${titleText}${getRuntimeMiscText('featureCardAriaJoiner', ', ')}${bodyText}`
+        : titleText);
+    }
+
+    const copy = document.createElement('header');
+    copy.className = 'feature-card__copy';
+
+    const heading = document.createElement('h2');
+    heading.className = 'feature-card__title';
+    heading.textContent = titleText;
+
+    const description = document.createElement('p');
+    description.className = 'feature-card__body';
+    description.textContent = bodyText;
+
+    copy.appendChild(heading);
+    copy.appendChild(description);
+    card.appendChild(copy);
+    card.appendChild(createFeatureCardArtwork(item));
+    return card;
+  }
+
+  function createFeatureAwardWheat(side) {
+    const wheat = document.createElement('span');
+    wheat.className = `feature-award__wheat feature-award__wheat--${side || 'left'}`;
+    wheat.setAttribute('aria-hidden', 'true');
+    return wheat;
+  }
+
+  function createFeatureAward(item, index) {
+    const award = document.createElement('section');
+    award.className = 'feature-award';
+    award.style.setProperty('--feature-award-index', String(index || 0));
+    award.style.setProperty('--feature-award-delay', `${180 + (index || 0) * 80}ms`);
+
+    const label = document.createElement('div');
+    label.className = 'feature-award__label';
+    (Array.isArray(item && item.lines) ? item.lines : []).forEach((line) => {
+      const row = document.createElement('span');
+      row.textContent = String(line || '');
+      label.appendChild(row);
+    });
+
+    award.appendChild(createFeatureAwardWheat('left'));
+    award.appendChild(label);
+    award.appendChild(createFeatureAwardWheat('right'));
+    return award;
+  }
+
+  function createFeatureAwards() {
+    const awards = document.createElement('div');
+    awards.className = 'feature-cards-surface__awards';
+    awards.setAttribute('aria-label', getRuntimeMiscText('principlesAriaLabel', 'Lumno principles'));
+    getFeatureAwards().forEach((item, index) => {
+      awards.appendChild(createFeatureAward(item, index));
+    });
+    return awards;
+  }
+
+  function createFeatureCardsSurface() {
+    const surface = document.createElement('div');
+    surface.className = 'feature-cards-surface';
+    surface.setAttribute('aria-label', getRuntimeMiscText('practicalFeaturesAriaLabel', 'Lumno practical features'));
+
+    const stack = document.createElement('div');
+    stack.className = 'feature-cards-surface__stack';
+    getFeatureCards().forEach((item, index) => {
+      stack.appendChild(createFeatureCard(item, index));
+    });
+
+    surface.appendChild(createFeatureAwards());
+    surface.appendChild(stack);
     return surface;
   }
 
@@ -2396,6 +2997,10 @@
         const surface = createNewtabPreviewSurface();
         visualStage.appendChild(surface);
         startNewtabPreviewHoverLoop(surface);
+      } else if (slide.visual.kind === 'site-search-demo-surface') {
+        visualStage.appendChild(createSiteSearchDemoSurface());
+      } else if (slide.visual.kind === 'feature-cards-surface') {
+        visualStage.appendChild(createFeatureCardsSurface());
       } else {
         visualStage.appendChild(createGenericVisualSurface());
       }
@@ -2557,7 +3162,10 @@
     const pageCount = Math.max(1, blueprint.slides.length - 1);
     const currentPageIndex = Math.max(0, state.index - 1);
     pageStrip.style.setProperty('--page-strip-count', String(pageCount));
-    pageStrip.setAttribute('aria-label', `引导页导航，第 ${currentPageIndex + 1} / ${pageCount} 页`);
+    pageStrip.setAttribute('aria-label', formatRuntimeTemplate(
+      getRuntimeMiscText('pageStripAriaTemplate', 'Onboarding navigation, page {current} of {total}'),
+      { current: currentPageIndex + 1, total: pageCount }
+    ));
     if (pageStrip.hidden) {
       return;
     }
@@ -2569,7 +3177,10 @@
       segment.dataset.active = pageIndex === currentPageIndex ? 'true' : 'false';
       segment.dataset.slideTarget = String(slideIndex);
       segment.style.setProperty('--page-strip-segment-index', String(pageIndex));
-      segment.setAttribute('aria-label', `第 ${pageIndex + 1} 页`);
+      segment.setAttribute('aria-label', formatRuntimeTemplate(
+        getRuntimeMiscText('pageSegmentAriaTemplate', 'Page {page}'),
+        { page: pageIndex + 1 }
+      ));
       if (pageIndex === currentPageIndex) {
         segment.setAttribute('aria-current', 'step');
       }
@@ -2637,9 +3248,14 @@
     });
   }
 
+  function isFrameScaledOnboardingLayout() {
+    return typeof window.matchMedia === 'function' &&
+      window.matchMedia('(max-width: 1240px) and (min-width: 860px), (max-height: 760px) and (min-height: 560px) and (min-width: 860px)').matches;
+  }
+
   function isStackedOnboardingLayout() {
     return typeof window.matchMedia === 'function' &&
-      window.matchMedia('(max-width: 900px)').matches;
+      window.matchMedia('(max-width: 859px), (max-height: 559px)').matches;
   }
 
   function resetStackedLayoutScroll() {
@@ -2658,22 +3274,68 @@
     });
   }
 
+  function updateOnboardingFrameScale() {
+    if (!root) {
+      return;
+    }
+    const shouldScaleFrame = isFrameScaledOnboardingLayout();
+    const viewportWidth = window.innerWidth || root.clientWidth || ONBOARDING_FRAME_WIDTH;
+    const viewportHeight = window.innerHeight || root.clientHeight || ONBOARDING_FRAME_HEIGHT;
+    const scale = shouldScaleFrame
+      ? Math.max(0.1, Math.min(1, viewportWidth / ONBOARDING_FRAME_WIDTH, viewportHeight / ONBOARDING_FRAME_HEIGHT))
+      : 1;
+    root.style.setProperty('--onboarding-frame-scale', scale.toFixed(3));
+    root.style.setProperty('--onboarding-frame-rendered-width', `${(ONBOARDING_FRAME_WIDTH * scale).toFixed(2)}px`);
+    root.style.setProperty('--onboarding-frame-rendered-height', `${(ONBOARDING_FRAME_HEIGHT * scale).toFixed(2)}px`);
+  }
+
+  function getCompactCopyContentHeight() {
+    if (!copyPanel) {
+      return 0;
+    }
+    const panelStyle = window.getComputedStyle(copyPanel);
+    const paddingTop = parseFloat(panelStyle.paddingTop) || 0;
+    const paddingBottom = parseFloat(panelStyle.paddingBottom) || 0;
+    const rowGap = parseFloat(panelStyle.rowGap || panelStyle.gap) || 0;
+    const rows = [
+      copyPanel.querySelector('.copy-block'),
+      copyPanel.querySelector('.interaction-slots'),
+      copyPanel.querySelector('.onboarding-copy-actions')
+    ].filter((element) => {
+      if (!element || element.hidden) {
+        return false;
+      }
+      const elementStyle = window.getComputedStyle(element);
+      return elementStyle.display !== 'none' && elementStyle.visibility !== 'hidden';
+    });
+    const rowsHeight = rows.reduce((sum, element) => (
+      sum + element.getBoundingClientRect().height
+    ), 0);
+    return paddingTop + paddingBottom + rowsHeight + (Math.max(0, rows.length - 1) * rowGap);
+  }
+
   function updateVisualCanvasScale() {
     if (!root || !visualSlot || !visualPanel || !visualCanvas) {
       return;
     }
+    updateOnboardingFrameScale();
     const rect = visualSlot.getBoundingClientRect();
     const availableWidth = visualSlot.clientWidth || rect.width || 0;
-    const isStackedLayout = isStackedOnboardingLayout();
-    const availableHeight = isStackedLayout
-      ? VISUAL_CANVAS_HEIGHT
+    const isCompactLayout = isStackedOnboardingLayout();
+    const viewportHeight = window.innerHeight || root.clientHeight || VISUAL_CANVAS_HEIGHT;
+    const compactVisualHeight = Math.max(0, viewportHeight - getCompactCopyContentHeight());
+    const availableHeight = isCompactLayout
+      ? compactVisualHeight
       : (visualSlot.clientHeight || rect.height || 0);
-    if (!availableWidth || !availableHeight) {
+    if (!availableWidth || (!isCompactLayout && !availableHeight)) {
       return;
     }
-    const scale = Math.max(0.1, Math.min(1, availableWidth / VISUAL_CANVAS_WIDTH, availableHeight / VISUAL_CANVAS_HEIGHT));
+    const scale = isCompactLayout
+      ? Math.max(0.1, Math.min(availableWidth / VISUAL_CANVAS_WIDTH, availableHeight / VISUAL_CANVAS_HEIGHT))
+      : Math.max(0.1, Math.min(1, availableWidth / VISUAL_CANVAS_WIDTH, availableHeight / VISUAL_CANVAS_HEIGHT));
     root.style.setProperty('--onboarding-visual-scale', scale.toFixed(3));
     root.style.setProperty('--onboarding-visual-rendered-width', `${(VISUAL_CANVAS_WIDTH * scale).toFixed(2)}px`);
+    root.style.setProperty('--onboarding-visual-rendered-height', `${(VISUAL_CANVAS_HEIGHT * scale).toFixed(2)}px`);
   }
 
   function scheduleVisualCanvasScaleUpdate() {
@@ -2962,7 +3624,9 @@
       nextSlide &&
       (
         (currentSlide.id === 'intro' && nextSlide.id === 'setup') ||
-        (currentSlide.id === 'setup' && nextSlide.id === 'search')
+        (currentSlide.id === 'setup' && nextSlide.id === 'search') ||
+        (currentSlide.id === 'search' && nextSlide.id === 'newtab') ||
+        (currentSlide.id === 'newtab' && nextSlide.id === 'finish')
       ) &&
       nextState.direction === 'forward';
     if (!shouldCapture) {
@@ -2997,6 +3661,7 @@
 
   function commitState(nextState) {
     state = nextState;
+    syncOnboardingSlideParam(state.index);
     render();
     resetStackedLayoutScroll();
   }
@@ -3069,13 +3734,31 @@
       toggleInteractionAccordion(target && target.dataset && target.dataset.accordionId);
       return;
     }
+    if (id === 'openChromeWebStore') {
+      openExternalTab(LUMNO_CHROME_WEB_STORE_URL);
+      return;
+    }
 
     const chromeApi = getChromeApi();
     const messageAction = ACTION_MESSAGE_BY_ID[id];
     if (!messageAction || !chromeApi || !chromeApi.runtime || typeof chromeApi.runtime.sendMessage !== 'function') {
+      if (id === 'openSiteSearchOptions') {
+        openSiteSearchOptionsFallback();
+      }
       return;
     }
-    chromeApi.runtime.sendMessage({ action: messageAction }, () => {});
+    try {
+      chromeApi.runtime.sendMessage({ action: messageAction }, (response) => {
+        const lastError = chromeApi.runtime && chromeApi.runtime.lastError;
+        if (id === 'openSiteSearchOptions' && (lastError || !response || response.ok === false)) {
+          openSiteSearchOptionsFallback();
+        }
+      });
+    } catch (error) {
+      if (id === 'openSiteSearchOptions') {
+        openSiteSearchOptionsFallback();
+      }
+    }
   }
 
   document.addEventListener('click', (event) => {
@@ -3154,6 +3837,7 @@
 
   getRuntimeLocale((locale) => {
     blueprint = MODEL.getOnboardingBlueprint(locale);
+    runtimeCopy = blueprint.runtimeCopy || runtimeCopy;
     const requestedIndex = Number(params.get('slide') || 0);
     state = MODEL.createOnboardingState(blueprint.slides.length, requestedIndex);
     updateVersionChip();

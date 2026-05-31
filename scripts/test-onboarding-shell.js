@@ -18,6 +18,17 @@ const lumnoWebWordmarkAsset = fs.readFileSync(
   path.join(__dirname, '..', 'assets', 'images', 'lumno-web-textlogo.svg'),
   'utf8'
 );
+const homepagePipAsset = fs.readFileSync(
+  path.join(__dirname, '..', 'assets', 'images', 'onboarding-auto-pip.svg'),
+  'utf8'
+);
+const newtabFiltersAsset = fs.readFileSync(
+  path.join(__dirname, '..', 'assets', 'images', 'onboarding-newtab-filters.webp')
+);
+const wheatAsset = fs.readFileSync(
+  path.join(__dirname, '..', 'assets', 'images', 'onboarding-wheat.svg'),
+  'utf8'
+);
 const bodyStyle = html.match(/\n\s*body\s*\{[\s\S]*?\n\s*\}/);
 const copyPanelStyle = html.match(/\.copy-panel\s*\{[\s\S]*?\n\s*\}/);
 const newtabWatermarkStyle = html.match(/\.onboarding-newtab-watermark\s*\{[\s\S]*?\n\s*\}/);
@@ -79,12 +90,12 @@ assert.match(
 );
 assert.match(
   html,
-  /@media \(max-height:\s*620px\) and \(min-width:\s*901px\)[\s\S]*?\.onboarding-shell\s*\{[\s\S]*?--onboarding-shell-lift-y:\s*0px;[\s\S]*?\}/,
-  'short desktop onboarding layouts should disable the upward lift to avoid clipping'
+  /@media \(max-height:\s*559px\) and \(min-width:\s*860px\)[\s\S]*?\.onboarding-shell\s*\{[\s\S]*?--onboarding-shell-lift-y:\s*0px;[\s\S]*?\}/,
+  'very short onboarding layouts should disable the upward lift only after the frame-scale range is exhausted'
 );
 assert.match(
   html,
-  /@media \(max-width:\s*900px\)[\s\S]*?\.onboarding-shell\s*\{[\s\S]*?--onboarding-shell-lift-y:\s*0px;[\s\S]*?place-items:\s*start center;[\s\S]*?\}/,
+  /@media \(max-width:\s*859px\)[\s\S]*?\.onboarding-shell\s*\{[\s\S]*?--onboarding-shell-lift-y:\s*0px;[\s\S]*?place-items:\s*start center;[\s\S]*?\}/,
   'stacked onboarding layouts should start at the top without an extra upward lift'
 );
 assert.match(
@@ -94,17 +105,57 @@ assert.match(
 );
 assert.match(
   html,
+  /\.onboarding-shell\s*\{[\s\S]*?--onboarding-frame-width:\s*1240px;[\s\S]*?--onboarding-frame-height:\s*680px;[\s\S]*?--onboarding-frame-scale:\s*1;[\s\S]*?--onboarding-frame-rendered-width:\s*var\(--onboarding-frame-width\);[\s\S]*?--onboarding-frame-rendered-height:\s*var\(--onboarding-frame-height\);[\s\S]*?\}/,
+  'onboarding should expose a fixed outer frame size that can scale proportionally before switching to vertical layout'
+);
+assert.match(
+  html,
+  /\.onboarding-shell\s*\{[\s\S]*?--onboarding-visual-rendered-height:\s*var\(--onboarding-visual-canvas-height\);[\s\S]*?\}/,
+  'right-side visuals should expose the scaled panel height so stacked layouts reserve the actual rendered visual area'
+);
+assert.match(
+  html,
   /\.onboarding-frame\s*\{[\s\S]*?position:\s*relative;[\s\S]*?width:\s*min\(1240px,\s*100%\);[\s\S]*?height:\s*min\(680px,\s*100%\);[\s\S]*?max-height:\s*680px;[\s\S]*?border:\s*0;[\s\S]*?overflow:\s*clip;[\s\S]*?grid-template-columns:\s*minmax\(340px,\s*1fr\) minmax\(var\(--onboarding-visual-min-width\),\s*var\(--onboarding-visual-max-width\)\);[\s\S]*?grid-template-rows:\s*minmax\(0,\s*1fr\);[\s\S]*?\}/,
   'onboarding frame should avoid hard edge borders while giving the fixed-ratio visual panel a bounded row'
 );
 assert.match(
   html,
-  /@media \(max-width:\s*900px\)[\s\S]*?\.onboarding-frame\s*\{[\s\S]*?grid-template-columns:\s*1fr;[\s\S]*?grid-template-rows:\s*auto auto;[\s\S]*?\}[\s\S]*?\.visual-panel-slot\s*\{[\s\S]*?height:\s*auto;[\s\S]*?\}/,
+  /@media \(max-width:\s*859px\)[\s\S]*?\.onboarding-frame\s*\{[\s\S]*?grid-template-columns:\s*1fr;[\s\S]*?grid-template-rows:\s*auto auto;[\s\S]*?\}[\s\S]*?\.visual-panel-slot\s*\{[\s\S]*?height:\s*var\(--onboarding-visual-rendered-height\);[\s\S]*?\}/,
   'narrow onboarding layouts should stack copy and the fixed-ratio visual panel vertically'
 );
 assert.match(
   html,
-  /@media \(max-width:\s*900px\)[\s\S]*?\.onboarding-shell\s*\{[\s\S]*?--onboarding-stacked-copy-min-height:\s*588px;[\s\S]*?\}[\s\S]*?\.copy-panel\s*\{[\s\S]*?min-height:\s*var\(--onboarding-stacked-copy-min-height\);[\s\S]*?\}/,
+  /@media \(max-width:\s*1240px\) and \(min-width:\s*860px\), \(max-height:\s*760px\) and \(min-height:\s*560px\) and \(min-width:\s*860px\)[\s\S]*?\.onboarding-shell\s*\{[\s\S]*?padding:\s*0;[\s\S]*?grid-template-columns:\s*var\(--onboarding-frame-rendered-width\);[\s\S]*?grid-template-rows:\s*var\(--onboarding-frame-rendered-height\);[\s\S]*?place-content:\s*center;[\s\S]*?place-items:\s*start;[\s\S]*?overflow:\s*hidden;[\s\S]*?\}[\s\S]*?\.onboarding-frame\s*\{[\s\S]*?width:\s*var\(--onboarding-frame-width\);[\s\S]*?height:\s*var\(--onboarding-frame-height\);[\s\S]*?transform:\s*scale\(var\(--onboarding-frame-scale,\s*1\)\);[\s\S]*?transform-origin:\s*top left;[\s\S]*?\}/,
+  'split-screen onboarding layouts should center a proportionally scaled rendered frame before switching to vertical layout'
+);
+assert.match(
+  html,
+  /@media \(max-width:\s*859px\), \(max-height:\s*559px\)[\s\S]*?\.onboarding-shell\s*\{[\s\S]*?min-width:\s*760px;[\s\S]*?grid-template-columns:\s*1fr;[\s\S]*?grid-template-rows:\s*auto;[\s\S]*?padding:\s*0;[\s\S]*?place-items:\s*stretch;[\s\S]*?overflow:\s*hidden;[\s\S]*?\}/,
+  'very small split-screen onboarding layouts should enter compact vertical mode only after the frame-scale range is exhausted'
+);
+assert.match(
+  html,
+  /@media \(max-width:\s*859px\), \(max-height:\s*559px\)[\s\S]*?\.onboarding-frame\s*\{[\s\S]*?width:\s*100%;[\s\S]*?height:\s*100dvh;[\s\S]*?border-radius:\s*0;[\s\S]*?box-shadow:\s*none;[\s\S]*?overflow:\s*hidden;[\s\S]*?grid-template-columns:\s*1fr;[\s\S]*?grid-template-rows:\s*minmax\(0,\s*1fr\) var\(--onboarding-visual-rendered-height\);[\s\S]*?\}/,
+  'compact vertical onboarding should remove the outer card margins and reserve remaining height for the top copy area'
+);
+assert.match(
+  html,
+  /@media \(max-width:\s*859px\), \(max-height:\s*559px\)[\s\S]*?\.copy-panel\s*\{[\s\S]*?min-height:\s*0;[\s\S]*?padding:\s*var\(--onboarding-copy-padding-y\) var\(--onboarding-copy-padding-x\);[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\);[\s\S]*?grid-template-rows:\s*auto auto auto;[\s\S]*?align-content:\s*start;[\s\S]*?\}/,
+  'compact vertical onboarding should keep the former left panel as a single-column top information flow'
+);
+assert.match(
+  html,
+  /@media \(max-width:\s*859px\), \(max-height:\s*559px\)[\s\S]*?\.title\s*\{[\s\S]*?--title-base-size:\s*clamp\(27px,\s*5vh,\s*30px\);[\s\S]*?\}[\s\S]*?\.body-copy\s*\{[\s\S]*?font-size:\s*clamp\(13px,\s*2\.35vh,\s*14px\);[\s\S]*?line-height:\s*1\.42;[\s\S]*?\}/,
+  'compact vertical onboarding should reduce type and copy rhythm before letting the page scroll'
+);
+assert.match(
+  html,
+  /@media \(max-width:\s*859px\), \(max-height:\s*559px\)[\s\S]*?\.visual-panel-slot\s*\{[\s\S]*?height:\s*var\(--onboarding-visual-rendered-height\);[\s\S]*?align-items:\s*end;[\s\S]*?justify-items:\s*center;[\s\S]*?background:\s*url\("\.\.\/\.\.\/assets\/wallpapers\/settings-bg-light-monet-newtab\.webp"\) center \/ cover no-repeat;[\s\S]*?overflow:\s*hidden;[\s\S]*?\}[\s\S]*?\.visual-panel\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?left:\s*50%;[\s\S]*?top:\s*auto;[\s\S]*?bottom:\s*0;[\s\S]*?margin-left:\s*calc\(var\(--onboarding-visual-canvas-width\) \* -0\.5\);[\s\S]*?margin-top:\s*0;[\s\S]*?transform-origin:\s*center bottom;[\s\S]*?\}/,
+  'compact vertical visual slot should keep a complete fixed-ratio preview anchored to the bottom'
+);
+assert.match(
+  html,
+  /@media \(max-width:\s*859px\)[\s\S]*?\.onboarding-shell\s*\{[\s\S]*?--onboarding-stacked-copy-min-height:\s*588px;[\s\S]*?\}[\s\S]*?\.copy-panel\s*\{[\s\S]*?min-height:\s*var\(--onboarding-stacked-copy-min-height\);[\s\S]*?\}/,
   'stacked onboarding layouts should reserve a consistent left copy height based on the tallest normal stacked slide'
 );
 assert.match(
@@ -116,6 +167,11 @@ assert.match(
   html,
   /@media \(max-width:\s*340px\)[\s\S]*?\.onboarding-shell\s*\{[\s\S]*?--onboarding-stacked-copy-min-height:\s*660px;[\s\S]*?\}/,
   'extra narrow stacked layouts should keep the left copy height consistent after longer labels wrap'
+);
+assert.match(
+  html,
+  /\.interaction-slots\[data-accordion="true"\]\s*\{[\s\S]*?min-height:\s*clamp\(150px,\s*32vh,\s*220px\);[\s\S]*?\}/,
+  'accordion interaction area should compress on short viewports instead of pushing the left-panel actions out of frame'
 );
 assert.match(
   html,
@@ -153,6 +209,26 @@ assert.match(
   script,
   /function renderShortcutLabel\(/,
   'onboarding should render shortcut labels as keycap tokens inside body copy'
+);
+assert.match(
+  script,
+  /function getBrowserLocale\(/,
+  'onboarding should resolve its default locale through a dedicated browser-locale helper'
+);
+assert.match(
+  script,
+  /chromeApi\.i18n[\s\S]*?getUILanguage/,
+  'system language mode should follow the browser UI language when Chrome exposes it'
+);
+assert.match(
+  script,
+  /stored && stored !== 'system'[\s\S]*?\? stored[\s\S]*?: getBrowserLocale\(\)/,
+  'onboarding should let the Lumno language setting override system mode'
+);
+assert.match(
+  script,
+  /runtimeCopy = blueprint\.runtimeCopy/,
+  'onboarding should use the localized runtime copy bundled with the resolved blueprint'
 );
 assert.match(
   script,
@@ -261,6 +337,16 @@ assert.match(
 );
 assert.match(
   script,
+  /function syncOnboardingSlideParam\(index\)[\s\S]*?new URL\(window\.location\.href\)[\s\S]*?url\.searchParams\.set\('slide',\s*String\(safeIndex\)\)[\s\S]*?window\.history\.replaceState\(window\.history\.state,\s*'',\s*nextUrl\);/,
+  'onboarding should sync the active slide into the current URL so refreshing keeps the same page'
+);
+assert.match(
+  script,
+  /function commitState\(nextState\)[\s\S]*?state = nextState;[\s\S]*?syncOnboardingSlideParam\(state\.index\);[\s\S]*?render\(\);/,
+  'committing onboarding state should update the slide query parameter before rendering the new page'
+);
+assert.match(
+  script,
   /pageStrip\.hidden\s*=\s*state\.index\s*<=\s*0;/,
   'in-panel page strip should stay hidden on the intro slide'
 );
@@ -295,13 +381,13 @@ assert.match(
 );
 assert.match(
   visualPanelSlotStyle ? visualPanelSlotStyle[0] : '',
-  /width:\s*100%;[\s\S]*?height:\s*100%;[\s\S]*?max-height:\s*100%;[\s\S]*?align-self:\s*stretch;[\s\S]*?display:\s*grid;[\s\S]*?align-items:\s*center;[\s\S]*?justify-items:\s*start;[\s\S]*?settings-bg-light-monet-newtab\.webp[\s\S]*?overflow:\s*visible;/,
-  'right-side visual slot should left-align the fixed-ratio panel over the Monet background without clipping overlay shadows'
+  /width:\s*100%;[\s\S]*?height:\s*100%;[\s\S]*?max-height:\s*100%;[\s\S]*?align-self:\s*stretch;[\s\S]*?display:\s*grid;[\s\S]*?align-items:\s*start;[\s\S]*?justify-items:\s*start;[\s\S]*?background:\s*transparent;[\s\S]*?overflow:\s*visible;/,
+  'right-side visual slot should left-align the scaled fixed-ratio panel without drawing an unscaled wallpaper behind it'
 );
 assert.match(
   visualPanelStyle ? visualPanelStyle[0] : '',
-  /width:\s*100%;[\s\S]*?height:\s*100%;[\s\S]*?aspect-ratio:\s*var\(--onboarding-visual-ratio\);[\s\S]*?overflow:\s*visible;/,
-  'right-side visual panel should fill the visual slot so scaled canvas margins do not reveal the frame background'
+  /width:\s*var\(--onboarding-visual-canvas-width\);[\s\S]*?height:\s*var\(--onboarding-visual-canvas-height\);[\s\S]*?aspect-ratio:\s*var\(--onboarding-visual-ratio\);[\s\S]*?background:\s*url\("\.\.\/\.\.\/assets\/wallpapers\/settings-bg-light-monet-newtab\.webp"\) center \/ cover no-repeat;[\s\S]*?overflow:\s*visible;[\s\S]*?transform:\s*scale\(var\(--onboarding-visual-scale,\s*1\)\);/,
+  'right-side visual panel should be the single fixed-ratio surface that scales as a whole'
 );
 assert.doesNotMatch(
   newtabPreviewBrowserBackdropStyle ? newtabPreviewBrowserBackdropStyle[0] : '',
@@ -320,8 +406,8 @@ assert.match(
 );
 assert.match(
   visualCanvasStyle ? visualCanvasStyle[0] : '',
-  /position:\s*absolute;[\s\S]*?left:\s*0;[\s\S]*?top:\s*0;[\s\S]*?width:\s*var\(--onboarding-visual-canvas-width\);[\s\S]*?height:\s*var\(--onboarding-visual-canvas-height\);[\s\S]*?transform:\s*scale\(var\(--onboarding-visual-scale,\s*1\)\);[\s\S]*?transform-origin:\s*top left;/,
-  'right-side canvas contents should scale from the top-left inside the already scaled fixed-ratio panel'
+  /position:\s*absolute;[\s\S]*?left:\s*0;[\s\S]*?top:\s*0;[\s\S]*?width:\s*100%;[\s\S]*?height:\s*100%;[\s\S]*?isolation:\s*isolate;/,
+  'right-side canvas contents should fill the fixed visual panel and inherit the panel-level scale'
 );
 assert.doesNotMatch(
   html,
@@ -415,7 +501,7 @@ assert.match(
 );
 assert.match(
   script,
-  /for \(let pageIndex = 0; pageIndex < pageCount; pageIndex \+= 1\)[\s\S]*?const slideIndex = pageIndex \+ 1;[\s\S]*?const segment = document\.createElement\('button'\);[\s\S]*?segment\.type = 'button';[\s\S]*?segment\.dataset\.active = pageIndex === currentPageIndex \? 'true' : 'false';[\s\S]*?segment\.dataset\.slideTarget = String\(slideIndex\);[\s\S]*?segment\.setAttribute\('aria-label', `第 \$\{pageIndex \+ 1\} 页`\);/,
+  /for \(let pageIndex = 0; pageIndex < pageCount; pageIndex \+= 1\)[\s\S]*?const slideIndex = pageIndex \+ 1;[\s\S]*?const segment = document\.createElement\('button'\);[\s\S]*?segment\.type = 'button';[\s\S]*?segment\.dataset\.active = pageIndex === currentPageIndex \? 'true' : 'false';[\s\S]*?segment\.dataset\.slideTarget = String\(slideIndex\);[\s\S]*?segment\.setAttribute\('aria-label', formatRuntimeTemplate\([\s\S]*?getRuntimeMiscText\('pageSegmentAriaTemplate', 'Page \{page\}'\)[\s\S]*?\{ page: pageIndex \+ 1 \}/,
   'page strip should render labelled buttons whose page index maps to real slide indexes after the intro'
 );
 assert.match(
@@ -530,7 +616,7 @@ assert.match(
 );
 assert.match(
   content,
-  /icon:\s*'ri-github-fill'[\s\S]*?tooltip:\s*'以 GPL-3\.0 许可证开源，点击访问 GitHub 仓库'/,
+  /githubTooltip:\s*'以 GPL-3\.0 许可证开源，点击访问 GitHub 仓库'[\s\S]*?icon:\s*'ri-github-fill'[\s\S]*?tooltip:\s*rows\.githubTooltip/,
   'trust row should use the filled Remix GitHub icon and precise GPL tooltip copy'
 );
 assert.match(
@@ -570,15 +656,15 @@ assert.match(
 );
 assert.match(
   html,
-  /class="onboarding-action-button onboarding-action-button--primary"[^>]*data-action="next"[\s\S]*?<span>快速上手<\/span>[\s\S]*?ri-arrow-right-line/,
-  'initial primary lower-left action should start quick onboarding with a right arrow icon'
+  /class="onboarding-action-button onboarding-action-button--primary"[^>]*data-action="next"[\s\S]*?<span>Get started<\/span>[\s\S]*?ri-arrow-right-line/,
+  'initial primary lower-left action should have an English fallback before localized rendering'
 );
 const secondaryActionHtml = html.match(/<button class="onboarding-action-button onboarding-action-button--secondary"[^>]*data-action="prev"[^>]*hidden[\s\S]*?<\/button>/);
 assert.ok(secondaryActionHtml, 'initial secondary lower-left action should stay hidden until content config reveals it');
 assert.match(
   secondaryActionHtml[0],
-  /<span>返回<\/span>/,
-  'initial secondary lower-left action should use the return label'
+  /<span>Back<\/span>/,
+  'initial secondary lower-left action should have an English fallback before localized rendering'
 );
 assert.doesNotMatch(
   secondaryActionHtml[0],
@@ -587,12 +673,12 @@ assert.doesNotMatch(
 );
 assert.match(
   html,
-  /class="onboarding-action-button onboarding-action-button--ghost"[^>]*data-action="openShortcuts"[^>]*hidden[\s\S]*?<span>更换快捷键<\/span>[\s\S]*?ri-external-link-line/,
-  'shortcut action should render as a hidden ghost action until the second page reveals it'
+  /class="onboarding-action-button onboarding-action-button--ghost"[^>]*data-action="openShortcuts"[^>]*hidden[\s\S]*?<span>Change shortcut<\/span>[\s\S]*?ri-external-link-line/,
+  'shortcut action should have an English fallback until localized rendering reveals it'
 );
 assert.match(
   content,
-  /actionId:\s*'openShortcuts'[\s\S]*?label:\s*'更换快捷键'[\s\S]*?tooltip:\s*'由于浏览器的限制，请在 扩展程序\/键盘快捷键 页面修改插件的所有快捷键，点击前往'[\s\S]*?tooltipMaxWidth:\s*260/,
+  /shortcutActionTooltip:\s*'由于浏览器的限制，请在 扩展程序\/键盘快捷键 页面修改插件的所有快捷键，点击前往'[\s\S]*?changeShortcut:\s*'更换快捷键'[\s\S]*?actionId:\s*'openShortcuts'[\s\S]*?label:\s*actions\.changeShortcut[\s\S]*?tooltip:\s*text\.setup\.shortcutActionTooltip[\s\S]*?tooltipMaxWidth:\s*260/,
   'shortcut action should expose the requested label, tooltip copy, and narrower tooltip width'
 );
 assert.doesNotMatch(
@@ -602,13 +688,13 @@ assert.doesNotMatch(
 );
 assert.match(
   content,
-  /id:\s*'setup'[\s\S]*?interactionRows:\s*Object\.freeze\(\[[\s\S]*?accordionId:\s*'dia-browser'[\s\S]*?text:\s*DIA_BROWSER_DISCLOSURE_TEXT[\s\S]*?label:\s*'快捷键设置页面'[\s\S]*?href:\s*SHORTCUTS_PAGE_URL[\s\S]*?actionId:\s*'openShortcuts'[\s\S]*?accordionId:\s*'local-file-search'[\s\S]*?text:\s*LOCAL_FILE_ACCORDION_TEXT[\s\S]*?label:\s*'扩展程序详情页'[\s\S]*?href:\s*EXTENSION_DETAILS_URL[\s\S]*?actionId:\s*'openExtensionDetails'/,
+  /function createSetupRows\(text\)[\s\S]*?accordionId:\s*'dia-browser'[\s\S]*?text:\s*text\.setup\.diaText[\s\S]*?label:\s*text\.setup\.shortcutsLink[\s\S]*?href:\s*SHORTCUTS_PAGE_URL[\s\S]*?actionId:\s*'openShortcuts'[\s\S]*?accordionId:\s*'local-file-search'[\s\S]*?text:\s*text\.setup\.localFileText[\s\S]*?label:\s*text\.setup\.detailsLink[\s\S]*?href:\s*EXTENSION_DETAILS_URL[\s\S]*?actionId:\s*'openExtensionDetails'[\s\S]*?id:\s*'setup'[\s\S]*?interactionRows:\s*createSetupRows\(text\)/,
   'focus search page should expose two shared accordion rows with linked accordion phrases'
 );
 assert.match(
   html,
-  /\.interaction-slots\[data-accordion="true"\]\s*\{[\s\S]*?min-height:\s*220px;[\s\S]*?align-content:\s*end;[\s\S]*?\}/,
-  'shared accordion rows should reserve room and grow upward from above the action row'
+  /\.interaction-slots\[data-accordion="true"\]\s*\{[\s\S]*?min-height:\s*clamp\(150px,\s*32vh,\s*220px\);[\s\S]*?align-content:\s*end;[\s\S]*?\}/,
+  'shared accordion rows should reserve flexible room and grow upward from above the action row'
 );
 assert.match(
   html,
@@ -672,13 +758,430 @@ assert.match(
 );
 assert.match(
   content,
-  /id:\s*'search'[\s\S]*?primary:\s*Object\.freeze\(\{[\s\S]*?actionId:\s*'next'[\s\S]*?label:\s*'下一步'[\s\S]*?icon:\s*'ri-arrow-right-line'[\s\S]*?\}\)/,
+  /id:\s*'search'[\s\S]*?primary:\s*Object\.freeze\(\{[\s\S]*?actionId:\s*'next'[\s\S]*?label:\s*actions\.next[\s\S]*?icon:\s*'ri-arrow-right-line'[\s\S]*?\}\)/,
   'newtab preview page should expose the lower-left next action'
 );
 assert.doesNotMatch(
   content,
   /id:\s*'search'[\s\S]*?secondary:\s*Object\.freeze\(\{[\s\S]*?label:\s*'返回'[\s\S]*?\}\)/,
   'newtab preview page should not expose the return action'
+);
+assert.match(
+  content,
+  /id:\s*'search'[\s\S]*?actions:\s*Object\.freeze\(\{\s*primary:\s*Object\.freeze\(\{[\s\S]*?actionId:\s*'next'[\s\S]*?label:\s*actions\.next[\s\S]*?icon:\s*'ri-arrow-right-line'[\s\S]*?\}\)\s*\}\)\s*\}\),\s*Object\.freeze\(\{\s*id:\s*'newtab'/,
+  'newtab preview page should not expose the site list ghost action'
+);
+assert.match(
+  content,
+  /id:\s*'newtab'[\s\S]*?title:\s*text\.newtab\.title[\s\S]*?body:\s*text\.newtab\.body[\s\S]*?primary:\s*Object\.freeze\(\{[\s\S]*?actionId:\s*'next'[\s\S]*?label:\s*actions\.next[\s\S]*?icon:\s*'ri-arrow-right-line'[\s\S]*?\}\)[\s\S]*?ghost:\s*Object\.freeze\(\{[\s\S]*?actionId:\s*'openSiteSearchOptions'[\s\S]*?label:\s*text\.newtab\.supportList[\s\S]*?icon:\s*'ri-external-link-line'[\s\S]*?tooltip:\s*text\.newtab\.supportTooltip[\s\S]*?\}\)/,
+  'page after newtab preview should expose the site search copy, next action, and right-aligned support list ghost action'
+);
+assert.match(
+  content,
+  /newtab:\s*Object\.freeze\(\{[\s\S]*?title:\s*'AI \/ 站内搜索一键直达'[\s\S]*?body:\s*'输入关键词，按下 Tab，直接搜索站点内结果。'/,
+  'page after newtab preview should use the requested site-search title and subtitle'
+);
+assert.match(
+  content,
+  /id:\s*'newtab'[\s\S]*?visualKind:\s*'site-search-demo-surface'[\s\S]*?visualVisible:\s*true/,
+  'page after newtab preview should render the site-search demo illustration on the right side'
+);
+assert.match(
+  html,
+  /\.visual-stage\[data-visual-kind="site-search-demo-surface"\]\s*\{[\s\S]*?overflow:\s*visible;[\s\S]*?\}/,
+  'site-search demo surface should use the same open right-side visual stage treatment'
+);
+assert.match(
+  html,
+  /\.site-search-demo-surface\s*\{[\s\S]*?animation:\s*onboarding-newtab-preview-enter 760ms cubic-bezier\(0\.16,\s*1,\s*0\.3,\s*1\) 140ms both;[\s\S]*?\}/,
+  'site-search demo surface should enter with the existing newtab visual transition'
+);
+assert.match(
+  html,
+  /\.site-search-demo-card\s+\.x-lumno-search-input__container\s*\{[\s\S]*?border-radius:\s*28px 28px 0 0;[\s\S]*?\}/,
+  'site-search demo cards should reuse the Lumno search input shell geometry'
+);
+assert.match(
+  html,
+  /\.ri-icon\s*\{[\s\S]*?width:\s*var\(--ri-size,\s*16px\);[\s\S]*?height:\s*var\(--ri-size,\s*16px\);[\s\S]*?font-size:\s*var\(--ri-size,\s*16px\);[\s\S]*?\}[\s\S]*?\.ri-size-16\s*\{\s*--ri-size:\s*16px;\s*\}/,
+  'onboarding should define the same Remix icon sizing primitives as the extension surfaces'
+);
+assert.match(
+  html,
+  /\.site-search-demo-stack\s*\{[\s\S]*?width:\s*min\(620px,\s*100%\);[\s\S]*?gap:\s*30px;[\s\S]*?\}/,
+  'site-search demo cases should use a compact stacked overlay layout'
+);
+assert.match(
+  html,
+  /\.site-search-demo-card\s*\{[\s\S]*?--site-search-demo-tab-hint-delay:\s*1500ms;[\s\S]*?--site-search-demo-mode-switch-delay:\s*2320ms;[\s\S]*?--site-search-demo-prompt-type-delay:\s*2620ms;[\s\S]*?--site-search-demo-results-delay:\s*3460ms;[\s\S]*?--site-search-demo-row-delay:\s*3620ms;/,
+  'site-search demo should wait after trigger typing and the Tab hint before switching into provider mode'
+);
+assert.match(
+  html,
+  /\.site-search-demo-query-token\s*\{[\s\S]*?max-width:\s*var\(--typed-width,\s*calc\(10ch \+ var\(--typed-width-buffer,\s*0\.65em\)\)\);[\s\S]*?overflow:\s*hidden;[\s\S]*?\}/,
+  'site-search demo typed text should keep enough final width for punctuation and the caret'
+);
+assert.match(
+  html,
+  /\.site-search-demo-query-token--trigger\s*\{[\s\S]*?site-search-demo-trigger-exit 220ms[\s\S]*?calc\(var\(--case-delay,\s*0ms\) \+ var\(--site-search-demo-mode-switch-delay\)\)/,
+  'site-search demo trigger text should remain visible until after the Tab hint pause'
+);
+assert.match(
+  html,
+  /\.site-search-demo-query-token--trigger \.onboarding-typing-char\s*\{[\s\S]*?animation-delay:\s*calc\(var\(--case-delay,\s*0ms\) \+ 620ms \+ var\(--typing-char-delay,\s*0ms\)\);[\s\S]*?\}/,
+  'site-search demo trigger text should reveal character-by-character without clipping glyphs'
+);
+assert.match(
+  html,
+  /\.site-search-demo-tab-hint\s*\{[\s\S]*?animation:\s*site-search-demo-tab-hint-cycle 1120ms[\s\S]*?calc\(var\(--case-delay,\s*0ms\) \+ var\(--site-search-demo-tab-hint-delay\)\)/,
+  'site-search demo Tab hint should appear after trigger typing and hold before mode switch'
+);
+assert.match(
+  html,
+  /\.site-search-demo-mode-prefix\s*\{[\s\S]*?animation:\s*site-search-demo-prefix-enter 300ms[\s\S]*?calc\(var\(--case-delay,\s*0ms\) \+ var\(--site-search-demo-mode-switch-delay\)\)/,
+  'site-search demo should enter provider mode after the Tab hint pause'
+);
+assert.match(
+  html,
+  /\.site-search-demo-query-token--prompt \.onboarding-typing-char\s*\{[\s\S]*?animation-delay:\s*calc\(var\(--case-delay,\s*0ms\) \+ var\(--site-search-demo-prompt-type-delay\) \+ var\(--typing-char-delay,\s*0ms\)\);[\s\S]*?\}/,
+  'site-search demo should type the provider query after switching mode'
+);
+assert.match(
+  html,
+  /@keyframes onboarding-type-character-reveal[\s\S]*?max-width:\s*var\(--typing-char-width,\s*1\.35em\);/,
+  'typed characters should appear whole instead of revealing by clipping the middle of a glyph'
+);
+assert.match(
+  html,
+  /\.onboarding-typing-char\s*\{[\s\S]*?animation:\s*onboarding-type-character-reveal 16ms linear forwards;[\s\S]*?\}/,
+  'typed character reveal should retain the visible end state after each character appears'
+);
+assert.match(
+  html,
+  /\.site-search-demo-results\s*\{[\s\S]*?--x-ov-suggestions-max-height:\s*76px;[\s\S]*?\}/,
+  'site-search demo result areas should stay compact instead of stretching the panels'
+);
+assert.match(
+  html,
+  /\.site-search-demo-results\s*\{[\s\S]*?animation:\s*onboarding-overlay-results-reveal 980ms cubic-bezier\(0\.22,\s*1,\s*0\.36,\s*1\)[\s\S]*?\}/,
+  'site-search demo results should reuse the first search page result reveal timing'
+);
+assert.match(
+  html,
+  /\.site-search-demo-result\s*\{[\s\S]*?animation:\s*onboarding-overlay-row-enter 500ms cubic-bezier\(0\.22,\s*1,\s*0\.36,\s*1\)[\s\S]*?\}/,
+  'site-search demo highlighted result should reuse the first search page row transition'
+);
+assert.match(
+  content,
+  /siteSearchDemo:\s*Object\.freeze\(\{[\s\S]*?kind:\s*'site'[\s\S]*?modeLabel:\s*'GitHub'[\s\S]*?resultTitle:\s*'在 GitHub 中搜索 "lumno extension"'[\s\S]*?actionLabel:\s*'在 GitHub 中搜索'[\s\S]*?kind:\s*'ai'[\s\S]*?modeLabel:\s*'ChatGPT'[\s\S]*?promptQuery:\s*'这个 PR 有哪些隐藏风险？'[\s\S]*?resultTitle:\s*'向 ChatGPT 提问 "这个 PR 有哪些隐藏风险？"'[\s\S]*?actionLabel:\s*'打开 ChatGPT 网页版'/,
+  'site-search demo should define one regular site-search case and one AI case'
+);
+const siteSearchDemoCasesBlock = content.match(/siteSearchDemo:\s*Object\.freeze\(\{[\s\S]*?cases:\s*Object\.freeze\(\[[\s\S]*?\n\s*\]\)[\s\S]*?\n\s*\}\)/);
+assert.ok(siteSearchDemoCasesBlock, 'site-search demo cases block should be easy to inspect');
+assert.doesNotMatch(
+  siteSearchDemoCasesBlock ? siteSearchDemoCasesBlock[0] : '',
+  /actionKey:/,
+  'site-search demo cases should not define an Enter keycap for the highlighted result'
+);
+assert.doesNotMatch(
+  siteSearchDemoCasesBlock ? siteSearchDemoCasesBlock[0] : '',
+  /resultDetail:/,
+  'site-search demo cases should not define URL detail text that the real site-search result does not render'
+);
+assert.doesNotMatch(
+  siteSearchDemoCasesBlock ? siteSearchDemoCasesBlock[0] : '',
+  /总结这篇文章|为什么首屏加载慢/,
+  'site-search demo AI case should use a more concrete and interesting question'
+);
+assert.match(
+  content,
+  /brandAccentRgb:\s*Object\.freeze\(\[36,\s*41,\s*46\]\)[\s\S]*?brandAccentRgb:\s*Object\.freeze\(\[16,\s*163,\s*127\]\)/,
+  'site-search demo should start from the same provider brand accents as the real theme code'
+);
+assert.match(
+  script,
+  /function normalizeSiteSearchDemoAccentRgb\([\s\S]*?luminance < 0\.12[\s\S]*?mixNewtabPreviewColor\(accentRgb,\s*\[255,\s*255,\s*255\],\s*0\.55\)/,
+  'site-search demo should normalize very dark brand accents like the real theme code'
+);
+assert.doesNotMatch(
+  script,
+  /resultTag:\s*'站内搜索'|resultTag:\s*'AI'/,
+  'site-search demo result rows should not include source tags that the real site-search result does not render'
+);
+const siteSearchDemoResultBlock = script.match(/function createSiteSearchDemoResult\(item\) \{[\s\S]*?\n  \}\n\n  function createSiteSearchDemoCase/);
+assert.ok(siteSearchDemoResultBlock, 'site-search demo result renderer should be easy to inspect');
+assert.match(
+  siteSearchDemoResultBlock ? siteSearchDemoResultBlock[0] : '',
+  /visitButton\.className = 'x-ov-suggestion-action-button x-ov-suggestion-visit-button';[\s\S]*?visitButton\.dataset\.visible = 'true';[\s\S]*?appendInlineLabelWithIcon\(visitButton,\s*item\.actionLabel,\s*'ri-arrow-right-line ri-size-12'\);/,
+  'site-search demo highlighted result should render the real visit button label with an arrow icon'
+);
+assert.doesNotMatch(
+  siteSearchDemoResultBlock ? siteSearchDemoResultBlock[0] : '',
+  /createLumnoOverlayActionTag|x-ov-action-tag__key|actionKey|Enter/,
+  'site-search demo highlighted result should not render a keyboard action tag'
+);
+assert.match(
+  siteSearchDemoResultBlock ? siteSearchDemoResultBlock[0] : '',
+  /if \(item\.resultDetail\) \{[\s\S]*?className = 'x-ov-suggestion-url-line';[\s\S]*?textWrapper\.appendChild\(detail\);[\s\S]*?\}/,
+  'site-search demo should only render URL detail rows when explicitly configured'
+);
+const siteSearchDemoInputBlock = script.match(/function createSiteSearchDemoInput\(item\) \{[\s\S]*?\n  \}\n\n  function createSiteSearchDemoResult/);
+assert.ok(siteSearchDemoInputBlock, 'site-search demo input renderer should be easy to inspect');
+assert.match(
+  siteSearchDemoInputBlock ? siteSearchDemoInputBlock[0] : '',
+  /searchIcon\.appendChild\(createIcon\('ri-search-line ri-size-16'\)\);/,
+  'site-search demo input should use the same 16px search icon as the shared search input component'
+);
+assert.match(
+  siteSearchDemoInputBlock ? siteSearchDemoInputBlock[0] : '',
+  /rightIcon\.appendChild\(createIcon\('ri-settings-line ri-size-16'\)\);/,
+  'site-search demo input should use the same settings icon as the shared search input component'
+);
+assert.doesNotMatch(
+  siteSearchDemoInputBlock ? siteSearchDemoInputBlock[0] : '',
+  /ri-settings-3-line/,
+  'site-search demo input should not use the suggestion command settings icon'
+);
+assert.match(
+  script,
+  /function createSiteSearchDemoCase\(/,
+  'site-search demo should render each stacked case through a shared helper'
+);
+assert.match(
+  script,
+  /function createSiteSearchDemoSurface\([\s\S]*?getSiteSearchDemoCases\(\)\.forEach\(/,
+  'site-search demo surface should render the two configured cases vertically'
+);
+assert.doesNotMatch(
+  script,
+  /function createSiteSearchDemoSurface\(\)\s*\{(?:(?!function createDemoCursorSvg)[\s\S])*createBrowserWindowClip/,
+  'site-search demo should not include a background browser illustration'
+);
+assert.doesNotMatch(
+  script,
+  /site-search-demo-card-header|site-search-demo-card-marker|site-search-demo-card-label/,
+  'site-search demo cases should not render extra top-left card labels'
+);
+assert.doesNotMatch(
+  html,
+  /site-search-demo-browser|site-search-demo-card-header|site-search-demo-card-marker|site-search-demo-card-label/,
+  'site-search demo CSS should not keep the removed browser illustration or card labels'
+);
+assert.match(
+  script,
+  /if \(item && item\.kind === 'ai'\) \{[\s\S]*?createSiteSearchDemoProviderIcon\(item,\s*'site-search-demo-mode-prefix__icon'\)/,
+  'site-search demo prefix should only show the provider icon for AI providers like the real input mode'
+);
+assert.match(
+  script,
+  /label\.textContent = formatRuntimeTemplate\([\s\S]*?getRuntimeSection\('siteSearchDemo'\)\.tabHintTemplate[\s\S]*?\{ provider: item\.modeLabel \|\| item\.label \|\| '' \}/,
+  'site-search demo tab hint should use the same copy shape as the real input mode'
+);
+assert.match(
+  html,
+  /\.site-search-demo-result\[data-active="true"\]\s*\{[\s\S]*?background:\s*var\(--x-ov-suggestion-row-bg,[\s\S]*?border-color:\s*var\(--x-ov-suggestion-row-border,[\s\S]*?\}/,
+  'site-search demo active rows should use provider theme variables instead of hard-coded blue or green'
+);
+assert.match(
+  script,
+  /--x-ov-suggestion-action-button-bg[\s\S]*?--x-ov-suggestion-action-button-text[\s\S]*?--x-ov-suggestion-action-button-border/,
+  'site-search demo should pass provider theme variables into the real visit button palette'
+);
+assert.match(
+  html,
+  /\.site-search-demo-result \.x-ov-suggestion-action-button\s*\{[\s\S]*?display:\s*none;[\s\S]*?background:\s*var\(--x-ov-suggestion-action-button-bg,[\s\S]*?color:\s*var\(--x-ov-suggestion-action-button-text,[\s\S]*?\}[\s\S]*?\.site-search-demo-result \.x-ov-suggestion-action-button\[data-visible="true"\]\s*\{[\s\S]*?display:\s*inline-flex;[\s\S]*?\}[\s\S]*?\.site-search-demo-result \.x-ov-suggestion-visit-button\s*\{[\s\S]*?border:\s*1px solid var\(--x-ov-suggestion-action-button-border,[\s\S]*?border-radius:\s*16px;/,
+  'site-search demo should style the arrow visit button using the real overlay button classes'
+);
+assert.match(
+  script,
+  /slide\.visual\.kind === 'site-search-demo-surface'[\s\S]*?visualStage\.appendChild\(createSiteSearchDemoSurface\(\)\)/,
+  'visual renderer should mount the site-search demo surface on the fourth page'
+);
+assert.match(
+  content,
+  /id:\s*'finish'[\s\S]*?visualKind:\s*'feature-cards-surface'[\s\S]*?visualVisible:\s*true[\s\S]*?actions:\s*Object\.freeze\(\{\s*primary:\s*Object\.freeze\(\{[\s\S]*?actionId:\s*'openNewtab'[\s\S]*?label:\s*text\.finish\.primaryAction[\s\S]*?icon:\s*'ri-arrow-right-line'[\s\S]*?\}\),[\s\S]*?secondary:\s*Object\.freeze\(\{[\s\S]*?actionId:\s*'openChromeWebStore'[\s\S]*?label:\s*text\.finish\.ratingAction[\s\S]*?\}\),[\s\S]*?ghost:\s*Object\.freeze\(\{[\s\S]*?actionId:\s*'openOptions'[\s\S]*?label:\s*text\.finish\.settingsAction[\s\S]*?icon:\s*'ri-external-link-line'[\s\S]*?\}\)[\s\S]*?\}\)/,
+  'final page should render the right-side practical feature card surface with start, rating, and settings actions'
+);
+assert.match(
+  script,
+  /const LUMNO_CHROME_WEB_STORE_URL = 'https:\/\/chromewebstore\.google\.com\/detail\/lumno-%E8%81%9A%E7%84%A6%E6%90%9C%E7%B4%A2%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5\/nggfkkbmogmadfoikakkfegkoilfcfao\?utm_source=item-share-cb';/,
+  'onboarding should keep a stable Chrome Web Store landing page URL for the rating action'
+);
+assert.match(
+  script,
+  /function openExternalTab\(url\)[\s\S]*?chromeApi\.runtime\.sendMessage\(\{\s*action:\s*'createTab',\s*url:\s*targetUrl\s*\}/,
+  'onboarding should open external action URLs through the background createTab message'
+);
+assert.match(
+  script,
+  /if \(id === 'openChromeWebStore'\) \{[\s\S]*?openExternalTab\(LUMNO_CHROME_WEB_STORE_URL\);[\s\S]*?return;[\s\S]*?\}/,
+  'final rating action should open the Chrome Web Store landing page'
+);
+assert.match(
+  content,
+  /featureCards:\s*Object\.freeze\(\[[\s\S]*?art:\s*'homepage-pip'[\s\S]*?title:\s*'自动视频画中画'[\s\S]*?body:\s*'切走视频页时自动开启'[\s\S]*?art:\s*'newtab-filters'[\s\S]*?artSize:\s*Object\.freeze\(\{\s*width:\s*298,\s*height:\s*120\s*\}\)[\s\S]*?title:\s*'打造你的个性新标签页'[\s\S]*?body:\s*'可更换壁纸，支持海量滤镜效果'/,
+  'final feature cards should use the requested copy, homepage PiP art, and optimized newtab filter art'
+);
+assert.match(
+  content,
+  /featureAwards:\s*Object\.freeze\(\[[\s\S]*?Object\.freeze\(\{\s*lines:\s*Object\.freeze\(\['开源',\s*'无隐私风险'\]\)[\s\S]*?Object\.freeze\(\{\s*lines:\s*Object\.freeze\(\['永久免费'\]\)[\s\S]*?Object\.freeze\(\{\s*lines:\s*Object\.freeze\(\['专注',\s*'用户体验'\]\)/,
+  'final feature cards should add the three requested wheat award groups above the cards'
+);
+assert.match(
+  script,
+  /function createFeatureCardsSurface\(\)[\s\S]*?getFeatureCards\(\)\.forEach\(/,
+  'final feature card surface should render the configured cards through a shared helper'
+);
+const featureCardsSurfaceBlock = script.match(/function createFeatureCardsSurface\(\) \{[\s\S]*?\n  \}\n\n  function renderVisualSurface/);
+assert.ok(featureCardsSurfaceBlock, 'final feature card surface renderer should be easy to inspect');
+assert.match(
+  script,
+  /function createFeatureAwards\(\)[\s\S]*?getFeatureAwards\(\)\.forEach\([\s\S]*?awards\.appendChild\(createFeatureAward\(item,\s*index\)\);[\s\S]*?return awards;/,
+  'final feature card surface should render wheat award groups from a shared helper'
+);
+assert.match(
+  featureCardsSurfaceBlock ? featureCardsSurfaceBlock[0] : '',
+  /surface\.appendChild\(createFeatureAwards\(\)\);[\s\S]*?surface\.appendChild\(stack\);/,
+  'wheat award groups should sit above the final feature cards in the surface'
+);
+assert.match(
+  script,
+  /slide\.visual\.kind === 'feature-cards-surface'[\s\S]*?visualStage\.appendChild\(createFeatureCardsSurface\(\)\)/,
+  'visual renderer should mount the final feature card surface'
+);
+assert.match(
+  html,
+  /\.visual-stage\[data-visual-kind="feature-cards-surface"\]\s*\{[\s\S]*?overflow:\s*visible;[\s\S]*?\}/,
+  'final feature cards should use the same open right-side visual stage treatment'
+);
+assert.match(
+  html,
+  /\.feature-cards-surface\s*\{[\s\S]*?animation:\s*onboarding-newtab-preview-enter 760ms cubic-bezier\(0\.16,\s*1,\s*0\.3,\s*1\) 140ms both;[\s\S]*?\}/,
+  'final feature card surface should enter with the existing right-side visual transition'
+);
+assert.match(
+  html,
+  /\.feature-cards-surface\s*\{[\s\S]*?--feature-award-leaf:\s*oklch\(47% 0\.035 88 \/ 0\.66\);[\s\S]*?--feature-award-ink:\s*oklch\(36% 0\.03 86 \/ 0\.76\);[\s\S]*?\}/,
+  'wheat award groups should use a muted warm color sampled to blend with the onboarding wallpaper'
+);
+assert.match(
+  html,
+  /\.feature-cards-surface__awards\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*80px;[\s\S]*?width:\s*min\(586px,\s*calc\(100% - 96px\)\);[\s\S]*?transform:\s*translateX\(-50%\);[\s\S]*?display:\s*flex;[\s\S]*?justify-content:\s*center;[\s\S]*?gap:\s*62px;[\s\S]*?\}/,
+  'wheat award groups should stay centered above the final feature cards'
+);
+assert.match(
+  html,
+  /\.feature-award\s*\{[\s\S]*?grid-template-columns:\s*22px minmax\(0,\s*max-content\) 22px;[\s\S]*?gap:\s*10px;[\s\S]*?\}/,
+  'individual wheat award groups should leave breathing room between text and wheat marks'
+);
+assert.match(
+  html,
+  /\.feature-award__wheat\s*\{[\s\S]*?width:\s*22px;[\s\S]*?height:\s*57px;[\s\S]*?-webkit-mask:\s*url\("\.\.\/\.\.\/assets\/images\/onboarding-wheat\.svg"\) center \/ contain no-repeat;[\s\S]*?mask:\s*url\("\.\.\/\.\.\/assets\/images\/onboarding-wheat\.svg"\) center \/ contain no-repeat;[\s\S]*?\}/,
+  'wheat award groups should reuse the provided wheat SVG as a smaller tintable mask'
+);
+assert.match(
+  html,
+  /\.feature-award__label\s*\{[\s\S]*?font-size:\s*18px;[\s\S]*?line-height:\s*1\.12;[\s\S]*?\}/,
+  'wheat award text should be smaller while the wheat marks keep their silhouette size'
+);
+assert.match(
+  wheatAsset,
+  /<svg width="24" height="62" viewBox="0 0 24 62"[\s\S]*?<path[\s\S]*?fill="black"\/>/,
+  'wheat award asset should preserve the provided 24 by 62 SVG silhouette'
+);
+assert.match(
+  html,
+  /\.feature-cards-surface__stack\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*298px\);[\s\S]*?gap:\s*22px;[\s\S]*?\}/,
+  'final feature cards should sit in one row with fixed homepage-card columns'
+);
+assert.doesNotMatch(
+  html,
+  /\.feature-cards-surface__stack\s*\{[\s\S]*?transform:\s*translateY\(-66px\);[\s\S]*?\}/,
+  'final feature cards should align visually with the subtitle without an extra upward offset'
+);
+assert.match(
+  html,
+  /\.feature-card\s*\{[\s\S]*?width:\s*298px;[\s\S]*?height:\s*222px;[\s\S]*?border-radius:\s*12px;[\s\S]*?box-shadow:\s*0 18px 34px[\s\S]*?isolation:\s*isolate;[\s\S]*?\}/,
+  'final feature cards should follow the Lumno web card shell treatment'
+);
+assert.match(
+  html,
+  /\.feature-card__art\s*\{[\s\S]*?width:\s*298px;[\s\S]*?height:\s*120px;[\s\S]*?flex:\s*0 0 120px;[\s\S]*?\}/,
+  'final feature cards should reserve the same 298 by 120 artwork slot as the homepage cards'
+);
+assert.match(
+  script,
+  /const HOMEPAGE_PIP_ART_SRC = '\.\.\/\.\.\/assets\/images\/onboarding-auto-pip\.svg';/,
+  'PiP feature card should point at the extracted homepage Picture-in-Picture asset'
+);
+assert.match(
+  homepagePipAsset,
+  /<svg width="298" height="120" viewBox="0 0 298 120"[\s\S]*?<rect x="139\.799" y="16\.9508" width="126" height="79"[\s\S]*?<rect x="175\.53" y="10" width="55\.9867" height="19\.28"[\s\S]*?<linearGradient id="paint2_linear_3359_444"/,
+  'extracted PiP asset should keep the homepage SVG dimensions, window, and Auto PiP pill artwork'
+);
+assert.match(
+  script,
+  /function createHomepagePipArtwork\(\)[\s\S]*?image\.className = 'feature-card__art-image';[\s\S]*?image\.src = HOMEPAGE_PIP_ART_SRC;[\s\S]*?image\.alt = '';[\s\S]*?image\.decoding = 'async';[\s\S]*?image\.loading = 'eager';[\s\S]*?image\.draggable = false;[\s\S]*?art\.appendChild\(image\);/,
+  'PiP feature card should render the extracted homepage artwork as an image resource'
+);
+assert.match(
+  script,
+  /const NEWTAB_FILTERS_ART_SRC = '\.\.\/\.\.\/assets\/images\/onboarding-newtab-filters\.webp';/,
+  'newtab feature card should point at the optimized filter artwork asset'
+);
+assert.strictEqual(
+  newtabFiltersAsset.subarray(0, 4).toString('ascii'),
+  'RIFF',
+  'newtab filter artwork should be a WebP RIFF asset'
+);
+assert.strictEqual(
+  newtabFiltersAsset.subarray(8, 12).toString('ascii'),
+  'WEBP',
+  'newtab filter artwork should use the WebP container'
+);
+assert.ok(
+  newtabFiltersAsset.length <= 12 * 1024,
+  'newtab filter artwork should stay compressed for the onboarding surface'
+);
+assert.match(
+  script,
+  /function createNewtabFiltersArtwork\(\)[\s\S]*?image\.className = 'feature-card__art-image';[\s\S]*?image\.src = NEWTAB_FILTERS_ART_SRC;[\s\S]*?image\.alt = '';[\s\S]*?image\.decoding = 'async';[\s\S]*?image\.loading = 'eager';[\s\S]*?image\.draggable = false;[\s\S]*?art\.appendChild\(image\);/,
+  'newtab feature card should render the optimized filter artwork as an image resource'
+);
+assert.doesNotMatch(
+  script,
+  /createHomepagePipIllustration|createFeatureSvgElement|document\.createElementNS\('http:\/\/www\.w3\.org\/2000\/svg'/,
+  'PiP feature card should not rebuild the homepage SVG from manual DOM nodes'
+);
+assert.match(
+  html,
+  /\.feature-card__art-image\s*\{[\s\S]*?width:\s*100%;[\s\S]*?height:\s*100%;[\s\S]*?display:\s*block;[\s\S]*?object-fit:\s*contain;[\s\S]*?\}/,
+  'PiP feature card image should fill the reserved artwork slot without distortion'
+);
+assert.doesNotMatch(
+  html,
+  /homepage-pip-|feature-card__art-svg/,
+  'final feature card CSS should not keep manually reconstructed homepage PiP SVG classes'
+);
+assert.match(
+  script,
+  /item && item\.art === 'newtab-filters'[\s\S]*?return createNewtabFiltersArtwork\(\);/,
+  'second feature card should render the newtab filter artwork instead of leaving the slot blank'
+);
+assert.doesNotMatch(
+  featureCardsSurfaceBlock ? featureCardsSurfaceBlock[0] : '',
+  /feature-card__icon|createIcon\(|ri-picture-in-picture-line|ri-image-edit-line/,
+  'final feature cards should not render standalone Remix icons'
+);
+assert.doesNotMatch(
+  html,
+  /\.feature-card__icon|ri-picture-in-picture-line|ri-image-edit-line/,
+  'final feature card CSS and template should not keep icon-only treatments'
+);
+assert.doesNotMatch(
+  featureCardsSurfaceBlock ? featureCardsSurfaceBlock[0] : '',
+  /createBrowserWindowClip|createGenericVisualSurface|createDemoCursorSvg/,
+  'final feature card surface should not render a browser mock or generic illustration'
 );
 assert.doesNotMatch(
   content,
@@ -727,6 +1230,21 @@ assert.match(
 );
 assert.match(
   script,
+  /openSiteSearchOptions:\s*'openSiteSearchOptionsPage'/,
+  'site list ghost action should route through the site-search options background action'
+);
+assert.match(
+  script,
+  /const SITE_SEARCH_OPTIONS_PAGE_PATH = 'src\/options\/options\.html#shortcuts';[\s\S]*?function openExtensionPageTab\([\s\S]*?chromeApi\.tabs\.create\(\{\s*url\s*\}\);[\s\S]*?function openSiteSearchOptionsFallback\([\s\S]*?openExtensionPageTab\(SITE_SEARCH_OPTIONS_PAGE_PATH\)/,
+  'site list ghost action should fall back to opening the options shortcuts tab directly from onboarding'
+);
+assert.match(
+  script,
+  /chromeApi\.runtime\.sendMessage\(\{\s*action:\s*messageAction\s*\},\s*\(response\)\s*=>\s*\{[\s\S]*?id === 'openSiteSearchOptions'[\s\S]*?openSiteSearchOptionsFallback\(\)/,
+  'site list ghost action should not silently fail when the background message is unavailable or rejected'
+);
+assert.match(
+  script,
   /createInteractionRowIcon\(slot\.icon\)/,
   'interaction slots should render the icon declared by the content model'
 );
@@ -767,7 +1285,7 @@ assert.doesNotMatch(
 );
 assert.match(
   script,
-  /aria-label', names\.length > 0 \? `\$\{names\.join\('、'\)\} 等` : ''/,
+  /const separator = getRuntimeMiscText\('browserNameSeparator', ', '\);[\s\S]*?const suffix = getRuntimeMiscText\('browserAvatarSuffix', 'and more'\);[\s\S]*?aria-label', names\.length > 0 \? `\$\{names\.join\(separator\)\} \$\{suffix\}`\.trim\(\) : ''/,
   'browser avatar group should expose a compact accessible browser-name label with an etc. hint'
 );
 assert.match(
@@ -882,8 +1400,18 @@ assert.match(
 );
 assert.match(
   script,
-  /function updateVisualCanvasScale\(\)[\s\S]*?visualSlot\.getBoundingClientRect\(\)[\s\S]*?availableWidth \/ VISUAL_CANVAS_WIDTH[\s\S]*?availableHeight \/ VISUAL_CANVAS_HEIGHT[\s\S]*?--onboarding-visual-scale[\s\S]*?--onboarding-visual-rendered-width/,
-  'onboarding should scale the whole right-side fixed panel from the available visual slot size'
+  /const ONBOARDING_FRAME_WIDTH = 1240;[\s\S]*?const ONBOARDING_FRAME_HEIGHT = 680;/,
+  'onboarding script should keep the outer frame design size for proportional split-screen scaling'
+);
+assert.match(
+  script,
+  /function updateOnboardingFrameScale\(\)[\s\S]*?isFrameScaledOnboardingLayout\(\)[\s\S]*?window\.innerWidth[\s\S]*?ONBOARDING_FRAME_WIDTH[\s\S]*?ONBOARDING_FRAME_HEIGHT[\s\S]*?--onboarding-frame-scale[\s\S]*?--onboarding-frame-rendered-width[\s\S]*?--onboarding-frame-rendered-height/,
+  'onboarding should scale the whole outer frame proportionally in the split-screen range'
+);
+assert.match(
+  script,
+  /function getCompactCopyContentHeight\(\)[\s\S]*?copyPanel\.querySelector\('\.copy-block'\)[\s\S]*?copyPanel\.querySelector\('\.interaction-slots'\)[\s\S]*?copyPanel\.querySelector\('\.onboarding-copy-actions'\)[\s\S]*?function updateVisualCanvasScale\(\)[\s\S]*?updateOnboardingFrameScale\(\)[\s\S]*?visualSlot\.getBoundingClientRect\(\)[\s\S]*?isStackedOnboardingLayout[\s\S]*?viewportHeight[\s\S]*?getCompactCopyContentHeight\(\)[\s\S]*?const scale = isCompactLayout[\s\S]*?Math\.max\(0\.1,\s*Math\.min\(availableWidth \/ VISUAL_CANVAS_WIDTH,\s*availableHeight \/ VISUAL_CANVAS_HEIGHT\)\)[\s\S]*?Math\.min\(1,\s*availableWidth \/ VISUAL_CANVAS_WIDTH,\s*availableHeight \/ VISUAL_CANVAS_HEIGHT\)[\s\S]*?--onboarding-visual-scale[\s\S]*?--onboarding-visual-rendered-width/,
+  'compact vertical onboarding should contain the bottom visual under the natural copy height while horizontal layouts keep contained proportional scaling'
 );
 assert.match(
   script,
@@ -987,8 +1515,13 @@ assert.match(
 );
 assert.match(
   script,
-  /function isStackedOnboardingLayout\(\)[\s\S]*?matchMedia\('\(max-width:\s*900px\)'\)\.matches/,
-  'onboarding should detect the stacked responsive layout before applying scroll corrections'
+  /function isFrameScaledOnboardingLayout\(\)[\s\S]*?matchMedia\('\(max-width:\s*1240px\) and \(min-width:\s*860px\), \(max-height:\s*760px\) and \(min-height:\s*560px\) and \(min-width:\s*860px\)'\)\.matches/,
+  'onboarding should detect the split-screen frame-scale range separately from vertical layout'
+);
+assert.match(
+  script,
+  /function isStackedOnboardingLayout\(\)[\s\S]*?matchMedia\('\(max-width:\s*859px\), \(max-height:\s*559px\)'\)\.matches/,
+  'onboarding should detect the compact vertical responsive layout before applying scroll corrections'
 );
 assert.match(
   script,
@@ -1071,12 +1604,12 @@ assert.doesNotMatch(
   'first-page wordmark should not use the previous hand-built fake logo'
 );
 assert.match(
-  script,
-  /const LUMNO_OVERLAY_FAKE_RESULTS = Object\.freeze/,
+  content,
+  /lumnoOverlay:\s*Object\.freeze\(\{[\s\S]*?results:\s*Object\.freeze/,
   'right-side onboarding visual should declare fake Lumno overlay result data'
 );
 assert.match(
-  script,
+  content,
   /type:\s*'topSite'[\s\S]*type:\s*'bookmark'[\s\S]*type:\s*'history'/,
   'fake overlay results should mirror actual search suggestion types'
 );
@@ -1099,6 +1632,21 @@ assert.match(
   script,
   /function createLumnoOverlayFavicon\(/,
   'right-side onboarding visual should use favicon-style icons like real overlay suggestions'
+);
+assert.match(
+  script,
+  /const iconNode = createLumnoOverlayFavicon\(result\);[\s\S]*iconSlot\.dataset\.favicon = iconNode\.tagName === 'IMG' \? 'true' : 'false';[\s\S]*iconSlot\.dataset\.emphasis = result\.active \? 'true' : 'false';/,
+  'non-favicon fake overlay result icons should expose favicon and emphasis state for the rounded icon background'
+);
+assert.match(
+  script,
+  /const iconSlot = item\.querySelector\('\.x-ov-suggestion-icon-slot'\);[\s\S]*iconSlot\.dataset\.emphasis = isActive \? 'true' : 'false';/,
+  'fake overlay hover loop should toggle the non-favicon icon background with the active result'
+);
+assert.match(
+  html,
+  /#_x_extension_overlay_2024_unique_ \.lumno-overlay-result \.x-ov-suggestion-icon-slot\[data-emphasis="true"\]\[data-favicon="false"\]\s*\{[\s\S]*?background-color:\s*#ffffff;[\s\S]*?\}/,
+  'fake overlay non-favicon icons should use the same rounded rectangle background as the real overlay active state'
 );
 assert.match(
   script,
@@ -1161,13 +1709,13 @@ assert.match(
   'newtab preview should recreate the real newtab search layer structure'
 );
 assert.match(
-  script,
-  /NEWTAB_PREVIEW_RECENT_SITES[\s\S]*Lumno - Chrome Web Store[\s\S]*kubai087\/lumno-extension[\s\S]*Tailwind CSS Docs[\s\S]*NEWTAB_PREVIEW_BOOKMARKS[\s\S]*title:\s*'工作台'[\s\S]*type:\s*'folder'[\s\S]*title:\s*'设计素材'[\s\S]*type:\s*'folder'[\s\S]*title:\s*'开发文档'[\s\S]*type:\s*'folder'/,
+  content,
+  /bookmarks:[\s\S]*title:\s*'工作台'[\s\S]*type:\s*'folder'[\s\S]*title:\s*'设计素材'[\s\S]*type:\s*'folder'[\s\S]*title:\s*'开发文档'[\s\S]*type:\s*'folder'[\s\S]*recentSites:[\s\S]*Lumno - Chrome Web Store[\s\S]*kubai087\/lumno-extension[\s\S]*Tailwind CSS Docs/,
   'newtab preview should prefill real-looking recent-site rows and three folder bookmarks'
 );
 assert.match(
   script,
-  /const NEWTAB_PREVIEW_QUERY = '';[\s\S]*field\.value = NEWTAB_PREVIEW_QUERY;[\s\S]*field\.placeholder = '搜索或输入网址\.\.\.';[\s\S]*viewport\.dataset\.ntSuggestionsOpen = 'false';/,
+  /field\.value = getNewtabPreviewQuery\(\);[\s\S]*field\.placeholder = getRuntimeMiscText\('newtabSearchPlaceholder', 'Search or enter URL\.\.\.'\);[\s\S]*viewport\.dataset\.ntSuggestionsOpen = 'false';/,
   'newtab preview should render the real empty-input newtab state instead of prefilled query text'
 );
 assert.match(
@@ -1177,7 +1725,7 @@ assert.match(
 );
 assert.match(
   script,
-  /bottomDockScroller\.appendChild\(createNewtabPreviewSection\('bookmarks', '书签', NEWTAB_PREVIEW_BOOKMARKS\)\);[\s\S]*bottomDockScroller\.appendChild\(sectionSafeCorridor\);[\s\S]*bottomDockScroller\.appendChild\(createNewtabPreviewSection\('recent', '最近访问', NEWTAB_PREVIEW_RECENT_SITES\)\);/,
+  /bottomDockScroller\.appendChild\(createNewtabPreviewSection\('bookmarks', getNewtabPreviewSectionTitle\('bookmarks', 'Bookmarks'\), getNewtabPreviewBookmarks\(\)\)\);[\s\S]*bottomDockScroller\.appendChild\(sectionSafeCorridor\);[\s\S]*bottomDockScroller\.appendChild\(createNewtabPreviewSection\('recent', getNewtabPreviewSectionTitle\('recent', 'Recent'\), getNewtabPreviewRecentSites\(\)\)\);/,
   'newtab preview should include the real bottom-dock bookmarks and recent sections with fake data'
 );
 assert.match(
@@ -1297,6 +1845,26 @@ assert.match(
 );
 assert.match(
   html,
+  /\.newtab-preview-viewport\s*\{[\s\S]*?--x-nt-content-viewport-width:\s*1040px;[\s\S]*?\}/,
+  'newtab preview should use a fixed design viewport width so the embedded page scales with the outer visual panel instead of the browser viewport'
+);
+assert.match(
+  html,
+  /\.newtab-preview-viewport #_x_extension_newtab_root_2024_unique_\s*\{[\s\S]*?width:\s*var\(--x-nt-search-max-width\);[\s\S]*?max-width:\s*var\(--x-nt-search-max-width\);/,
+  'newtab preview search panel should keep its designed width and inherit proportional scaling from the visual panel'
+);
+assert.match(
+  html,
+  /\.newtab-preview-bottom-dock,\s*[\s\S]*?#_x_extension_newtab_bottom_dock_2024_unique_\s*\{[\s\S]*?width:\s*var\(--x-nt-content-max-width\);/,
+  'newtab preview bottom dock should keep its designed width instead of shrinking with the real viewport'
+);
+assert.doesNotMatch(
+  html,
+  /\.newtab-preview-viewport[\s\S]*?\b(?:90|96)vw\b/,
+  'newtab preview should not depend on real viewport units inside the embedded fixed-size browser content'
+);
+assert.match(
+  html,
   /\.newtab-preview-wordmark img\s*\{[\s\S]*?width:\s*108px;[\s\S]*?opacity:\s*0\.52;/,
   'newtab preview wordmark should be smaller and lighter inside the cropped browser area'
 );
@@ -1319,6 +1887,21 @@ assert.match(
   browserWindowStyle ? browserWindowStyle[0] : '',
   /--onboarding-browser-window-inset:\s*5%;[\s\S]*?left:\s*var\(--onboarding-browser-window-inset\);[\s\S]*?top:\s*var\(--onboarding-browser-window-inset\);[\s\S]*?width:\s*176%;[\s\S]*?height:\s*162%;/,
   'browser skeleton should keep balanced visible top and left inset while showing only its upper-left portion inside the visual container'
+);
+assert.match(
+  visualPanelStyle ? visualPanelStyle[0] : '',
+  /width:\s*var\(--onboarding-visual-canvas-width\);[\s\S]*?height:\s*var\(--onboarding-visual-canvas-height\);[\s\S]*?transform:\s*scale\(var\(--onboarding-visual-scale,\s*1\)\);[\s\S]*?transform-origin:\s*top left;/,
+  'right visual panel should be the fixed 704x680 scaled unit, including the wallpaper, UI mock, and cursor coordinate space'
+);
+assert.match(
+  visualCanvasStyle ? visualCanvasStyle[0] : '',
+  /width:\s*100%;[\s\S]*?height:\s*100%;/,
+  'visual canvas should fill the fixed scaled panel rather than own the responsive scale'
+);
+assert.doesNotMatch(
+  visualCanvasStyle ? visualCanvasStyle[0] : '',
+  /transform:\s*scale\(var\(--onboarding-visual-scale/,
+  'visual canvas should not scale independently inside the right visual panel'
 );
 assert.doesNotMatch(
   browserWindowStyle ? browserWindowStyle[0] : '',
@@ -1412,13 +1995,28 @@ assert.match(
 );
 assert.match(
   html,
-  /data-cursor-mode="search"[\s\S]*?onboarding-cursor-newtab-hover-loop 4060ms linear 1500ms[\s\S]*?data-active-slide="search"\]\[data-direction="forward"\][\s\S]*?onboarding-cursor-newtab-from-setup 5040ms[\s\S]*?onboarding-cursor-newtab-hover-loop 4060ms linear 5040ms[\s\S]*?@keyframes onboarding-cursor-newtab-from-setup[\s\S]*?--onboarding-cursor-transition-left[\s\S]*?left:\s*38%;[\s\S]*?top:\s*82%;[\s\S]*?left:\s*36\.6%;[\s\S]*?top:\s*56\.4%;[\s\S]*?left:\s*70%;[\s\S]*?top:\s*72%;[\s\S]*?@keyframes onboarding-cursor-newtab-hover-loop[\s\S]*?0%[\s\S]*?left:\s*70%;[\s\S]*?top:\s*72%;[\s\S]*?12\.81%,[\s\S]*?42\.36%[\s\S]*?left:\s*38%;[\s\S]*?top:\s*82%;[\s\S]*?55\.17%,[\s\S]*?84\.73%[\s\S]*?left:\s*36\.6%;[\s\S]*?top:\s*56\.4%;[\s\S]*?96%,[\s\S]*?100%[\s\S]*?left:\s*70%;[\s\S]*?top:\s*72%;/,
-  'newtab preview cursor should quickly align to lifted recent and bookmark hover targets before looping'
+  /data-cursor-mode="search"[\s\S]*?onboarding-cursor-newtab-triangle-loop 4060ms linear 1500ms infinite[\s\S]*?data-active-slide="search"\]\[data-direction="forward"\][\s\S]*?onboarding-cursor-newtab-from-setup 5040ms cubic-bezier\(0\.22,\s*1,\s*0\.36,\s*1\) both,[\s\S]*?onboarding-cursor-newtab-triangle-loop 4060ms linear 5040ms infinite[\s\S]*?@keyframes onboarding-cursor-newtab-from-setup[\s\S]*?--onboarding-cursor-transition-left[\s\S]*?left:\s*38%;[\s\S]*?top:\s*82%;[\s\S]*?left:\s*36\.6%;[\s\S]*?top:\s*56\.4%;[\s\S]*?100%[\s\S]*?left:\s*54\.8%;[\s\S]*?top:\s*66\.5%;[\s\S]*?@keyframes onboarding-cursor-newtab-triangle-loop[\s\S]*?0%[\s\S]*?left:\s*54\.8%;[\s\S]*?top:\s*66\.5%;[\s\S]*?12\.81%,[\s\S]*?42\.36%[\s\S]*?left:\s*38%;[\s\S]*?top:\s*82%;[\s\S]*?55\.17%,[\s\S]*?84\.73%[\s\S]*?left:\s*36\.6%;[\s\S]*?top:\s*56\.4%;[\s\S]*?100%[\s\S]*?left:\s*54\.8%;[\s\S]*?top:\s*66\.5%;/,
+  'newtab preview cursor should loop a triangle through recent, bookmark, and the midpoint between rows'
+);
+assert.match(
+  html,
+  /data-cursor-mode="newtab"[\s\S]*?onboarding-cursor-site-search-idle 7200ms[\s\S]*?data-active-slide="newtab"\]\[data-direction="forward"\][\s\S]*?onboarding-cursor-site-search-from-newtab 3560ms[\s\S]*?onboarding-cursor-site-search-idle 7200ms[\s\S]*?3560ms infinite[\s\S]*?@keyframes onboarding-cursor-site-search-from-newtab[\s\S]*?--onboarding-cursor-transition-left[\s\S]*?--onboarding-cursor-transition-top[\s\S]*?left:\s*84%;[\s\S]*?top:\s*34%;[\s\S]*?left:\s*84%;[\s\S]*?top:\s*56%;[\s\S]*?left:\s*76%;[\s\S]*?top:\s*67\.5%;[\s\S]*?@keyframes onboarding-cursor-site-search-idle[\s\S]*?left:\s*76%;[\s\S]*?top:\s*67\.5%;/,
+  'site-search page cursor should move from the previous page cursor position before idling near the demo result'
+);
+assert.match(
+  html,
+  /data-active-slide="finish"\]\[data-direction="forward"\]\s+\[data-cursor-mode="finish"\] \.demo-cursor\s*\{[\s\S]*?onboarding-cursor-finish-from-site-search 3200ms[\s\S]*?onboarding-cursor-idle-drift 7200ms[\s\S]*?3200ms infinite[\s\S]*?@keyframes onboarding-cursor-finish-from-site-search[\s\S]*?--onboarding-cursor-transition-left[\s\S]*?--onboarding-cursor-transition-top[\s\S]*?left:\s*70%;[\s\S]*?top:\s*72%;/,
+  'finish page cursor should animate from the site-search cursor position before settling into the final idle drift'
 );
 assert.match(
   script,
-  /const NEWTAB_PREVIEW_HOVER_START_MS = 1500;[\s\S]*?const NEWTAB_PREVIEW_HOVER_HOLD_MS = 1200;[\s\S]*?const NEWTAB_PREVIEW_HOVER_MOVE_MS = 520;[\s\S]*?const NEWTAB_PREVIEW_HOVER_RESET_MS = 620;[\s\S]*?const NEWTAB_PREVIEW_HOVER_RETURN_MS = 520;/,
-  'newtab preview hover state loop should match the faster cursor timing'
+  /const NEWTAB_PREVIEW_HOVER_START_MS = 1500;[\s\S]*?const NEWTAB_PREVIEW_HOVER_HOLD_MS = 1200;[\s\S]*?const NEWTAB_PREVIEW_HOVER_MOVE_MS = 520;[\s\S]*?const NEWTAB_PREVIEW_HOVER_SETTLE_MS = 1140;/,
+  'newtab preview hover state sequence should match the one-shot triangle cursor timing'
+);
+assert.match(
+  script,
+  /const steps = \[[\s\S]*?\{ target: 'recent', duration: NEWTAB_PREVIEW_HOVER_HOLD_MS \}[\s\S]*?\{ target: '', duration: NEWTAB_PREVIEW_HOVER_MOVE_MS \}[\s\S]*?\{ target: 'bookmark', duration: NEWTAB_PREVIEW_HOVER_HOLD_MS \}[\s\S]*?\{ target: '', duration: NEWTAB_PREVIEW_HOVER_SETTLE_MS \}[\s\S]*?const step = steps\[newtabPreviewHoverStepIndex % steps\.length\];/,
+  'newtab preview hover state sequence should loop with the triangle cursor timing'
 );
 assert.match(
   html,
@@ -1432,8 +2030,8 @@ assert.match(
 );
 assert.match(
   script,
-  /function captureCursorTransitionStart\(nextState\)[\s\S]*?currentSlide\.id === 'intro' && nextSlide\.id === 'setup'[\s\S]*?currentSlide\.id === 'setup' && nextSlide\.id === 'search'[\s\S]*?getComputedStyle\(cursor\)[\s\S]*?--onboarding-cursor-transition-left[\s\S]*?--onboarding-cursor-transition-top[\s\S]*?--onboarding-cursor-transition-transform/,
-  'cursor transition should capture the current animated cursor frame before moving from the cover logo or focus-search page'
+  /function captureCursorTransitionStart\(nextState\)[\s\S]*?currentSlide\.id === 'intro' && nextSlide\.id === 'setup'[\s\S]*?currentSlide\.id === 'setup' && nextSlide\.id === 'search'[\s\S]*?currentSlide\.id === 'search' && nextSlide\.id === 'newtab'[\s\S]*?currentSlide\.id === 'newtab' && nextSlide\.id === 'finish'[\s\S]*?getComputedStyle\(cursor\)[\s\S]*?--onboarding-cursor-transition-left[\s\S]*?--onboarding-cursor-transition-top[\s\S]*?--onboarding-cursor-transition-transform/,
+  'cursor transition should capture the current animated cursor frame before moving between cursor-driven pages, including site-search to finish'
 );
 assert.match(
   script,
@@ -1462,8 +2060,13 @@ assert.match(
 );
 assert.match(
   html,
-  /\.lumno-overlay-query-text\s*\{[\s\S]*?max-width:\s*0;[\s\S]*?animation:\s*onboarding-query-reveal 1040ms steps\(9,\s*end\) 1640ms both;[\s\S]*?\}/,
-  'overlay query should reveal extension as the cursor moves across the input'
+  /\.lumno-overlay-query-text\s*\{[\s\S]*?max-width:\s*calc\(9ch \+ 0\.75em\);[\s\S]*?overflow:\s*hidden;[\s\S]*?opacity:\s*1;[\s\S]*?\}/,
+  'overlay query should leave enough reveal width for the typed keyword'
+);
+assert.match(
+  html,
+  /\.lumno-overlay-query-text \.onboarding-typing-char\s*\{[\s\S]*?animation-delay:\s*calc\(1640ms \+ var\(--typing-char-delay,\s*0ms\)\);[\s\S]*?\}/,
+  'overlay query should reveal extension character-by-character as the cursor moves across the input'
 );
 assert.match(
   html,
@@ -1516,16 +2119,16 @@ assert.match(
   'returning from the second slide to the first should blur out the right-side illustration'
 );
 assert.match(
-  script,
-  /const LUMNO_OVERLAY_QUERY = 'extension';/,
+  content,
+  /lumnoOverlay:\s*Object\.freeze\(\{[\s\S]*?query:\s*'extension'/,
   'overlay demo should use a common keyword that can naturally show extension/browser-page results'
 );
 assert.match(
-  script,
+  content,
   /type:\s*'topSite'[\s\S]*?sourceTag:\s*'常用'[\s\S]*?type:\s*'bookmark'[\s\S]*?sourceTag:\s*'书签'[\s\S]*?type:\s*'history'[\s\S]*?sourceTag:\s*'历史'[\s\S]*?type:\s*'newtab'[\s\S]*?visitButtonLabel:\s*'搜索'[\s\S]*?type:\s*'browserPage'[\s\S]*?chrome:\/\/extensions\//,
   'fake overlay results should match the real search order: top site, bookmark, history, Google search, browser-page command'
 );
-const overlayResultsSource = script.match(/const LUMNO_OVERLAY_FAKE_RESULTS = Object\.freeze\(\[[\s\S]*?\n  \]\);/);
+const overlayResultsSource = content.match(/lumnoOverlay:\s*Object\.freeze\(\{[\s\S]*?results:\s*Object\.freeze\(\[[\s\S]*?\n\s*\]\)[\s\S]*?\n\s*\}\)/);
 assert.ok(overlayResultsSource, 'overlay fake result data should be declared as a frozen array');
 assert.doesNotMatch(
   overlayResultsSource[0],
@@ -1534,12 +2137,12 @@ assert.doesNotMatch(
 );
 assert.match(
   script,
-  /rightIcon\.appendChild\(createIcon\('ri-settings-line'\)\);/,
+  /rightIcon\.appendChild\(createIcon\('ri-settings-line ri-size-16'\)\);/,
   'overlay input right icon should match the real settings icon'
 );
 assert.match(
   script,
-  /searchIcon\.appendChild\(createIcon\('ri-search-line'\)\);/,
+  /searchIcon\.appendChild\(createIcon\('ri-search-line ri-size-16'\)\);/,
   'overlay input left icon should match the real shared search input icon'
 );
 assert.match(

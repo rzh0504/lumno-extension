@@ -1,4 +1,6 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 
 const onboarding = require('../src/onboarding/onboarding-content.js');
 const GITHUB_HOMEPAGE_URL = 'https://github.com/kubai087/lumno-extension';
@@ -21,12 +23,23 @@ assert.strictEqual(typeof onboarding.getShortcutDisplayTokens, 'function');
 assert.strictEqual(typeof onboarding.formatShortcutForDisplay, 'function');
 assert.strictEqual(typeof onboarding.parseShortcutHotkey, 'function');
 assert.strictEqual(typeof onboarding.shortcutHotkeyMatchesEvent, 'function');
+assert.strictEqual(typeof onboarding.getOnboardingRuntimeCopy, 'function');
 
 const locales = onboarding.getSupportedLocales();
 assert.deepStrictEqual(locales, ['zh_CN', 'zh_TW', 'ja', 'en']);
+const localeDirs = fs.readdirSync(path.join(__dirname, '..', '_locales'))
+  .filter((name) => fs.existsSync(path.join(__dirname, '..', '_locales', name, 'messages.json')))
+  .sort();
+assert.deepStrictEqual(
+  locales.slice().sort(),
+  localeDirs,
+  'onboarding locales should stay aligned with the extension locale files'
+);
 
-const blueprint = onboarding.getOnboardingBlueprint('en');
+const blueprint = onboarding.getOnboardingBlueprint('zh_CN');
 assert.strictEqual(blueprint.brand, 'Lumno');
+assert.strictEqual(blueprint.locale, 'zh_CN');
+assert.strictEqual(blueprint.htmlLang, 'zh-CN');
 assert.strictEqual(blueprint.mode, 'paginated');
 assert.ok(Array.isArray(blueprint.slides), 'blueprint should expose slides');
 assert.ok(blueprint.slides.length >= 3, 'framework should support a multi-page onboarding flow');
@@ -229,7 +242,7 @@ assert.deepStrictEqual(
   {
     primary: {
       actionId: 'next',
-      label: '下一步',
+      label: '下一页',
       icon: 'ri-arrow-right-line'
     },
     secondary: {
@@ -267,7 +280,7 @@ assert.deepStrictEqual(
   {
     primary: {
       actionId: 'next',
-      label: '下一步',
+      label: '下一页',
       icon: 'ri-arrow-right-line'
     },
     secondary: null,
@@ -276,30 +289,166 @@ assert.deepStrictEqual(
   'third page should expose a lower-left next action instead of a return action'
 );
 
+const fourthSlide = blueprint.slides[3];
+assert.strictEqual(fourthSlide.id, 'newtab');
+assert.deepStrictEqual(
+  fourthSlide.copy,
+  {
+    eyebrow: '',
+    title: 'AI / 站内搜索一键直达',
+    body: '输入关键词，按下 Tab，直接搜索站点内结果。'
+  },
+  'fourth page should introduce the Tab-triggered site search list after the newtab page'
+);
+assert.strictEqual(fourthSlide.visual.kind, 'site-search-demo-surface');
+assert.strictEqual(fourthSlide.visual.visible, true);
+assert.strictEqual(fourthSlide.cursor.enabled, true);
+assert.deepStrictEqual(
+  fourthSlide.actions,
+  {
+    primary: {
+      actionId: 'next',
+      label: '下一页',
+      icon: 'ri-arrow-right-line'
+    },
+    secondary: null,
+    ghost: {
+      actionId: 'openSiteSearchOptions',
+      label: '支持列表',
+      icon: 'ri-external-link-line',
+      tooltip: '支持自定义，点击前往设置'
+    }
+  },
+  'fourth page should expose next plus a right-aligned support list ghost action'
+);
+
 assert.deepStrictEqual(
   blueprint.slides.map((slide) => slide.cursor.enabled),
   [true, true, true, true, true],
   'the animated cursor should remain available on every onboarding page'
 );
 
-blueprint.slides.slice(3).forEach((slide) => {
-  assert.deepStrictEqual(
-    slide.copy,
-    { eyebrow: '', title: '', body: '' },
-    'only the requested first three pages should contain copy for now'
-  );
-});
+const fifthSlide = blueprint.slides[4];
+assert.strictEqual(fifthSlide.id, 'finish');
+assert.deepStrictEqual(
+  fifthSlide.copy,
+  {
+    eyebrow: '',
+    title: '更多实用功能',
+    body: '围绕浏览器提效领域，做最关心用户体验的插件。'
+  },
+  'final page after site search should introduce more practical browser productivity features'
+);
 assert.deepStrictEqual(
   blueprint.slides.map((slide) => slide.visual.visible),
-  [true, true, true, false, false],
-  'the first three pages should show the right-side visual area'
+  [true, true, true, true, true],
+  'all onboarding pages should keep the right-side visual area populated'
+);
+assert.strictEqual(
+  fifthSlide.visual.kind,
+  'feature-cards-surface',
+  'final page should render the practical features card surface on the right'
+);
+assert.strictEqual(fifthSlide.visual.visible, true);
+assert.deepStrictEqual(
+  fifthSlide.actions,
+  {
+    primary: {
+      actionId: 'openNewtab',
+      label: '开始体验',
+      icon: 'ri-arrow-right-line'
+    },
+    secondary: {
+      actionId: 'openChromeWebStore',
+      label: '为我们评分',
+      icon: ''
+    },
+    ghost: {
+      actionId: 'openOptions',
+      label: '设置',
+      icon: 'ri-external-link-line'
+    }
+  },
+  'final page should expose start, rating, and settings actions'
 );
 
 const fallback = onboarding.getOnboardingBlueprint('missing-locale');
 assert.strictEqual(fallback.locale, 'en', 'unknown locales should fall back to English');
+assert.strictEqual(
+  fallback.slides[0].copy.title,
+  'Search bookmarks instantly',
+  'unknown locales should fall back to English onboarding copy'
+);
 
 const zh = onboarding.getOnboardingBlueprint('zh-CN');
 assert.strictEqual(zh.locale, 'zh_CN', 'BCP-47 Chinese locale should normalize to extension locale key');
+
+const en = onboarding.getOnboardingBlueprint('en-US');
+assert.strictEqual(en.locale, 'en');
+assert.strictEqual(en.htmlLang, 'en');
+assert.strictEqual(en.slides[0].copy.title, 'Search bookmarks instantly');
+assert.deepStrictEqual(en.slides[0].copy.titleLines, ['Search bookmarks', 'instantly']);
+assert.deepStrictEqual(
+  en.slides[0].copy.titleCycle,
+  {
+    prefix: 'Search ',
+    items: [
+      { id: 'bookmark', label: 'bookmarks', tone: 'bookmark' },
+      { id: 'history', label: 'history', tone: 'history' },
+      { id: 'top-sites', label: 'top sites', tone: 'top-sites' },
+      { id: 'settings', label: 'settings', tone: 'settings' }
+    ]
+  },
+  'English first slide should keep the rotating title layout compact'
+);
+assert.strictEqual(en.slides[0].copy.body, 'Open-source command bar & clean new tab');
+assert.deepStrictEqual(
+  en.slides[0].left.interactionSlots.map((slot) => slot.label),
+  [
+    'Open source, private, user-first',
+    'Works in major browsers',
+    'Plays well with other new-tab extensions'
+  ],
+  'English intro rows should be translated and short enough for the existing layout'
+);
+assert.deepStrictEqual(
+  en.slides[1].copy,
+  {
+    eyebrow: '',
+    title: 'Native-feeling command bar',
+    body: 'Press {shortcut} on any site to open Lumno.'
+  },
+  'English focus-search copy should preserve the shortcut placeholder'
+);
+assert.strictEqual(
+  en.slides[1].left.interactionSlots[0].label,
+  'For Dia browser users',
+  'English accordion labels should be localized'
+);
+assert.strictEqual(en.slides[1].actions.ghost.label, 'Change shortcut');
+assert.strictEqual(en.slides[2].copy.title, 'A calmer new tab');
+assert.strictEqual(en.slides[3].actions.ghost.label, 'Supported sites');
+assert.strictEqual(en.slides[4].actions.primary.label, 'Start using Lumno');
+
+const zhTw = onboarding.getOnboardingBlueprint('zh-Hant-TW');
+assert.strictEqual(zhTw.locale, 'zh_TW');
+assert.strictEqual(zhTw.htmlLang, 'zh-TW');
+assert.strictEqual(zhTw.slides[0].copy.title, '讓書籤一搜即達');
+assert.strictEqual(zhTw.slides[1].left.interactionSlots[1].label, '在本機 PDF/HTML 分頁中使用聚焦搜尋');
+assert.strictEqual(zhTw.slides[4].actions.secondary.label, '為我們評分');
+
+const ja = onboarding.getOnboardingBlueprint('ja-JP');
+assert.strictEqual(ja.locale, 'ja');
+assert.strictEqual(ja.htmlLang, 'ja');
+assert.strictEqual(ja.slides[0].copy.title, 'ブックマークをすぐ検索');
+assert.strictEqual(ja.slides[1].copy.title, 'ネイティブなコマンドバー');
+assert.strictEqual(ja.slides[4].actions.secondary.label, '評価する');
+
+const enRuntimeCopy = onboarding.getOnboardingRuntimeCopy('en');
+assert.strictEqual(enRuntimeCopy.misc.openLabel, 'Open');
+assert.strictEqual(enRuntimeCopy.newtabPreview.sections.bookmarks, 'Bookmarks');
+assert.strictEqual(enRuntimeCopy.siteSearchDemo.tabHintTemplate, 'Search with {provider}');
+assert.strictEqual(enRuntimeCopy.featureCards[0].title, 'Auto Picture-in-Picture');
 
 assert.deepStrictEqual(
   onboarding.getShortcutDisplayTokens('⌘T'),

@@ -68,6 +68,9 @@
   "settings_global_section_title": {
     "message": "全局设置"
   },
+  "settings_onboarding_tutorial_action": {
+    "message": "使用教程"
+  },
   "settings_language_title": {
     "message": "语言"
   },
@@ -466,6 +469,18 @@
   },
   "newtab_ai_quick_jump_feature_hint_close": {
     "message": "关闭 AI 跳转提示"
+  },
+  "update_notice_badge": {
+    "message": "已更新至 {version}"
+  },
+  "update_notice_text_fallback": {
+    "message": "查看本次更新"
+  },
+  "update_notice_link": {
+    "message": "更新日志"
+  },
+  "update_notice_close": {
+    "message": "关闭更新提示"
   },
   "newtab_bookmark_cascade_debug_enable": {
     "message": "显示书签菜单安全三角"

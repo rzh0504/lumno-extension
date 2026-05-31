@@ -67,6 +67,7 @@
   const clearShortcutButton = document.getElementById('_x_extension_clear_shortcut_2024_unique_');
   const resetShortcutButton = document.getElementById('_x_extension_reset_shortcut_2024_unique_');
   const shortcutsStatus = document.getElementById('_x_extension_shortcuts_status_2024_unique_');
+  const openOnboardingPageButton = document.getElementById('_x_extension_open_onboarding_page_2026_unique_');
   const openShortcutsPageButton = document.getElementById('_x_extension_open_shortcuts_page_2026_unique_');
   const customSelectWraps = Array.from(document.querySelectorAll('._x_extension_custom_select_2024_unique_'));
   const siteSearchCustomList = document.getElementById('_x_extension_site_search_custom_list_2024_unique_');
@@ -2847,6 +2848,19 @@
   if (openShortcutsPageButton) {
     openShortcutsPageButton.addEventListener('click', () => {
       chrome.runtime.sendMessage({ action: 'openExtensionShortcutsPage' }, (response) => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          showToast(getMessage('toast_error', '操作失败，请重试'), true);
+          return;
+        }
+        if (!response || response.ok === false) {
+          showToast(getMessage('toast_error', '操作失败，请重试'), true);
+        }
+      });
+    });
+  }
+  if (openOnboardingPageButton) {
+    openOnboardingPageButton.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'openOnboardingPage' }, (response) => {
         if (chrome.runtime && chrome.runtime.lastError) {
           showToast(getMessage('toast_error', '操作失败，请重试'), true);
           return;

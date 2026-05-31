@@ -35,7 +35,7 @@
   const NEWTAB_WALLPAPER_STORAGE_KEY = '_x_extension_newtab_wallpaper_2026_unique_';
   const NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY = '_x_extension_newtab_wallpaper_overlay_2026_unique_';
   const NEWTAB_WALLPAPER_EFFECT_STORAGE_KEY = '_x_extension_newtab_wallpaper_effect_2026_unique_';
-  const LUMNO_CHROME_WEB_STORE_URL = 'https://chromewebstore.google.com/detail/nggfkkbmogmadfoikakkfegkoilfcfao?utm_source=item-share-cb';
+  const LUMNO_CHROME_WEB_STORE_URL = 'https://chromewebstore.google.com/detail/lumno-%E8%81%9A%E7%84%A6%E6%90%9C%E7%B4%A2%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/nggfkkbmogmadfoikakkfegkoilfcfao?utm_source=item-share-cb';
   const LUMNO_WEB_ORIGIN = 'https://lumno.kubai.design';
   const LUMNO_COMMUNITY_LINKS_URL = `${LUMNO_WEB_ORIGIN}/community-links.json`;
   const LUMNO_FEEDBACK_EMAIL = 'i@kubai.design';
@@ -73,6 +73,7 @@
   const SUGGESTION_NAVIGATION = globalThis.LumnoSuggestionNavigation || {};
   const SEARCH_INPUT_MODE = globalThis.LumnoSearchInputMode || {};
   const FEATURE_HINTS = globalThis.LumnoFeatureHints || {};
+  const UPDATE_NOTICE = globalThis.LumnoUpdateNotice || {};
   const FAVICON_UTILS = globalThis.LumnoFaviconUtils || {};
   const NEWTAB_FAVICON_CACHE = globalThis.LumnoFaviconCache || globalThis.LumnoNewtabFaviconCache || {};
   const NEWTAB_FAVICON_THEME = globalThis.LumnoNewtabFaviconTheme || {};
@@ -122,6 +123,7 @@
   const THEME_ICON_LOAD_TIMEOUT_MS = 2400;
   const THEME_RESOLUTION_BATCH_SIZE = 2;
   const THEME_RESOLUTION_BATCH_DELAY_MS = 160;
+  const RESTORE_SEARCH_LAYOUT_LOCK_MS = 900;
   const NEWTAB_RECENT_CACHE_STORAGE_KEY = '_x_extension_newtab_recent_cache_2024_unique_';
   const NEWTAB_BOOKMARK_CACHE_STORAGE_KEY = '_x_extension_newtab_bookmark_cache_2024_unique_';
   const PINNED_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_pinned_recent_sites_2026_unique_';
@@ -165,6 +167,9 @@
   let toastElement = null;
   let toastController = null;
   let layoutController = null;
+  let searchEntryRestoreLayoutLockUntil = 0;
+  let searchEntryLastVisibleViewportWidth = Math.max(0, window.innerWidth || 0);
+  let searchEntryLastVisibleViewportHeight = Math.max(0, window.innerHeight || 0);
   let currentRecentMode = 'most';
   let currentRecentCount = 4;
   let currentBookmarkCount = 8;
@@ -192,7 +197,7 @@
   let feedbackLinks = LUMNO_FEEDBACK_LINKS_FALLBACK;
   let feedbackLinksLoaded = false;
   let feedbackLinksLoadingPromise = null;
-  let aiQuickJumpFeatureHintController = null;
+  let updateNoticeController = null;
   let pageNoticeController = null;
   let newtabWordmarkVisible = true;
   let bookmarkCurrentPage = 0;
@@ -970,22 +975,6 @@
     const size = sizeClass || 'ri-size-16';
     const extra = extraClass ? ` ${extraClass}` : '';
     return `<i class="ri-icon ${size}${extra} ${id}" aria-hidden="true"></i>`;
-  }
-
-  function buildAiSiteSearchSupportListUrl() {
-    if (typeof EXTENSION_ROUTES.buildOptionsUrl === 'function') {
-      return EXTENSION_ROUTES.buildOptionsUrl(chrome, 'shortcuts:site-search-ai');
-    }
-    const fallbackUrl = chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function'
-      ? chrome.runtime.getURL('src/options/options.html')
-      : 'src/options/options.html';
-    const url = new URL(fallbackUrl, window.location.href);
-    url.hash = 'shortcuts:site-search-ai';
-    return url.toString();
-  }
-
-  function openAiSiteSearchSupportList() {
-    window.location.assign(buildAiSiteSearchSupportListUrl());
   }
 
   function getRuntimeVersion() {
@@ -2725,9 +2714,9 @@
     updateWallpaperLanguageStrings();
     updateWallpaperAppearanceSelectionUi();
     updateFeedbackLanguageStrings();
-    if (aiQuickJumpFeatureHintController &&
-        typeof aiQuickJumpFeatureHintController.updateLanguage === 'function') {
-      aiQuickJumpFeatureHintController.updateLanguage();
+    if (updateNoticeController &&
+        typeof updateNoticeController.updateLanguage === 'function') {
+      updateNoticeController.updateLanguage();
     }
     if (inputParts && inputParts.input) {
       defaultPlaceholderText = t('search_placeholder', defaultPlaceholderText);
@@ -2957,6 +2946,7 @@
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') {
+      rememberSearchEntryViewport();
       hideToast();
     }
     if (document.visibilityState !== 'visible') {
@@ -5469,15 +5459,66 @@
     }, handoffDelayMs);
   }
 
+  function getCurrentSearchEntryPaddingTop() {
+    if (!document.body || !document.body.style) {
+      return null;
+    }
+    const value = Number.parseFloat(document.body.style.getPropertyValue('padding-top'));
+    return Number.isFinite(value) ? Math.round(value) : null;
+  }
+
+  function getSearchEntryViewportSnapshot() {
+    return {
+      width: Math.max(0, Math.round(window.innerWidth || 0)),
+      height: Math.max(0, Math.round(window.innerHeight || 0))
+    };
+  }
+
+  function rememberSearchEntryViewport() {
+    const viewport = getSearchEntryViewportSnapshot();
+    searchEntryLastVisibleViewportWidth = viewport.width;
+    searchEntryLastVisibleViewportHeight = viewport.height;
+  }
+
+  function hasSearchEntryViewportChangedSinceLastVisible() {
+    const viewport = getSearchEntryViewportSnapshot();
+    return Math.abs(viewport.width - searchEntryLastVisibleViewportWidth) > 1 ||
+      Math.abs(viewport.height - searchEntryLastVisibleViewportHeight) > 1;
+  }
+
+  function beginSearchEntryRestoreLayoutLock() {
+    if (!document.body ||
+        document.body.getAttribute('data-nt-ready') !== '1' ||
+        hasSearchEntryViewportChangedSinceLastVisible() ||
+        getCurrentSearchEntryPaddingTop() === null) {
+      return;
+    }
+    searchEntryRestoreLayoutLockUntil = Date.now() + RESTORE_SEARCH_LAYOUT_LOCK_MS;
+  }
+
+  function shouldPreserveSearchEntryLayout() {
+    if (!searchEntryRestoreLayoutLockUntil || Date.now() > searchEntryRestoreLayoutLockUntil) {
+      searchEntryRestoreLayoutLockUntil = 0;
+      return false;
+    }
+    if (getCurrentSearchEntryPaddingTop() === null) {
+      searchEntryRestoreLayoutLockUntil = 0;
+      return false;
+    }
+    return true;
+  }
+
   function updateBookmarkSectionPosition() {
     if (layoutController && typeof layoutController.updateBottomDockLayout === 'function') {
       layoutController.updateBottomDockLayout({
+        preserveSearchEntryLayout: shouldPreserveSearchEntryLayout(),
         onRecentHidden: () => {
           recentMouseInsideSection = false;
           recentMouseLeftAt = 0;
         }
       });
     }
+    rememberSearchEntryViewport();
     scheduleWallpaperAdaptiveToneUpdate();
   }
 
@@ -5815,10 +5856,15 @@
     if (document.visibilityState !== 'visible') {
       return;
     }
-    if (recentDataDirty || !recentLoadedOnce) {
+    const shouldReloadRecent = recentDataDirty || !recentLoadedOnce;
+    const shouldReloadBookmarks = bookmarkDataDirty || !bookmarkLoadedOnce;
+    if (shouldReloadRecent || shouldReloadBookmarks) {
+      beginSearchEntryRestoreLayoutLock();
+    }
+    if (shouldReloadRecent) {
       loadRecentSites();
     }
-    if (bookmarkDataDirty || !bookmarkLoadedOnce) {
+    if (shouldReloadBookmarks) {
       loadBookmarks();
     }
   }
@@ -8763,15 +8809,19 @@
   applyWordmarkThemeAppearance();
   searchLayer = document.createElement('div');
   searchLayer.id = '_x_extension_newtab_search_layer_2024_unique_';
-  if (typeof FEATURE_HINTS.createFeatureHint === 'function') {
-    aiQuickJumpFeatureHintController = FEATURE_HINTS.createFeatureHint({
+  updateNoticeController = typeof UPDATE_NOTICE.createUpdateNotice === 'function'
+    ? UPDATE_NOTICE.createUpdateNotice({
       documentObj: document,
-      definition: 'newtab-ai-quick-jump',
+      featureHints: FEATURE_HINTS,
+      chromeApi: chrome,
+      surface: 'newtab',
       t,
       getRiSvg,
-      onLinkClick: openAiSiteSearchSupportList
-    });
-  }
+      onDetailsClick() {
+        chrome.runtime.sendMessage({ action: 'openReleasePage', reason: 'notice' });
+      }
+    })
+    : null;
 
   if (rightIcon) {
     rightIcon.style.setProperty('right', '14px');
@@ -9062,13 +9112,14 @@
 
   document.body.insertBefore(wordmarkContainer, root);
   searchLayer.appendChild(inputParts.container);
-  if (aiQuickJumpFeatureHintController && aiQuickJumpFeatureHintController.element) {
-    searchLayer.appendChild(aiQuickJumpFeatureHintController.element);
-  }
   root.appendChild(searchLayer);
-  document.body.insertBefore(suggestionsSurface, root.nextSibling);
-  document.body.insertBefore(suggestionsOutline, root.nextSibling);
-  document.body.insertBefore(suggestionsContainer, root.nextSibling);
+  const newtabUpdateNoticeAnchor = root.nextSibling;
+  if (updateNoticeController && updateNoticeController.element) {
+    document.body.insertBefore(updateNoticeController.element, newtabUpdateNoticeAnchor);
+  }
+  document.body.insertBefore(suggestionsSurface, newtabUpdateNoticeAnchor);
+  document.body.insertBefore(suggestionsOutline, newtabUpdateNoticeAnchor);
+  document.body.insertBefore(suggestionsContainer, newtabUpdateNoticeAnchor);
   bottomDockScroller.appendChild(bookmarkSection);
   bottomDockScroller.appendChild(sectionSafeCorridor);
   bottomDockScroller.appendChild(recentSection);

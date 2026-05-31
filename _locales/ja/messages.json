@@ -68,6 +68,9 @@
   "settings_global_section_title": {
     "message": "全体設定"
   },
+  "settings_onboarding_tutorial_action": {
+    "message": "使い方"
+  },
   "settings_language_title": {
     "message": "言語"
   },
@@ -466,6 +469,18 @@
   },
   "newtab_ai_quick_jump_feature_hint_close": {
     "message": "AIジャンプヒントを閉じる"
+  },
+  "update_notice_badge": {
+    "message": "{version} に更新済み"
+  },
+  "update_notice_text_fallback": {
+    "message": "今回の更新内容を見る"
+  },
+  "update_notice_link": {
+    "message": "更新履歴"
+  },
+  "update_notice_close": {
+    "message": "更新通知を閉じる"
   },
   "newtab_bookmark_cascade_debug_enable": {
     "message": "ブックマークメニューの安全三角形を表示"

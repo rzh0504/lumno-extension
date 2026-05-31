@@ -68,6 +68,9 @@
   "settings_global_section_title": {
     "message": "Global Settings"
   },
+  "settings_onboarding_tutorial_action": {
+    "message": "Tutorial"
+  },
   "settings_language_title": {
     "message": "Language"
   },
@@ -466,6 +469,18 @@
   },
   "newtab_ai_quick_jump_feature_hint_close": {
     "message": "Dismiss AI quick jump tip"
+  },
+  "update_notice_badge": {
+    "message": "Updated to {version}"
+  },
+  "update_notice_text_fallback": {
+    "message": "See what changed in this update"
+  },
+  "update_notice_link": {
+    "message": "Changelog"
+  },
+  "update_notice_close": {
+    "message": "Dismiss update notice"
   },
   "newtab_bookmark_cascade_debug_enable": {
     "message": "Show bookmark menu safe triangle"

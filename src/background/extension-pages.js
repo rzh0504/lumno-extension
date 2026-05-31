@@ -28,14 +28,27 @@
     return `chrome://extensions/?id=${encodeURIComponent(chromeApi.runtime.id)}`;
   }
 
-  function openExtensionOptionsPage(callback) {
+  function openExtensionOptionsPage(options, callback) {
     const chromeApi = getChromeApi();
-    const done = typeof callback === 'function' ? callback : () => {};
+    const openOptions = typeof options === 'function' ? {} : (options || {});
+    const done = typeof options === 'function'
+      ? options
+      : (typeof callback === 'function' ? callback : () => {});
+    const hash = typeof openOptions.hash === 'string' ? openOptions.hash.trim() : '';
     const fallbackOpen = () => {
       const routes = getRoutesApi();
       const optionsUrl = routes && typeof routes.buildOptionsUrl === 'function'
-        ? routes.buildOptionsUrl(chromeApi)
-        : chromeApi.runtime.getURL('src/options/options.html');
+        ? routes.buildOptionsUrl(chromeApi, hash)
+        : (() => {
+          const url = new URL(
+            chromeApi.runtime.getURL('src/options/options.html'),
+            'chrome-extension://lumno/'
+          );
+          if (hash) {
+            url.hash = hash.startsWith('#') ? hash.slice(1) : hash;
+          }
+          return url.toString();
+        })();
       chromeApi.tabs.create({ url: optionsUrl }, () => {
         done(!(chromeApi.runtime && chromeApi.runtime.lastError));
       });
@@ -43,6 +56,11 @@
 
     if (!chromeApi || !chromeApi.tabs || !chromeApi.runtime) {
       done(false);
+      return;
+    }
+
+    if (hash) {
+      fallbackOpen();
       return;
     }
 
@@ -58,6 +76,10 @@
       }
       done(true);
     });
+  }
+
+  function openSiteSearchOptionsPage(callback) {
+    openExtensionOptionsPage({ hash: 'shortcuts' }, callback);
   }
 
   function buildExtensionPageUrl(path) {
@@ -327,6 +349,7 @@
     openBookmarkManagerPage,
     openExtensionOptionsPage,
     openExtensionShortcutsPage,
+    openSiteSearchOptionsPage,
     openOnboardingPage,
     openReleasePage
   });

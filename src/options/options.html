@@ -507,6 +507,36 @@
         margin: 0;
         color: var(--panel-text);
       }
+      ._x_extension_general_header_row_2026_unique_ {
+        min-height: 40px;
+        padding-top: 6px;
+        padding-bottom: 4px;
+      }
+      ._x_extension_onboarding_guide_button_2026_unique_ {
+        margin-left: auto;
+        min-height: 30px;
+        padding: 6px 10px;
+        align-self: center;
+        border: 1px solid transparent;
+        background: transparent;
+        color: rgba(107, 114, 128, 0.86);
+        box-shadow: none;
+        font-size: 12px;
+        line-height: 1;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      ._x_extension_onboarding_guide_button_2026_unique_:hover {
+        background: rgba(15, 23, 42, 0.045);
+        color: var(--panel-text);
+      }
+      #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_onboarding_guide_button_2026_unique_ {
+        color: rgba(156, 163, 175, 0.88);
+      }
+      #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_onboarding_guide_button_2026_unique_:hover {
+        background: rgba(255, 255, 255, 0.075);
+        color: #f3f4f6;
+      }
       ._x_extension_shortcuts_actions_2024_unique_ {
         gap: 10px;
         flex-wrap: wrap;
@@ -2070,8 +2100,12 @@
       </div>
       <div id="_x_extension_settings_panel_2024_unique_" data-theme="light">
         <div class="_x_extension_settings_content_2024_unique_" data-content="general" data-active="false">
-          <div class="_x_extension_setting_row_2024_unique_">
+          <div class="_x_extension_setting_row_2024_unique_ _x_extension_general_header_row_2026_unique_">
             <p class="_x_extension_section_title_2024_unique_" data-i18n="settings_global_section_title">全局设置</p>
+            <button id="_x_extension_open_onboarding_page_2026_unique_" class="_x_extension_shortcut_submit_2024_unique_ _x_extension_onboarding_guide_button_2026_unique_" type="button">
+              <span data-i18n="settings_onboarding_tutorial_action">使用教程</span>
+              <i class="ri-icon ri-size-14 ri-external-link-line" aria-hidden="true"></i>
+            </button>
           </div>
           <div class="_x_extension_setting_row_2024_unique_">
             <div>
@@ -2118,6 +2152,18 @@
               </div>
               <input id="_x_extension_sync_import_input_2024_unique_" type="file" accept="application/json" style="display:none;" />
             </div>
+          </div>
+          <div class="_x_extension_setting_row_2024_unique_ _x_extension_setting_row_compact_2024_unique_">
+            <div>
+              <p class="_x_extension_setting_title_2024_unique_">
+                <span data-i18n="settings_auto_pip_title">视频自动画中画</span>
+              </p>
+              <p class="_x_extension_setting_desc_2024_unique_" data-i18n="settings_auto_pip_desc">在网页上播放视频时，若切换至其他标签页，则正在播放中的视频将以浮窗的形式播放</p>
+            </div>
+            <label class="_x_extension_switch_2024_unique_" for="_x_extension_auto_pip_toggle_2024_unique_">
+              <input id="_x_extension_auto_pip_toggle_2024_unique_" type="checkbox">
+              <span class="_x_extension_switch_slider_2024_unique_" aria-hidden="true"></span>
+            </label>
           </div>
           <div class="_x_extension_setting_divider_wrap_2024_unique_" role="presentation">
             <div class="_x_extension_setting_divider_2024_unique_"></div>
@@ -2551,24 +2597,6 @@
           </div>
         </div>
         <div class="_x_extension_settings_content_2024_unique_" data-content="labs" data-active="false">
-          <div class="_x_extension_setting_row_2024_unique_ _x_extension_setting_row_compact_2024_unique_">
-            <div>
-              <p class="_x_extension_setting_title_2024_unique_">
-                <span class="_x_extension_setting_title_with_icon_2024_unique_">
-                  <span data-i18n="settings_auto_pip_title">视频自动画中画</span>
-                  <span class="_x_extension_shortcut_badge_2024_unique_ _x_extension_lab_beta_badge_2026_unique_">Beta</span>
-                </span>
-              </p>
-              <p class="_x_extension_setting_desc_2024_unique_" data-i18n="settings_auto_pip_desc">在网页上播放视频时，若切换至其他标签页，则正在播放中的视频将以浮窗的形式播放</p>
-            </div>
-            <label class="_x_extension_switch_2024_unique_" for="_x_extension_auto_pip_toggle_2024_unique_">
-              <input id="_x_extension_auto_pip_toggle_2024_unique_" type="checkbox">
-              <span class="_x_extension_switch_slider_2024_unique_" aria-hidden="true"></span>
-            </label>
-          </div>
-          <div class="_x_extension_setting_divider_wrap_2024_unique_" role="presentation">
-            <div class="_x_extension_setting_divider_2024_unique_"></div>
-          </div>
           <div class="_x_extension_setting_row_2024_unique_ _x_extension_setting_row_compact_2024_unique_">
             <div>
               <p class="_x_extension_setting_title_2024_unique_">

@@ -58,6 +58,12 @@ function openOnboardingPage(options) {
   });
 }
 
+function openSiteSearchOptionsPage() {
+  return new Promise((resolve) => {
+    pages.openSiteSearchOptionsPage(resolve);
+  });
+}
+
 (async () => {
   const localStore = {};
   const syncStore = {};
@@ -88,9 +94,19 @@ function openOnboardingPage(options) {
   assert.strictEqual(onboardingUrl.searchParams.get('reason'), 'manual', 'onboarding should include open reason');
   assert.strictEqual(onboardingUrl.searchParams.get('version'), 'v0.9.9', 'onboarding should include extension version');
 
+  assert.strictEqual(typeof pages.openSiteSearchOptionsPage, 'function', 'site-search options opener should be exported');
+  const siteSearchOptionsOpened = await openSiteSearchOptionsPage();
+  assert.strictEqual(siteSearchOptionsOpened, true, 'site-search options opener should create a tab');
+  assert.strictEqual(createdTabs.length, 2, 'site-search options opener should create one tab');
+  assert.strictEqual(
+    createdTabs[1],
+    'chrome-extension://lumno-test-id/src/options/options.html#shortcuts',
+    'site-search options opener should deep-link to the shortcuts/site-search list'
+  );
+
   const firstOpened = await openReleasePage({ reason: 'update', oncePerVersion: true });
   assert.strictEqual(firstOpened, true, 'first update should open the release page');
-  assert.strictEqual(createdTabs.length, 2, 'first update should create one release tab');
+  assert.strictEqual(createdTabs.length, 3, 'first update should create one release tab');
   assert.strictEqual(
     syncStore[pages.RELEASE_PAGE_OPENED_STORAGE_KEY].version,
     'v0.9.9',
@@ -104,12 +120,12 @@ function openOnboardingPage(options) {
 
   const secondOpened = await openReleasePage({ reason: 'update', oncePerVersion: true });
   assert.strictEqual(secondOpened, false, 'same version should not reopen the release page');
-  assert.strictEqual(createdTabs.length, 2, 'same version should not create another release tab');
+  assert.strictEqual(createdTabs.length, 3, 'same version should not create another release tab');
 
   global.chrome = createChromeApi(localStore, syncStore, createdTabs, '0.10.0');
   const nextVersionOpened = await openReleasePage({ reason: 'update', oncePerVersion: true });
   assert.strictEqual(nextVersionOpened, true, 'new version should open the release page again');
-  assert.strictEqual(createdTabs.length, 3, 'new version should create a new release tab');
+  assert.strictEqual(createdTabs.length, 4, 'new version should create a new release tab');
   assert.strictEqual(
     syncStore[pages.RELEASE_PAGE_OPENED_STORAGE_KEY].version,
     'v0.10.0',

@@ -113,6 +113,71 @@ body[data-nt-suggestions-open="true"] .x-lumno-feature-hint--newtab-ai-quick-jum
   transform: translate(-50%, -4px) scale(0.98);
 }
 
+.x-lumno-feature-hint--update-notice {
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  z-index: 18;
+  width: min(90vw, var(--x-nt-search-max-width, 720px));
+  max-width: calc(100vw - 24px);
+  margin: 0;
+  min-height: 40px;
+  padding: 8px 36px 8px 12px;
+  border-radius: 999px;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  transform: translateY(-4px) scale(0.98);
+  transform-origin: center top;
+}
+
+.x-lumno-feature-hint--update-notice-newtab {
+  margin-top: 10px;
+}
+
+.x-lumno-feature-hint--update-notice-overlay {
+  position: fixed;
+  left: 50%;
+  right: auto;
+  top: 20vh;
+  width: 760px;
+  max-width: calc(100vw - 24px);
+  margin: 0;
+  z-index: 2147483647;
+  filter: blur(6px);
+  transform: translateX(-50%) translateY(calc(-100% + 2px)) scale(0.985);
+  transform-origin: center bottom;
+  transition: transform 340ms cubic-bezier(0.2, 1, 0.36, 1), opacity 220ms ease,
+    filter 300ms ease, visibility 220ms ease;
+}
+
+.x-lumno-feature-hint--update-notice[data-align-mode="auto"][data-multiline="true"] {
+  align-items: center;
+}
+
+.x-lumno-feature-hint--update-notice[data-visible="true"] {
+  display: flex;
+  transform: translateY(0) scale(1);
+}
+
+.x-lumno-feature-hint--update-notice-overlay[data-visible="true"] {
+  filter: blur(0);
+  transform: translateX(-50%) translateY(calc(-100% - 8px)) scale(1);
+}
+
+.x-lumno-feature-hint--update-notice-overlay[data-overlay-mounting="true"] {
+  opacity: 0;
+  filter: blur(8px);
+  pointer-events: none;
+  transform: translateX(-50%) translateY(calc(-100% - 8px)) scale(0.985);
+}
+
+body[data-nt-suggestions-open="true"] .x-lumno-feature-hint--update-notice {
+  display: none;
+}
+
 .x-lumno-feature-hint[data-arrow-side="top"][data-arrow-align="start"] {
   transform-origin: left top;
 }
@@ -343,10 +408,26 @@ body[data-nt-suggestions-open="true"] .x-lumno-feature-hint--newtab-ai-quick-jum
   -webkit-text-fill-color: currentColor;
 }
 
+.x-lumno-feature-hint__badge-icon[data-icon-type="text"] {
+  width: 22px;
+  height: 18px;
+  padding-inline-start: 4px;
+  font-size: 15px;
+  line-height: 1;
+  justify-content: flex-end;
+  box-sizing: border-box;
+}
+
 .x-lumno-feature-hint__badge-text {
   position: relative;
   z-index: 1;
   color: inherit;
+}
+
+.x-lumno-feature-hint--update-notice .x-lumno-feature-hint__badge {
+  gap: 3px;
+  min-height: 24px;
+  padding: 2px 10px 2px 2px;
 }
 
 .x-lumno-feature-hint__text {
@@ -395,6 +476,12 @@ body[data-nt-suggestions-open="true"] .x-lumno-feature-hint--newtab-ai-quick-jum
 .x-lumno-feature-hint__link:focus-visible {
   outline: 2px solid rgba(75, 84, 95, 0.22);
   outline-offset: 2px;
+}
+
+.x-lumno-feature-hint--update-notice .x-lumno-feature-hint__link {
+  min-height: 26px;
+  padding: 3px 10px;
+  align-self: center;
 }
 
 .x-lumno-feature-hint__link-icon {
@@ -446,7 +533,30 @@ body[data-nt-suggestions-open="true"] .x-lumno-feature-hint--newtab-ai-quick-jum
   outline-offset: 2px;
 }
 
+.x-lumno-feature-hint--update-notice .x-lumno-feature-hint__close {
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+}
+
 body[data-theme="dark"] .x-lumno-feature-hint {
+  --x-lumno-feature-hint-bg-top: #111827;
+  --x-lumno-feature-hint-bg-bottom: #0f172a;
+  --x-lumno-feature-hint-border: rgba(255, 255, 255, 0.18);
+  --x-lumno-feature-hint-text: rgba(248, 250, 252, 0.78);
+  --x-lumno-feature-hint-strong: #f8fafc;
+  --x-lumno-feature-hint-badge-bg: rgba(255, 255, 255, 0.075);
+  --x-lumno-feature-hint-badge-text: rgba(248, 250, 252, 0.74);
+  --x-lumno-feature-hint-sweep-edge: rgba(255, 255, 255, 0.075);
+  --x-lumno-feature-hint-sweep-core: rgba(255, 255, 255, 0.25);
+  --x-lumno-feature-hint-sweep-line: rgba(255, 255, 255, 0.38);
+  box-shadow:
+    0 18px 38px rgba(0, 0, 0, 0.34),
+    0 4px 12px rgba(0, 0, 0, 0.22);
+}
+
+#_x_extension_overlay_2024_unique_[data-theme="dark"] .x-lumno-feature-hint,
+.x-lumno-feature-hint--update-notice-overlay[data-theme="dark"] {
   --x-lumno-feature-hint-bg-top: #111827;
   --x-lumno-feature-hint-bg-bottom: #0f172a;
   --x-lumno-feature-hint-border: rgba(255, 255, 255, 0.18);
@@ -466,7 +576,18 @@ body[data-theme="dark"] .x-lumno-feature-hint__close {
   color: rgba(248, 250, 252, 0.58);
 }
 
+#_x_extension_overlay_2024_unique_[data-theme="dark"] .x-lumno-feature-hint__close,
+.x-lumno-feature-hint--update-notice-overlay[data-theme="dark"] .x-lumno-feature-hint__close {
+  color: rgba(248, 250, 252, 0.58);
+}
+
 body[data-theme="dark"] .x-lumno-feature-hint__close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+}
+
+#_x_extension_overlay_2024_unique_[data-theme="dark"] .x-lumno-feature-hint__close:hover,
+.x-lumno-feature-hint--update-notice-overlay[data-theme="dark"] .x-lumno-feature-hint__close:hover {
   background: rgba(255, 255, 255, 0.1);
   color: #f8fafc;
 }
@@ -475,7 +596,17 @@ body[data-theme="dark"] .x-lumno-feature-hint__link {
   background: rgba(255, 255, 255, 0.06);
 }
 
+#_x_extension_overlay_2024_unique_[data-theme="dark"] .x-lumno-feature-hint__link,
+.x-lumno-feature-hint--update-notice-overlay[data-theme="dark"] .x-lumno-feature-hint__link {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 body[data-theme="dark"] .x-lumno-feature-hint__link:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+#_x_extension_overlay_2024_unique_[data-theme="dark"] .x-lumno-feature-hint__link:hover,
+.x-lumno-feature-hint--update-notice-overlay[data-theme="dark"] .x-lumno-feature-hint__link:hover {
   background: rgba(255, 255, 255, 0.11);
 }
 
@@ -489,6 +620,16 @@ body[data-theme="dark"] .x-lumno-feature-hint__link:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .x-lumno-feature-hint--update-notice-overlay {
+    transition: none;
+  }
+
+  .x-lumno-feature-hint--update-notice-overlay[data-overlay-mounting="true"] {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateX(-50%) translateY(calc(-100% - 8px)) scale(1);
+  }
+
   .x-lumno-feature-hint__badge::after {
     animation: none;
     opacity: 0;

@@ -22,6 +22,10 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   let clickOutsideHandler = null;
   let overlayScrollPauseHandler = null;
   let overlayRevealGate = null;
+  let overlayUpdateNoticeController = null;
+  let overlayUpdateNoticeFrameListener = null;
+  let overlayUpdateNoticeFrameVisualViewport = null;
+  let overlayUpdateNoticeMountTimer = null;
   let openInCurrentTabModifierActive = false;
   const OVERLAY_HOST_ID = '_x_extension_overlay_host_2026_unique_';
   const OVERLAY_PANEL_ID = '_x_extension_overlay_2024_unique_';
@@ -31,6 +35,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   const SUGGESTION_ACTION_MODEL = window.LumnoSuggestionActionModel || {};
   const SUGGESTION_NAVIGATION = window.LumnoSuggestionNavigation || {};
   const SEARCH_INPUT_MODE = window.LumnoSearchInputMode || {};
+  const FEATURE_HINTS = window.LumnoFeatureHints || {};
+  const UPDATE_NOTICE = window.LumnoUpdateNotice || {};
   const FAVICON_UTILS = window.LumnoFaviconUtils || {};
   const overlayRuntime = window.LumnoOverlayRuntime;
   const overlayLifecycle = window.LumnoOverlayLifecycle;
@@ -158,6 +164,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   const RI_CSS_URL = overlayRuntime.getRuntimeUrl(chrome, 'assets/remixicon/fonts/remixicon.css');
   const OPEN_SANS_CSS_URL = overlayRuntime.getRuntimeUrl(chrome, 'assets/fonts/open-sans/open-sans.css');
   const SEARCH_INPUT_CSS_URL = overlayRuntime.getRuntimeUrl(chrome, 'src/shared/search-input.css');
+  const FEATURE_HINTS_CSS_URL = overlayRuntime.getRuntimeUrl(chrome, 'src/shared/feature-hints.css');
   const TOOLTIP_CSS_URL = overlayRuntime.getRuntimeUrl(chrome, 'src/shared/tooltip.css');
   const OVERLAY_SUGGESTIONS_CSS_URL = overlayRuntime.getRuntimeUrl(chrome, 'src/overlay/suggestions-view.css');
   const overlayMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -710,12 +717,68 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     overlayViewportSizeSync.stop();
   }
 
+  function syncOverlayUpdateNoticeFrame(overlayElement) {
+    const noticeElement = overlayUpdateNoticeController && overlayUpdateNoticeController.element
+      ? overlayUpdateNoticeController.element
+      : null;
+    if (!noticeElement || !overlayElement) {
+      return;
+    }
+    const sizePreset = getOverlaySizePreset(overlaySizeMode);
+    const width = overlayElement.style.getPropertyValue('width') || `${sizePreset.width}px`;
+    const maxWidth = overlayElement.style.getPropertyValue('max-width') || 'calc(100vw - 24px)';
+    const top = overlayElement.style.getPropertyValue('top') || '20vh';
+    const zoom = overlayElement.style.getPropertyValue('zoom') || '1';
+    noticeElement.style.setProperty('width', width, 'important');
+    noticeElement.style.setProperty('max-width', maxWidth, 'important');
+    noticeElement.style.setProperty('top', top, 'important');
+    noticeElement.style.setProperty('zoom', zoom, 'important');
+    noticeElement.setAttribute('data-theme', overlayElement.getAttribute('data-theme') || '');
+  }
+
+  function stopOverlayUpdateNoticeFrameSync() {
+    if (overlayUpdateNoticeFrameListener) {
+      window.removeEventListener('resize', overlayUpdateNoticeFrameListener);
+      if (overlayUpdateNoticeFrameVisualViewport &&
+          typeof overlayUpdateNoticeFrameVisualViewport.removeEventListener === 'function') {
+        overlayUpdateNoticeFrameVisualViewport.removeEventListener('resize', overlayUpdateNoticeFrameListener);
+      }
+      overlayUpdateNoticeFrameListener = null;
+      overlayUpdateNoticeFrameVisualViewport = null;
+    }
+  }
+
+  function clearOverlayUpdateNoticeMountTimer() {
+    if (overlayUpdateNoticeMountTimer !== null) {
+      clearTimeout(overlayUpdateNoticeMountTimer);
+      overlayUpdateNoticeMountTimer = null;
+    }
+  }
+
+  function startOverlayUpdateNoticeFrameSync(overlayElement) {
+    stopOverlayUpdateNoticeFrameSync();
+    if (!overlayElement) {
+      return;
+    }
+    overlayUpdateNoticeFrameListener = () => {
+      syncOverlayUpdateNoticeFrame(overlayElement);
+    };
+    window.addEventListener('resize', overlayUpdateNoticeFrameListener, { passive: true });
+    if (window.visualViewport && typeof window.visualViewport.addEventListener === 'function') {
+      window.visualViewport.addEventListener('resize', overlayUpdateNoticeFrameListener, { passive: true });
+      overlayUpdateNoticeFrameVisualViewport = window.visualViewport;
+    }
+    syncOverlayUpdateNoticeFrame(overlayElement);
+  }
+
   function applyOverlaySizeForPageZoom(overlayElement) {
     overlayViewportSizeSync.apply(overlayElement);
+    syncOverlayUpdateNoticeFrame(overlayElement);
   }
 
   function startOverlayViewportSizeSync(overlayElement) {
     overlayViewportSizeSync.start(overlayElement);
+    syncOverlayUpdateNoticeFrame(overlayElement);
   }
 
   // Helper function to remove overlay and clean up styles
@@ -726,6 +789,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       overlayRevealGate = null;
     }
     stopOverlayViewportSizeSync();
+    stopOverlayUpdateNoticeFrameSync();
+    clearOverlayUpdateNoticeMountTimer();
     stopOverlayAntiTranslateObserver();
     if (overlayElement) {
       const mountHost = overlayElement._lumnoOverlayHost || overlayElement;
@@ -819,6 +884,26 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       inputModeController.destroy();
       inputModeController = null;
     }
+    const storedUpdateNoticeController = overlayElement && overlayElement._lumnoUpdateNoticeController;
+    if (storedUpdateNoticeController && typeof storedUpdateNoticeController.destroy === 'function') {
+      if (storedUpdateNoticeController.element && storedUpdateNoticeController.element.parentNode) {
+        storedUpdateNoticeController.element.parentNode.removeChild(storedUpdateNoticeController.element);
+      }
+      storedUpdateNoticeController.destroy();
+      if (storedUpdateNoticeController === overlayUpdateNoticeController) {
+        overlayUpdateNoticeController = null;
+      }
+      if (overlayElement) {
+        overlayElement._lumnoUpdateNoticeController = null;
+      }
+    }
+    if (overlayUpdateNoticeController && typeof overlayUpdateNoticeController.destroy === 'function') {
+      if (overlayUpdateNoticeController.element && overlayUpdateNoticeController.element.parentNode) {
+        overlayUpdateNoticeController.element.parentNode.removeChild(overlayUpdateNoticeController.element);
+      }
+      overlayUpdateNoticeController.destroy();
+      overlayUpdateNoticeController = null;
+    }
   }
 
   const overlayShell = window.LumnoOverlayShell;
@@ -851,6 +936,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       openSansCssUrl: OPEN_SANS_CSS_URL,
       remixIconCssUrl: RI_CSS_URL,
       searchInputCssUrl: SEARCH_INPUT_CSS_URL,
+      featureHintsCssUrl: FEATURE_HINTS_CSS_URL,
       tooltipCssUrl: TOOLTIP_CSS_URL,
       overlaySuggestionsCssUrl: OVERLAY_SUGGESTIONS_CSS_URL
     });
@@ -890,6 +976,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       overlayThemeMode = mode;
       const previousResolvedTheme = overlay ? overlay.getAttribute('data-theme') : '';
       applyOverlayThemeVariables(overlay, mode);
+      syncOverlayUpdateNoticeFrame(overlay);
       const nextResolvedTheme = overlay ? overlay.getAttribute('data-theme') : '';
       suggestionItems.forEach((item) => {
         if (item && item._xTheme) {
@@ -930,6 +1017,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       openSansCssUrl: OPEN_SANS_CSS_URL,
       remixIconCssUrl: RI_CSS_URL,
       searchInputCssUrl: SEARCH_INPUT_CSS_URL,
+      featureHintsCssUrl: FEATURE_HINTS_CSS_URL,
       tooltipCssUrl: TOOLTIP_CSS_URL,
       overlaySuggestionsCssUrl: OVERLAY_SUGGESTIONS_CSS_URL
     });
@@ -940,7 +1028,6 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         styleRoot: overlayStyleRoot || document.head || document.documentElement
       })
       : null;
-
     if (typeof window._x_extension_createSearchInput_2024_unique_ !== 'function') {
       console.warn('Lumno: input UI helper not available.');
       removeOverlay(overlay);
@@ -984,6 +1071,62 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     const searchInput = inputParts.input;
     const inputContainer = inputParts.container;
     const rightIcon = inputParts.rightIcon;
+    overlayUpdateNoticeController = typeof UPDATE_NOTICE.createUpdateNotice === 'function'
+      ? UPDATE_NOTICE.createUpdateNotice({
+        documentObj: document,
+        featureHints: FEATURE_HINTS,
+        chromeApi: chrome,
+        surface: 'overlay',
+        t,
+        getRiSvg,
+        onDetailsClick() {
+          chrome.runtime.sendMessage({ action: 'openReleasePage', reason: 'notice' });
+        }
+      })
+      : null;
+    if (overlayUpdateNoticeController) {
+      overlay._lumnoUpdateNoticeController = overlayUpdateNoticeController;
+    }
+    function shouldAnimateOverlayUpdateNoticeMount(noticeElement) {
+      if (!noticeElement || noticeElement.getAttribute('data-visible') !== 'true') {
+        return false;
+      }
+      return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+
+    function finishOverlayUpdateNoticeMountAnimation(noticeElement) {
+      if (noticeElement) {
+        noticeElement.removeAttribute('data-overlay-mounting');
+      }
+    }
+
+    function mountOverlayUpdateNotice() {
+      const noticeElement = overlayUpdateNoticeController && overlayUpdateNoticeController.element
+        ? overlayUpdateNoticeController.element
+        : null;
+      if (!noticeElement || noticeElement.parentNode) {
+        return;
+      }
+      const animateMount = shouldAnimateOverlayUpdateNoticeMount(noticeElement);
+      if (animateMount) {
+        noticeElement.setAttribute('data-overlay-mounting', 'true');
+      }
+      applyNoTranslateDeep(noticeElement);
+      if (overlayStyleRoot && typeof overlayStyleRoot.insertBefore === 'function') {
+        overlayStyleRoot.insertBefore(noticeElement, overlay);
+      } else if (document.body) {
+        document.body.appendChild(noticeElement);
+      }
+      syncOverlayUpdateNoticeFrame(overlay);
+      if (animateMount) {
+        void noticeElement.offsetHeight;
+        requestAnimationFrame(() => {
+          finishOverlayUpdateNoticeMountAnimation(noticeElement);
+        });
+      } else {
+        finishOverlayUpdateNoticeMountAnimation(noticeElement);
+      }
+    }
     const setInputScopedStyle = (element, property, value) => {
       if (!element) {
         return;
@@ -5997,7 +6140,19 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     applyNoTranslateDeep(overlay);
     document.body.appendChild(overlayHost);
     startOverlayViewportSizeSync(overlay);
+    startOverlayUpdateNoticeFrameSync(overlay);
     startOverlayAntiTranslateObserver(overlay);
+
+    function scheduleOverlayUpdateNoticeMount(delayMs) {
+      clearOverlayUpdateNoticeMountTimer();
+      overlayUpdateNoticeMountTimer = setTimeout(() => {
+        overlayUpdateNoticeMountTimer = null;
+        if (!overlay || !overlay.isConnected) {
+          return;
+        }
+        mountOverlayUpdateNotice();
+      }, Math.max(0, Number(delayMs) || 0));
+    }
 
     const revealOverlay = () => {
       if (!overlay || !overlay.isConnected) {
@@ -6011,6 +6166,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         overlay.style.setProperty('opacity', '1', 'important');
         overlay.style.setProperty('transform', 'translateX(-50%) translateY(0) scale(1)', 'important');
         overlay.style.setProperty('filter', 'blur(0)', 'important');
+        scheduleOverlayUpdateNoticeMount(0);
       } else {
         clearOverlayEnterAnimationFrames();
         // Flush initial style state before starting transition to avoid skipped enter animations.
@@ -6019,6 +6175,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           overlay.style.setProperty('opacity', '1', 'important');
           overlay.style.setProperty('transform', 'translateX(-50%) translateY(0) scale(1)', 'important');
           overlay.style.setProperty('filter', 'blur(0)', 'important');
+          scheduleOverlayUpdateNoticeMount(360);
         });
       }
     };

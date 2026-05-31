@@ -310,8 +310,13 @@
     badge.className = 'x-lumno-feature-hint__badge';
     badgeIcon.className = 'x-lumno-feature-hint__badge-icon';
     badgeText.className = 'x-lumno-feature-hint__badge-text';
+    const badgeIconText = String(definition.badgeIconText || '').trim();
     if (definition.badgeIcon) {
       badgeIcon.innerHTML = getRiSvg(definition.badgeIcon, 'ri-size-10');
+      badge.appendChild(badgeIcon);
+    } else if (badgeIconText) {
+      badgeIcon.textContent = badgeIconText;
+      badgeIcon.setAttribute('data-icon-type', 'text');
       badge.appendChild(badgeIcon);
     }
     badge.appendChild(badgeText);
