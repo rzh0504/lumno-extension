@@ -36,15 +36,15 @@
   const NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY = '_x_extension_newtab_wallpaper_overlay_2026_unique_';
   const NEWTAB_WALLPAPER_EFFECT_STORAGE_KEY = '_x_extension_newtab_wallpaper_effect_2026_unique_';
   const LUMNO_CHROME_WEB_STORE_URL = 'https://chromewebstore.google.com/detail/lumno-%E8%81%9A%E7%84%A6%E6%90%9C%E7%B4%A2%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/nggfkkbmogmadfoikakkfegkoilfcfao?utm_source=item-share-cb';
+  const LUMNO_CHROME_WEB_STORE_REVIEW_URL = 'https://chromewebstore.google.com/detail/lumno-%E8%81%9A%E7%84%A6%E6%90%9C%E7%B4%A2%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/nggfkkbmogmadfoikakkfegkoilfcfao/reviews?utm_source=item-share-cb';
   const LUMNO_WEB_ORIGIN = 'https://lumno.kubai.design';
   const LUMNO_COMMUNITY_LINKS_URL = `${LUMNO_WEB_ORIGIN}/community-links.json`;
-  const LUMNO_FEEDBACK_EMAIL = 'i@kubai.design';
   const LUMNO_FEEDBACK_GITHUB_ISSUE_URL = 'https://github.com/kubai087/lumno-extension/issues/new';
   const LUMNO_FEEDBACK_LINKS_FETCH_TIMEOUT_MS = 2500;
   const LUMNO_FEEDBACK_LINKS_FALLBACK = Object.freeze({
     x: 'https://x.com/kubai087',
     githubIssue: LUMNO_FEEDBACK_GITHUB_ISSUE_URL,
-    email: LUMNO_FEEDBACK_EMAIL,
+    chromeReview: LUMNO_CHROME_WEB_STORE_REVIEW_URL,
     discord: 'https://discord.gg/2u9sg7ZNkJ',
     wechatQr: `${LUMNO_WEB_ORIGIN}/qrcode.JPG`,
     communityByLocale: Object.freeze({
@@ -190,7 +190,7 @@
   let feedbackMenu = null;
   let feedbackXLink = null;
   let feedbackGithubIssueLink = null;
-  let feedbackMailButton = null;
+  let feedbackChromeReviewLink = null;
   let feedbackCommunityButton = null;
   let feedbackDetail = null;
   let feedbackPopoverCloseTimer = 0;
@@ -977,130 +977,6 @@
     return `<i class="ri-icon ${size}${extra} ${id}" aria-hidden="true"></i>`;
   }
 
-  function getRuntimeVersion() {
-    if (chrome && chrome.runtime && typeof chrome.runtime.getManifest === 'function') {
-      const manifest = chrome.runtime.getManifest();
-      return manifest && manifest.version ? manifest.version : '';
-    }
-    return '';
-  }
-
-  function normalizeOperatingSystemName(value, userAgent) {
-    const raw = `${value || ''} ${userAgent || ''}`.toLowerCase();
-    if (/iphone|ipad|ipod|ios/.test(raw)) {
-      return 'iOS';
-    }
-    if (raw.includes('android')) {
-      return 'Android';
-    }
-    if (raw.includes('chrome os') || raw.includes('cros') || raw.includes('chromebook')) {
-      return 'ChromeOS';
-    }
-    if (raw.includes('mac')) {
-      return 'macOS';
-    }
-    if (raw.includes('win')) {
-      return 'Windows';
-    }
-    if (raw.includes('linux') || raw.includes('x11')) {
-      return 'Linux';
-    }
-    return 'unknown';
-  }
-
-  function getOperatingSystemName(platformOverride) {
-    const uaData = navigator.userAgentData || null;
-    const platform = platformOverride ||
-      (uaData && uaData.platform) ||
-      navigator.platform ||
-      '';
-    return normalizeOperatingSystemName(platform, navigator.userAgent || '');
-  }
-
-  function normalizeBrowserName(name) {
-    const value = String(name || '').trim();
-    if (!value) {
-      return '';
-    }
-    if (/edge/i.test(value)) {
-      return 'Microsoft Edge';
-    }
-    if (/chrome/i.test(value)) {
-      return 'Google Chrome';
-    }
-    if (/chromium/i.test(value)) {
-      return 'Chromium';
-    }
-    return value;
-  }
-
-  function parseBrowserFromUserAgent(userAgent) {
-    const ua = String(userAgent || '');
-    const patterns = [
-      { name: 'Microsoft Edge', regex: /\bEdgA?\/([\d.]+)/ },
-      { name: 'Microsoft Edge', regex: /\bEdgiOS\/([\d.]+)/ },
-      { name: 'Opera', regex: /\bOPR\/([\d.]+)/ },
-      { name: 'Vivaldi', regex: /\bVivaldi\/([\d.]+)/ },
-      { name: 'Yandex Browser', regex: /\bYaBrowser\/([\d.]+)/ },
-      { name: 'Dia', regex: /\bDia\/([\d.]+)/ },
-      { name: 'Google Chrome', regex: /\bCriOS\/([\d.]+)/ },
-      { name: 'Google Chrome', regex: /\bChrome\/([\d.]+)/ },
-      { name: 'Firefox', regex: /\bFirefox\/([\d.]+)/ },
-      { name: 'Safari', regex: /\bVersion\/([\d.]+).*?\bSafari\// }
-    ];
-    for (let index = 0; index < patterns.length; index += 1) {
-      const match = ua.match(patterns[index].regex);
-      if (match && match[1]) {
-        return {
-          name: patterns[index].name,
-          version: match[1]
-        };
-      }
-    }
-    return {
-      name: 'unknown',
-      version: ''
-    };
-  }
-
-  function getPreferredBrowserBrand(brands) {
-    const items = Array.isArray(brands) ? brands : [];
-    const validItems = items.filter((item) => {
-      const brand = item && item.brand ? String(item.brand) : '';
-      return brand && !/not.*brand/i.test(brand);
-    });
-    return validItems.find((item) => !/chromium/i.test(item.brand)) ||
-      validItems[0] ||
-      null;
-  }
-
-  async function getBrowserInfo() {
-    const ua = navigator.userAgent || '';
-    const uaInfo = parseBrowserFromUserAgent(ua);
-    const uaData = navigator.userAgentData || null;
-    let highEntropy = null;
-    if (uaData && typeof uaData.getHighEntropyValues === 'function') {
-      try {
-        highEntropy = await uaData.getHighEntropyValues(['fullVersionList', 'platform']);
-      } catch (error) {
-        highEntropy = null;
-      }
-    }
-    const brand = getPreferredBrowserBrand(
-      (highEntropy && highEntropy.fullVersionList) ||
-      (uaData && uaData.brands)
-    );
-    const brandName = normalizeBrowserName(brand && brand.brand);
-    const brandVersion = brand && brand.version ? String(brand.version) : '';
-    const name = brandName || uaInfo.name || 'unknown';
-    const version = brandVersion.includes('.') ? brandVersion : (uaInfo.version || brandVersion);
-    return {
-      name,
-      version,
-      os: getOperatingSystemName(highEntropy && highEntropy.platform)
-    };
-  }
-
   function normalizeFeedbackHttpsUrl(value) {
     const raw = String(value || '').trim();
     if (!raw) {
@@ -1112,14 +988,6 @@
     } catch (error) {
       return '';
     }
-  }
-
-  function normalizeFeedbackEmail(value) {
-    const raw = String(value || '').trim();
-    if (!raw || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) {
-      return '';
-    }
-    return raw;
   }
 
   function normalizeFeedbackCommunityChannel(value, fallback) {
@@ -1144,7 +1012,14 @@
       x: normalizeFeedbackHttpsUrl(links.x) || LUMNO_FEEDBACK_LINKS_FALLBACK.x,
       githubIssue: normalizeFeedbackHttpsUrl(links.githubIssue || links.github_issue || links.issue) ||
         LUMNO_FEEDBACK_LINKS_FALLBACK.githubIssue,
-      email: normalizeFeedbackEmail(links.email) || LUMNO_FEEDBACK_LINKS_FALLBACK.email,
+      chromeReview: normalizeFeedbackHttpsUrl(
+        links.chromeReview ||
+        links.chrome_review ||
+        links.chromeWebStoreReview ||
+        links.chrome_web_store_review ||
+        links.chromeRating ||
+        links.chrome_rating
+      ) || LUMNO_FEEDBACK_LINKS_FALLBACK.chromeReview,
       discord: normalizeFeedbackHttpsUrl(links.discord) || LUMNO_FEEDBACK_LINKS_FALLBACK.discord,
       wechatQr: normalizeFeedbackHttpsUrl(links.wechatQr) || LUMNO_FEEDBACK_LINKS_FALLBACK.wechatQr,
       communityByLocale: normalizeFeedbackCommunityMap(source.communityByLocale)
@@ -1252,10 +1127,11 @@
       feedbackGithubIssueLink.href = links.githubIssue || LUMNO_FEEDBACK_LINKS_FALLBACK.githubIssue;
       setFeedbackActionLabel(feedbackGithubIssueLink, label, tooltip);
     }
-    if (feedbackMailButton) {
-      const label = t('newtab_feedback_mail_label', 'Email');
-      const tooltip = t('newtab_feedback_mail_tooltip', 'Sending email');
-      setFeedbackActionLabel(feedbackMailButton, label, tooltip);
+    if (feedbackChromeReviewLink) {
+      const label = t('newtab_feedback_chrome_review_label', 'Chrome rating');
+      const tooltip = t('newtab_feedback_chrome_review_tooltip', 'Rate on Chrome Web Store');
+      feedbackChromeReviewLink.href = links.chromeReview || LUMNO_FEEDBACK_LINKS_FALLBACK.chromeReview;
+      setFeedbackActionLabel(feedbackChromeReviewLink, label, tooltip);
     }
     if (feedbackCommunityButton) {
       const label = channel === 'wechat'
@@ -1357,31 +1233,6 @@
     }
   }
 
-  async function buildFeedbackMailtoUrl(emailOverride) {
-    const browserInfo = await getBrowserInfo();
-    const subject = encodeURIComponent(t('newtab_feedback_mail_subject', 'Lumno feedback'));
-    const feedbackEmail = normalizeFeedbackEmail(emailOverride) || LUMNO_FEEDBACK_EMAIL;
-    const browserLine = browserInfo.version
-      ? `${browserInfo.name} ${browserInfo.version}`
-      : browserInfo.name;
-    const body = encodeURIComponent([
-      '',
-      '',
-      '---',
-      `${t('newtab_feedback_mail_source_label', 'Source')}: ${t('newtab_page_label', 'New Tab')}`,
-      `${t('newtab_feedback_mail_version_label', 'Lumno Version')}: ${getRuntimeVersion() || 'unknown'}`,
-      `${t('newtab_feedback_mail_language_label', 'Language')}: ${getSystemLocale()}`,
-      `${t('newtab_feedback_mail_os_label', 'OS')}: ${browserInfo.os || 'unknown'}`,
-      `${t('newtab_feedback_mail_browser_label', 'Browser')}: ${browserLine || 'unknown'}`
-    ].join('\n'));
-    return `mailto:${feedbackEmail}?subject=${subject}&body=${body}`;
-  }
-
-  async function openFeedbackMailto(emailOverride) {
-    const url = await buildFeedbackMailtoUrl(emailOverride);
-    window.location.href = url;
-  }
-
   function openFeedbackExternalUrl(url) {
     const safeUrl = normalizeFeedbackHttpsUrl(url);
     if (!safeUrl) {
@@ -1457,15 +1308,6 @@
 
   function toggleFeedbackPopover() {
     setFeedbackPopoverOpen(!isFeedbackPopoverOpen());
-  }
-
-  async function handleFeedbackMailClick(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    hideTopActionTooltip();
-    const links = await loadFeedbackLinks({ force: false });
-    closeFeedbackPopover();
-    openFeedbackMailto(links && links.email);
   }
 
   async function handleFeedbackCommunityClick(event) {
@@ -1562,15 +1404,20 @@
         t('newtab_feedback_github_issue_tooltip', 'Opening a GitHub Issue')
     );
 
-    feedbackMailButton = document.createElement('button');
-    feedbackMailButton.type = 'button';
-    feedbackMailButton.className = 'x-nt-feedback-action';
-    feedbackMailButton.setAttribute('role', 'menuitem');
-    feedbackMailButton.innerHTML = getRiSvg('ri-mail-line', 'ri-size-16');
-    feedbackMailButton.addEventListener('click', handleFeedbackMailClick);
+    feedbackChromeReviewLink = document.createElement('a');
+    feedbackChromeReviewLink.className = 'x-nt-feedback-action';
+    feedbackChromeReviewLink.target = '_blank';
+    feedbackChromeReviewLink.rel = 'noreferrer noopener';
+    feedbackChromeReviewLink.setAttribute('role', 'menuitem');
+    feedbackChromeReviewLink.innerHTML = getRiSvg('ri-star-line', 'ri-size-16');
+    feedbackChromeReviewLink.addEventListener('click', () => {
+      hideTopActionTooltip();
+      closeFeedbackPopover();
+    });
     bindFeedbackActionTooltip(
-      feedbackMailButton,
-      () => feedbackMailButton.getAttribute('data-tooltip') || t('newtab_feedback_mail_tooltip', 'Sending email')
+      feedbackChromeReviewLink,
+      () => feedbackChromeReviewLink.getAttribute('data-tooltip') ||
+        t('newtab_feedback_chrome_review_tooltip', 'Rate on Chrome Web Store')
     );
 
     feedbackCommunityButton = document.createElement('button');
@@ -1592,7 +1439,7 @@
 
     feedbackMenu.appendChild(feedbackXLink);
     feedbackMenu.appendChild(feedbackGithubIssueLink);
-    feedbackMenu.appendChild(feedbackMailButton);
+    feedbackMenu.appendChild(feedbackChromeReviewLink);
     feedbackMenu.appendChild(feedbackCommunityButton);
     feedbackPopover.appendChild(feedbackMenu);
     feedbackPopover.appendChild(feedbackDetail);

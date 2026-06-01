@@ -145,6 +145,21 @@ function flushMicrotasks() {
     'first feature hint should become visible after storage loads'
   );
   assert.strictEqual(
+    firstController.element.getAttribute('data-rounded-arrow-tip'),
+    'true',
+    'new feature hint should opt into component-rendered rounded arrow tip'
+  );
+  assert.strictEqual(
+    firstController.element.children[0].className,
+    'x-lumno-feature-hint__arrow-tip',
+    'rounded arrow tip should be rendered as a component child'
+  );
+  assert.strictEqual(
+    firstController.element.children[0].getAttribute('aria-hidden'),
+    'true',
+    'rounded arrow tip should stay hidden from assistive technology'
+  );
+  assert.strictEqual(
     syncStore[syncKey],
     true,
     'first visible render should persist a sync dismissal marker'
@@ -201,6 +216,35 @@ function flushMicrotasks() {
     migratedSyncStore[syncKey],
     true,
     'legacy local dismissed state should migrate into sync'
+  );
+
+  const plainController = featureHints.createFeatureHint({
+    documentObj: createFakeDocument(),
+    definition: {
+      id: 'plain-feature-hint',
+      introducedIn: '0.0.0',
+      surface: 'test',
+      placement: 'test',
+      arrowSide: 'bottom',
+      arrowAlign: 'center',
+      dismissStorage: 'none',
+      badgeFallback: 'New',
+      textFallback: 'Plain feature hint',
+      closeLabelFallback: 'Dismiss plain feature hint'
+    },
+    t: (key, fallback) => fallback,
+    getRiSvg: () => ''
+  });
+  assert(plainController, 'plain feature hint should be created');
+  assert.strictEqual(
+    plainController.element.getAttribute('data-rounded-arrow-tip'),
+    'false',
+    'rounded arrow tip should stay opt-in at the component definition level'
+  );
+  assert.notStrictEqual(
+    plainController.element.children[0].className,
+    'x-lumno-feature-hint__arrow-tip',
+    'plain feature hints should not render a rounded arrow tip child'
   );
 
   console.log('feature hint tests passed');

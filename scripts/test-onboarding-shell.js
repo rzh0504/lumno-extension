@@ -69,6 +69,16 @@ assert.match(
   'newtab watermark should sit smaller and closer to the title without adding layout height or stealing input'
 );
 assert.match(
+  html,
+  /\.onboarding-shell\[data-active-slide="intro"\]\s+\.copy-block\s*\{[\s\S]*?padding-top:\s*18px;[\s\S]*?\}/,
+  'intro title group should sit farther below the Lumno wordmark on desktop'
+);
+assert.match(
+  html,
+  /html\[lang="en"\]\s+\.onboarding-shell\[data-active-slide="intro"\]\s+\.title-logo-mark\s*\{[\s\S]*?--title-logo-mark-offset-y:\s*0\.08em;[\s\S]*?\}/,
+  'English intro title logo should have a tiny downward optical offset without affecting other locales'
+);
+assert.match(
   newtabWatermarkSolidStyle ? newtabWatermarkSolidStyle[0] : '',
   /-webkit-mask:\s*url\("\.\.\/\.\.\/assets\/images\/lumno-wordmark-mask\.svg"\) center \/ contain no-repeat;[\s\S]*?mask:\s*url\("\.\.\/\.\.\/assets\/images\/lumno-wordmark-mask\.svg"\) center \/ contain no-repeat;/,
   'newtab watermark should reuse the newtab solid-mask wordmark treatment for adaptive ink'
@@ -140,8 +150,18 @@ assert.match(
 );
 assert.match(
   html,
-  /@media \(max-width:\s*859px\), \(max-height:\s*559px\)[\s\S]*?\.copy-panel\s*\{[\s\S]*?min-height:\s*0;[\s\S]*?padding:\s*var\(--onboarding-copy-padding-y\) var\(--onboarding-copy-padding-x\);[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\);[\s\S]*?grid-template-rows:\s*auto auto auto;[\s\S]*?align-content:\s*start;[\s\S]*?\}/,
-  'compact vertical onboarding should keep the former left panel as a single-column top information flow'
+  /@media \(max-width:\s*859px\), \(max-height:\s*559px\)[\s\S]*?\.copy-panel\s*\{[\s\S]*?min-height:\s*0;[\s\S]*?padding:\s*var\(--onboarding-copy-padding-y\) var\(--onboarding-copy-padding-x\);[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\);[\s\S]*?grid-template-rows:\s*auto minmax\(0,\s*1fr\) auto;[\s\S]*?align-content:\s*stretch;[\s\S]*?\}[\s\S]*?\.interaction-slots\s*\{[\s\S]*?align-self:\s*end;[\s\S]*?\}[\s\S]*?\.onboarding-copy-actions\s*\{[\s\S]*?align-self:\s*end;[\s\S]*?\}/,
+  'compact vertical onboarding should keep a single-column top information flow that distributes across the available height'
+);
+assert.match(
+  html,
+  /@media \(max-width:\s*859px\), \(max-height:\s*559px\)[\s\S]*?\.onboarding-newtab-watermark\s*\{[\s\S]*?top:\s*clamp\(32px,\s*4\.6vh,\s*44px\);[\s\S]*?width:\s*104px;[\s\S]*?height:\s*24px;[\s\S]*?opacity:\s*0\.54;[\s\S]*?transform:\s*none;[\s\S]*?\}[\s\S]*?\.onboarding-newtab-watermark__image\s*\{[\s\S]*?width:\s*104px;[\s\S]*?\}/,
+  'compact intro layout should keep the Lumno wordmark separated from the title'
+);
+assert.match(
+  html,
+  /@media \(max-width:\s*859px\), \(max-height:\s*559px\)[\s\S]*?\.onboarding-shell\[data-active-slide="intro"\]\s+\.copy-block\s*\{[\s\S]*?padding-top:\s*clamp\(18px,\s*3\.2vh,\s*34px\);[\s\S]*?\}/,
+  'compact intro title group should sit lower to leave room for the Lumno wordmark'
 );
 assert.match(
   html,
@@ -150,7 +170,12 @@ assert.match(
 );
 assert.match(
   html,
-  /@media \(max-width:\s*859px\), \(max-height:\s*559px\)[\s\S]*?\.visual-panel-slot\s*\{[\s\S]*?height:\s*var\(--onboarding-visual-rendered-height\);[\s\S]*?align-items:\s*end;[\s\S]*?justify-items:\s*center;[\s\S]*?background:\s*url\("\.\.\/\.\.\/assets\/wallpapers\/settings-bg-light-monet-newtab\.webp"\) center \/ cover no-repeat;[\s\S]*?overflow:\s*hidden;[\s\S]*?\}[\s\S]*?\.visual-panel\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?left:\s*50%;[\s\S]*?top:\s*auto;[\s\S]*?bottom:\s*0;[\s\S]*?margin-left:\s*calc\(var\(--onboarding-visual-canvas-width\) \* -0\.5\);[\s\S]*?margin-top:\s*0;[\s\S]*?transform-origin:\s*center bottom;[\s\S]*?\}/,
+  /@media \(max-width:\s*859px\), \(max-height:\s*559px\)[\s\S]*?\.title-line--with-logo\s*\{[\s\S]*?gap:\s*0\.32em;[\s\S]*?\}[\s\S]*?\.title-logo-mark\s*\{[\s\S]*?width:\s*0\.96em;[\s\S]*?height:\s*0\.96em;[\s\S]*?filter:\s*drop-shadow\(0 5px 7px rgba\(56,\s*172,\s*248,\s*0\.34\)\);[\s\S]*?\}/,
+  'compact intro title logo should keep more breathing room from the title text'
+);
+assert.match(
+  html,
+  /@media \(max-width:\s*859px\), \(max-height:\s*559px\)[\s\S]*?\.visual-panel-slot\s*\{[\s\S]*?width:\s*100vw;[\s\S]*?height:\s*var\(--onboarding-visual-rendered-height\);[\s\S]*?align-self:\s*stretch;[\s\S]*?justify-self:\s*start;[\s\S]*?align-items:\s*end;[\s\S]*?justify-items:\s*center;[\s\S]*?background:\s*url\("\.\.\/\.\.\/assets\/wallpapers\/settings-bg-light-monet-newtab\.webp"\) center \/ cover no-repeat;[\s\S]*?overflow:\s*hidden;[\s\S]*?\}[\s\S]*?\.visual-panel\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?left:\s*50%;[\s\S]*?top:\s*auto;[\s\S]*?bottom:\s*0;[\s\S]*?margin-left:\s*calc\(var\(--onboarding-visual-canvas-width\) \* -0\.5\);[\s\S]*?margin-top:\s*0;[\s\S]*?transform-origin:\s*center bottom;[\s\S]*?\}/,
   'compact vertical visual slot should keep a complete fixed-ratio preview anchored to the bottom'
 );
 assert.match(
@@ -299,6 +324,16 @@ assert.match(
   script,
   /if \(id === 'toggleInteractionAccordion'\)[\s\S]*?toggleInteractionAccordion\(target && target\.dataset && target\.dataset\.accordionId\);/,
   'clicking an accordion row should toggle by accordion id so only one content block opens at a time'
+);
+assert.match(
+  script,
+  /function navigateOnboardingToNewtab\(\)[\s\S]*?LumnoExtensionRoutes[\s\S]*?buildNewtabUrl[\s\S]*?focus:\s*true[\s\S]*?chromeApi\.runtime\.getURL\('src\/newtab\/newtab\.html\?focus=1'\)[\s\S]*?window\.location\.assign\(url\)/,
+  'final start action should navigate the onboarding tab to the focused newtab URL while preserving browser history'
+);
+assert.match(
+  script,
+  /if \(id === 'openNewtab'\)[\s\S]*?if \(navigateOnboardingToNewtab\(\)\)[\s\S]*?return;[\s\S]*?\}/,
+  'openNewtab should try navigating the current onboarding tab before falling back to background tab creation'
 );
 assert.match(
   script,
@@ -1066,13 +1101,13 @@ assert.match(
 );
 assert.match(
   html,
-  /\.feature-cards-surface__awards\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*80px;[\s\S]*?width:\s*min\(586px,\s*calc\(100% - 96px\)\);[\s\S]*?transform:\s*translateX\(-50%\);[\s\S]*?display:\s*flex;[\s\S]*?justify-content:\s*center;[\s\S]*?gap:\s*62px;[\s\S]*?\}/,
+  /\.feature-cards-surface__awards\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*80px;[\s\S]*?width:\s*min\(628px,\s*calc\(100% - 72px\)\);[\s\S]*?transform:\s*translateX\(-50%\);[\s\S]*?display:\s*flex;[\s\S]*?justify-content:\s*center;[\s\S]*?gap:\s*42px;[\s\S]*?\}/,
   'wheat award groups should stay centered above the final feature cards'
 );
 assert.match(
   html,
-  /\.feature-award\s*\{[\s\S]*?grid-template-columns:\s*22px minmax\(0,\s*max-content\) 22px;[\s\S]*?gap:\s*10px;[\s\S]*?\}/,
-  'individual wheat award groups should leave breathing room between text and wheat marks'
+  /\.feature-award\s*\{[\s\S]*?width:\s*176px;[\s\S]*?grid-template-columns:\s*22px minmax\(0,\s*112px\) 22px;[\s\S]*?gap:\s*10px;[\s\S]*?\}/,
+  'individual wheat award groups should share one visual width with breathing room between text and wheat marks'
 );
 assert.match(
   html,
@@ -1081,8 +1116,8 @@ assert.match(
 );
 assert.match(
   html,
-  /\.feature-award__label\s*\{[\s\S]*?font-size:\s*18px;[\s\S]*?line-height:\s*1\.12;[\s\S]*?\}/,
-  'wheat award text should be smaller while the wheat marks keep their silhouette size'
+  /\.feature-award__label\s*\{[\s\S]*?width:\s*112px;[\s\S]*?font-size:\s*17px;[\s\S]*?line-height:\s*1\.12;[\s\S]*?\}/,
+  'wheat award text should use a shared label width while the wheat marks keep their silhouette size'
 );
 assert.match(
   wheatAsset,
@@ -1380,6 +1415,21 @@ assert.match(
 );
 assert.match(
   html,
+  /\.title\s*\{[\s\S]*?--title-font-weight:\s*760;[\s\S]*?font-weight:\s*var\(--title-font-weight\);[\s\S]*?\}[\s\S]*?html\[lang="en"\]\s+\.title\s*\{[\s\S]*?--title-font-weight:\s*620;[\s\S]*?\}/,
+  'English onboarding titles should render lighter than the default CJK title weight'
+);
+assert.match(
+  html,
+  /\.title\s*\{[\s\S]*?--title-font-stretch:\s*100%;[\s\S]*?--title-font-width-axis:\s*100;[\s\S]*?font-stretch:\s*var\(--title-font-stretch\);[\s\S]*?font-variation-settings:\s*"wdth" var\(--title-font-width-axis\);[\s\S]*?letter-spacing:\s*0;[\s\S]*?\}[\s\S]*?html\[lang="en"\]\s+\.title\s*\{[\s\S]*?--title-font-stretch:\s*94%;[\s\S]*?--title-font-width-axis:\s*94;[\s\S]*?\}/,
+  'English onboarding titles should use a narrower font width while keeping neutral letter spacing'
+);
+assert.match(
+  html,
+  /\.title\s*\{[\s\S]*?--title-line-gap:\s*0px;[\s\S]*?\}[\s\S]*?html\[lang="en"\]\s+\.onboarding-shell\[data-active-slide="intro"\]\s+\.title\s*\{[\s\S]*?--title-line-gap:\s*0\.1em;[\s\S]*?\}[\s\S]*?\.title-break\s*\{[\s\S]*?height:\s*var\(--title-line-gap\);[\s\S]*?\}/,
+  'English intro title should add extra space before the second line without changing letter spacing'
+);
+assert.match(
+  html,
   /\.title-line\s*\{[\s\S]*?white-space:\s*nowrap;[\s\S]*?\}/,
   'configured title lines should stay on their intended line count'
 );
@@ -1410,8 +1460,8 @@ assert.match(
 );
 assert.match(
   script,
-  /function getCompactCopyContentHeight\(\)[\s\S]*?copyPanel\.querySelector\('\.copy-block'\)[\s\S]*?copyPanel\.querySelector\('\.interaction-slots'\)[\s\S]*?copyPanel\.querySelector\('\.onboarding-copy-actions'\)[\s\S]*?function updateVisualCanvasScale\(\)[\s\S]*?updateOnboardingFrameScale\(\)[\s\S]*?visualSlot\.getBoundingClientRect\(\)[\s\S]*?isStackedOnboardingLayout[\s\S]*?viewportHeight[\s\S]*?getCompactCopyContentHeight\(\)[\s\S]*?const scale = isCompactLayout[\s\S]*?Math\.max\(0\.1,\s*Math\.min\(availableWidth \/ VISUAL_CANVAS_WIDTH,\s*availableHeight \/ VISUAL_CANVAS_HEIGHT\)\)[\s\S]*?Math\.min\(1,\s*availableWidth \/ VISUAL_CANVAS_WIDTH,\s*availableHeight \/ VISUAL_CANVAS_HEIGHT\)[\s\S]*?--onboarding-visual-scale[\s\S]*?--onboarding-visual-rendered-width/,
-  'compact vertical onboarding should contain the bottom visual under the natural copy height while horizontal layouts keep contained proportional scaling'
+  /function getCompactCopyContentHeight\(\)[\s\S]*?copyPanel\.querySelector\('\.copy-block'\)[\s\S]*?copyPanel\.querySelector\('\.interaction-slots'\)[\s\S]*?copyPanel\.querySelector\('\.onboarding-copy-actions'\)[\s\S]*?function updateVisualCanvasScale\(\)[\s\S]*?updateOnboardingFrameScale\(\)[\s\S]*?visualSlot\.getBoundingClientRect\(\)[\s\S]*?isStackedOnboardingLayout[\s\S]*?viewportWidth[\s\S]*?viewportHeight[\s\S]*?Math\.min\(viewportWidth,\s*visualSlot\.clientWidth[\s\S]*?getCompactCopyContentHeight\(\)[\s\S]*?const scale = isCompactLayout[\s\S]*?Math\.max\(0\.1,\s*Math\.min\(availableWidth \/ VISUAL_CANVAS_WIDTH,\s*availableHeight \/ VISUAL_CANVAS_HEIGHT\)\)[\s\S]*?Math\.min\(1,\s*availableWidth \/ VISUAL_CANVAS_WIDTH,\s*availableHeight \/ VISUAL_CANVAS_HEIGHT\)[\s\S]*?--onboarding-visual-scale[\s\S]*?--onboarding-visual-rendered-width/,
+  'compact vertical onboarding should contain the bottom visual to the visible viewport under the natural copy height while horizontal layouts keep contained proportional scaling'
 );
 assert.match(
   script,
@@ -1425,7 +1475,7 @@ assert.match(
 );
 assert.match(
   html,
-  /\.title-logo-mark\s*\{[\s\S]*?width:\s*1\.08em;[\s\S]*?height:\s*1\.08em;[\s\S]*?filter:\s*drop-shadow\(0 7px 8px rgba\(56,\s*172,\s*248,\s*0\.38\)\);[\s\S]*?transform:\s*rotate\(7deg\);[\s\S]*?\}/,
+  /\.title-logo-mark\s*\{[\s\S]*?--title-logo-mark-offset-y:\s*0px;[\s\S]*?width:\s*1\.08em;[\s\S]*?height:\s*1\.08em;[\s\S]*?filter:\s*drop-shadow\(0 7px 8px rgba\(56,\s*172,\s*248,\s*0\.38\)\);[\s\S]*?transform:\s*translateY\(var\(--title-logo-mark-offset-y\)\) rotate\(7deg\);[\s\S]*?\}/,
   'title logo should render larger with a compact blue shadow and right tilt'
 );
 assert.match(
@@ -1552,6 +1602,11 @@ assert.match(
   script,
   /appendTitleLine\(secondLine,\s*slide\.copy\.titleLogo\)/,
   'title cycle renderer should append the Lumno logo after the second title line'
+);
+assert.match(
+  script,
+  /if \(lines\.length > 0 && text\) \{[\s\S]*?title\.setAttribute\('aria-label', text\);[\s\S]*?\}/,
+  'forced multiline titles should keep the full title available as an accessible label'
 );
 assert.match(
   script,

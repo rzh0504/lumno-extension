@@ -14,6 +14,12 @@ function assertContains(source, needle, message) {
   assert.ok(source.includes(needle), message);
 }
 
+function getMessage(messages, key) {
+  const item = messages[key];
+  assert.ok(item && typeof item.message === 'string', `${key} should be localized`);
+  return item.message;
+}
+
 assertContains(
   newtabHtml,
   'transition: opacity 170ms ease, transform 360ms cubic-bezier(0.2, 1.45, 0.35, 1)',
@@ -87,6 +93,44 @@ assertContains(
 
 assertContains(
   newtabJs,
+  "const LUMNO_CHROME_WEB_STORE_REVIEW_URL = 'https://chromewebstore.google.com/detail/lumno-%E8%81%9A%E7%84%A6%E6%90%9C%E7%B4%A2%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/nggfkkbmogmadfoikakkfegkoilfcfao/reviews?utm_source=item-share-cb';",
+  'feedback popover should define a direct Chrome Web Store reviews URL'
+);
+
+assertContains(
+  newtabJs,
+  "chromeReview: LUMNO_CHROME_WEB_STORE_REVIEW_URL,",
+  'feedback link fallback should include the Chrome review URL'
+);
+
+assertContains(
+  newtabJs,
+  'let feedbackChromeReviewLink = null;',
+  'feedback popover should keep a Chrome review link reference'
+);
+
+assertContains(
+  newtabJs,
+  "feedbackChromeReviewLink.innerHTML = getRiSvg('ri-star-line', 'ri-size-16');",
+  'feedback popover should use a rating star icon for the Chrome review action'
+);
+
+assertContains(
+  newtabJs,
+  "feedbackMenu.appendChild(feedbackChromeReviewLink);",
+  'feedback popover should place the Chrome review action in the icon row'
+);
+
+assert.ok(
+  !newtabJs.includes('feedbackMailButton') &&
+    !newtabJs.includes('handleFeedbackMailClick') &&
+    !newtabJs.includes('openFeedbackMailto') &&
+    !newtabJs.includes('mailto:'),
+  'feedback popover should remove the email action from the icon row'
+);
+
+assertContains(
+  newtabJs,
   'image.width = 1080;',
   'wechat QR image should reserve its published width before loading'
 );
@@ -110,24 +154,66 @@ assert.match(
 );
 
 assert.strictEqual(
-  zhCnMessages.newtab_feedback_wechat_panel_title.message,
+  getMessage(zhCnMessages, 'newtab_feedback_wechat_panel_title'),
   'Bug 反馈 & 新功能提需',
   'zh-CN should label the expanded wechat panel as bug feedback and feature requests'
 );
 assert.strictEqual(
-  zhTwMessages.newtab_feedback_wechat_panel_title.message,
+  getMessage(zhTwMessages, 'newtab_feedback_wechat_panel_title'),
   'Bug 回報與新功能需求',
   'zh-TW should label the expanded wechat panel idiomatically'
 );
 assert.strictEqual(
-  enMessages.newtab_feedback_wechat_panel_title.message,
+  getMessage(enMessages, 'newtab_feedback_wechat_panel_title'),
   'Bug reports & feature requests',
   'en should label the expanded wechat panel clearly'
 );
 assert.strictEqual(
-  jaMessages.newtab_feedback_wechat_panel_title.message,
-  'バグ報告・新機能リクエスト',
+  getMessage(jaMessages, 'newtab_feedback_wechat_panel_title'),
+  '不具合・要望',
   'ja should label the expanded wechat panel clearly'
+);
+
+assert.strictEqual(
+  getMessage(zhCnMessages, 'newtab_feedback_chrome_review_label'),
+  'Chrome 评分',
+  'zh-CN should label the Chrome review action'
+);
+assert.strictEqual(
+  getMessage(zhTwMessages, 'newtab_feedback_chrome_review_label'),
+  'Chrome 評分',
+  'zh-TW should label the Chrome review action'
+);
+assert.strictEqual(
+  getMessage(enMessages, 'newtab_feedback_chrome_review_label'),
+  'Chrome rating',
+  'en should label the Chrome review action'
+);
+assert.strictEqual(
+  getMessage(jaMessages, 'newtab_feedback_chrome_review_label'),
+  'Chromeで評価',
+  'ja should label the Chrome review action'
+);
+
+assert.strictEqual(
+  getMessage(zhCnMessages, 'newtab_feedback_chrome_review_tooltip'),
+  '在 Chrome Web Store 评分',
+  'zh-CN should explain the Chrome review action'
+);
+assert.strictEqual(
+  getMessage(zhTwMessages, 'newtab_feedback_chrome_review_tooltip'),
+  '在 Chrome Web Store 評分',
+  'zh-TW should explain the Chrome review action'
+);
+assert.strictEqual(
+  getMessage(enMessages, 'newtab_feedback_chrome_review_tooltip'),
+  'Rate on Chrome Web Store',
+  'en should explain the Chrome review action'
+);
+assert.strictEqual(
+  getMessage(jaMessages, 'newtab_feedback_chrome_review_tooltip'),
+  'Chrome Web Storeで評価する',
+  'ja should explain the Chrome review action'
 );
 
 console.log('newtab feedback popover tests passed');

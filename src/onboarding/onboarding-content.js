@@ -357,7 +357,7 @@
         siteSearchDemo: Object.freeze({
           tabHintTemplate: '使用 {provider} 搜尋',
           cases: Object.freeze([
-            Object.freeze({ kind: 'site', label: '站內搜尋', triggerQuery: 'github', modeLabel: 'GitHub', prefixLabel: 'GitHub', promptQuery: 'lumno extension', promptWidth: '15ch', favicon: 'https://www.google.com/s2/favicons?domain=github.com&sz=64', iconClass: 'ri-github-fill', resultTitle: '在 GitHub 中搜尋 "lumno extension"', actionLabel: '在 GitHub 中搜尋', brandAccentRgb: Object.freeze([36, 41, 46]) }),
+            Object.freeze({ kind: 'site', label: '站內搜尋', triggerQuery: 'github', modeLabel: 'GitHub', prefixLabel: 'GitHub', promptQuery: 'lumno extension', promptWidth: '15ch', favicon: 'https://www.google.com/s2/favicons?domain=github.com&sz=64', iconClass: 'ri-github-fill', resultTitle: '在 GitHub 中搜尋「lumno extension」', actionLabel: '在 GitHub 中搜尋', brandAccentRgb: Object.freeze([36, 41, 46]) }),
             Object.freeze({ kind: 'ai', label: 'AI', triggerQuery: 'chatgpt', modeLabel: 'ChatGPT', prefixLabel: 'ChatGPT', promptQuery: '這個 PR 有哪些隱藏風險？', promptWidth: '14em', favicon: 'https://www.google.com/s2/favicons?domain=chatgpt.com&sz=64', iconClass: 'ri-sparkling-2-line', resultTitle: '向 ChatGPT 提問「這個 PR 有哪些隱藏風險？」', actionLabel: '開啟 ChatGPT 網頁版', brandAccentRgb: Object.freeze([16, 163, 127]) })
           ])
         }),
@@ -374,52 +374,52 @@
     }),
     ja: Object.freeze({
       intro: Object.freeze({
-        title: 'ブックマークをすぐ検索',
-        titleLines: Object.freeze(['ブックマークを', 'すぐ検索']),
+        title: '保存したページをすぐ検索',
+        titleLines: Object.freeze(['保存したページを', 'すぐ検索']),
         titleCycle: Object.freeze({
           prefix: 'ブラウザの',
           items: Object.freeze([
-            Object.freeze({ id: 'bookmark', label: 'ブックマーク', tone: 'bookmark' }),
+            Object.freeze({ id: 'bookmark', label: '保存ページ', tone: 'bookmark' }),
             Object.freeze({ id: 'history', label: '履歴', tone: 'history' }),
             Object.freeze({ id: 'top-sites', label: 'よく使うサイト', tone: 'top-sites' }),
             Object.freeze({ id: 'settings', label: '設定', tone: 'settings' })
           ])
         }),
-        body: 'オープンソースのコマンドバー & ミニマルな新規タブ',
+        body: 'コード公開。検索も新しいタブもすっきり',
         rows: Object.freeze({
-          trust: 'オープンソース・プライバシー配慮・体験重視',
+          trust: 'コード公開・個人情報に配慮・使いやすさ重視',
           browser: '主要ブラウザに対応',
-          compatibility: '他の新規タブ拡張と併用可',
-          githubLabel: 'GitHub リポジトリ',
-          githubTooltip: 'GPL-3.0 で公開中。GitHub リポジトリを開く',
+          compatibility: '他の新しいタブ拡張と併用可',
+          githubLabel: 'GitHub で見る',
+          githubTooltip: 'GPL-3.0 で公開中。GitHub を開く',
           browserTooltipLabel: '対応ブラウザ',
           compatibilityTooltipLabel: '互換性について',
-          compatibilityTooltip: 'Chrome の制限により、Lumno だけで新規タブの上書きをオフにはできませんが、他の新規タブ拡張と併用できます。\nLumno を入れたあと、使いたい新規タブ拡張を再度有効化してください。',
+          compatibilityTooltip: 'Chrome の制限により、Lumno だけで新しいタブの上書きをオフにはできませんが、他の新しいタブ拡張と併用できます。\nLumno を入れたあと、使いたい新しいタブ拡張をもう一度有効にしてください。',
           browserAvatarPrefix: '対応',
           browserAvatarSuffix: '主要ブラウザ'
         }),
         primaryAction: '始める'
       }),
       setup: Object.freeze({
-        title: 'ネイティブなコマンドバー',
+        title: 'どこでも呼び出せる',
         body: 'どのサイトでも{shortcut}を押すだけで、Lumno を呼び出せます。',
-        diaLabel: 'Dia ブラウザをご利用の方へ',
-        diaText: 'Dia でショートカットが反応しない場合は、ブラウザのショートカット設定で「Open command bar」を「In Dia」から「Global」に変更してください。',
-        shortcutsLink: 'ショートカット設定',
-        localFileLabel: 'ローカル PDF/HTML で使う',
-        localFileText: '拡張機能の詳細ページで Lumno の「ファイルの URL へのアクセスを許可する」をオンにし、タブを再読み込みしてください。',
-        detailsLink: '拡張機能の詳細ページ',
-        shortcutActionTooltip: 'ブラウザの制限により、Lumno のショートカットは拡張機能のキーボードショートカットページで変更します。クリックして開く'
+        diaLabel: 'Dia をお使いの方へ',
+        diaText: 'Dia でキーが反応しない場合は、ブラウザのキー設定で「Open command bar」を「In Dia」から「Global」に変更してください。',
+        shortcutsLink: 'キー設定',
+        localFileLabel: '手元の PDF/HTML で使う',
+        localFileText: '拡張機能の詳細ページで Lumno の「ファイルの URL へのアクセスを許可する」をオンにし、タブを読み込み直してください。',
+        detailsLink: '拡張機能の詳細',
+        shortcutActionTooltip: 'ブラウザの制限により、Lumno のキー設定は拡張機能のキー設定ページで変更します。押すと開きます'
       }),
       search: Object.freeze({
-        title: '美しい新規タブ',
-        body: '見た目の調整と、ブックマークや履歴の整理をまとめて。'
+        title: 'すっきり新しいタブ',
+        body: '見た目の調整と、保存ページや履歴の整理をまとめて。'
       }),
       newtab: Object.freeze({
         title: 'AI / サイト内検索へ直行',
-        body: 'キーワード入力後に Tab。サイト内検索をすぐ開けます。',
+        body: '検索語入力後に Tab。サイト内検索をすぐ開けます。',
         supportList: '対応リスト',
-        supportTooltip: 'カスタマイズできます。クリックして設定を開く'
+        supportTooltip: '自由に追加できます。押すと設定を開きます'
       }),
       finish: Object.freeze({
         title: '便利な機能をさらに',
@@ -428,7 +428,7 @@
         ratingAction: '評価する',
         settingsAction: '設定'
       }),
-      actions: Object.freeze({ next: '次へ', back: '戻る', changeShortcut: 'ショートカット変更' }),
+      actions: Object.freeze({ next: '次へ', back: '戻る', changeShortcut: 'キーを変更' }),
       runtimeCopy: Object.freeze({
         misc: Object.freeze({
           infoLabel: '説明',
@@ -442,17 +442,17 @@
           settingsLabel: '設定',
           previousLabelTemplate: '{label} 前へ',
           nextLabelTemplate: '{label} 次へ',
-          debugBookmarkCascadeLabel: 'ブックマーク階層をデバッグ',
-          feedbackLabel: 'フィードバック',
+          debugBookmarkCascadeLabel: '保存ページ階層を調整',
+          feedbackLabel: '意見を送る',
           wallpaperLabel: '壁紙',
           siteSearchDemoAriaLabel: 'Lumno サイト内検索デモ',
-          newtabSearchPreviewAriaLabel: 'Lumno 新規タブ検索プレビュー',
-          newtabPreviewAriaLabel: 'Lumno 新規タブプレビュー',
+          newtabSearchPreviewAriaLabel: 'Lumno 新しいタブ検索の表示例',
+          newtabPreviewAriaLabel: 'Lumno 新しいタブの表示例',
           openItemAriaTemplate: '{title}を開く',
           sectionModeRecentLabel: '最近使ったサイトの表示モード',
-          sectionModeBookmarksLabel: 'ブックマーク表示モード',
-          bookmarkManagerLabel: 'ブックマークマネージャーを開く',
-          pageStripAriaTemplate: 'オンボーディングナビゲーション、{current} / {total} ページ',
+          sectionModeBookmarksLabel: '保存ページの表示方法',
+          bookmarkManagerLabel: '保存ページ管理を開く',
+          pageStripAriaTemplate: '案内ページ、{current} / {total}ページ',
           pageSegmentAriaTemplate: '{page}ページ目',
           featureCardAriaJoiner: '、',
           principlesAriaLabel: 'Lumno の原則',
@@ -462,7 +462,7 @@
           query: 'extension',
           results: Object.freeze([
             Object.freeze({ type: 'topSite', title: 'Chrome Web Store - Extensions', detail: 'https://chromewebstore.google.com/category/extensions', sourceTag: 'よく使う', favicon: 'https://www.google.com/s2/favicons?domain=chromewebstore.google.com&sz=32', actionTagLabel: '開く', actionTagKey: 'Enter', visitButtonLabel: '開く', active: true }),
-            Object.freeze({ type: 'bookmark', title: 'Chrome Extensions API Reference', detail: 'ブックマーク / 開発 / Browser extensions', sourceTag: 'ブックマーク', sourceTagKind: 'bookmark', favicon: 'https://www.google.com/s2/favicons?domain=developer.chrome.com&sz=32', visitButtonLabel: '開く' }),
+            Object.freeze({ type: 'bookmark', title: 'Chrome Extensions API Reference', detail: '保存ページ / 開発 / Browser extensions', sourceTag: '保存', sourceTagKind: 'bookmark', favicon: 'https://www.google.com/s2/favicons?domain=developer.chrome.com&sz=32', visitButtonLabel: '開く' }),
             Object.freeze({ type: 'history', title: 'Extensions - Chrome for Developers', detail: 'https://developer.chrome.com/docs/extensions', sourceTag: '履歴', favicon: 'https://www.google.com/s2/favicons?domain=developer.chrome.com&sz=32', visitButtonLabel: '開く', historyDeletable: true }),
             Object.freeze({ type: 'newtab', title: '"extension" を検索', visitButtonLabel: '検索' }),
             Object.freeze({ type: 'browserPage', title: 'chrome://extensions/ を開く', visitButtonLabel: '開く' })
@@ -470,11 +470,11 @@
         }),
         newtabPreview: Object.freeze({
           query: '',
-          sections: Object.freeze({ bookmarks: 'ブックマーク', recent: '最近使ったサイト' }),
+          sections: Object.freeze({ bookmarks: '保存ページ', recent: '最近使ったサイト' }),
           bookmarks: Object.freeze([
-            Object.freeze({ title: 'ワークスペース', type: 'folder', previewUrls: Object.freeze(['https://developer.chrome.com/docs/extensions/', 'https://chromewebstore.google.com/category/extensions', 'https://github.com/', 'https://figma.com/']) }),
+            Object.freeze({ title: '作業場', type: 'folder', previewUrls: Object.freeze(['https://developer.chrome.com/docs/extensions/', 'https://chromewebstore.google.com/category/extensions', 'https://github.com/', 'https://figma.com/']) }),
             Object.freeze({ title: 'デザイン素材', type: 'folder', previewUrls: Object.freeze(['https://www.figma.com/', 'https://www.framer.com/', 'https://dribbble.com/', 'https://mobbin.com/']) }),
-            Object.freeze({ title: '開発ドキュメント', type: 'folder', previewUrls: Object.freeze(['https://developer.chrome.com/docs/extensions/', 'https://developer.mozilla.org/', 'https://github.com/', 'https://web.dev/']) })
+            Object.freeze({ title: '開発資料', type: 'folder', previewUrls: Object.freeze(['https://developer.chrome.com/docs/extensions/', 'https://developer.mozilla.org/', 'https://github.com/', 'https://web.dev/']) })
           ]),
           recentSites: Object.freeze([
             Object.freeze({ title: 'Lumno - Chrome Web Store', siteName: 'Chrome Web Store', url: 'chromeWebStore', urlText: 'chromewebstore.google.com', accentRgb: Object.freeze([66, 133, 244]) }),
@@ -486,18 +486,18 @@
         siteSearchDemo: Object.freeze({
           tabHintTemplate: '{provider}で検索',
           cases: Object.freeze([
-            Object.freeze({ kind: 'site', label: 'サイト内検索', triggerQuery: 'github', modeLabel: 'GitHub', prefixLabel: 'GitHub', promptQuery: 'lumno extension', promptWidth: '15ch', favicon: 'https://www.google.com/s2/favicons?domain=github.com&sz=64', iconClass: 'ri-github-fill', resultTitle: 'GitHub で "lumno extension" を検索', actionLabel: 'GitHub で検索', brandAccentRgb: Object.freeze([36, 41, 46]) }),
-            Object.freeze({ kind: 'ai', label: 'AI', triggerQuery: 'chatgpt', modeLabel: 'ChatGPT', prefixLabel: 'ChatGPT', promptQuery: 'この PR の隠れたリスクは？', promptWidth: '14em', favicon: 'https://www.google.com/s2/favicons?domain=chatgpt.com&sz=64', iconClass: 'ri-sparkling-2-line', resultTitle: 'ChatGPT に「この PR の隠れたリスクは？」と質問', actionLabel: 'ChatGPT を開く', brandAccentRgb: Object.freeze([16, 163, 127]) })
+            Object.freeze({ kind: 'site', label: 'サイト内検索', triggerQuery: 'github', modeLabel: 'GitHub', prefixLabel: 'GitHub', promptQuery: 'lumno extension', promptWidth: '15ch', favicon: 'https://www.google.com/s2/favicons?domain=github.com&sz=64', iconClass: 'ri-github-fill', resultTitle: 'GitHub で「lumno extension」を検索', actionLabel: 'GitHub で検索', brandAccentRgb: Object.freeze([36, 41, 46]) }),
+            Object.freeze({ kind: 'ai', label: 'AI', triggerQuery: 'chatgpt', modeLabel: 'ChatGPT', prefixLabel: 'ChatGPT', promptQuery: 'この PR の隠れたリスクは？', promptWidth: '14em', favicon: 'https://www.google.com/s2/favicons?domain=chatgpt.com&sz=64', iconClass: 'ri-sparkling-2-line', resultTitle: 'ChatGPT に「この PR の隠れたリスクは？」と質問', actionLabel: 'ChatGPT Web版を開く', brandAccentRgb: Object.freeze([16, 163, 127]) })
           ])
         }),
         featureCards: Object.freeze([
-          Object.freeze({ art: 'homepage-pip', tone: 'pip', title: '自動ピクチャーインピクチャー', body: '動画タブを離れると自動で表示' }),
-          Object.freeze({ art: 'newtab-filters', artSize: Object.freeze({ width: 298, height: 120 }), tone: 'newtab', title: '新規タブを自分らしく', body: '壁紙と豊富なフィルターを選べます' })
+          Object.freeze({ art: 'homepage-pip', tone: 'pip', title: '動画を自動で小窓表示', body: '動画タブを離れると自動で表示' }),
+          Object.freeze({ art: 'newtab-filters', artSize: Object.freeze({ width: 298, height: 120 }), tone: 'newtab', title: '新しいタブを自分好みに', body: '壁紙と多彩な効果を選べます' })
         ]),
         featureAwards: Object.freeze([
-          Object.freeze({ lines: Object.freeze(['オープンソース', 'プライバシー配慮']) }),
-          Object.freeze({ lines: Object.freeze(['ずっと無料']) }),
-          Object.freeze({ lines: Object.freeze(['体験を', '重視']) })
+          Object.freeze({ lines: Object.freeze(['中身を公開', '情報に配慮']) }),
+          Object.freeze({ lines: Object.freeze(['ずっと無料', '制限なし']) }),
+          Object.freeze({ lines: Object.freeze(['使いやすさ', '細部まで']) })
         ])
       })
     }),
@@ -514,47 +514,51 @@
             Object.freeze({ id: 'settings', label: 'settings', tone: 'settings' })
           ])
         }),
-        body: 'Open-source command bar & clean new tab',
+        body: 'Open-source command bar + a cleaner new tab',
         rows: Object.freeze({
-          trust: 'Open source, private, user-first',
+          trust: 'Open source, private by design',
           browser: 'Works in major browsers',
-          compatibility: 'Plays well with other new-tab extensions',
+          compatibility: 'Friendly with other new-tab extensions',
           githubLabel: 'GitHub repo',
-          githubTooltip: 'Open-source under GPL-3.0. Visit the GitHub repo',
+          githubTooltip: 'Open-sourced under GPL-3.0. View the repo on GitHub.',
           browserTooltipLabel: 'Supported browsers',
           compatibilityTooltipLabel: 'Compatibility',
-          compatibilityTooltip: 'Chrome does not let Lumno turn off its new-tab override by itself, but Lumno can coexist with another new-tab extension.\nAfter installing Lumno, reinstall or re-enable your preferred new-tab extension so it keeps control.',
+          compatibilityTooltip: 'Chrome does not let Lumno disable its new-tab override on its own, but Lumno can live alongside another new-tab extension.\nAfter installing Lumno, reinstall or re-enable your favorite new-tab extension so it stays in charge.',
           browserAvatarPrefix: 'Works in',
           browserAvatarSuffix: 'major browsers'
         }),
         primaryAction: 'Get started'
       }),
       setup: Object.freeze({
-        title: 'Native-feeling command bar',
-        body: 'Press {shortcut} on any site to open Lumno.',
-        diaLabel: 'For Dia browser users',
-        diaText: 'In Dia, if the command bar shortcut does not work, open the browser shortcut settings and change "Open command bar" from "In Dia" to "Global".',
-        shortcutsLink: 'Shortcut settings',
-        localFileLabel: 'Use Lumno on local PDF/HTML tabs',
-        localFileText: 'Open the extension details page, enable "Allow access to file URLs" for Lumno, then refresh that tab.',
-        detailsLink: 'Extension details',
-        shortcutActionTooltip: 'Browser shortcuts are changed from the Extensions / Keyboard shortcuts page. Click to open it.'
+        title: 'A command bar that feels native',
+        titleLines: Object.freeze(['A command bar', 'that feels native']),
+        body: 'Press {shortcut} to open Lumno anywhere.',
+        diaLabel: 'Using Dia?',
+        diaText: 'If the shortcut does not respond in Dia, click Open shortcut settings and change "Open command bar" from "In Dia" to "Global".',
+        shortcutsLink: 'Open shortcut settings',
+        localFileLabel: 'Working with local files?',
+        localFileText: 'Click Open extension details, allow Lumno to access file URLs, then refresh the PDF or HTML tab.',
+        detailsLink: 'Open extension details',
+        shortcutActionTooltip: 'Browser shortcuts live on the Extensions / Keyboard shortcuts page. Click to open it.'
       }),
       search: Object.freeze({
-        title: 'A calmer new tab',
-        body: 'Customize the look and keep bookmarks and history easy to scan.'
+        title: 'A calmer new tab for where you go',
+        titleLines: Object.freeze(['A calmer new tab', 'for where you go']),
+        body: 'Make it yours. Bookmarks and history stay tidy.'
       }),
       newtab: Object.freeze({
         title: 'AI / site search in one jump',
-        body: 'Type a keyword, press Tab, and search the target site directly.',
+        titleLines: Object.freeze(['AI / site search', 'in one jump']),
+        body: 'Type, hit Tab, and jump to the right search.',
         supportList: 'Supported sites',
-        supportTooltip: 'Customizable. Click to open settings.'
+        supportTooltip: 'Add your own sites in settings.'
       }),
       finish: Object.freeze({
-        title: 'More useful tools',
-        body: 'Built for faster browsing with care for the details.',
+        title: 'Tiny browser wins that add up',
+        titleLines: Object.freeze(['Tiny browser wins', 'that add up']),
+        body: 'Video popouts, new-tab polish, and useful extras.',
         primaryAction: 'Start using Lumno',
-        ratingAction: 'Rate us',
+        ratingAction: 'Rate Lumno',
         settingsAction: 'Settings'
       }),
       actions: Object.freeze({ next: 'Next', back: 'Back', changeShortcut: 'Change shortcut' }),
@@ -565,27 +569,27 @@
           browserAvatarSuffix: 'and more',
           openLabel: 'Open',
           searchLabel: 'Search',
-          goLabel: 'Visit',
-          removeHistoryLabel: 'Remove history item',
-          newtabSearchPlaceholder: 'Search or enter URL...',
+          goLabel: 'Go',
+          removeHistoryLabel: 'Remove from history',
+          newtabSearchPlaceholder: 'Search or enter a URL...',
           settingsLabel: 'Settings',
-          previousLabelTemplate: '{label} previous',
-          nextLabelTemplate: '{label} next',
-          debugBookmarkCascadeLabel: 'Debug bookmark cascade',
-          feedbackLabel: 'Feedback',
+          previousLabelTemplate: '{label}, previous',
+          nextLabelTemplate: '{label}, next',
+          debugBookmarkCascadeLabel: 'Debug bookmark menu',
+          feedbackLabel: 'Send feedback',
           wallpaperLabel: 'Wallpaper',
-          siteSearchDemoAriaLabel: 'Lumno site search demo',
-          newtabSearchPreviewAriaLabel: 'Lumno new tab search preview',
-          newtabPreviewAriaLabel: 'Lumno new tab preview',
+          siteSearchDemoAriaLabel: 'Lumno site-search demo',
+          newtabSearchPreviewAriaLabel: 'Lumno new-tab search preview',
+          newtabPreviewAriaLabel: 'Lumno new-tab preview',
           openItemAriaTemplate: 'Open {title}',
-          sectionModeRecentLabel: 'Recent display mode',
-          sectionModeBookmarksLabel: 'Bookmarks display mode',
+          sectionModeRecentLabel: 'Recent sites view',
+          sectionModeBookmarksLabel: 'Bookmarks view',
           bookmarkManagerLabel: 'Open bookmark manager',
-          pageStripAriaTemplate: 'Onboarding navigation, page {current} of {total}',
+          pageStripAriaTemplate: 'Onboarding, page {current} of {total}',
           pageSegmentAriaTemplate: 'Page {page}',
           featureCardAriaJoiner: ', ',
           principlesAriaLabel: 'Lumno principles',
-          practicalFeaturesAriaLabel: 'Lumno practical features'
+          practicalFeaturesAriaLabel: 'Lumno extras'
         }),
         lumnoOverlay: Object.freeze({
           query: 'extension',
@@ -615,18 +619,18 @@
         siteSearchDemo: Object.freeze({
           tabHintTemplate: 'Search with {provider}',
           cases: Object.freeze([
-            Object.freeze({ kind: 'site', label: 'Site search', triggerQuery: 'github', modeLabel: 'GitHub', prefixLabel: 'GitHub', promptQuery: 'lumno extension', promptWidth: '15ch', favicon: 'https://www.google.com/s2/favicons?domain=github.com&sz=64', iconClass: 'ri-github-fill', resultTitle: 'Search GitHub for "lumno extension"', actionLabel: 'Search GitHub', brandAccentRgb: Object.freeze([36, 41, 46]) }),
-            Object.freeze({ kind: 'ai', label: 'AI', triggerQuery: 'chatgpt', modeLabel: 'ChatGPT', prefixLabel: 'ChatGPT', promptQuery: 'What risks are hidden in this PR?', promptWidth: '16em', favicon: 'https://www.google.com/s2/favicons?domain=chatgpt.com&sz=64', iconClass: 'ri-sparkling-2-line', resultTitle: 'Ask ChatGPT "What risks are hidden in this PR?"', actionLabel: 'Open ChatGPT', brandAccentRgb: Object.freeze([16, 163, 127]) })
+            Object.freeze({ kind: 'site', label: 'Site search', triggerQuery: 'github', modeLabel: 'GitHub', prefixLabel: 'GitHub', promptQuery: 'lumno extension', promptWidth: '15ch', favicon: 'https://www.google.com/s2/favicons?domain=github.com&sz=64', iconClass: 'ri-github-fill', resultTitle: 'Search in GitHub "lumno extension"', actionLabel: 'Search in GitHub', brandAccentRgb: Object.freeze([36, 41, 46]) }),
+            Object.freeze({ kind: 'ai', label: 'Ask AI', triggerQuery: 'chatgpt', modeLabel: 'ChatGPT', prefixLabel: 'ChatGPT', promptQuery: 'What should I watch for in this PR?', promptWidth: '16em', favicon: 'https://www.google.com/s2/favicons?domain=chatgpt.com&sz=64', iconClass: 'ri-sparkling-2-line', resultTitle: 'Ask ChatGPT "What should I watch for in this PR?"', actionLabel: 'Open ChatGPT web app', brandAccentRgb: Object.freeze([16, 163, 127]) })
           ])
         }),
         featureCards: Object.freeze([
-          Object.freeze({ art: 'homepage-pip', tone: 'pip', title: 'Auto Picture-in-Picture', body: 'Opens when you leave a video tab' }),
-          Object.freeze({ art: 'newtab-filters', artSize: Object.freeze({ width: 298, height: 120 }), tone: 'newtab', title: 'Make the new tab yours', body: 'Wallpapers and rich filter effects' })
+          Object.freeze({ art: 'homepage-pip', tone: 'pip', title: 'Auto Picture-in-Picture', body: 'Pops out when you leave a video tab' }),
+          Object.freeze({ art: 'newtab-filters', artSize: Object.freeze({ width: 298, height: 120 }), tone: 'newtab', title: 'Make the new tab yours', body: 'Wallpapers, filters, and a softer view' })
         ]),
         featureAwards: Object.freeze([
-          Object.freeze({ lines: Object.freeze(['Open source', 'Privacy-safe']) }),
-          Object.freeze({ lines: Object.freeze(['Free forever']) }),
-          Object.freeze({ lines: Object.freeze(['UX', 'focused']) })
+          Object.freeze({ lines: Object.freeze(['Open source', 'Privacy first']) }),
+          Object.freeze({ lines: Object.freeze(['Free forever', 'No strings']) }),
+          Object.freeze({ lines: Object.freeze(['Feels native', 'stays light']) })
         ])
       })
     })
@@ -1228,6 +1232,7 @@
         copy: Object.freeze({
           eyebrow: '',
           title: text.setup.title,
+          titleLines: text.setup.titleLines,
           body: text.setup.body
         }),
         visualKind: 'bookmark-focus-surface',
@@ -1258,6 +1263,7 @@
         copy: Object.freeze({
           eyebrow: '',
           title: text.search.title,
+          titleLines: text.search.titleLines,
           body: text.search.body
         }),
         visualKind: 'newtab-preview-surface',
@@ -1277,6 +1283,7 @@
         copy: Object.freeze({
           eyebrow: '',
           title: text.newtab.title,
+          titleLines: text.newtab.titleLines,
           body: text.newtab.body
         }),
         visualKind: 'site-search-demo-surface',
@@ -1302,11 +1309,11 @@
         copy: Object.freeze({
           eyebrow: '',
           title: text.finish.title,
+          titleLines: text.finish.titleLines,
           body: text.finish.body
         }),
         visualKind: 'feature-cards-surface',
         visualVisible: true,
-        interactionKinds: Object.freeze(['checklist', 'final-action']),
         cursorEnabled: true,
         actions: Object.freeze({
           primary: Object.freeze({

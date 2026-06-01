@@ -56,6 +56,24 @@ blueprint.slides.forEach((slide, index) => {
   assert.ok(slide.actions && typeof slide.actions === 'object', 'slides should expose lower-left action slots');
 });
 
+locales.forEach((locale) => {
+  const localeBlueprint = onboarding.getOnboardingBlueprint(locale);
+  localeBlueprint.slides.forEach((slide) => {
+    slide.left.interactionSlots.forEach((slot) => {
+      const accordion = slot && slot.accordion;
+      if (!accordion || !Array.isArray(accordion.links)) {
+        return;
+      }
+      accordion.links.forEach((link) => {
+        assert.ok(
+          String(accordion.text || '').includes(link.label),
+          `${locale} ${slot.id} accordion text should include the inline link label "${link.label}"`
+        );
+      });
+    });
+  });
+});
+
 const firstSlide = blueprint.slides[0];
 assert.strictEqual(firstSlide.id, 'intro');
 assert.strictEqual(firstSlide.copy.title, '让浏览器的书签一搜即达');
@@ -351,6 +369,11 @@ assert.strictEqual(
 );
 assert.strictEqual(fifthSlide.visual.visible, true);
 assert.deepStrictEqual(
+  fifthSlide.left.interactionSlots,
+  [],
+  'final page should not render empty left-side placeholder interaction rows'
+);
+assert.deepStrictEqual(
   fifthSlide.actions,
   {
     primary: {
@@ -401,13 +424,13 @@ assert.deepStrictEqual(
   },
   'English first slide should keep the rotating title layout compact'
 );
-assert.strictEqual(en.slides[0].copy.body, 'Open-source command bar & clean new tab');
+assert.strictEqual(en.slides[0].copy.body, 'Open-source command bar + a cleaner new tab');
 assert.deepStrictEqual(
   en.slides[0].left.interactionSlots.map((slot) => slot.label),
   [
-    'Open source, private, user-first',
+    'Open source, private by design',
     'Works in major browsers',
-    'Plays well with other new-tab extensions'
+    'Friendly with other new-tab extensions'
   ],
   'English intro rows should be translated and short enough for the existing layout'
 );
@@ -415,20 +438,58 @@ assert.deepStrictEqual(
   en.slides[1].copy,
   {
     eyebrow: '',
-    title: 'Native-feeling command bar',
-    body: 'Press {shortcut} on any site to open Lumno.'
+    title: 'A command bar that feels native',
+    titleLines: ['A command bar', 'that feels native'],
+    body: 'Press {shortcut} to open Lumno anywhere.'
   },
   'English focus-search copy should preserve the shortcut placeholder'
 );
 assert.strictEqual(
   en.slides[1].left.interactionSlots[0].label,
-  'For Dia browser users',
+  'Using Dia?',
   'English accordion labels should be localized'
 );
 assert.strictEqual(en.slides[1].actions.ghost.label, 'Change shortcut');
-assert.strictEqual(en.slides[2].copy.title, 'A calmer new tab');
+assert.deepStrictEqual(
+  en.slides[2].copy,
+  {
+    eyebrow: '',
+    title: 'A calmer new tab for where you go',
+    titleLines: ['A calmer new tab', 'for where you go'],
+    body: 'Make it yours. Bookmarks and history stay tidy.'
+  },
+  'English new-tab copy should force a two-line title that carries the Chinese meaning'
+);
+assert.deepStrictEqual(
+  en.slides[3].copy,
+  {
+    eyebrow: '',
+    title: 'AI / site search in one jump',
+    titleLines: ['AI / site search', 'in one jump'],
+    body: 'Type, hit Tab, and jump to the right search.'
+  },
+  'English site-search copy should force the second line from "in"'
+);
 assert.strictEqual(en.slides[3].actions.ghost.label, 'Supported sites');
+assert.deepStrictEqual(
+  en.slides[4].copy,
+  {
+    eyebrow: '',
+    title: 'Tiny browser wins that add up',
+    titleLines: ['Tiny browser wins', 'that add up'],
+    body: 'Video popouts, new-tab polish, and useful extras.'
+  },
+  'English finish copy should stay compact and personable'
+);
 assert.strictEqual(en.slides[4].actions.primary.label, 'Start using Lumno');
+
+en.slides.slice(1).forEach((slide) => {
+  assert.strictEqual(slide.copy.titleLines.length, 2, `${slide.id} English title should render as two lines`);
+  slide.copy.titleLines.forEach((line) => {
+    assert.ok(line.length <= 20, `${slide.id} English title line should stay short: ${line}`);
+  });
+  assert.ok(slide.copy.body.length <= 56, `${slide.id} English subtitle should stay short enough to avoid orphan words`);
+});
 
 const zhTw = onboarding.getOnboardingBlueprint('zh-Hant-TW');
 assert.strictEqual(zhTw.locale, 'zh_TW');
@@ -440,15 +501,97 @@ assert.strictEqual(zhTw.slides[4].actions.secondary.label, '為我們評分');
 const ja = onboarding.getOnboardingBlueprint('ja-JP');
 assert.strictEqual(ja.locale, 'ja');
 assert.strictEqual(ja.htmlLang, 'ja');
-assert.strictEqual(ja.slides[0].copy.title, 'ブックマークをすぐ検索');
-assert.strictEqual(ja.slides[1].copy.title, 'ネイティブなコマンドバー');
+assert.strictEqual(ja.slides[0].copy.title, '保存したページをすぐ検索');
+assert.strictEqual(ja.slides[1].copy.title, 'どこでも呼び出せる');
+assert.strictEqual(ja.slides[3].copy.body, '検索語入力後に Tab。サイト内検索をすぐ開けます。');
 assert.strictEqual(ja.slides[4].actions.secondary.label, '評価する');
+assert.deepStrictEqual(
+  ja.runtimeCopy.featureAwards.map((award) => award.lines),
+  [
+    ['中身を公開', '情報に配慮'],
+    ['ずっと無料', '制限なし'],
+    ['使いやすさ', '細部まで']
+  ],
+  'Japanese feature awards should use balanced two-line labels'
+);
+
+function collectStringValues(value, bucket) {
+  if (typeof value === 'string') {
+    bucket.push(value);
+    return bucket;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectStringValues(item, bucket));
+    return bucket;
+  }
+  if (value && typeof value === 'object') {
+    Object.values(value).forEach((item) => collectStringValues(item, bucket));
+  }
+  return bucket;
+}
+
+const jaOnboardingStrings = collectStringValues(ja, []);
+[
+  'ブックマーク',
+  'ネイティブ',
+  'コマンドバー',
+  'ショートカット',
+  'オープンソース',
+  'ミニマル',
+  'プライバシー',
+  'リポジトリ',
+  'カスタマイズ',
+  'フィードバック',
+  'オンボーディング',
+  'ナビゲーション',
+  'ブックマークマネージャー',
+  'ピクチャーインピクチャー',
+  'ワークスペース',
+  'ドキュメント',
+  'プレビュー'
+].forEach((term) => {
+  assert.strictEqual(
+    jaOnboardingStrings.some((text) => text.includes(term)),
+    false,
+    `Japanese onboarding copy should avoid long katakana term: ${term}`
+  );
+});
 
 const enRuntimeCopy = onboarding.getOnboardingRuntimeCopy('en');
 assert.strictEqual(enRuntimeCopy.misc.openLabel, 'Open');
 assert.strictEqual(enRuntimeCopy.newtabPreview.sections.bookmarks, 'Bookmarks');
 assert.strictEqual(enRuntimeCopy.siteSearchDemo.tabHintTemplate, 'Search with {provider}');
+assert.deepStrictEqual(
+  enRuntimeCopy.siteSearchDemo.cases.map((item) => ({
+    kind: item.kind,
+    resultTitle: item.resultTitle,
+    actionLabel: item.actionLabel
+  })),
+  [
+    {
+      kind: 'site',
+      resultTitle: 'Search in GitHub "lumno extension"',
+      actionLabel: 'Search in GitHub'
+    },
+    {
+      kind: 'ai',
+      resultTitle: 'Ask ChatGPT "What should I watch for in this PR?"',
+      actionLabel: 'Open ChatGPT web app'
+    }
+  ],
+  'English site-search demo highlighted rows should mirror the real Lumno suggestion copy'
+);
 assert.strictEqual(enRuntimeCopy.featureCards[0].title, 'Auto Picture-in-Picture');
+assert.strictEqual(enRuntimeCopy.featureCards[0].body, 'Pops out when you leave a video tab');
+assert.deepStrictEqual(
+  enRuntimeCopy.featureAwards.map((award) => award.lines),
+  [
+    ['Open source', 'Privacy first'],
+    ['Free forever', 'No strings'],
+    ['Feels native', 'stays light']
+  ],
+  'English feature awards should read naturally in compact two-line badges'
+);
 
 assert.deepStrictEqual(
   onboarding.getShortcutDisplayTokens('⌘T'),

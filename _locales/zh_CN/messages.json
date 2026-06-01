@@ -518,6 +518,12 @@
   "newtab_feedback_github_issue_tooltip": {
     "message": "提交 GitHub Issue"
   },
+  "newtab_feedback_chrome_review_label": {
+    "message": "Chrome 评分"
+  },
+  "newtab_feedback_chrome_review_tooltip": {
+    "message": "在 Chrome Web Store 评分"
+  },
   "newtab_feedback_mail_label": {
     "message": "邮箱"
   },

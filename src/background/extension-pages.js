@@ -7,6 +7,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function() {
   const ONBOARDING_WEB_URL = 'https://lumno.kubai.design/onboarding/';
   const ONBOARDING_ROUTE_PATH = 'src/onboarding/onboarding.html';
+  const ONBOARDING_UPDATE_MIGRATION_VERSION = 'v0.9.11';
   const RELEASE_URL = 'https://lumno.kubai.design/release/';
   const RELEASE_PAGE_OPENED_STORAGE_KEY = '_x_lumno_release_page_opened_2026_unique_';
 
@@ -132,15 +133,34 @@
     });
   }
 
-  function getExtensionVersionTag() {
-    const chromeApi = getChromeApi();
-    const version = chromeApi && chromeApi.runtime && chromeApi.runtime.getManifest
-      ? String((chromeApi.runtime.getManifest() || {}).version || '').trim()
-      : '';
+  function normalizeExtensionVersionTag(value) {
+    const version = String(value || '').trim();
     if (!version) {
       return '';
     }
-    return /^v/i.test(version) ? version : `v${version}`;
+    return /^v/i.test(version) ? `v${version.slice(1)}` : `v${version}`;
+  }
+
+  function shouldOpenOnboardingForUpdate(details, currentVersion) {
+    const reason = details && typeof details.reason === 'string'
+      ? String(details.reason).trim().toLowerCase()
+      : '';
+    if (reason !== 'update') {
+      return false;
+    }
+    const version = normalizeExtensionVersionTag(currentVersion || getExtensionVersionTag());
+    if (version !== ONBOARDING_UPDATE_MIGRATION_VERSION) {
+      return false;
+    }
+    const previousVersion = normalizeExtensionVersionTag(details && details.previousVersion);
+    return previousVersion !== ONBOARDING_UPDATE_MIGRATION_VERSION;
+  }
+
+  function getExtensionVersionTag() {
+    const chromeApi = getChromeApi();
+    return normalizeExtensionVersionTag(chromeApi && chromeApi.runtime && chromeApi.runtime.getManifest
+      ? String((chromeApi.runtime.getManifest() || {}).version || '').trim()
+      : '');
   }
 
   function getLocalStorageArea(chromeApi) {
@@ -340,7 +360,9 @@
   return Object.freeze({
     buildReleaseUrl,
     buildOnboardingUrl,
+    shouldOpenOnboardingForUpdate,
     ONBOARDING_WEB_URL,
+    ONBOARDING_UPDATE_MIGRATION_VERSION,
     ONBOARDING_ROUTE_PATH,
     RELEASE_PAGE_OPENED_STORAGE_KEY,
     getBookmarkManagerUrls,

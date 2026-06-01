@@ -340,9 +340,9 @@ function flushMicrotasks() {
   );
   assert(
     updateNoticeCss.includes('transform: translateX(-50%) translateY(calc(-100% + 2px)) scale(0.985);') &&
-      updateNoticeCss.includes('transform: translateX(-50%) translateY(calc(-100% - 8px)) scale(1);') &&
+      updateNoticeCss.includes('transform: translateX(-50%) translateY(calc(-100% - 14px)) scale(1);') &&
       updateNoticeCss.includes('filter: blur(6px);'),
-    'overlay update notice should use the same vertical blur/scale enter motion as the overlay'
+    'overlay update notice should use a slightly higher vertical blur/scale enter motion above the overlay'
   );
   assert(
     updateNoticeCss.includes('.x-lumno-feature-hint--update-notice-overlay[data-overlay-mounting="true"]') &&
@@ -354,6 +354,46 @@ function flushMicrotasks() {
     updateNoticeCss.includes('gap: 3px;') &&
       updateNoticeCss.includes('padding: 2px 10px 2px 2px;'),
     'update notice badge should keep the badge left inset equal to its vertical inset'
+  );
+  assert(
+    updateNoticeCss.includes('linear-gradient(180deg, var(--x-lumno-feature-hint-badge-gloss) 0%, transparent 48%)') &&
+      updateNoticeCss.includes('border: 1px solid var(--x-lumno-feature-hint-badge-border);') &&
+      updateNoticeCss.includes('box-shadow: var(--x-lumno-feature-hint-badge-shadow);'),
+    'update notice badge should use layered gloss, a hairline border, and depth shadow'
+  );
+  const lightUpdateNoticeBadgeRuleMatch = updateNoticeCss.match(
+    /\.x-lumno-feature-hint--update-notice \.x-lumno-feature-hint__badge \{([\s\S]*?)\n\}/
+  );
+  assert(lightUpdateNoticeBadgeRuleMatch, 'light update notice badge should own scoped material tokens');
+  const lightUpdateNoticeBadgeRule = lightUpdateNoticeBadgeRuleMatch[1];
+  assert(
+    lightUpdateNoticeBadgeRule.includes('--x-lumno-feature-hint-badge-bg: rgba(75, 84, 95, 0.055);') &&
+      lightUpdateNoticeBadgeRule.includes('--x-lumno-feature-hint-badge-gloss: rgba(255, 255, 255, 0.28);') &&
+      lightUpdateNoticeBadgeRule.includes('--x-lumno-feature-hint-badge-border: rgba(75, 84, 95, 0.09);') &&
+      lightUpdateNoticeBadgeRule.includes('0 1px 1px rgba(17, 24, 39, 0.04);'),
+    'light update notice badge should keep the material subtle, not pillowy'
+  );
+  const darkUpdateNoticeSweepRuleMatch = updateNoticeCss.match(
+    /body\[data-theme="dark"\] \.x-lumno-feature-hint--update-notice,[\s\S]*?\.x-lumno-feature-hint--update-notice-overlay\[data-theme="dark"\] \{([\s\S]*?)\n\}/
+  );
+  assert(darkUpdateNoticeSweepRuleMatch, 'dark update notice should own a scoped badge sweep override');
+  const darkUpdateNoticeSweepRule = darkUpdateNoticeSweepRuleMatch[1];
+  assert(
+    darkUpdateNoticeSweepRule.includes('--x-lumno-feature-hint-sweep-edge: rgba(255, 255, 255, 0.025);') &&
+      darkUpdateNoticeSweepRule.includes('--x-lumno-feature-hint-sweep-core: rgba(255, 255, 255, 0.09);') &&
+      darkUpdateNoticeSweepRule.includes('--x-lumno-feature-hint-sweep-line: rgba(255, 255, 255, 0.14);'),
+    'dark update notice badge sweep should be subtler than the generic dark feature hint sweep'
+  );
+  const darkUpdateNoticeBadgeRuleMatch = updateNoticeCss.match(
+    /body\[data-theme="dark"\] \.x-lumno-feature-hint--update-notice \.x-lumno-feature-hint__badge,[\s\S]*?\.x-lumno-feature-hint--update-notice-overlay\[data-theme="dark"\] \.x-lumno-feature-hint__badge \{([\s\S]*?)\n\}/
+  );
+  assert(darkUpdateNoticeBadgeRuleMatch, 'dark update notice badge should override the light badge material on the badge element');
+  const darkUpdateNoticeBadgeRule = darkUpdateNoticeBadgeRuleMatch[1];
+  assert(
+    darkUpdateNoticeBadgeRule.includes('--x-lumno-feature-hint-badge-gloss: rgba(255, 255, 255, 0.07);') &&
+      darkUpdateNoticeBadgeRule.includes('--x-lumno-feature-hint-badge-border: rgba(255, 255, 255, 0.1);') &&
+      darkUpdateNoticeBadgeRule.includes('0 1px 1px rgba(0, 0, 0, 0.14);'),
+    'dark update notice badge should keep material contrast without making the sweep brighter'
   );
   assert(
     updateNoticeCss.includes('.x-lumno-feature-hint__badge-icon[data-icon-type="text"]') &&

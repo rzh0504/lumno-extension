@@ -518,6 +518,12 @@
   "newtab_feedback_github_issue_tooltip": {
     "message": "Opening a GitHub Issue"
   },
+  "newtab_feedback_chrome_review_label": {
+    "message": "Chrome rating"
+  },
+  "newtab_feedback_chrome_review_tooltip": {
+    "message": "Rate on Chrome Web Store"
+  },
   "newtab_feedback_mail_label": {
     "message": "Email"
   },

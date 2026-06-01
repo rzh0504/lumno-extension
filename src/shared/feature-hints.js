@@ -17,6 +17,7 @@
       widthMode: 'content',
       dismissStorage: 'sync',
       rememberOnFirstShow: true,
+      roundedArrowTip: true,
       badgeIcon: 'ri-asterisk',
       badgeKey: 'newtab_wallpaper_feature_hint_badge',
       badgeFallback: 'New',
@@ -37,6 +38,7 @@
       alignMode: 'auto',
       dismissStorage: 'sync',
       rememberOnFirstShow: true,
+      roundedArrowTip: true,
       badgeIcon: 'ri-asterisk',
       badgeKey: 'newtab_ai_quick_jump_feature_hint_badge',
       badgeFallback: 'New',
@@ -269,7 +271,11 @@
     const rememberOnFirstShow = typeof config.rememberOnFirstShow === 'boolean'
       ? config.rememberOnFirstShow
       : Boolean(definition.rememberOnFirstShow);
+    const roundedArrowTip = typeof config.roundedArrowTip === 'boolean'
+      ? config.roundedArrowTip
+      : Boolean(definition.roundedArrowTip);
     const element = documentObj.createElement('span');
+    const arrowTip = documentObj.createElement('span');
     const text = documentObj.createElement('span');
     const badge = documentObj.createElement('span');
     const badgeIcon = documentObj.createElement('span');
@@ -303,9 +309,13 @@
     element.setAttribute('data-align-mode', alignMode);
     element.setAttribute('data-multiline', 'false');
     element.setAttribute('data-has-link', hasLink ? 'true' : 'false');
+    element.setAttribute('data-rounded-arrow-tip', roundedArrowTip ? 'true' : 'false');
     element.setAttribute('data-visible', 'false');
     element.setAttribute('data-dismissed', dismissed ? 'true' : 'false');
     element.setAttribute('aria-hidden', 'true');
+
+    arrowTip.className = 'x-lumno-feature-hint__arrow-tip';
+    arrowTip.setAttribute('aria-hidden', 'true');
 
     badge.className = 'x-lumno-feature-hint__badge';
     badgeIcon.className = 'x-lumno-feature-hint__badge-icon';
@@ -365,6 +375,9 @@
       controller.dismiss();
     });
 
+    if (roundedArrowTip) {
+      element.appendChild(arrowTip);
+    }
     element.appendChild(badge);
     element.appendChild(text);
     if (hasLink) {

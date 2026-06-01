@@ -12,6 +12,7 @@
   const TITLE_CYCLE_FIRST_DELAY_MS = 520;
   const TEXT_SWAP_FALLBACK_DURATION_MS = 200;
   const SITE_SEARCH_OPTIONS_PAGE_PATH = 'src/options/options.html#shortcuts';
+  const FOCUSED_NEWTAB_RELATIVE_PAGE_PATH = '../newtab/newtab.html?focus=1';
   const LUMNO_CHROME_WEB_STORE_URL = 'https://chromewebstore.google.com/detail/lumno-%E8%81%9A%E7%84%A6%E6%90%9C%E7%B4%A2%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/nggfkkbmogmadfoikakkfegkoilfcfao?utm_source=item-share-cb';
   const ACTION_MESSAGE_BY_ID = Object.freeze({
     openShortcuts: 'openExtensionShortcutsPage',
@@ -318,6 +319,38 @@
       ? chromeApi.runtime.getURL(pagePath)
       : pagePath;
     return hash ? `${baseUrl}#${hash}` : baseUrl;
+  }
+
+  function navigateOnboardingToNewtab() {
+    const chromeApi = getChromeApi();
+    const routes = globalThis.LumnoExtensionRoutes;
+    let url = '';
+    if (routes && typeof routes.buildNewtabUrl === 'function') {
+      url = routes.buildNewtabUrl(chromeApi, { focus: true });
+    }
+    if (!url && chromeApi && chromeApi.runtime && typeof chromeApi.runtime.getURL === 'function') {
+      url = chromeApi.runtime.getURL('src/newtab/newtab.html?focus=1');
+    }
+    if (!url && typeof window !== 'undefined' && window.location) {
+      try {
+        url = new URL(FOCUSED_NEWTAB_RELATIVE_PAGE_PATH, window.location.href).toString();
+      } catch (error) {
+        url = FOCUSED_NEWTAB_RELATIVE_PAGE_PATH;
+      }
+    }
+    if (!url || typeof window === 'undefined' || !window.location) {
+      return false;
+    }
+    try {
+      if (typeof window.location.assign === 'function') {
+        window.location.assign(url);
+        return true;
+      }
+      window.location.href = url;
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
 
   function openExtensionPageTab(path) {
@@ -3320,9 +3353,12 @@
     }
     updateOnboardingFrameScale();
     const rect = visualSlot.getBoundingClientRect();
-    const availableWidth = visualSlot.clientWidth || rect.width || 0;
     const isCompactLayout = isStackedOnboardingLayout();
+    const viewportWidth = window.innerWidth || root.clientWidth || VISUAL_CANVAS_WIDTH;
     const viewportHeight = window.innerHeight || root.clientHeight || VISUAL_CANVAS_HEIGHT;
+    const availableWidth = isCompactLayout
+      ? Math.min(viewportWidth, visualSlot.clientWidth || rect.width || viewportWidth)
+      : (visualSlot.clientWidth || rect.width || 0);
     const compactVisualHeight = Math.max(0, viewportHeight - getCompactCopyContentHeight());
     const availableHeight = isCompactLayout
       ? compactVisualHeight
@@ -3544,6 +3580,9 @@
     title.dataset.empty = text ? 'false' : 'true';
     title.textContent = '';
     title.removeAttribute('aria-label');
+    if (lines.length > 0 && text) {
+      title.setAttribute('aria-label', text);
+    }
     if (renderTitleCycleCopy(slide, lines)) {
       return;
     }
@@ -3737,6 +3776,11 @@
     if (id === 'openChromeWebStore') {
       openExternalTab(LUMNO_CHROME_WEB_STORE_URL);
       return;
+    }
+    if (id === 'openNewtab') {
+      if (navigateOnboardingToNewtab()) {
+        return;
+      }
     }
 
     const chromeApi = getChromeApi();

@@ -105,6 +105,7 @@ const BACKGROUND_PAGES = globalThis.LumnoBackgroundPages || {};
 const getExtensionDetailsUrl = BACKGROUND_PAGES.getExtensionDetailsUrl;
 const openExtensionOptionsPage = BACKGROUND_PAGES.openExtensionOptionsPage;
 const openOnboardingPage = BACKGROUND_PAGES.openOnboardingPage;
+const shouldOpenOnboardingForUpdate = BACKGROUND_PAGES.shouldOpenOnboardingForUpdate;
 const openReleasePage = BACKGROUND_PAGES.openReleasePage;
 const openBookmarkManagerPage = BACKGROUND_PAGES.openBookmarkManagerPage;
 const openExtensionShortcutsPage = BACKGROUND_PAGES.openExtensionShortcutsPage;
@@ -1890,6 +1891,9 @@ chrome.runtime.onInstalled.addListener((details) => {
     return;
   }
   if (reason === 'update') {
+    if (typeof shouldOpenOnboardingForUpdate === 'function' && shouldOpenOnboardingForUpdate(details)) {
+      openOnboardingPage({ reason: 'update' });
+    }
     publishExtensionUpdateNotice(details);
   }
   schedulePersistPinnedTabSnapshot();

@@ -81,6 +81,22 @@ function openSiteSearchOptionsPage() {
   assert.strictEqual(builtOnboardingUrl.searchParams.get('reason'), 'manual', 'built onboarding URL should include open reason');
   assert.strictEqual(builtOnboardingUrl.searchParams.get('version'), 'v0.9.9', 'built onboarding URL should include extension version');
 
+  assert.strictEqual(
+    pages.shouldOpenOnboardingForUpdate({ reason: 'update', previousVersion: '0.9.10' }, '0.9.11'),
+    true,
+    '0.9.11 update should open onboarding once for existing users'
+  );
+  assert.strictEqual(
+    pages.shouldOpenOnboardingForUpdate({ reason: 'install' }, '0.9.11'),
+    false,
+    'install should not rely on the one-time update onboarding gate'
+  );
+  assert.strictEqual(
+    pages.shouldOpenOnboardingForUpdate({ reason: 'update', previousVersion: '0.9.11' }, '0.9.12'),
+    false,
+    'future updates after 0.9.11 should not open onboarding for existing users'
+  );
+
   const onboardingOpened = await openOnboardingPage({ reason: 'manual' });
   assert.strictEqual(onboardingOpened, true, 'manual onboarding should open a tab');
   assert.strictEqual(createdTabs.length, 1, 'manual onboarding should create one tab');
