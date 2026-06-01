@@ -1,0 +1,77 @@
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+
+const repoRoot = path.join(__dirname, '..');
+const backgroundJs = fs.readFileSync(path.join(repoRoot, 'src/background/background.js'), 'utf8');
+const overlayRuntimeJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/runtime.js'), 'utf8');
+const overlayJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/search-panel.js'), 'utf8');
+const actionModelJs = fs.readFileSync(path.join(repoRoot, 'src/shared/suggestion-action-model.js'), 'utf8');
+
+assert.match(
+  overlayRuntimeJs,
+  /documentPipEnabled:\s*'_x_extension_document_pip_enabled_2026_unique_'/,
+  'overlay runtime should expose the web clip storage key'
+);
+
+assert.match(
+  backgroundJs,
+  /documentPipEnabled:\s*documentPipEnabledCache/,
+  'background should pass the current web clip setting into the overlay context'
+);
+
+assert.match(
+  backgroundJs,
+  /'openDocumentPipPicker'/,
+  'background message router should route the web clip command action'
+);
+assert.match(
+  backgroundJs,
+  /case 'openDocumentPipPicker':[\s\S]*?openDocumentPipPickerOnTab\(senderTab,\s*'search-command'\)/,
+  'web clip command messages should open the Document PiP picker on the sender tab'
+);
+
+assert.match(
+  overlayJs,
+  /let documentPipEnabled = Boolean\(normalizedOverlayContext\.documentPipEnabled\);/,
+  'overlay should initialize web clip command visibility from the injected context'
+);
+assert.match(
+  overlayJs,
+  /type:\s*'commandDocumentPip'[\s\S]*?primary:\s*'clip'[\s\S]*?requiresDocumentPipEnabled:\s*true/,
+  'overlay command definitions should include a plain clip command gated by the web clip setting'
+);
+assert.match(
+  overlayJs,
+  /if \(command\.requiresDocumentPipEnabled && !documentPipEnabled\) \{[\s\S]*?continue;/,
+  'clip command matching should be skipped while web clip is disabled'
+);
+assert.match(
+  overlayJs,
+  /case 'commandDocumentPip':[\s\S]*?chrome\.runtime\.sendMessage\(\{\s*action:\s*'openDocumentPipPicker'\s*\}/,
+  'overlay should activate the web clip command through the background picker action'
+);
+assert.match(
+  overlayJs,
+  /suggestion\.type === 'commandDocumentPip'[\s\S]*?ri-scissors-cut-line/,
+  'web clip command suggestions should render with a dedicated clipping icon'
+);
+assert.match(
+  overlayJs,
+  /overlayDocumentPipStorageListener = \(changes,\s*areaName\) =>[\s\S]*?documentPipEnabled = changes\[DOCUMENT_PIP_ENABLED_STORAGE_KEY\]\.newValue === true/,
+  'overlay should keep clip command visibility synced if the setting changes'
+);
+
+assert.match(
+  actionModelJs,
+  /if \(suggestion\.type === 'commandDocumentPip'\) \{[\s\S]*?return 'commandDocumentPip';/,
+  'suggestion action model should expose a command-specific action for web clip'
+);
+
+['en', 'ja', 'zh_CN', 'zh_TW'].forEach((locale) => {
+  const messages = JSON.parse(fs.readFileSync(path.join(repoRoot, '_locales', locale, 'messages.json'), 'utf8'));
+  assert.ok(messages.document_pip_command_title && messages.document_pip_command_title.message, `${locale} should localize the web clip command title`);
+  assert.ok(messages.document_pip_command_action && messages.document_pip_command_action.message, `${locale} should localize the web clip command action`);
+});
+
+console.log('document PiP clip command tests passed');

@@ -331,6 +331,8 @@
           return t('command_newtab', '新建标签页');
         case 'commandSettings':
           return formatMessage('command_settings', '打开 {name} 设置', { name: 'Lumno' });
+        case 'commandDocumentPip':
+          return t('document_pip_command_action', '开始剪裁');
         default:
           return t('action_open_new_tab', '新开');
       }
@@ -818,6 +820,8 @@
           iconNode = createSuggestionInlineIcon('ri-add-line', 'subtext');
         } else if (suggestion.type === 'commandSettings') {
           iconNode = createSuggestionInlineIcon('ri-settings-3-line', 'subtext');
+        } else if (suggestion.type === 'commandDocumentPip') {
+          iconNode = createSuggestionInlineIcon('ri-scissors-cut-line', 'subtext');
         } else if (suggestion.type === 'modeSwitch' && suggestion.favicon) {
           const favicon = createFaviconImage(index);
           favicon.src = suggestion.favicon || '';

@@ -134,6 +134,12 @@
   "settings_document_pip_desc": {
     "message": "ページ内の一部を切り出して浮かせて表示。参照や比較に使えます"
   },
+  "document_pip_command_title": {
+    "message": "ページ小窓を開始"
+  },
+  "document_pip_command_action": {
+    "message": "開始"
+  },
   "settings_auto_pip_title": {
     "message": "動画を自動で小窓表示"
   },
@@ -835,6 +841,9 @@
   },
   "shortcuts_placeholder_alias": {
     "message": "任意。例：Bilibili、YouTubeなど"
+  },
+  "shortcuts_insert_query": {
+    "message": "{query}を挿入"
   },
   "shortcuts_add": {
     "message": "サイト内検索を追加"

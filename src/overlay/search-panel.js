@@ -8,6 +8,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   let overlaySearchResultPriorityStorageListener = null;
   let overlaySearchResultSourceTypesStorageListener = null;
   let overlaySearchBlacklistStorageListener = null;
+  let overlayDocumentPipStorageListener = null;
   let overlaySizeStorageListener = null;
   let overlayTabPriorityStorageListener = null;
   let overlayTabScoreDebugStorageListener = null;
@@ -152,6 +153,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   const DEFAULT_SEARCH_ENGINE_STORAGE_KEY = overlayStorageKeys.defaultSearchEngine;
   const SITE_SEARCH_STORAGE_KEY = overlayStorageKeys.siteSearchCustom;
   const SITE_SEARCH_DISABLED_STORAGE_KEY = overlayStorageKeys.siteSearchDisabled;
+  const DOCUMENT_PIP_ENABLED_STORAGE_KEY = overlayStorageKeys.documentPipEnabled;
   const SEARCH_RESULT_PRIORITY_STORAGE_KEY = overlayStorageKeys.searchResultPriority;
   const SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY = overlayStorageKeys.searchResultSourceTypes;
   const SEARCH_BLACKLIST_STORAGE_KEY = overlayStorageKeys.searchBlacklist;
@@ -172,6 +174,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   let overlaySearchResultPriorityMode = 'autocomplete';
   let overlaySizeMode = 'standard';
   let overlaySearchBlacklistItems = [];
+  let documentPipEnabled = Boolean(normalizedOverlayContext.documentPipEnabled);
   let overlayThemeListenerAttached = false;
 
   function normalizeOverlaySearchBlacklistItems(items) {
@@ -853,6 +856,10 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       chrome.storage.onChanged.removeListener(overlaySearchBlacklistStorageListener);
       overlaySearchBlacklistStorageListener = null;
     }
+    if (overlayDocumentPipStorageListener) {
+      chrome.storage.onChanged.removeListener(overlayDocumentPipStorageListener);
+      overlayDocumentPipStorageListener = null;
+    }
     if (overlayTabPriorityStorageListener) {
       chrome.storage.onChanged.removeListener(overlayTabPriorityStorageListener);
       overlayTabPriorityStorageListener = null;
@@ -1303,17 +1310,36 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         type: 'commandSettings',
         primary: '/settings',
         aliases: ['/set', '/settings', '/s']
+      },
+      {
+        type: 'commandDocumentPip',
+        primary: 'clip',
+        aliases: ['webclip', 'web clip'],
+        exactMatch: true,
+        requiresDocumentPipEnabled: true
       }
     ];
 
     function getCommandMatch(rawInput) {
       const input = String(rawInput || '').trim().toLowerCase();
-      if (!input.startsWith('/')) {
-        return null;
-      }
       for (let i = 0; i < commandDefinitions.length; i += 1) {
         const command = commandDefinitions[i];
+        if (command.requiresDocumentPipEnabled && !documentPipEnabled) {
+          continue;
+        }
         const tokens = [command.primary].concat(command.aliases || []);
+        if (command.exactMatch) {
+          if (tokens.includes(input)) {
+            return {
+              command: command,
+              completion: command.primary
+            };
+          }
+          continue;
+        }
+        if (!input.startsWith('/')) {
+          continue;
+        }
         for (let j = 0; j < tokens.length; j += 1) {
           const token = tokens[j];
           if (token.startsWith(input) || input.startsWith(token)) {
@@ -1333,6 +1359,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         titleText = formatMessage('command_settings', '打开 Lumno 设置', {
           name: 'Lumno'
         });
+      } else if (command.type === 'commandDocumentPip') {
+        titleText = t('document_pip_command_title', '开启网页剪裁');
       } else {
         titleText = t('command_newtab', '新建标签页');
       }
@@ -2166,6 +2194,24 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       }
     };
     chrome.storage.onChanged.addListener(overlaySearchBlacklistStorageListener);
+    if (storageArea) {
+      storageArea.get([DOCUMENT_PIP_ENABLED_STORAGE_KEY], (result) => {
+        documentPipEnabled = result && result[DOCUMENT_PIP_ENABLED_STORAGE_KEY] === true;
+        if (latestOverlayQuery) {
+          updateSearchSuggestions(lastSuggestionResponse, latestOverlayQuery);
+        }
+      });
+    }
+    overlayDocumentPipStorageListener = (changes, areaName) => {
+      if (!storageAreaName || areaName !== storageAreaName || !changes[DOCUMENT_PIP_ENABLED_STORAGE_KEY]) {
+        return;
+      }
+      documentPipEnabled = changes[DOCUMENT_PIP_ENABLED_STORAGE_KEY].newValue === true;
+      if (latestOverlayQuery) {
+        updateSearchSuggestions(lastSuggestionResponse, latestOverlayQuery);
+      }
+    };
+    chrome.storage.onChanged.addListener(overlayDocumentPipStorageListener);
 
     if (storageArea) {
       storageArea.get([OVERLAY_TAB_PRIORITY_STORAGE_KEY], (result) => {
@@ -2592,7 +2638,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       if (!suggestion) {
         return false;
       }
-    const neutralTypes = ['googleSuggest', 'newtab', 'modeSwitch', 'chatgpt', 'perplexity', 'commandNewTab', 'commandSettings'];
+      const neutralTypes = ['googleSuggest', 'newtab', 'modeSwitch', 'chatgpt', 'perplexity', 'commandNewTab', 'commandSettings', 'commandDocumentPip'];
       if (neutralTypes.includes(suggestion.type)) {
         return false;
       }
@@ -2829,6 +2875,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           return t('command_newtab', '新建标签页');
         case 'commandSettings':
           return formatMessage('command_settings', '打开 {name} 设置', { name: 'Lumno' });
+        case 'commandDocumentPip':
+          return t('document_pip_command_action', '开始剪裁');
         default:
           return t('action_open_new_tab', '新开');
       }
@@ -3799,6 +3847,10 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       });
     }
 
+    function openDocumentPipPickerFromOverlay() {
+      chrome.runtime.sendMessage({ action: 'openDocumentPipPicker' });
+    }
+
     // Add input event for search suggestions
     searchInput.addEventListener('compositionstart', function() {
       isComposing = true;
@@ -4142,6 +4194,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             chrome.runtime.sendMessage({ action: 'openNewTab' });
           } else if (commandMatch.command.type === 'commandSettings') {
             chrome.runtime.sendMessage({ action: 'openOptionsPage' });
+          } else if (commandMatch.command.type === 'commandDocumentPip') {
+            openDocumentPipPickerFromOverlay();
           }
           removeOverlay(overlay);
           document.removeEventListener('click', clickOutsideHandler);
@@ -4179,6 +4233,14 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             }
             if (selectedSuggestion.type === 'commandSettings') {
               chrome.runtime.sendMessage({ action: 'openOptionsPage' });
+              removeOverlay(overlay);
+              document.removeEventListener('click', clickOutsideHandler);
+              document.removeEventListener('keydown', keydownHandler);
+              document.removeEventListener('keydown', captureTabHandler, true);
+              return;
+            }
+            if (selectedSuggestion.type === 'commandDocumentPip') {
+              openDocumentPipPickerFromOverlay();
               removeOverlay(overlay);
               document.removeEventListener('click', clickOutsideHandler);
               document.removeEventListener('keydown', keydownHandler);
@@ -5621,6 +5683,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             iconNode = createSuggestionInlineIcon('ri-add-line', 'subtext');
           } else if (suggestion.type === 'commandSettings') {
             iconNode = createSuggestionInlineIcon('ri-settings-3-line', 'subtext');
+          } else if (suggestion.type === 'commandDocumentPip') {
+            iconNode = createSuggestionInlineIcon('ri-scissors-cut-line', 'subtext');
           } else if (suggestion.type === 'modeSwitch' && suggestion.favicon) {
             const favicon = document.createElement('img');
             favicon.className = 'x-ov-suggestion-favicon';
@@ -5962,6 +6026,14 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
               document.removeEventListener('keydown', captureTabHandler, true);
               return;
             }
+            if (suggestion.type === 'commandDocumentPip') {
+              openDocumentPipPickerFromOverlay();
+              removeOverlay(overlay);
+              document.removeEventListener('click', clickOutsideHandler);
+              document.removeEventListener('keydown', keydownHandler);
+              document.removeEventListener('keydown', captureTabHandler, true);
+              return;
+            }
             if (suggestion.type === 'siteSearchPrompt' && suggestion.provider) {
               activateSiteSearch(suggestion.provider);
               searchInput.focus();
@@ -6019,6 +6091,14 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             }
             if (suggestion.type === 'commandSettings') {
               chrome.runtime.sendMessage({ action: 'openOptionsPage' });
+              removeOverlay(overlay);
+              document.removeEventListener('click', clickOutsideHandler);
+              document.removeEventListener('keydown', keydownHandler);
+              document.removeEventListener('keydown', captureTabHandler, true);
+              return;
+            }
+            if (suggestion.type === 'commandDocumentPip') {
+              openDocumentPipPickerFromOverlay();
               removeOverlay(overlay);
               document.removeEventListener('click', clickOutsideHandler);
               document.removeEventListener('keydown', keydownHandler);

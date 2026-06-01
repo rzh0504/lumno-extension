@@ -13,11 +13,12 @@ const ALLOWLIST = [
   'brand/provider names in assets/data/site-search.json and provider defaults',
   'AI provider remote page selector probes in src/background/ai-provider-submit.js',
   'localized onboarding content model in src/onboarding/onboarding-content.js',
+  'localized update notice fallback model in src/shared/update-notice.js',
   'browser built-in bookmark folder aliases used only for folder detection',
   'debug-only score reason strings when the debug flag is disabled by default',
   'Chinese search-intent tokens in src/shared/search-utils.js scoring dictionaries'
 ];
-const I18N_CALL_RE = /(?:^|[^\w])(?:t|getMessage|formatMessage|updateSyncStatusText|attachPopconfirm|createModeOption)\s*\(/;
+const I18N_CALL_RE = /(?:^|[^\w])(?:t|baseT|getMessage|formatMessage|updateSyncStatusText|attachPopconfirm|createModeOption)\s*\(/;
 
 function walk(root) {
   if (!fs.existsSync(root)) {
@@ -104,6 +105,10 @@ function isAllowlistedLine(file, line) {
     return true;
   }
   if (file === 'src/onboarding/onboarding-content.js') {
+    return true;
+  }
+  if (file === 'src/shared/update-notice.js' &&
+      /\b(?:badgeFallback|textFallback|linkFallback|closeLabelFallback):\s*['"`]/.test(line)) {
     return true;
   }
   if (file === 'src/onboarding/onboarding.js' && /\b(?:error|copied):\s*['"`]/.test(line)) {

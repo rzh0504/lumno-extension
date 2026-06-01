@@ -47,6 +47,9 @@
     if (suggestion.type === 'commandSettings') {
       return 'commandSettings';
     }
+    if (suggestion.type === 'commandDocumentPip') {
+      return 'commandDocumentPip';
+    }
     if (config.shouldSwitchMatchedTab) {
       return 'switch';
     }

@@ -134,6 +134,12 @@
   "settings_document_pip_desc": {
     "message": "把網頁中的局部內容單獨剪出來懸浮查看，可用於參考、對照"
   },
+  "document_pip_command_title": {
+    "message": "開啟網頁剪裁"
+  },
+  "document_pip_command_action": {
+    "message": "開始剪裁"
+  },
   "settings_auto_pip_title": {
     "message": "自動畫中畫"
   },
@@ -835,6 +841,9 @@
   },
   "shortcuts_placeholder_alias": {
     "message": "選填，例如 小破站、油管等"
+  },
+  "shortcuts_insert_query": {
+    "message": "插入 {query}"
   },
   "shortcuts_add": {
     "message": "新增站內搜尋"

@@ -12,6 +12,7 @@
     defaultSearchEngine: '_x_extension_default_search_engine_2024_unique_',
     siteSearchCustom: '_x_extension_site_search_custom_2024_unique_',
     siteSearchDisabled: '_x_extension_site_search_disabled_2024_unique_',
+    documentPipEnabled: '_x_extension_document_pip_enabled_2026_unique_',
     searchResultPriority: '_x_extension_search_result_priority_2026_unique_',
     searchResultSourceTypes: '_x_extension_search_result_source_types_2026_unique_',
     searchBlacklist: '_x_extension_search_blacklist_2026_unique_',

@@ -77,6 +77,7 @@
   const siteSearchKeyInput = document.getElementById('_x_extension_site_search_key_2024_unique_');
   const siteSearchNameInput = document.getElementById('_x_extension_site_search_name_2024_unique_');
   const siteSearchTemplateInput = document.getElementById('_x_extension_site_search_template_2024_unique_');
+  const siteSearchInsertQueryButton = document.getElementById('_x_extension_site_search_insert_query_2026_unique_');
   const siteSearchAliasInput = document.getElementById('_x_extension_site_search_alias_2024_unique_');
   const siteSearchForm = document.querySelector('._x_extension_settings_content_2024_unique_[data-content="shortcuts"] ._x_extension_shortcut_form_2024_unique_');
   const siteSearchFormTrigger = document.getElementById('_x_extension_site_search_expand_2024_unique_');
@@ -141,6 +142,7 @@
   const OVERLAY_SIZE_MODE_STORAGE_KEY = '_x_extension_overlay_size_mode_2026_unique_';
   const BOOKMARK_COUNT_STORAGE_KEY = '_x_extension_bookmark_count_2024_unique_';
   const BOOKMARK_COLUMNS_STORAGE_KEY = '_x_extension_bookmark_columns_2024_unique_';
+  const BOOKMARK_VIEW_MODE_STORAGE_KEY = '_x_extension_bookmark_view_mode_2026_unique_';
   const PINNED_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_pinned_recent_sites_2026_unique_';
   const HIDDEN_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_hidden_recent_sites_2026_unique_';
   const AUTO_PIP_ENABLED_STORAGE_KEY = '_x_extension_auto_pip_enabled_2026_unique_';
@@ -179,6 +181,7 @@
     OVERLAY_SIZE_MODE_STORAGE_KEY,
     BOOKMARK_COUNT_STORAGE_KEY,
     BOOKMARK_COLUMNS_STORAGE_KEY,
+    BOOKMARK_VIEW_MODE_STORAGE_KEY,
     PINNED_RECENT_SITES_STORAGE_KEY,
     HIDDEN_RECENT_SITES_STORAGE_KEY,
     AUTO_PIP_ENABLED_STORAGE_KEY,
@@ -2391,6 +2394,7 @@
     RECENT_COUNT_STORAGE_KEY,
     BOOKMARK_COUNT_STORAGE_KEY,
     BOOKMARK_COLUMNS_STORAGE_KEY,
+    BOOKMARK_VIEW_MODE_STORAGE_KEY,
     NEWTAB_WIDTH_MODE_STORAGE_KEY,
     NEWTAB_SEARCH_WIDTH_STORAGE_KEY,
     NEWTAB_THEME_MODE_STORAGE_KEY,
@@ -2552,6 +2556,39 @@
         : getMessage('shortcuts_add', '添加站内搜索');
       siteSearchAddButton.classList.add('_x_extension_shortcut_save_2024_unique_');
     }
+  }
+
+  function insertSiteSearchQueryToken() {
+    if (!siteSearchTemplateInput) {
+      return;
+    }
+    const token = '{query}';
+    const currentValue = String(siteSearchTemplateInput.value || '');
+    const existingIndex = currentValue.indexOf(token);
+    if (existingIndex >= 0) {
+      const nextCursor = existingIndex + token.length;
+      siteSearchTemplateInput.focus();
+      if (typeof siteSearchTemplateInput.setSelectionRange === 'function') {
+        siteSearchTemplateInput.setSelectionRange(nextCursor, nextCursor);
+      }
+      return;
+    }
+    const selectionStart = Number.isInteger(siteSearchTemplateInput.selectionStart)
+      ? siteSearchTemplateInput.selectionStart
+      : currentValue.length;
+    const selectionEnd = Number.isInteger(siteSearchTemplateInput.selectionEnd)
+      ? siteSearchTemplateInput.selectionEnd
+      : selectionStart;
+    const safeStart = Math.max(0, Math.min(selectionStart, currentValue.length));
+    const safeEnd = Math.max(safeStart, Math.min(selectionEnd, currentValue.length));
+    const nextValue = `${currentValue.slice(0, safeStart)}${token}${currentValue.slice(safeEnd)}`;
+    const nextCursor = safeStart + token.length;
+    siteSearchTemplateInput.value = nextValue;
+    siteSearchTemplateInput.focus();
+    if (typeof siteSearchTemplateInput.setSelectionRange === 'function') {
+      siteSearchTemplateInput.setSelectionRange(nextCursor, nextCursor);
+    }
+    siteSearchTemplateInput.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
   function attachSaveButtonAnimation(button) {
@@ -4311,6 +4348,13 @@
     });
   }
 
+  if (siteSearchInsertQueryButton) {
+    siteSearchInsertQueryButton.addEventListener('click', () => {
+      setSiteSearchFormExpanded(true);
+      insertSiteSearchQueryToken();
+    });
+  }
+
   if (siteSearchAddButton) {
     attachSaveButtonAnimation(siteSearchAddButton);
     siteSearchAddButton.addEventListener('click', function() {
@@ -4468,6 +4512,7 @@
         changes[OVERLAY_SIZE_MODE_STORAGE_KEY] ||
         changes[BOOKMARK_COUNT_STORAGE_KEY] ||
         changes[BOOKMARK_COLUMNS_STORAGE_KEY] ||
+        changes[BOOKMARK_VIEW_MODE_STORAGE_KEY] ||
         changes[AUTO_PIP_ENABLED_STORAGE_KEY] ||
         changes[PINNED_TAB_RECOVERY_ENABLED_STORAGE_KEY] ||
         changes[OVERLAY_TAB_PRIORITY_STORAGE_KEY] ||

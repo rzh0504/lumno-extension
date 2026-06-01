@@ -1490,6 +1490,7 @@ function openOverlayOnTab(activeTab, tabs, source) {
               prioritizeCurrentPageMatch: prioritizeCurrentPageMatch,
               currentTabId: typeof activeTab.id === 'number' ? activeTab.id : null,
               currentTabUrl: getResolvedTabUrl(activeTab),
+              documentPipEnabled: documentPipEnabledCache,
               siteSearchProviders: Array.isArray(siteSearchProviders) ? siteSearchProviders : []
             }]
           }, function(results) {
@@ -2121,6 +2122,7 @@ const BACKGROUND_MESSAGE_ROUTE_GROUPS = Object.freeze({
     actions: [
       'pipRequestOwnership',
       'pipReleaseOwnership',
+      'openDocumentPipPicker',
       'siteTryEnterPiPInMainWorld',
       'iqiyiTryEnterPiPInMainWorld',
       'iqiyiSetupAutoPiPInMainWorld',
@@ -2404,6 +2406,19 @@ function handlePipMessage(request, sender, sendResponse) {
           });
         });
       return true;
+    }
+    case 'openDocumentPipPicker': {
+      const senderTab = sender && sender.tab ? sender.tab : null;
+      if (!senderTab || typeof senderTab.id !== 'number') {
+        sendResponse({ ok: false, reason: 'no-sender-tab' });
+        return;
+      }
+      openDocumentPipPickerOnTab(senderTab, 'search-command');
+      sendResponse({
+        ok: documentPipEnabledCache === true,
+        enabled: documentPipEnabledCache === true
+      });
+      return;
     }
     case 'siteTryEnterPiPInMainWorld': {
       sendPipMainWorldResponse('siteTryEnterPiPInMainWorld', sender, sendResponse);

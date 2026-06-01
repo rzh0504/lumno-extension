@@ -134,6 +134,12 @@
   "settings_document_pip_desc": {
     "message": "Clip part of a page into a floating view for reference and side-by-side comparison"
   },
+  "document_pip_command_title": {
+    "message": "Start Web Clip"
+  },
+  "document_pip_command_action": {
+    "message": "Start clip"
+  },
   "settings_auto_pip_title": {
     "message": "Auto Picture-in-Picture"
   },
@@ -835,6 +841,9 @@
   },
   "shortcuts_placeholder_alias": {
     "message": "Optional — e.g. Bilibili, YouTube"
+  },
+  "shortcuts_insert_query": {
+    "message": "Insert {query}"
   },
   "shortcuts_add": {
     "message": "Add site search"

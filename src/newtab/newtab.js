@@ -4041,7 +4041,7 @@
     if (!suggestion) {
       return false;
     }
-  const neutralTypes = ['googleSuggest', 'newtab', 'modeSwitch', 'chatgpt', 'perplexity', 'commandNewTab', 'commandSettings'];
+    const neutralTypes = ['googleSuggest', 'newtab', 'modeSwitch', 'chatgpt', 'perplexity', 'commandNewTab', 'commandSettings', 'commandDocumentPip'];
     if (neutralTypes.includes(suggestion.type)) {
       return false;
     }
