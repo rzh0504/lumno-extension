@@ -11,6 +11,7 @@
     const getRiSvg = typeof config.getRiSvg === 'function' ? config.getRiSvg : (() => '');
     const getExtensionFaviconUrl = typeof config.getExtensionFaviconUrl === 'function' ? config.getExtensionFaviconUrl : (() => '');
     const getGstaticFaviconUrl = typeof config.getGstaticFaviconUrl === 'function' ? config.getGstaticFaviconUrl : (() => '');
+    const getChromeFaviconUrl = typeof config.getChromeFaviconUrl === 'function' ? config.getChromeFaviconUrl : (() => '');
     const isOwnExtensionUrl = typeof config.isOwnExtensionUrl === 'function' ? config.isOwnExtensionUrl : (() => false);
     const isBlockedLocalFaviconUrl = typeof config.isBlockedLocalFaviconUrl === 'function' ? config.isBlockedLocalFaviconUrl : (() => false);
     const shouldBlockFaviconForHost = typeof config.shouldBlockFaviconForHost === 'function' ? config.shouldBlockFaviconForHost : (() => false);
@@ -374,6 +375,25 @@
       }
     }
 
+    function getRuntimeChromeFaviconUrl(pageUrl) {
+      const page = String(pageUrl || '').trim();
+      if (!page) {
+        return '';
+      }
+      const configured = getSafeFaviconCandidateUrl(getChromeFaviconUrl(page));
+      if (configured) {
+        return configured;
+      }
+      try {
+        const faviconUrl = new URL('chrome://favicon2/');
+        faviconUrl.searchParams.set('pageUrl', page);
+        faviconUrl.searchParams.set('size', '128');
+        return getSafeFaviconCandidateUrl(faviconUrl.toString());
+      } catch (e) {
+        return '';
+      }
+    }
+
     function createThemeAwareFaviconState(img, url, host, optionsArg) {
       img._xThemeFaviconSession = (img._xThemeFaviconSession || 0) + 1;
       const session = img._xThemeFaviconSession;
@@ -386,6 +406,8 @@
         primaryUrl: getSafeFaviconCandidateUrl(
           (optionsArg && (optionsArg.primaryUrl || optionsArg.fallbackUrl)) || ''
         ),
+        browserUrl: getSafeFaviconCandidateUrl((optionsArg && optionsArg.browserUrl) || '') ||
+          (/^https?:\/\//i.test(String(url || '')) ? '' : getRuntimeChromeFaviconUrl(url)),
         extensionFavicon: getRuntimeExtensionFaviconUrl(url),
         gstaticFavicon: getRuntimeGstaticFaviconUrl(url),
         previousWorkingSrc,
@@ -457,6 +479,7 @@
       return [
         { kind: 'primary', url: state.primaryUrl },
         { kind: 'extension', url: state.extensionFavicon },
+        { kind: 'browser', url: state.browserUrl },
         { kind: 'gstatic', url: state.gstaticFavicon }
       ].filter((candidate) => {
         const url = getSafeFaviconCandidateUrl(candidate.url);

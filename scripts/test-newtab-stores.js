@@ -1,6 +1,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 const recentStore = require('../src/newtab/recent-sites-store.js');
 const bookmarkStore = require('../src/newtab/bookmarks-store.js');
 
@@ -62,6 +63,37 @@ async function testRecentStore() {
     ['pinned.example', 'recent.example', 'top.example', 'tab.example']
   );
   assert.strictEqual(merged[0]._xPinned, true);
+
+  const browserPageMerged = recentStore.mergeRecentSiteSources({
+    ...options,
+    mode: 'latest',
+    limit: 4,
+    candidateLimit: 4,
+    pinned: [],
+    hidden: [],
+    shouldExcludeUrl: (url) => String(url || '') === 'chrome://newtab/',
+    shouldPrioritizeTabUrl: (url) => String(url || '').startsWith('chrome://') &&
+      String(url || '') !== 'chrome://newtab/',
+    historyItems: [
+      { title: 'One', url: 'https://one.example/', lastVisitTime: 20 },
+      { title: 'Two', url: 'https://two.example/', lastVisitTime: 19 },
+      { title: 'Three', url: 'https://three.example/', lastVisitTime: 18 },
+      { title: 'Four', url: 'https://four.example/', lastVisitTime: 17 }
+    ],
+    tabs: [
+      { title: '新标签页', url: 'chrome://newtab/', lastAccessed: 30 },
+      { title: '扩展程序', url: 'chrome://extensions/', lastAccessed: 31 }
+    ]
+  });
+  assert.ok(
+    browserPageMerged.some((item) => item.url === 'chrome://extensions/'),
+    'browser internal tabs should survive a full history candidate set'
+  );
+  assert.strictEqual(
+    browserPageMerged.some((item) => item.url === 'chrome://newtab/'),
+    false,
+    'browser newtab pages should still be filtered from recent sites'
+  );
 
   const storage = createMemoryStorage({
     [recentStore.DEFAULT_PINNED_KEY]: [
@@ -161,6 +193,264 @@ function testBookmarkCacheHydrationGuard() {
   );
 }
 
+function createFakeElement(tagName) {
+  const attributes = new Map();
+  return {
+    tagName: String(tagName || '').toUpperCase(),
+    children: [],
+    className: '',
+    textContent: '',
+    title: '',
+    tabIndex: 0,
+    disabled: false,
+    innerHTML: '',
+    style: {
+      setProperty() {},
+      removeProperty() {}
+    },
+    classList: {
+      add() {},
+      remove() {},
+      toggle() {},
+      contains() {
+        return false;
+      }
+    },
+    setAttribute(name, value) {
+      attributes.set(name, String(value));
+    },
+    getAttribute(name) {
+      return attributes.has(name) ? attributes.get(name) : null;
+    },
+    removeAttribute(name) {
+      attributes.delete(name);
+    },
+    appendChild(child) {
+      this.children.push(child);
+      child.parentElement = this;
+      return child;
+    },
+    addEventListener() {},
+    removeEventListener() {}
+  };
+}
+
+function testRecentViewUsesCanonicalFaviconPageUrl() {
+  const sandbox = { globalThis: null };
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(fs.readFileSync(path.join(repoRoot, 'src/newtab/recent-sites-view.js'), 'utf8'), sandbox, {
+    filename: 'src/newtab/recent-sites-view.js'
+  });
+  const documentObj = {
+    visibilityState: 'visible',
+    createElement: createFakeElement,
+    addEventListener() {},
+    removeEventListener() {}
+  };
+  const grid = createFakeElement('div');
+  const calls = [];
+  const proxyUrl = 'https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=https%3A%2F%2Fwww.lovart.ai%2Fhome&size=128';
+  const view = sandbox.LumnoNewtabRecentSitesView.createRecentSitesView({
+    documentObj,
+    windowObj: {
+      setTimeout,
+      clearTimeout,
+      addEventListener() {},
+      removeEventListener() {}
+    },
+    grid,
+    cards: [],
+    t: (_key, fallback) => fallback || '',
+    formatMessage: (_key, fallback, values) => fallback.replace('{title}', values.title),
+    sanitizeDisplayText: (text) => String(text || ''),
+    getOwnExtensionPageDisplay: () => null,
+    getCanonicalPageUrlForFavicon: () => 'https://www.lovart.ai/home',
+    getHostFromUrl: (url) => new URL(url).hostname.replace(/^www\./, ''),
+    getSiteDisplayName: (host, title) => title || host,
+    getUrlDisplay: (url) => url,
+    getRiSvg: () => '',
+    attachFaviconWithFallbacks(_img, url, host) {
+      calls.push({ url, host });
+    },
+    getImmediateThemeForSuggestion: () => null,
+    queueThemeForTarget() {},
+    applyCardTheme() {},
+    updatePinButton() {},
+    updateDismissButton() {}
+  });
+
+  view.render([{ title: 'faviconV2 (48x48)', url: proxyUrl, host: 't2.gstatic.cn' }], {});
+  assert.deepStrictEqual(calls[0], {
+    url: 'https://www.lovart.ai/home',
+    host: 'lovart.ai'
+  });
+}
+
+function testRecentViewPassesBrowserPageFaviconCandidate() {
+  const sandbox = { globalThis: null };
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(fs.readFileSync(path.join(repoRoot, 'src/newtab/recent-sites-view.js'), 'utf8'), sandbox, {
+    filename: 'src/newtab/recent-sites-view.js'
+  });
+  const documentObj = {
+    visibilityState: 'visible',
+    createElement: createFakeElement,
+    addEventListener() {},
+    removeEventListener() {}
+  };
+  const grid = createFakeElement('div');
+  const calls = [];
+  const browserPageIcon = 'data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%20128%20128%22%2F%3E';
+  const view = sandbox.LumnoNewtabRecentSitesView.createRecentSitesView({
+    documentObj,
+    windowObj: {
+      setTimeout,
+      clearTimeout,
+      addEventListener() {},
+      removeEventListener() {}
+    },
+    grid,
+    cards: [],
+    t: (_key, fallback) => fallback || '',
+    formatMessage: (_key, fallback, values) => fallback.replace('{title}', values.title),
+    sanitizeDisplayText: (text) => String(text || ''),
+    getOwnExtensionPageDisplay: () => null,
+    getCanonicalPageUrlForFavicon: (url) => url,
+    getHostFromUrl: (url) => new URL(url).hostname,
+    getSiteDisplayName: (host, title) => title || host,
+    getUrlDisplay: (url) => url,
+    getRiSvg: () => '',
+    attachFaviconWithFallbacks(_img, url, host, options) {
+      calls.push({
+        url,
+        host,
+        primaryUrl: options && options.primaryUrl
+      });
+    },
+    getBrowserPageFaviconUrl: () => browserPageIcon,
+    getImmediateThemeForSuggestion: () => null,
+    queueThemeForTarget() {},
+    applyCardTheme() {},
+    updatePinButton() {},
+    updateDismissButton() {}
+  });
+
+  view.render([{ title: '扩展程序', url: 'chrome://extensions/', host: 'extensions' }], {});
+  assert.deepStrictEqual(calls[0], {
+    url: 'chrome://extensions/',
+    host: 'extensions',
+    primaryUrl: browserPageIcon
+  });
+}
+
+function testBookmarkViewPassesBrowserFaviconCandidateForLocalUrl() {
+  const sandbox = { globalThis: null };
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(fs.readFileSync(path.join(repoRoot, 'src/newtab/bookmarks-view.js'), 'utf8'), sandbox, {
+    filename: 'src/newtab/bookmarks-view.js'
+  });
+  const documentObj = {
+    createElement: createFakeElement
+  };
+  const grid = createFakeElement('div');
+  const calls = [];
+  const view = sandbox.LumnoNewtabBookmarksView.createBookmarksView({
+    documentObj,
+    windowObj: {
+      setTimeout,
+      clearTimeout
+    },
+    grid,
+    cards: [],
+    t: (_key, fallback) => fallback || '',
+    formatMessage: (_key, fallback, values) => fallback.replace('{title}', values.title),
+    sanitizeDisplayText: (text) => String(text || ''),
+    getHostFromUrl: (url) => new URL(url).hostname,
+    getSiteDisplayName: (host, title) => title || host,
+    getUrlDisplay: (url) => url,
+    getRiSvg: () => '',
+    getFigmaFolderSvg: () => '',
+    normalizeHost: (host) => String(host || '').toLowerCase(),
+    attachFaviconWithFallbacks(_img, url, host, options) {
+      calls.push({ url, host, browserUrl: options && options.browserUrl });
+    },
+    isLocalNetworkHost: (host) => String(host || '').startsWith('192.168.'),
+    getChromeFaviconUrl: (url) => `chrome://favicon2/?pageUrl=${encodeURIComponent(url)}&size=128`,
+    getImmediateThemeForSuggestion: () => null,
+    queueThemeForTarget() {},
+    applyCardTheme() {}
+  });
+
+  view.render([{ title: 'Router', url: 'http://192.168.1.1/admin' }], {
+    folderId: '1',
+    rootFolderId: '1'
+  });
+
+  assert.deepStrictEqual(calls[0], {
+    url: 'http://192.168.1.1/admin',
+    host: '192.168.1.1',
+    browserUrl: 'chrome://favicon2/?pageUrl=http%3A%2F%2F192.168.1.1%2Fadmin&size=128'
+  });
+}
+
+function testBookmarkViewPassesBrowserPageFaviconCandidate() {
+  const sandbox = { globalThis: null };
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(fs.readFileSync(path.join(repoRoot, 'src/newtab/bookmarks-view.js'), 'utf8'), sandbox, {
+    filename: 'src/newtab/bookmarks-view.js'
+  });
+  const documentObj = {
+    createElement: createFakeElement
+  };
+  const grid = createFakeElement('div');
+  const calls = [];
+  const browserPageIcon = 'data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%20128%20128%22%2F%3E';
+  const view = sandbox.LumnoNewtabBookmarksView.createBookmarksView({
+    documentObj,
+    windowObj: {
+      setTimeout,
+      clearTimeout
+    },
+    grid,
+    cards: [],
+    t: (_key, fallback) => fallback || '',
+    formatMessage: (_key, fallback, values) => fallback.replace('{title}', values.title),
+    sanitizeDisplayText: (text) => String(text || ''),
+    getHostFromUrl: (url) => new URL(url).hostname,
+    getSiteDisplayName: (host, title) => title || host,
+    getUrlDisplay: (url) => url,
+    getRiSvg: () => '',
+    getFigmaFolderSvg: () => '',
+    normalizeHost: (host) => String(host || '').toLowerCase(),
+    attachFaviconWithFallbacks(_img, url, host, options) {
+      calls.push({
+        url,
+        host,
+        primaryUrl: options && options.primaryUrl,
+        browserUrl: options && options.browserUrl
+      });
+    },
+    getBrowserPageFaviconUrl: () => browserPageIcon,
+    isLocalNetworkHost: () => false,
+    getChromeFaviconUrl: (url) => `chrome://favicon2/?pageUrl=${encodeURIComponent(url)}&size=128`,
+    getImmediateThemeForSuggestion: () => null,
+    queueThemeForTarget() {},
+    applyCardTheme() {}
+  });
+
+  view.render([{ title: '扩展程序', url: 'chrome://extensions/' }], {
+    folderId: '1',
+    rootFolderId: '1'
+  });
+
+  assert.deepStrictEqual(calls[0], {
+    url: 'chrome://extensions/',
+    host: 'extensions',
+    primaryUrl: browserPageIcon,
+    browserUrl: 'chrome://favicon2/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128'
+  });
+}
+
 function testNewtabUsesBookmarkCacheHydrationGuard() {
   const newtabJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/newtab.js'), 'utf8');
   assert.ok(
@@ -177,6 +467,10 @@ testRecentStore()
   .then(() => {
     testBookmarkStore();
     testBookmarkCacheHydrationGuard();
+    testRecentViewUsesCanonicalFaviconPageUrl();
+    testRecentViewPassesBrowserPageFaviconCandidate();
+    testBookmarkViewPassesBrowserFaviconCandidateForLocalUrl();
+    testBookmarkViewPassesBrowserPageFaviconCandidate();
     testNewtabUsesBookmarkCacheHydrationGuard();
     console.log('newtab store tests passed');
   })

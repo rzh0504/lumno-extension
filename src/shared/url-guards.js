@@ -19,6 +19,16 @@
       lower.startsWith('about:');
   }
 
+  function isBrowserNewtabUrl(url) {
+    const lower = String(url || '').trim().toLowerCase().replace(/[?#].*$/, '').replace(/\/+$/, '');
+    return lower === 'chrome://newtab' ||
+      lower === 'chrome://new-tab-page' ||
+      lower === 'edge://newtab' ||
+      lower === 'brave://newtab' ||
+      lower === 'vivaldi://newtab' ||
+      lower === 'opera://startpage';
+  }
+
   function isExtensionStoreUrl(url) {
     if (!url) {
       return false;
@@ -94,6 +104,7 @@
     canOpenOverlayOnUrl,
     isBrowserExtensionProtocol,
     isBrowserInternalUrl,
+    isBrowserNewtabUrl,
     isExtensionStoreUrl,
     isRestrictedUrl
   });

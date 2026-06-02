@@ -18,6 +18,24 @@ assert.ok(guards, 'LumnoUrlGuards should be exported');
 assert.strictEqual(guards.isBrowserExtensionProtocol('chrome-extension:'), true);
 assert.strictEqual(guards.isBrowserExtensionProtocol('https:'), false);
 
+assert.strictEqual(guards.isBrowserNewtabUrl('chrome://newtab/'), true);
+assert.strictEqual(guards.isBrowserNewtabUrl('chrome://new-tab-page/'), true);
+assert.strictEqual(guards.isBrowserNewtabUrl('edge://newtab/'), true);
+assert.strictEqual(guards.isBrowserNewtabUrl('chrome://extensions/'), false);
+assert.strictEqual(guards.isBrowserInternalUrl('chrome://extensions/'), true);
+assert.strictEqual(guards.isBrowserInternalUrl('about:blank'), true);
+assert.strictEqual(guards.isBrowserInternalUrl('https://example.com/'), false);
+
+const newtabJs = fs.readFileSync('src/newtab/newtab.js', 'utf8');
+assert.ok(
+  newtabJs.includes('isBrowserNewtabUrl(url)'),
+  'newtab recent-site filtering should use the precise browser newtab guard'
+);
+assert.ok(
+  newtabJs.includes('shouldPrioritizeTabUrl: isBrowserPageRecentUrl'),
+  'newtab recent-site merging should prioritize non-newtab browser pages from open tabs'
+);
+
 assert.strictEqual(guards.isRestrictedUrl('chrome://extensions/'), true);
 assert.strictEqual(guards.isRestrictedUrl('chrome-extension://abc/src/newtab/newtab.html'), true);
 assert.strictEqual(guards.isRestrictedUrl('https://chromewebstore.google.com/detail/example/abc'), true);

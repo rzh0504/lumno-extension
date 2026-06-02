@@ -92,6 +92,15 @@
       return host || '';
     });
     const attachFaviconWithFallbacks = getFunction(options, 'attachFaviconWithFallbacks');
+    const isLocalNetworkHost = getFunction(options, 'isLocalNetworkHost', function() {
+      return false;
+    });
+    const getChromeFaviconUrl = getFunction(options, 'getChromeFaviconUrl', function() {
+      return '';
+    });
+    const getBrowserPageFaviconUrl = getFunction(options, 'getBrowserPageFaviconUrl', function() {
+      return '';
+    });
     const getImmediateThemeForSuggestion = getFunction(options, 'getImmediateThemeForSuggestion', function() {
       return null;
     });
@@ -146,6 +155,25 @@
         Number.isFinite(clientWidth) &&
         clientWidth > 0 &&
         scrollWidth > clientWidth + 1;
+    }
+
+    function getBrowserFaviconCandidateForBookmark(url, host) {
+      const pageUrl = String(url || '').trim();
+      if (!pageUrl) {
+        return '';
+      }
+      if (!/^https?:\/\//i.test(pageUrl)) {
+        return /^[a-z][a-z0-9+.-]*:/i.test(pageUrl)
+          ? getChromeFaviconUrl(pageUrl)
+          : '';
+      }
+      return host && isLocalNetworkHost(host)
+        ? getChromeFaviconUrl(pageUrl)
+        : '';
+    }
+
+    function getPrimaryFaviconCandidateForBookmark(url) {
+      return getBrowserPageFaviconUrl(url);
     }
 
     function buildCard(item, index, state) {
@@ -208,7 +236,10 @@
         if (index < 4) {
           favicon.fetchPriority = 'high';
         }
-        attachFaviconWithFallbacks(favicon, item.url, host);
+        attachFaviconWithFallbacks(favicon, item.url, host, {
+          primaryUrl: getPrimaryFaviconCandidateForBookmark(item.url),
+          browserUrl: getBrowserFaviconCandidateForBookmark(item.url, host)
+        });
         icon = favicon;
       }
 
@@ -243,7 +274,10 @@
           previewFavicon.loading = 'eager';
           previewFavicon.decoding = 'async';
           previewFavicon.setAttribute('aria-hidden', 'true');
-          attachFaviconWithFallbacks(previewFavicon, url, previewHost);
+          attachFaviconWithFallbacks(previewFavicon, url, previewHost, {
+            primaryUrl: getPrimaryFaviconCandidateForBookmark(url),
+            browserUrl: getBrowserFaviconCandidateForBookmark(url, previewHost)
+          });
           previewWrap.appendChild(previewFavicon);
         }
         card.appendChild(previewWrap);

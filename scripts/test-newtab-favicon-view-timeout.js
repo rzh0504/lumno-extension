@@ -132,6 +132,9 @@ const runtime = sandbox.LumnoNewtabFaviconView.createFaviconViewRuntime({
   getGstaticFaviconUrl(pageUrl) {
     return `https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=${encodeURIComponent(pageUrl)}&size=128`;
   },
+  getChromeFaviconUrl(pageUrl) {
+    return `chrome://favicon2/?pageUrl=${encodeURIComponent(pageUrl)}&size=128`;
+  },
   getHostFromUrl(url) {
     return new URL(url).hostname;
   },
@@ -155,6 +158,10 @@ const runtime = sandbox.LumnoNewtabFaviconView.createFaviconViewRuntime({
   const img = createFakeImage();
   runtime.attachFaviconWithFallbacks(img, 'https://example.test/page', 'example.test');
   assert.strictEqual(img.src, 'chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Fexample.test%2Fpage&size=128');
+  const browserImg = createFakeImage();
+  runtime.attachFaviconWithFallbacks(browserImg, 'chrome://newtab/', 'newtab');
+  assert.strictEqual(browserImg.src, 'chrome://favicon2/?pageUrl=chrome%3A%2F%2Fnewtab%2F&size=128');
+  browserImg._xThemeFaviconSession += 1;
   await wait(18);
   assert.strictEqual(img.src, 'https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=https%3A%2F%2Fexample.test%2Fpage&size=128');
   img._xThemeFaviconSession += 1;

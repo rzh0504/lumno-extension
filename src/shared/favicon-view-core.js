@@ -224,6 +224,27 @@
       applyFaviconOpticalShift(img);
     }
 
+    function ensureFaviconStartsLoading(img) {
+      if (!img) {
+        return;
+      }
+      try {
+        const loadingValue = String(
+          (typeof img.getAttribute === 'function' ? img.getAttribute('loading') : '') ||
+            img.loading ||
+            ''
+        ).toLowerCase();
+        if (loadingValue === 'lazy') {
+          img.loading = 'eager';
+          if (typeof img.setAttribute === 'function') {
+            img.setAttribute('loading', 'eager');
+          }
+        }
+      } catch (e) {
+        // Ignore unsupported loading mutations on non-browser test doubles.
+      }
+    }
+
     function requestFaviconData(url) {
       if (!url || url.startsWith('data:') || isBlockedLocalFaviconUrl(url)) {
         return Promise.resolve(null);
@@ -296,6 +317,7 @@
       const hasAppeared = img.getAttribute('data-favicon-has-appeared') === 'true';
       const shouldAnimate = !hasAppeared;
       if (shouldAnimate || isFallbackVisible || isPlaceholderVisible) {
+        ensureFaviconStartsLoading(img);
         showPendingFallbackIcon(img);
       }
       img._xFaviconLoadToken = (img._xFaviconLoadToken || 0) + 1;

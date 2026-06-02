@@ -1551,6 +1551,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       getHostFromUrl,
       getExtensionFaviconUrl,
       getGstaticFaviconUrl,
+      getChromeFaviconUrl,
       shouldBlockFaviconForHost,
       isBlockedLocalFaviconUrl: isBlockedLocalFaviconCacheUrl,
       isFaviconProxyUrl,
@@ -2269,12 +2270,19 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         : String(hostname || '').toLowerCase().replace(/^www\./i, '');
     }
 
+    function getCanonicalPageUrlForFavicon(url) {
+      return typeof FAVICON_UTILS.getCanonicalPageUrlForFavicon === 'function'
+        ? FAVICON_UTILS.getCanonicalPageUrlForFavicon(url)
+        : String(url || '');
+    }
+
     function getExtensionFaviconUrl(pageUrl) {
-      if (!pageUrl || !/^https?:\/\//i.test(pageUrl)) {
+      const canonicalPageUrl = getCanonicalPageUrlForFavicon(pageUrl);
+      if (!canonicalPageUrl || !/^https?:\/\//i.test(canonicalPageUrl)) {
         return '';
       }
       return typeof FAVICON_UTILS.getExtensionFaviconUrl === 'function'
-        ? FAVICON_UTILS.getExtensionFaviconUrl(pageUrl, {
+        ? FAVICON_UTILS.getExtensionFaviconUrl(canonicalPageUrl, {
           getRuntimeUrl: chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function'
             ? chrome.runtime.getURL.bind(chrome.runtime)
             : null,
@@ -2284,12 +2292,34 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     }
 
     function getGstaticFaviconUrl(pageUrl) {
-      if (!pageUrl || !/^https?:\/\//i.test(pageUrl)) {
+      const canonicalPageUrl = getCanonicalPageUrlForFavicon(pageUrl);
+      if (!canonicalPageUrl || !/^https?:\/\//i.test(canonicalPageUrl)) {
         return '';
       }
       return typeof FAVICON_UTILS.getGstaticFaviconUrl === 'function'
-        ? FAVICON_UTILS.getGstaticFaviconUrl(pageUrl, { size: 128 })
+        ? FAVICON_UTILS.getGstaticFaviconUrl(canonicalPageUrl, { size: 128 })
         : '';
+    }
+
+    function getChromeFaviconUrl(pageUrl) {
+      const page = getCanonicalPageUrlForFavicon(pageUrl) || String(pageUrl || '').trim();
+      if (!page) {
+        return '';
+      }
+      return typeof FAVICON_UTILS.getChromeFaviconUrl === 'function'
+        ? FAVICON_UTILS.getChromeFaviconUrl(page, { size: 128 })
+        : '';
+    }
+
+    function getPageFaviconCandidateUrl(pageUrl) {
+      const page = getCanonicalPageUrlForFavicon(pageUrl) || String(pageUrl || '').trim();
+      if (!page) {
+        return '';
+      }
+      if (/^https?:\/\//i.test(page)) {
+        return getExtensionFaviconUrl(page) || getChromeFaviconUrl(page) || getGstaticFaviconUrl(page);
+      }
+      return getChromeFaviconUrl(page);
     }
 
     function getHostFaviconUrl(hostname) {
@@ -2722,8 +2752,41 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       return createSuggestionInlineIcon('ri-search-line', tone);
     }
 
-    function createLinkIcon() {
-      return createSuggestionInlineIcon('ri-link');
+    function createLinkIcon(tone) {
+      return createSuggestionInlineIcon('ri-link', tone);
+    }
+
+    function createAttachedSuggestionFavicon(suggestion, index, fallbackIconFactory) {
+      const favicon = document.createElement('img');
+      favicon.className = 'x-ov-suggestion-favicon';
+      favicon.decoding = 'async';
+      favicon.loading = 'eager';
+      favicon.referrerPolicy = 'no-referrer';
+      if (index < 4) {
+        favicon.fetchPriority = 'high';
+      }
+      applyFaviconOpticalAlignment(favicon);
+      const suggestionHost = suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : '';
+      const iconUrl = suggestion && suggestion.favicon ? suggestion.favicon : '';
+      if (iconUrl && !isFaviconProxyUrl(iconUrl) && !isChromeMonogramFaviconUrl(iconUrl)) {
+        attachFaviconData(favicon, iconUrl, suggestionHost);
+      }
+      const replaceWithFallbackIcon = function() {
+        const fallbackDiv = typeof fallbackIconFactory === 'function'
+          ? fallbackIconFactory()
+          : createLinkIcon();
+        if (favicon.parentNode) {
+          favicon.parentNode.replaceChild(fallbackDiv, favicon);
+        }
+      };
+      attachResolvedFaviconWithFallbacks(
+        favicon,
+        suggestion && suggestion.url ? suggestion.url : '',
+        suggestionHost,
+        iconUrl,
+        replaceWithFallbackIcon
+      );
+      return favicon;
     }
 
     function getNonFaviconIconBg() {
@@ -3482,6 +3545,23 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       return true;
     }
 
+    function getProviderFaviconPageUrl(provider) {
+      const template = provider && provider.template ? provider.template : '';
+      if (!template) {
+        return '';
+      }
+      try {
+        const url = template.replace(/\{query\}/g, 'test');
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          return '';
+        }
+        return `${parsed.origin}/`;
+      } catch (e) {
+        return '';
+      }
+    }
+
     function recordSearchSuggestionSelectionFromSuggestion(suggestion, query, source) {
       if (!suggestion || suggestion.forceSearch || suggestion.provider || !suggestion.url) {
         return;
@@ -3501,17 +3581,18 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     }
 
     function getProviderIcon(provider) {
-      if (provider && provider.icon) {
-        return provider.icon;
+      const explicitIcon = provider && (provider.icon || provider.iconUrl) ? (provider.icon || provider.iconUrl) : '';
+      const providerIconPageUrl = explicitIcon ? getCanonicalPageUrlForFavicon(explicitIcon) : '';
+      if (providerIconPageUrl && providerIconPageUrl !== explicitIcon) {
+        return getPageFaviconCandidateUrl(providerIconPageUrl) || explicitIcon;
       }
-      if (provider && provider.iconUrl) {
-        return provider.iconUrl;
+      if (explicitIcon) {
+        return explicitIcon;
       }
-      const template = provider && provider.template ? provider.template : '';
+      const providerPageUrl = getProviderFaviconPageUrl(provider);
       try {
-        const url = template.replace(/\{query\}/g, 'test');
-        const hostname = normalizeHost(new URL(url).hostname);
-        return getHostFaviconUrl(hostname);
+        const hostname = normalizeHost(new URL(providerPageUrl).hostname);
+        return getPageFaviconCandidateUrl(providerPageUrl) || getHostFaviconUrl(hostname);
       } catch (e) {
         return '';
       }
@@ -5052,14 +5133,16 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             type: 'browserPage',
             title: formatMessage('open_url', '打开 {url}', { url: targetUrl }),
             url: targetUrl,
-            favicon: 'https://img.icons8.com/?size=100&id=1LqgD1Q7n2fy&format=png&color=000000'
+            favicon: getPageFaviconCandidateUrl(targetUrl) ||
+              'https://img.icons8.com/?size=100&id=1LqgD1Q7n2fy&format=png&color=000000'
           });
         } else if (rule.type === 'url' && rule.url) {
           matches.push({
             type: 'browserPage',
             title: formatMessage('open_url', '打开 {url}', { url: rule.url }),
             url: rule.url,
-            favicon: 'https://img.icons8.com/?size=100&id=1LqgD1Q7n2fy&format=png&color=000000'
+            favicon: getPageFaviconCandidateUrl(rule.url) ||
+              'https://img.icons8.com/?size=100&id=1LqgD1Q7n2fy&format=png&color=000000'
           });
         }
       });
@@ -5168,7 +5251,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         type: 'directUrl',
         title: formatMessage('open_url', '打开 {url}', { url: targetUrl }),
         url: targetUrl,
-        favicon: '',
+        favicon: getPageFaviconCandidateUrl(targetUrl),
         isLocalNetwork: isLocalNetwork
       };
     }
@@ -5602,16 +5685,18 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
 
           let iconNode = null;
           let iconWrapper = null;
-          if (suggestion.type === 'browserPage') {
-            iconNode = createLinkIcon();
-          } else if (suggestion.type === 'directUrl') {
-            const directUrlHost = suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : '';
-            const isLocalDirectUrl = Boolean(
-              suggestion && suggestion.isLocalNetwork
-            ) || (directUrlHost && isLocalNetworkHost(directUrlHost));
-            iconNode = isLocalDirectUrl
-              ? createLinkIcon()
-              : createSearchIcon();
+          if (suggestion.type === 'browserPage' || suggestion.type === 'directUrl') {
+            if (suggestion.favicon) {
+              iconNode = createAttachedSuggestionFavicon(
+                suggestion,
+                index,
+                createLinkIcon
+              );
+            } else {
+              iconNode = suggestion.type === 'browserPage'
+                ? createLinkIcon()
+                : createSearchIcon();
+            }
           } else if (suggestion.type === 'commandNewTab') {
             iconNode = createSuggestionInlineIcon('ri-add-line', 'subtext');
           } else if (suggestion.type === 'commandSettings') {
@@ -5630,7 +5715,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             applyFaviconOpticalAlignment(favicon);
             favicon.src = suggestion.favicon || '';
             favicon.onerror = function() {
-              const fallbackDiv = createSearchIcon('subtext');
+              const fallbackDiv = createLinkIcon('subtext');
               if (favicon.parentNode) {
                 favicon.parentNode.replaceChild(fallbackDiv, favicon);
               }
@@ -5643,37 +5728,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             if (suggestionHost && shouldBlockFaviconForHost(suggestionHost)) {
               iconNode = createLinkIcon();
             } else if (suggestion.favicon) {
-              // Create icon for suggestions - always use img for all types
-              const favicon = document.createElement('img');
-              favicon.className = 'x-ov-suggestion-favicon';
-              favicon.decoding = 'async';
-              favicon.loading = 'eager';
-              favicon.referrerPolicy = 'no-referrer';
-              if (index < 4) {
-                favicon.fetchPriority = 'high';
-              }
-              if (!isFaviconProxyUrl(suggestion.favicon)) {
-                attachFaviconData(
-                  favicon,
-                  suggestion.favicon || '',
-                  suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : ''
-                );
-              }
-              applyFaviconOpticalAlignment(favicon);
-              const replaceWithFallbackIcon = function() {
-                const fallbackDiv = createLinkIcon();
-                if (favicon.parentNode) {
-                  favicon.parentNode.replaceChild(fallbackDiv, favicon);
-                }
-              };
-              attachResolvedFaviconWithFallbacks(
-                favicon,
-                suggestion && suggestion.url ? suggestion.url : '',
-                suggestionHost,
-                suggestion.favicon || '',
-                replaceWithFallbackIcon
-              );
-              iconNode = favicon;
+              iconNode = createAttachedSuggestionFavicon(suggestion, index, createLinkIcon);
             } else {
               iconNode = createSearchIcon('subtext');
             }

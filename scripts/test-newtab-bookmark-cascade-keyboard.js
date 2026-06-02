@@ -272,7 +272,8 @@ async function flushPromises() {
     root: [
       { id: 'research', title: 'Research', type: 'folder' },
       { id: 'patterns', title: 'Patterns', type: 'folder' },
-      { id: 'archive', title: 'Archive', url: 'https://example.com/archive' }
+      { id: 'archive', title: 'Archive', url: 'https://example.com/archive' },
+      { id: 'router', title: 'Router', url: 'http://192.168.1.1/admin' }
     ],
     research: [
       { id: 'amazon', title: 'Amazon Menu Aim', url: 'https://example.com/amazon' },
@@ -283,6 +284,7 @@ async function flushPromises() {
     ]
   };
 
+  const faviconCalls = [];
   const runtime = createBookmarkCascadeMenuRuntime({
     documentObj,
     windowObj: {
@@ -313,14 +315,18 @@ async function flushPromises() {
     },
     t: (_key, fallback) => fallback || '',
     sanitizeDisplayText: (value) => String(value || ''),
-    getHostFromUrl: () => '',
+    getHostFromUrl: (url) => new URL(url).hostname,
     getSiteDisplayName: (_host, title) => title || '',
     getUrlDisplay: (url) => url,
     getRiSvg: () => '',
     getFigmaFolderSvg: () => '',
     initFolderPathMorph() {},
     playFolderPathMorph() {},
-    attachFaviconWithFallbacks() {},
+    attachFaviconWithFallbacks(_img, url, host, options) {
+      faviconCalls.push({ url, host, browserUrl: options && options.browserUrl });
+    },
+    isLocalNetworkHost: (host) => String(host || '').startsWith('192.168.'),
+    getChromeFaviconUrl: (url) => `chrome://favicon2/?pageUrl=${encodeURIComponent(url)}&size=128`,
     ensureReady: () => Promise.resolve(true),
     getItems: (folderId) => itemsByFolder[String(folderId || '')] || [],
     navigateToUrl() {}
@@ -338,7 +344,15 @@ async function flushPromises() {
   assert.strictEqual(levels.length, 1, 'opening a cascade should render the root menu level');
   let rootItems = getMenuItems(levels[0]);
   assert.strictEqual(getLevelTitle(levels[0]), 'Root', 'opening a cascade should render the trigger folder title');
-  assert.strictEqual(rootItems.length, 3, 'folder titles should not be counted as keyboard menu items');
+  assert.strictEqual(rootItems.length, 4, 'folder titles should not be counted as keyboard menu items');
+  assert.ok(
+    faviconCalls.some((call) => (
+      call.url === 'http://192.168.1.1/admin' &&
+      call.host === '192.168.1.1' &&
+      call.browserUrl === 'chrome://favicon2/?pageUrl=http%3A%2F%2F192.168.1.1%2Fadmin&size=128'
+    )),
+    'local bookmark cascade items should pass the browser favicon candidate'
+  );
   assert.strictEqual(getActiveLabel(levels[0]), 'Research', 'opening a cascade should select the first menu item');
   assert.strictEqual(documentObj.activeElement, rootItems[0], 'opening a cascade should move keyboard focus into the menu');
 

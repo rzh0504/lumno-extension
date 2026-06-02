@@ -4666,7 +4666,7 @@ async function getSearchSuggestions(query) {
   const lookupMaxResults = searchPolicy.lookupMaxResults || 120;
   const searchScoreOptions = {
     getTitlePinyinMatchScore,
-    isLocalNetworkHost: shouldBlockFaviconForHost,
+    isLocalNetworkHost,
     isOwnExtensionUrl
   };
   const sourceTypes = await loadSearchResultSourceTypes();

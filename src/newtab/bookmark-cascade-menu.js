@@ -64,6 +64,15 @@
     const initFolderPathMorph = getFunction(config, 'initFolderPathMorph');
     const playFolderPathMorph = getFunction(config, 'playFolderPathMorph');
     const attachFaviconWithFallbacks = getFunction(config, 'attachFaviconWithFallbacks');
+    const isLocalNetworkHost = getFunction(config, 'isLocalNetworkHost', function() {
+      return false;
+    });
+    const getChromeFaviconUrl = getFunction(config, 'getChromeFaviconUrl', function() {
+      return '';
+    });
+    const getBrowserPageFaviconUrl = getFunction(config, 'getBrowserPageFaviconUrl', function() {
+      return '';
+    });
     const ensureReady = getFunction(config, 'ensureReady', function() {
       return Promise.resolve(false);
     });
@@ -1054,6 +1063,25 @@
       return true;
     }
 
+    function getBrowserFaviconCandidateForBookmark(url, host) {
+      const pageUrl = String(url || '').trim();
+      if (!pageUrl) {
+        return '';
+      }
+      if (!/^https?:\/\//i.test(pageUrl)) {
+        return /^[a-z][a-z0-9+.-]*:/i.test(pageUrl)
+          ? getChromeFaviconUrl(pageUrl)
+          : '';
+      }
+      return host && isLocalNetworkHost(host)
+        ? getChromeFaviconUrl(pageUrl)
+        : '';
+    }
+
+    function getPrimaryFaviconCandidateForBookmark(url) {
+      return getBrowserPageFaviconUrl(url);
+    }
+
     function createBookmarkCascadeItemIcon(item, index) {
       if (!documentObj) {
         return null;
@@ -1073,7 +1101,10 @@
       icon.className = 'x-nt-bookmark-cascade-icon';
       icon.alt = siteName || t('site_icon_alt', '站点');
       icon.loading = index < 4 ? 'eager' : 'lazy';
-      attachFaviconWithFallbacks(icon, item.url, host);
+      attachFaviconWithFallbacks(icon, item.url, host, {
+        primaryUrl: getPrimaryFaviconCandidateForBookmark(item.url),
+        browserUrl: getBrowserFaviconCandidateForBookmark(item.url, host)
+      });
       return icon;
     }
 

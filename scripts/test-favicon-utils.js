@@ -36,18 +36,52 @@ assert.strictEqual(
   utils.getGstaticFaviconUrl('https://example.com/a b'),
   'https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=https%3A%2F%2Fexample.com%2Fa+b&size=128'
 );
+assert.strictEqual(
+  utils.getChromeFaviconUrl('chrome://newtab/'),
+  'chrome://favicon2/?pageUrl=chrome%3A%2F%2Fnewtab%2F&size=128'
+);
+assert.strictEqual(
+  utils.getChromeFaviconUrl('http://192.168.1.8/dashboard'),
+  'chrome://favicon2/?pageUrl=http%3A%2F%2F192.168.1.8%2Fdashboard&size=128'
+);
+const browserPageFaviconUrl = utils.getBrowserPageFaviconUrl('chrome://extensions/');
+assert.strictEqual(browserPageFaviconUrl.startsWith('data:image/svg+xml,'), true);
+assert.strictEqual(browserPageFaviconUrl.includes('chrome%3A%2F%2Fextensions'), false);
+assert.strictEqual(utils.getBrowserPageFaviconUrl('chrome://newtab/').startsWith('data:image/svg+xml,'), true);
+assert.strictEqual(utils.getBrowserPageFaviconUrl('https://example.com/'), '');
+assert.strictEqual(utils.getChromeFaviconUrl(''), '');
+assert.strictEqual(
+  utils.getPageUrlFromFaviconProxyUrl('https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=https%3A%2F%2Fwww.lovart.ai%2Fhome&size=128'),
+  'https://www.lovart.ai/home'
+);
+assert.strictEqual(
+  utils.getPageUrlFromFaviconProxyUrl('chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Fwww.lovart.ai%2Fhome&size=128'),
+  'https://www.lovart.ai/home'
+);
+assert.strictEqual(
+  utils.getCanonicalPageUrlForFavicon('https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=https%3A%2F%2Fwww.lovart.ai%2Fhome&size=128'),
+  'https://www.lovart.ai/home'
+);
+assert.strictEqual(
+  utils.getCanonicalPageUrlForFavicon('https://example.com/docs'),
+  'https://example.com/docs'
+);
+assert.strictEqual(
+  utils.getCanonicalFaviconHost('https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=https%3A%2F%2Fwww.lovart.ai%2Fhome&size=128'),
+  'lovart.ai'
+);
 
-assert.strictEqual(utils.shouldBlockFaviconForHost('localhost'), true);
-assert.strictEqual(utils.shouldBlockFaviconForHost('192.168.1.8'), true);
-assert.strictEqual(utils.shouldBlockFaviconForHost('service.internal'), true);
+assert.strictEqual(utils.shouldBlockFaviconForHost('localhost'), false);
+assert.strictEqual(utils.shouldBlockFaviconForHost('192.168.1.8'), false);
+assert.strictEqual(utils.shouldBlockFaviconForHost('service.internal'), false);
 assert.strictEqual(utils.shouldBlockFaviconForHost('example.com'), false);
 
-assert.strictEqual(utils.isBlockedLocalFaviconUrl('https://127.0.0.1/favicon.ico'), true);
+assert.strictEqual(utils.isBlockedLocalFaviconUrl('https://127.0.0.1/favicon.ico'), false);
 assert.strictEqual(
   utils.isBlockedLocalFaviconUrl('chrome://favicon2/?url=http%3A%2F%2F192.168.1.8%2F'),
-  true
+  false
 );
-assert.strictEqual(utils.isBlockedLocalFaviconUrl('chrome://favicon2/?url=localhost'), true);
+assert.strictEqual(utils.isBlockedLocalFaviconUrl('chrome://favicon2/?url=localhost'), false);
 assert.strictEqual(
   utils.isBlockedLocalFaviconUrl('chrome://favicon2/?url=https%3A%2F%2Fexample.com%2F'),
   false
@@ -58,7 +92,7 @@ assert.strictEqual(
 );
 assert.strictEqual(
   utils.isBlockedLocalFaviconUrl('chrome-extension://abc/_favicon/?pageUrl=http%3A%2F%2F192.168.1.8%2F&size=128'),
-  true
+  false
 );
 assert.strictEqual(utils.isBlockedLocalFaviconUrl('https://example.com/favicon.ico'), false);
 

@@ -71,6 +71,10 @@ assertContains(
   'bookmark cascade folder SVG hover layer should start hidden like bookmark cards'
 );
 assert.ok(
+  /\.x-nt-bookmark-cascade-icon\s*\{[\s\S]*?border-radius:\s*4px;[\s\S]*?\}/.test(newtabHtml),
+  'bookmark cascade favicon corners should stay compact'
+);
+assert.ok(
   !/\.x-nt-bookmark-cascade-item(?:(?!\}).)*translateY/s.test(newtabHtml),
   'bookmark cascade item hover styling should not vertically translate menu rows'
 );

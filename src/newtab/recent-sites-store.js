@@ -28,10 +28,17 @@
       : defaultNormalizeHost;
   }
 
+  function getCanonicalPageUrl(url, options) {
+    if (options && typeof options.getCanonicalPageUrlForFavicon === 'function') {
+      return options.getCanonicalPageUrlForFavicon(url) || String(url || '');
+    }
+    return String(url || '');
+  }
+
   function getHostFromUrl(url, options) {
     const normalizeHost = getNormalizeHost(options);
     try {
-      return normalizeHost(new URL(String(url || '')).hostname);
+      return normalizeHost(new URL(getCanonicalPageUrl(url, options)).hostname);
     } catch (error) {
       return '';
     }
@@ -307,6 +314,14 @@
     }
   }
 
+  function shouldPrioritizeTabUrl(url, options) {
+    return Boolean(
+      options &&
+      typeof options.shouldPrioritizeTabUrl === 'function' &&
+      options.shouldPrioritizeTabUrl(url)
+    );
+  }
+
   function mergeRecentSitesWithPinned(items, pinned, hidden, limit, options) {
     const opts = options && typeof options === 'object' ? options : {};
     const maxItems = Math.max(0, Number(limit) || 0);
@@ -347,6 +362,13 @@
     const mode = options.mode === 'most' ? 'most' : 'latest';
     const results = [];
     const seenHosts = new Set();
+    const tabCandidates = (Array.isArray(options.tabs) ? options.tabs : [])
+      .slice()
+      .sort((a, b) => (Number(b && b.lastAccessed) || 0) - (Number(a && a.lastAccessed) || 0));
+    const priorityTabCandidates = tabCandidates.filter((item) =>
+      shouldPrioritizeTabUrl(item && item.url, options)
+    );
+    appendSourceItems(results, seenHosts, priorityTabCandidates, 'tabs', candidateLimit, options);
     if (mode === 'most') {
       appendSourceItems(results, seenHosts, options.topSites, 'topSites', candidateLimit, options);
       if (results.length === 0) {
@@ -357,9 +379,6 @@
       appendSourceItems(results, seenHosts, options.historyItems, 'history', candidateLimit, options);
       appendSourceItems(results, seenHosts, options.topSites, 'topSites', candidateLimit, options);
     }
-    const tabCandidates = (Array.isArray(options.tabs) ? options.tabs : [])
-      .slice()
-      .sort((a, b) => (Number(b && b.lastAccessed) || 0) - (Number(a && a.lastAccessed) || 0));
     appendSourceItems(results, seenHosts, tabCandidates, 'tabs', candidateLimit, options);
     return mergeRecentSitesWithPinned(
       results,

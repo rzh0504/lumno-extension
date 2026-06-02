@@ -113,7 +113,15 @@ const core = sandbox.LumnoFaviconViewCore.createFaviconViewCore({
   const realUrl = 'https://m2.futurecomm.cn/favicon.ico';
   const proxyDataUrl = 'data:image/png;base64,ZmFrZS1wcm94eS1mYWxsYmFjaw==';
 
+  img.loading = 'lazy';
+  img.setAttribute('loading', 'lazy');
   assert.strictEqual(core.setFaviconSrcWithAnimation(img, proxyUrl), true);
+  assert.strictEqual(
+    img.loading,
+    'eager',
+    'placeholder favicons must opt out of lazy loading so hidden images still start loading'
+  );
+  assert.strictEqual(img.getAttribute('loading'), 'eager');
   assert.strictEqual(img.getAttribute('width'), '128');
   assert.strictEqual(img.getAttribute('height'), '128');
   core.attachFaviconData(img, proxyUrl, 'futurecomm.cn');

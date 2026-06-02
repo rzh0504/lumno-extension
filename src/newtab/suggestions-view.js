@@ -50,6 +50,14 @@
       : function() {
         return false;
       };
+    const isLocalNetworkHost = typeof config.isLocalNetworkHost === 'function'
+      ? config.isLocalNetworkHost
+      : shouldBlockFaviconForHost;
+    const getChromeFaviconUrl = typeof config.getChromeFaviconUrl === 'function'
+      ? config.getChromeFaviconUrl
+      : function() {
+        return '';
+      };
     const getHostFromUrl = typeof config.getHostFromUrl === 'function'
       ? config.getHostFromUrl
       : function() {
@@ -121,6 +129,11 @@
     const attachFaviconWithFallbacks = typeof config.attachFaviconWithFallbacks === 'function'
       ? config.attachFaviconWithFallbacks
       : noop;
+    const getBrowserPageFaviconUrl = typeof config.getBrowserPageFaviconUrl === 'function'
+      ? config.getBrowserPageFaviconUrl
+      : function() {
+        return '';
+      };
     const reportMissingIcon = typeof config.reportMissingIcon === 'function'
       ? config.reportMissingIcon
       : noop;
@@ -210,7 +223,7 @@
         // Fall back to host-based checks below for partially typed URLs.
       }
       const host = getHostFromUrl(url);
-      return Boolean(host && shouldBlockFaviconForHost(host));
+      return Boolean(host && (isLocalNetworkHost(host) || shouldBlockFaviconForHost(host)));
     }
 
     function createSuggestionInlineIcon(iconName, tone) {
@@ -259,6 +272,21 @@
       iconSlot.appendChild(iconNode);
       iconSlot._xIsFavicon = isFaviconIcon;
       return iconSlot;
+    }
+
+    function getBrowserFaviconCandidateForSuggestion(suggestion, host) {
+      const url = suggestion && suggestion.url ? String(suggestion.url) : '';
+      if (!url) {
+        return '';
+      }
+      if (!/^https?:\/\//i.test(url)) {
+        return getChromeFaviconUrl(url);
+      }
+      return host && isLocalNetworkHost(host) ? getChromeFaviconUrl(url) : '';
+    }
+
+    function getPrimaryFaviconCandidate(url, explicitUrl) {
+      return getBrowserPageFaviconUrl(url) || explicitUrl || '';
     }
 
     function setIconEmphasis(item, isActive) {
@@ -637,7 +665,10 @@
           applyFallbackIcon(favicon);
         } else {
           attachFaviconWithFallbacks(favicon, tab.url || '', hostForTab, {
-            primaryUrl: tab.favIconUrl || ''
+            primaryUrl: getPrimaryFaviconCandidate(tab.url || '', tab.favIconUrl || ''),
+            browserUrl: !/^https?:\/\//i.test(String(tab.url || '')) || (hostForTab && isLocalNetworkHost(hostForTab))
+              ? getChromeFaviconUrl(tab.url || '')
+              : ''
           });
         }
         const iconSlot = createIconSlot(favicon, !useFallback);
@@ -804,10 +835,20 @@
 
         let iconNode = null;
         let iconWrapper = null;
-        if (suggestion.type === 'browserPage') {
-          iconNode = createSuggestionInlineIcon('ri-window-2-line');
-        } else if (suggestion.type === 'directUrl') {
-          iconNode = createSearchIcon();
+        if (suggestion.type === 'browserPage' || suggestion.type === 'directUrl') {
+          if (suggestion.favicon) {
+            const suggestionHost = suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : '';
+            const favicon = createFaviconImage(index, { objectFitContain: true });
+            attachFaviconWithFallbacks(favicon, suggestion.url || suggestion.favicon || '', suggestionHost, {
+              primaryUrl: getPrimaryFaviconCandidate(suggestion.url || '', suggestion.favicon || ''),
+              browserUrl: getBrowserFaviconCandidateForSuggestion(suggestion, suggestionHost)
+            });
+            iconNode = favicon;
+          } else {
+            iconNode = suggestion.type === 'browserPage'
+              ? createSuggestionInlineIcon('ri-window-2-line')
+              : createSearchIcon();
+          }
         } else if (suggestion.type === 'commandNewTab') {
           iconNode = createSuggestionInlineIcon('ri-add-line', 'subtext');
         } else if (suggestion.type === 'commandSettings') {
@@ -818,7 +859,7 @@
           const favicon = createFaviconImage(index);
           favicon.src = suggestion.favicon || '';
           favicon.onerror = function() {
-            const fallbackIcon = createSearchIcon('subtext');
+            const fallbackIcon = createLinkIcon('subtext');
             if (favicon.parentNode) {
               favicon.parentNode.replaceChild(fallbackIcon, favicon);
             }
@@ -832,14 +873,12 @@
             suggestion.type === 'inlineSiteSearch' ||
             suggestion.type === 'siteSearchPrompt')
         ) {
+          const suggestionHost = suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : '';
           const favicon = createFaviconImage(index, { objectFitContain: true });
-          favicon.src = suggestion.favicon || '';
-          favicon.onerror = function() {
-            const fallbackIcon = createSearchIcon('subtext');
-            if (favicon.parentNode) {
-              favicon.parentNode.replaceChild(fallbackIcon, favicon);
-            }
-          };
+          attachFaviconWithFallbacks(favicon, suggestion.url || suggestion.favicon || '', suggestionHost, {
+            primaryUrl: getPrimaryFaviconCandidate(suggestion.url || '', suggestion.favicon || ''),
+            browserUrl: getBrowserFaviconCandidateForSuggestion(suggestion, suggestionHost)
+          });
           iconNode = favicon;
         } else if (suggestion.favicon) {
           const suggestionHost = suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : '';
@@ -850,7 +889,7 @@
             const favicon = createFaviconImage(index, { objectFitContain: true });
             const faviconPageUrl = suggestion && suggestion.url ? suggestion.url : (suggestion.favicon || '');
             attachFaviconWithFallbacks(favicon, faviconPageUrl, suggestionHost, {
-              primaryUrl: suggestion.favicon || ''
+              primaryUrl: getPrimaryFaviconCandidate(faviconPageUrl, suggestion.favicon || '')
             });
             iconNode = favicon;
           }

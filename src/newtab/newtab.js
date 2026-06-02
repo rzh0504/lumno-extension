@@ -3475,10 +3475,16 @@
       return '';
     }
     try {
-      return normalizeHost(new URL(url).hostname);
+      return normalizeHost(new URL(getCanonicalPageUrlForFavicon(url) || url).hostname);
     } catch (e) {
       return '';
     }
+  }
+
+  function getCanonicalPageUrlForFavicon(url) {
+    return typeof FAVICON_UTILS.getCanonicalPageUrlForFavicon === 'function'
+      ? FAVICON_UTILS.getCanonicalPageUrlForFavicon(url)
+      : String(url || '');
   }
 
   function normalizeAccentRgb(value) {
@@ -3643,7 +3649,7 @@
   function getThemePageUrlForSuggestion(suggestion, hostKey) {
     if (suggestion && suggestion.url) {
       try {
-        const parsed = new URL(suggestion.url);
+        const parsed = new URL(getCanonicalPageUrlForFavicon(suggestion.url) || suggestion.url);
         if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
           return parsed.href;
         }
@@ -4379,6 +4385,7 @@
     getRiSvg,
     getExtensionFaviconUrl,
     getGstaticFaviconUrl,
+    getChromeFaviconUrl,
     isOwnExtensionUrl,
     isBlockedLocalFaviconUrl,
     shouldBlockFaviconForHost,
@@ -4464,9 +4471,10 @@
     }
     if (suggestion && suggestion.url) {
       try {
-        const hostname = normalizeHost(new URL(suggestion.url).hostname);
+        const pageUrl = getCanonicalPageUrlForFavicon(suggestion.url) || suggestion.url;
+        const hostname = normalizeHost(new URL(pageUrl).hostname);
         if (hostname) {
-          return getGstaticFaviconUrl(suggestion.url) || getHostFaviconUrl(hostname);
+          return getGstaticFaviconUrl(pageUrl) || getHostFaviconUrl(hostname);
         }
       } catch (e) {
         // Ignore malformed URLs.
@@ -4852,6 +4860,9 @@
     stableHashCode,
     normalizeHost,
     attachFaviconWithFallbacks,
+    isLocalNetworkHost,
+    getChromeFaviconUrl,
+    getBrowserPageFaviconUrl,
     getImmediateThemeForSuggestion,
     queueThemeForTarget,
     applyCardTheme: applyBookmarkCardTheme,
@@ -4880,6 +4891,9 @@
     initFolderPathMorph,
     playFolderPathMorph,
     attachFaviconWithFallbacks,
+    isLocalNetworkHost,
+    getChromeFaviconUrl,
+    getBrowserPageFaviconUrl,
     ensureReady: ensureBookmarkTreeCache,
     getItems: (folderId) => {
       const id = String(folderId || '');
@@ -4957,10 +4971,12 @@
     sanitizeDisplayText,
     getOwnExtensionPageDisplay,
     getHostFromUrl,
+    getCanonicalPageUrlForFavicon,
     getSiteDisplayName,
     getUrlDisplay,
     getRiSvg,
     attachFaviconWithFallbacks,
+    getBrowserPageFaviconUrl,
     getImmediateThemeForSuggestion,
     queueThemeForTarget,
     applyCardTheme: applyRecentCardTheme,
@@ -5710,9 +5726,11 @@
     return {
       normalizeHost,
       getHostFromUrl,
+      getCanonicalPageUrlForFavicon,
       sanitizeDisplayText,
       getSiteDisplayName,
       shouldExcludeUrl: shouldExcludeFromRecentSites,
+      shouldPrioritizeTabUrl: isBrowserPageRecentUrl,
       maxPinned: MAX_PINNED_RECENT_SITES,
       maxHidden: MAX_HIDDEN_RECENT_SITES,
       ...(extraOptions || {})
@@ -5971,6 +5989,38 @@
       normalized === 'ms-browser-extension:';
   }
 
+  function isBrowserNewtabUrl(url) {
+    const guards = window.LumnoUrlGuards || {};
+    if (typeof guards.isBrowserNewtabUrl === 'function') {
+      return guards.isBrowserNewtabUrl(url);
+    }
+    const lower = String(url || '').trim().toLowerCase().replace(/[?#].*$/, '').replace(/\/+$/, '');
+    return lower === 'chrome://newtab' ||
+      lower === 'chrome://new-tab-page' ||
+      lower === 'edge://newtab' ||
+      lower === 'brave://newtab' ||
+      lower === 'vivaldi://newtab' ||
+      lower === 'opera://startpage';
+  }
+
+  function isBrowserInternalUrl(url) {
+    const guards = window.LumnoUrlGuards || {};
+    if (typeof guards.isBrowserInternalUrl === 'function') {
+      return guards.isBrowserInternalUrl(url);
+    }
+    const lower = String(url || '').trim().toLowerCase();
+    return lower.startsWith('chrome://') ||
+      lower.startsWith('edge://') ||
+      lower.startsWith('brave://') ||
+      lower.startsWith('vivaldi://') ||
+      lower.startsWith('opera://') ||
+      lower.startsWith('about:');
+  }
+
+  function isBrowserPageRecentUrl(url) {
+    return Boolean(url && isBrowserInternalUrl(url) && !isBrowserNewtabUrl(url));
+  }
+
   function isOwnExtensionUrl(url) {
     if (!url || !chrome || !chrome.runtime || !chrome.runtime.id) {
       return false;
@@ -6067,11 +6117,12 @@
   }
 
   function getExtensionFaviconUrl(pageUrl) {
-    if (!pageUrl || !/^https?:\/\//i.test(pageUrl)) {
+    const canonicalPageUrl = getCanonicalPageUrlForFavicon(pageUrl);
+    if (!canonicalPageUrl || !/^https?:\/\//i.test(canonicalPageUrl)) {
       return '';
     }
     return typeof FAVICON_UTILS.getExtensionFaviconUrl === 'function'
-      ? FAVICON_UTILS.getExtensionFaviconUrl(pageUrl, {
+      ? FAVICON_UTILS.getExtensionFaviconUrl(canonicalPageUrl, {
         getRuntimeUrl: chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function'
           ? chrome.runtime.getURL.bind(chrome.runtime)
           : null,
@@ -6081,12 +6132,40 @@
   }
 
   function getGstaticFaviconUrl(pageUrl) {
-    if (!pageUrl || !/^https?:\/\//i.test(pageUrl)) {
+    const canonicalPageUrl = getCanonicalPageUrlForFavicon(pageUrl);
+    if (!canonicalPageUrl || !/^https?:\/\//i.test(canonicalPageUrl)) {
       return '';
     }
     return typeof FAVICON_UTILS.getGstaticFaviconUrl === 'function'
-      ? FAVICON_UTILS.getGstaticFaviconUrl(pageUrl, { size: FAVICON_PROXY_SIZE })
+      ? FAVICON_UTILS.getGstaticFaviconUrl(canonicalPageUrl, { size: FAVICON_PROXY_SIZE })
       : '';
+  }
+
+  function getChromeFaviconUrl(pageUrl) {
+    const canonicalPageUrl = getCanonicalPageUrlForFavicon(pageUrl) || String(pageUrl || '').trim();
+    if (!canonicalPageUrl) {
+      return '';
+    }
+    return typeof FAVICON_UTILS.getChromeFaviconUrl === 'function'
+      ? FAVICON_UTILS.getChromeFaviconUrl(canonicalPageUrl, { size: FAVICON_PROXY_SIZE })
+      : '';
+  }
+
+  function getBrowserPageFaviconUrl(pageUrl) {
+    return typeof FAVICON_UTILS.getBrowserPageFaviconUrl === 'function'
+      ? FAVICON_UTILS.getBrowserPageFaviconUrl(pageUrl)
+      : '';
+  }
+
+  function getPageFaviconCandidateUrl(pageUrl) {
+    const page = String(pageUrl || '').trim();
+    if (!page) {
+      return '';
+    }
+    if (/^https?:\/\//i.test(page)) {
+      return getExtensionFaviconUrl(page) || getChromeFaviconUrl(page) || getGstaticFaviconUrl(page);
+    }
+    return getChromeFaviconUrl(page);
   }
 
   function getHostFaviconUrl(hostname) {
@@ -6193,6 +6272,9 @@
     if (!url) {
       return true;
     }
+    if (isBrowserNewtabUrl(url)) {
+      return true;
+    }
     try {
       const parsed = new URL(url);
       if (isBrowserExtensionProtocol(parsed.protocol)) {
@@ -6257,13 +6339,17 @@
 
     const mergeWithTabsIfNeeded = (sources, mergeMode) => {
       const withoutTabs = mergeSources(sources, mergeMode);
-      if (withoutTabs.length >= safeLimit) {
-        return Promise.resolve(withoutTabs);
-      }
-      return readOpenTabs().then((tabs) => mergeSources({
-        ...(sources || {}),
-        tabs
-      }, mergeMode));
+      return readOpenTabs().then((tabs) => {
+        const shouldMergeTabs = withoutTabs.length < safeLimit ||
+          (Array.isArray(tabs) && tabs.some((tab) => isBrowserPageRecentUrl(tab && tab.url)));
+        if (!shouldMergeTabs) {
+          return withoutTabs;
+        }
+        return mergeSources({
+          ...(sources || {}),
+          tabs
+        }, mergeMode);
+      });
     };
 
     const loadLatestRecentSites = () => readHistoryItems().then((historyItems) => {
@@ -6272,7 +6358,7 @@
       }
       const historyOnly = mergeSources({ historyItems }, 'latest');
       if (historyOnly.length >= safeLimit) {
-        return historyOnly;
+        return mergeWithTabsIfNeeded({ historyItems }, 'latest');
       }
       return readTopSites().then((topSites) => mergeWithTabsIfNeeded({
         historyItems,
@@ -6288,7 +6374,7 @@
           return loadLatestRecentSites();
         }
         if (topOnly.length >= safeLimit) {
-          return topOnly;
+          return mergeWithTabsIfNeeded({ topSites: topSiteItems }, 'most');
         }
         return mergeWithTabsIfNeeded({ topSites: topSiteItems }, 'most');
       });
@@ -6982,18 +7068,36 @@
     return true;
   }
 
-  function getProviderIcon(provider) {
-    if (provider && provider.icon) {
-      return provider.icon;
-    }
-    if (provider && provider.iconUrl) {
-      return provider.iconUrl;
-    }
+  function getProviderFaviconPageUrl(provider) {
     const template = provider && provider.template ? provider.template : '';
+    if (!template) {
+      return '';
+    }
     try {
       const url = template.replace(/\{query\}/g, 'test');
-      const hostname = normalizeHost(new URL(url).hostname);
-      return getHostFaviconUrl(hostname);
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return '';
+      }
+      return `${parsed.origin}/`;
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function getProviderIcon(provider) {
+    const explicitIcon = provider && (provider.icon || provider.iconUrl) ? (provider.icon || provider.iconUrl) : '';
+    const providerIconPageUrl = explicitIcon ? getCanonicalPageUrlForFavicon(explicitIcon) : '';
+    if (providerIconPageUrl && providerIconPageUrl !== explicitIcon) {
+      return getPageFaviconCandidateUrl(providerIconPageUrl) || explicitIcon;
+    }
+    if (explicitIcon) {
+      return explicitIcon;
+    }
+    const providerPageUrl = getProviderFaviconPageUrl(provider);
+    try {
+      const hostname = normalizeHost(new URL(providerPageUrl).hostname);
+      return getPageFaviconCandidateUrl(providerPageUrl) || getHostFaviconUrl(hostname);
     } catch (e) {
       return '';
     }
@@ -7244,14 +7348,16 @@
           type: 'browserPage',
           title: formatMessage('open_url', '打开 {url}', { url: targetUrl }),
           url: targetUrl,
-          favicon: 'https://img.icons8.com/?size=100&id=1LqgD1Q7n2fy&format=png&color=000000'
+          favicon: getPageFaviconCandidateUrl(targetUrl) ||
+            'https://img.icons8.com/?size=100&id=1LqgD1Q7n2fy&format=png&color=000000'
         });
       } else if (rule.type === 'url' && rule.url) {
         matches.push({
           type: 'browserPage',
           title: formatMessage('open_url', '打开 {url}', { url: rule.url }),
           url: rule.url,
-          favicon: 'https://img.icons8.com/?size=100&id=1LqgD1Q7n2fy&format=png&color=000000'
+          favicon: getPageFaviconCandidateUrl(rule.url) ||
+            'https://img.icons8.com/?size=100&id=1LqgD1Q7n2fy&format=png&color=000000'
         });
       }
     });
@@ -7267,7 +7373,7 @@
       type: 'directUrl',
       title: formatMessage('open_url', '打开 {url}', { url: targetUrl }),
       url: targetUrl,
-      favicon: ''
+      favicon: getPageFaviconCandidateUrl(targetUrl)
     };
   }
 
@@ -7391,6 +7497,7 @@
     formatTabRankDebugText,
     isTabRankScoreDebugEnabled: () => tabRankScoreDebugEnabled,
     shouldBlockFaviconForHost,
+    isLocalNetworkHost,
     getHostFromUrl,
     getThemeHostForSuggestion,
     getImmediateThemeForSuggestion,
@@ -7408,6 +7515,8 @@
     attachFaviconWithFallbacks,
     reportMissingIcon,
     preloadIcon,
+    getChromeFaviconUrl,
+    getBrowserPageFaviconUrl,
     setSuggestionsVisible,
     onSetSelectedIndex: (nextIndex) => {
       selectedIndex = nextIndex;

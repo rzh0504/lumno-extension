@@ -1,9 +1,12 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const faviconTheme = require('../src/newtab/favicon-theme.js');
 
 require('../src/shared/suggestion-action-model.js');
 require('../src/newtab/suggestions-view.js');
 const suggestionsView = globalThis.LumnoNewtabSuggestionsView;
+const repoRoot = path.resolve(__dirname, '..');
 
 class FakeStyle {
   constructor() {
@@ -143,7 +146,14 @@ function getHostFromUrl(url) {
 
 function shouldBlockFaviconForHost(hostname) {
   const host = String(hostname || '').toLowerCase();
-  return host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local');
+  return host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host.startsWith('192.168.') ||
+    host.endsWith('.local');
+}
+
+function isLocalNetworkHost(hostname) {
+  return shouldBlockFaviconForHost(hostname);
 }
 
 function applyThemeVariables(target, theme, defaultTheme) {
@@ -158,6 +168,27 @@ function applyThemeVariables(target, theme, defaultTheme) {
   }
   target.style.setProperty('--x-nt-suggestion-active-bg', resolvedTheme.highlightBg);
   target.style.setProperty('--x-nt-suggestion-active-border', resolvedTheme.highlightBorder);
+}
+
+function testSiteSearchProviderIconsUsePageFaviconCandidates() {
+  const newtabJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/newtab.js'), 'utf8');
+  const overlayJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/search-panel.js'), 'utf8');
+  assert.ok(
+    /function getProviderIcon\(provider\)[\s\S]*getPageFaviconCandidateUrl\(providerIconPageUrl\)/.test(newtabJs),
+    'newtab site-search provider icons should convert proxy icon URLs into page favicon candidates'
+  );
+  assert.ok(
+    /function getProviderFaviconPageUrl\(provider\)[\s\S]*return `\$\{parsed\.origin\}\/`;/.test(newtabJs),
+    'newtab site-search provider icons should use the provider origin instead of a synthetic search query'
+  );
+  assert.ok(
+    /function getProviderIcon\(provider\)[\s\S]*getPageFaviconCandidateUrl\(providerIconPageUrl\)/.test(overlayJs),
+    'overlay site-search provider icons should convert proxy icon URLs into page favicon candidates'
+  );
+  assert.ok(
+    /function getProviderFaviconPageUrl\(provider\)[\s\S]*return `\$\{parsed\.origin\}\/`;/.test(overlayJs),
+    'overlay site-search provider icons should use the provider origin instead of a synthetic search query'
+  );
 }
 
 async function testLocalUrlSuggestionUsesFallbackTheme() {
@@ -177,7 +208,8 @@ async function testLocalUrlSuggestionUsesFallbackTheme() {
     sanitizeDisplayText: (value) => String(value || ''),
     getHostFromUrl,
     getThemeHostForSuggestion: (suggestion) => getHostFromUrl(suggestion && suggestion.url),
-    shouldBlockFaviconForHost,
+    shouldBlockFaviconForHost: () => false,
+    isLocalNetworkHost,
     getImmediateThemeForSuggestion: () => defaultTheme,
     getThemeForSuggestion: () => Promise.resolve(defaultTheme),
     getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
@@ -221,6 +253,330 @@ async function testLocalUrlSuggestionUsesFallbackTheme() {
     urlHighlightTheme.highlightBg,
     'local URL active row should use the fallback theme highlight background'
   );
+}
+
+async function testDirectUrlSuggestionUsesFaviconWhenAvailable() {
+  const document = createFakeDocument();
+  const container = document.createElement('div');
+  container.setConnected(true);
+  const items = [];
+  const defaultTheme = faviconTheme.createDefaultTheme();
+  const attached = [];
+
+  const view = suggestionsView.createSuggestionsView({
+    document,
+    container,
+    items,
+    t: (key, fallback) => fallback || key,
+    formatMessage: (key, fallback, params) => String(fallback || key).replace('{name}', params && params.name ? params.name : ''),
+    getRiSvg: () => '',
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl,
+    getThemeHostForSuggestion: (suggestion) => getHostFromUrl(suggestion && suggestion.url),
+    shouldBlockFaviconForHost: () => false,
+    isLocalNetworkHost,
+    getImmediateThemeForSuggestion: () => defaultTheme,
+    getThemeForSuggestion: () => Promise.resolve(defaultTheme),
+    getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    getHoverColors: (theme) => faviconTheme.getHoverColors(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
+    applyMarkVariables: () => {},
+    getChromeFaviconUrl: (url) => `chrome://favicon2/?pageUrl=${encodeURIComponent(url)}&size=128`,
+    attachFaviconWithFallbacks: (img, url, host, options) => {
+      attached.push({
+        img,
+        url,
+        host,
+        primaryUrl: options && options.primaryUrl,
+        browserUrl: options && options.browserUrl
+      });
+    },
+    defaultTheme
+  });
+
+  view.render({
+    query: '192.168.1.8',
+    primaryHighlightIndex: 0,
+    primaryHighlightReason: 'navigation',
+    suggestions: [{
+      type: 'directUrl',
+      title: '打开 http://192.168.1.8/',
+      url: 'http://192.168.1.8/',
+      favicon: 'chrome-extension://abc/_favicon/?pageUrl=http%3A%2F%2F192.168.1.8%2F&size=128'
+    }]
+  });
+
+  const item = view.getItems()[0];
+  assert.ok(item, 'direct URL suggestion should render');
+  assert.strictEqual(item._xIconIsFavicon, true, 'direct URL suggestion with favicon should render an image icon');
+  assert.strictEqual(attached.length, 1, 'direct URL favicon should be attached through the fallback chain');
+  assert.strictEqual(attached[0].url, 'http://192.168.1.8/');
+  assert.strictEqual(attached[0].host, '192.168.1.8');
+  assert.strictEqual(
+    attached[0].primaryUrl,
+    'chrome-extension://abc/_favicon/?pageUrl=http%3A%2F%2F192.168.1.8%2F&size=128'
+  );
+  assert.strictEqual(
+    attached[0].browserUrl,
+    'chrome://favicon2/?pageUrl=http%3A%2F%2F192.168.1.8%2F&size=128'
+  );
+}
+
+async function testTabSuggestionUsesBrowserFaviconCandidate() {
+  const document = createFakeDocument();
+  const container = document.createElement('div');
+  container.setConnected(true);
+  const items = [];
+  const defaultTheme = faviconTheme.createDefaultTheme();
+  const attached = [];
+
+  const view = suggestionsView.createSuggestionsView({
+    document,
+    container,
+    items,
+    t: (key, fallback) => fallback || key,
+    getRiSvg: () => '',
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl,
+    getThemeHostForSuggestion: (suggestion) => getHostFromUrl(suggestion && suggestion.url),
+    shouldBlockFaviconForHost: () => false,
+    getImmediateThemeForSuggestion: () => defaultTheme,
+    getThemeForSuggestion: () => Promise.resolve(defaultTheme),
+    getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    getHoverColors: (theme) => faviconTheme.getHoverColors(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
+    applyMarkVariables: () => {},
+    getChromeFaviconUrl: (url) => `chrome://favicon2/?pageUrl=${encodeURIComponent(url)}&size=128`,
+    attachFaviconWithFallbacks: (img, url, host, options) => {
+      attached.push({ img, url, host, browserUrl: options && options.browserUrl });
+    },
+    defaultTheme
+  });
+
+  view.renderTabs([{
+    title: '新标签页',
+    url: 'chrome://newtab/',
+    favIconUrl: ''
+  }]);
+
+  const item = view.getItems()[0];
+  assert.ok(item, 'tab suggestion should render');
+  assert.strictEqual(item._xIconIsFavicon, true, 'tab suggestion should keep favicon image slot');
+  assert.strictEqual(attached.length, 1, 'tab favicon should be attached through the fallback chain');
+  assert.strictEqual(attached[0].url, 'chrome://newtab/');
+  assert.strictEqual(attached[0].browserUrl, 'chrome://favicon2/?pageUrl=chrome%3A%2F%2Fnewtab%2F&size=128');
+}
+
+async function testHighlightedSiteSearchUsesFaviconFallbackChain() {
+  const document = createFakeDocument();
+  const container = document.createElement('div');
+  container.setConnected(true);
+  const items = [];
+  const defaultTheme = faviconTheme.createDefaultTheme();
+  const providerFavicon = 'https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=https%3A%2F%2Fgithub.com%2F&size=128';
+  const attached = [];
+
+  const view = suggestionsView.createSuggestionsView({
+    document,
+    container,
+    items,
+    t: (key, fallback) => fallback || key,
+    getRiSvg: (iconName) => iconName,
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl,
+    getThemeHostForSuggestion: (suggestion) => getHostFromUrl(suggestion && suggestion.url),
+    shouldBlockFaviconForHost: () => false,
+    getImmediateThemeForSuggestion: () => defaultTheme,
+    getThemeForSuggestion: () => Promise.resolve(defaultTheme),
+    getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    getHoverColors: (theme) => faviconTheme.getHoverColors(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
+    applyMarkVariables: () => {},
+    attachFaviconWithFallbacks: (img, url, host, options) => {
+      attached.push({
+        img,
+        url,
+        host,
+        primaryUrl: options && options.primaryUrl,
+        browserUrl: options && options.browserUrl
+      });
+    },
+    defaultTheme
+  });
+
+  view.render({
+    query: 'react',
+    primaryHighlightIndex: 0,
+    primaryHighlightReason: 'none',
+    suggestions: [{
+      type: 'siteSearch',
+      title: '在 GitHub 中搜索 "react"',
+      url: 'https://github.com/search?q=react',
+      favicon: providerFavicon,
+      provider: {
+        key: 'gh',
+        name: 'GitHub',
+        template: 'https://github.com/search?q={query}'
+      },
+      searchQuery: 'react'
+    }]
+  });
+
+  const item = view.getItems()[0];
+  const iconSlot = item && item._xIconWrap;
+  assert.ok(iconSlot, 'site search suggestion should render an icon slot');
+  assert.strictEqual(item._xIconIsFavicon, true, 'highlighted site search should use an image favicon');
+  assert.strictEqual(attached.length, 1, 'highlighted site search favicon should use the shared fallback chain');
+  assert.strictEqual(attached[0].url, 'https://github.com/search?q=react');
+  assert.strictEqual(attached[0].host, 'github.com');
+  assert.strictEqual(attached[0].primaryUrl, providerFavicon);
+  assert.strictEqual(attached[0].browserUrl, '');
+}
+
+async function testAiSiteSearchUsesFaviconFallbackChain() {
+  const document = createFakeDocument();
+  const container = document.createElement('div');
+  container.setConnected(true);
+  const items = [];
+  const defaultTheme = faviconTheme.createDefaultTheme();
+  const providerFavicon = 'https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=https%3A%2F%2Fwww.doubao.com%2F&size=128';
+  const attached = [];
+
+  const view = suggestionsView.createSuggestionsView({
+    document,
+    container,
+    items,
+    t: (key, fallback) => fallback || key,
+    getRiSvg: () => '',
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl,
+    getThemeHostForSuggestion: (suggestion) => getHostFromUrl(suggestion && suggestion.url),
+    shouldBlockFaviconForHost: () => false,
+    getImmediateThemeForSuggestion: () => defaultTheme,
+    getThemeForSuggestion: () => Promise.resolve(defaultTheme),
+    getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    getHoverColors: (theme) => faviconTheme.getHoverColors(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
+    applyMarkVariables: () => {},
+    isAiSiteSearchProvider: (provider) => Boolean(provider && provider.action === 'openAndSubmit'),
+    attachFaviconWithFallbacks: (img, url, host, options) => {
+      attached.push({
+        img,
+        url,
+        host,
+        primaryUrl: options && options.primaryUrl,
+        browserUrl: options && options.browserUrl
+      });
+    },
+    defaultTheme
+  });
+
+  view.render({
+    query: '阿萨德',
+    primaryHighlightIndex: 0,
+    primaryHighlightReason: 'none',
+    suggestions: [{
+      type: 'siteSearch',
+      title: '向 豆包 提问 "阿萨德"',
+      url: 'https://www.doubao.com/chat/',
+      favicon: providerFavicon,
+      provider: {
+        key: 'dbai',
+        name: '豆包',
+        template: 'https://www.doubao.com/chat/',
+        action: 'openAndSubmit',
+        submitStrategy: 'doubaoPrompt'
+      },
+      searchQuery: '阿萨德'
+    }]
+  });
+
+  const item = view.getItems()[0];
+  assert.ok(item, 'AI site search suggestion should render');
+  assert.strictEqual(item._xIconIsFavicon, true, 'AI site search should use an image favicon');
+  assert.strictEqual(attached.length, 1, 'AI site search favicon should use the shared fallback chain');
+  assert.strictEqual(attached[0].url, 'https://www.doubao.com/chat/');
+  assert.strictEqual(attached[0].host, 'www.doubao.com');
+  assert.strictEqual(attached[0].primaryUrl, providerFavicon);
+  assert.strictEqual(attached[0].browserUrl, '');
+}
+
+async function testModeSwitchImageFallbackUsesLinkIcon() {
+  const document = createFakeDocument();
+  const container = document.createElement('div');
+  container.setConnected(true);
+  const items = [];
+  const defaultTheme = faviconTheme.createDefaultTheme();
+
+  const view = suggestionsView.createSuggestionsView({
+    document,
+    container,
+    items,
+    t: (key, fallback) => fallback || key,
+    getRiSvg: (iconName) => iconName,
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl,
+    getThemeHostForSuggestion: (suggestion) => getHostFromUrl(suggestion && suggestion.url),
+    shouldBlockFaviconForHost: () => false,
+    getImmediateThemeForSuggestion: () => defaultTheme,
+    getThemeForSuggestion: () => Promise.resolve(defaultTheme),
+    getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    getHoverColors: (theme) => faviconTheme.getHoverColors(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
+    applyMarkVariables: () => {},
+    defaultTheme
+  });
+
+  view.render({
+    query: 'settings',
+    primaryHighlightIndex: 0,
+    primaryHighlightReason: 'modeSwitch',
+    suggestions: [{
+      type: 'modeSwitch',
+      title: '切换搜索模式',
+      url: '',
+      favicon: 'https://example.com/missing.png'
+    }]
+  });
+
+  const item = view.getItems()[0];
+  const iconSlot = item && item._xIconWrap;
+  assert.ok(iconSlot, 'mode switch suggestion should render an icon slot');
+  const image = iconSlot.childNodes[0];
+  assert.strictEqual(image.tagName, 'IMG', 'mode switch suggestion should start with a favicon image');
+  assert.strictEqual(typeof image.onerror, 'function', 'favicon image should install an error fallback');
+  image.onerror();
+  assert.strictEqual(iconSlot.childNodes[0].innerHTML, 'ri-link');
 }
 
 async function testProxyFallbackFaviconUsesFallbackTheme() {
@@ -505,7 +861,14 @@ async function testOpenNewTabVisitButtonReflectsCurrentTabModifier() {
   );
 }
 
+testSiteSearchProviderIconsUsePageFaviconCandidates();
+
 testLocalUrlSuggestionUsesFallbackTheme()
+  .then(testDirectUrlSuggestionUsesFaviconWhenAvailable)
+  .then(testTabSuggestionUsesBrowserFaviconCandidate)
+  .then(testHighlightedSiteSearchUsesFaviconFallbackChain)
+  .then(testAiSiteSearchUsesFaviconFallbackChain)
+  .then(testModeSwitchImageFallbackUsesLinkIcon)
   .then(testProxyFallbackFaviconUsesFallbackTheme)
   .then(testVisitButtonAndEnterTagShareOverlayVisibilityRules)
   .then(testAiProviderVisitButtonUsesWebAppLabel)

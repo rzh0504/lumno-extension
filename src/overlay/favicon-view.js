@@ -13,6 +13,7 @@
     const getHostFromUrl = typeof config.getHostFromUrl === 'function' ? config.getHostFromUrl : (() => '');
     const getExtensionFaviconUrl = typeof config.getExtensionFaviconUrl === 'function' ? config.getExtensionFaviconUrl : (() => '');
     const getGstaticFaviconUrl = typeof config.getGstaticFaviconUrl === 'function' ? config.getGstaticFaviconUrl : (() => '');
+    const getChromeFaviconUrl = typeof config.getChromeFaviconUrl === 'function' ? config.getChromeFaviconUrl : (() => '');
     const shouldBlockFaviconForHost = typeof config.shouldBlockFaviconForHost === 'function' ? config.shouldBlockFaviconForHost : (() => false);
     const isFaviconProxyUrl = typeof config.isFaviconProxyUrl === 'function' ? config.isFaviconProxyUrl : (() => false);
     const isBlockedLocalFaviconUrl = typeof config.isBlockedLocalFaviconUrl === 'function'
@@ -271,6 +272,25 @@
       }
     }
 
+    function getRuntimeChromeFaviconUrl(pageUrl) {
+      const page = String(pageUrl || '').trim();
+      if (!page) {
+        return '';
+      }
+      const configured = getSafeOverlayFaviconCandidateUrl(getChromeFaviconUrl(page));
+      if (configured) {
+        return configured;
+      }
+      try {
+        const faviconUrl = new URL('chrome://favicon2/');
+        faviconUrl.searchParams.set('pageUrl', page);
+        faviconUrl.searchParams.set('size', '128');
+        return getSafeOverlayFaviconCandidateUrl(faviconUrl.toString());
+      } catch (e) {
+        return '';
+      }
+    }
+
     function requestFaviconData(url) {
       return faviconViewCore.requestFaviconData(url);
     }
@@ -306,6 +326,7 @@
         fallbackUrl: getSafeOverlayFaviconCandidateUrl(fallbackUrl),
         primaryUrl: getSafeOverlayFaviconCandidateUrl(fallbackUrl),
         extensionFavicon: getRuntimeExtensionFaviconUrl(pageUrl),
+        browserUrl: /^https?:\/\//i.test(String(pageUrl || '')) ? '' : getRuntimeChromeFaviconUrl(pageUrl),
         gstaticFavicon: getRuntimeGstaticFaviconUrl(pageUrl),
         previousWorkingSrc: getLastWorkingFaviconSrc(img),
         hasFailedHandler: typeof onFailed === 'function',
@@ -332,6 +353,7 @@
       return [
         { kind: 'primary', url: state.primaryUrl },
         { kind: 'extension', url: state.extensionFavicon },
+        { kind: 'browser', url: state.browserUrl },
         { kind: 'gstatic', url: state.gstaticFavicon }
       ].filter((candidate) => {
         const url = getSafeOverlayFaviconCandidateUrl(candidate.url);

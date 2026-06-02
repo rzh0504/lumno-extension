@@ -55,6 +55,12 @@
     const getHostFromUrl = getFunction(options, 'getHostFromUrl', function() {
       return '';
     });
+    const getCanonicalPageUrlForFavicon = getFunction(options, 'getCanonicalPageUrlForFavicon', function(url) {
+      return url || '';
+    });
+    const getBrowserPageFaviconUrl = getFunction(options, 'getBrowserPageFaviconUrl', function() {
+      return '';
+    });
     const getSiteDisplayName = getFunction(options, 'getSiteDisplayName', function(host, title) {
       return title || host || '';
     });
@@ -114,7 +120,9 @@
         return null;
       }
       const ownExtensionDisplay = getOwnExtensionPageDisplay(item.url, item.title);
-      const host = ownExtensionDisplay ? 'lumno.kubai.design' : (item.host || getHostFromUrl(item.url) || '');
+      const faviconPageUrl = getCanonicalPageUrlForFavicon(item.url) || item.url;
+      const canonicalHost = getHostFromUrl(faviconPageUrl);
+      const host = ownExtensionDisplay ? 'lumno.kubai.design' : (canonicalHost || item.host || getHostFromUrl(item.url) || '');
       const siteName = ownExtensionDisplay ? ownExtensionDisplay.siteName : getSiteDisplayName(host, item.title);
       const titleText = ownExtensionDisplay
         ? ownExtensionDisplay.titleText
@@ -129,7 +137,7 @@
         title: titleText
       }));
       card._xHost = host;
-      const themeSuggestion = { type: 'history', url: item.url, title: item.title || '' };
+      const themeSuggestion = { type: 'history', url: faviconPageUrl, title: item.title || '' };
       const immediateTheme = getImmediateThemeForSuggestion(themeSuggestion);
       card._xTheme = immediateTheme;
       applyCardTheme(card, immediateTheme, host);
@@ -151,7 +159,9 @@
       if (shouldEager) {
         faviconImage.fetchPriority = 'high';
       }
-      attachFaviconWithFallbacks(faviconImage, item.url, host);
+      attachFaviconWithFallbacks(faviconImage, faviconPageUrl, host, {
+        primaryUrl: getBrowserPageFaviconUrl(faviconPageUrl)
+      });
       const name = documentObj.createElement('div');
       name.className = 'x-nt-recent-name';
       name.textContent = siteName;
