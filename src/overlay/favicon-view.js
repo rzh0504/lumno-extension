@@ -307,6 +307,7 @@
         extensionFavicon: getRuntimeExtensionFaviconUrl(pageUrl),
         gstaticFavicon: getRuntimeGstaticFaviconUrl(pageUrl),
         previousWorkingSrc: getLastWorkingFaviconSrc(img),
+        hasFailedHandler: typeof onFailed === 'function',
         handleFailed: typeof onFailed === 'function' ? onFailed : function() {},
         isSessionCurrent() {
           return Boolean(img && img._xOverlayThemeFaviconSession === session);
@@ -399,10 +400,18 @@
       }
       tried.add(nextUrl);
       clearOverlayCandidateLoadTimer(img);
-      const scheduleDefaultExtensionFaviconCheck = () => {
-        if (!candidate || candidate.kind !== 'extension' || !state.gstaticFavicon) {
+
+      const shouldCheckDefaultProxy = candidate &&
+        (candidate.kind === 'extension' || candidate.kind === 'gstatic');
+      let defaultProxyCheckStarted = false;
+      const scheduleDefaultProxyFaviconCheck = () => {
+        if (!shouldCheckDefaultProxy) {
           return;
         }
+        if (defaultProxyCheckStarted) {
+          return;
+        }
+        defaultProxyCheckStarted = true;
         setTimer(() => {
           if (!img || !state.isSessionCurrent()) {
             return;
@@ -411,12 +420,19 @@
           if (currentSrc !== nextUrl) {
             return;
           }
-          faviconViewCore.detectDefaultExtensionFavicon(img, nextUrl).then((isDefault) => {
+          const defaultCheckPromise = candidate.kind === 'extension'
+            ? faviconViewCore.detectDefaultExtensionFavicon(img, nextUrl)
+            : faviconViewCore.requestFaviconData(nextUrl).then((dataUrl) => !dataUrl);
+          defaultCheckPromise.catch(() => false).then((isDefault) => {
             if (!isDefault || !img || !state.isSessionCurrent()) {
               return;
             }
             const latestSrc = img.getAttribute('data-favicon-current-src') || img.src || '';
             if (latestSrc !== nextUrl) {
+              return;
+            }
+            if (candidate.kind === 'gstatic') {
+              finalizeOverlayDefaultProxyFaviconFailure(img, state);
               return;
             }
             if (typeof img._xOverlayThemeFaviconErrorHandler === 'function') {
@@ -425,29 +441,38 @@
           });
         }, 0);
       };
-      const handleExtensionLoad = () => {
-        scheduleDefaultExtensionFaviconCheck();
+      const handleProxyLoad = () => {
+        scheduleDefaultProxyFaviconCheck();
       };
-      if (candidate && candidate.kind === 'extension' && state.gstaticFavicon) {
-        img.addEventListener('load', handleExtensionLoad, { once: true });
+      if (shouldCheckDefaultProxy) {
+        img.addEventListener('load', handleProxyLoad, { once: true });
       }
       const applied = setFaviconSrcWithAnimation(img, nextUrl, { persist: false });
       const reused = !applied && canReuseCurrentFavicon(img, nextUrl);
       if (!applied && !reused) {
-        img.removeEventListener('load', handleExtensionLoad);
+        img.removeEventListener('load', handleProxyLoad);
         return false;
       }
       if (reused) {
-        img.removeEventListener('load', handleExtensionLoad);
+        img.removeEventListener('load', handleProxyLoad);
         showResolvedFavicon(img);
       } else {
         setFaviconVisibility(img, 'visible');
         scheduleOverlayCandidateLoadTimer(img, state, nextUrl);
-        if (candidate && candidate.kind === 'extension' && img.complete && img.naturalWidth > 0) {
-          scheduleDefaultExtensionFaviconCheck();
+        if (shouldCheckDefaultProxy && img.complete && img.naturalWidth > 0) {
+          scheduleDefaultProxyFaviconCheck();
         }
       }
       return true;
+    }
+
+    function finalizeOverlayDefaultProxyFaviconFailure(img, state) {
+      clearOverlayCandidateLoadTimer(img);
+      if (state.hasFailedHandler) {
+        state.handleFailed();
+        return;
+      }
+      applyFallbackIcon(img);
     }
 
     function finalizeOverlayThemeAwareFaviconFailure(img, state) {
