@@ -2,6 +2,10 @@ const assert = require('assert');
 const fs = require('fs');
 const vm = require('vm');
 
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function createFakeImage() {
   const attributes = new Map();
   const listeners = new Map();
@@ -40,6 +44,13 @@ function createFakeImage() {
       if (set) {
         set.delete(listener);
       }
+    },
+    dispatchEvent(type) {
+      const set = listeners.get(type);
+      if (!set) {
+        return;
+      }
+      Array.from(set).forEach((listener) => listener());
     }
   };
 }
@@ -52,7 +63,8 @@ const sandbox = {
 };
 sandbox.globalThis = sandbox;
 sandbox.LumnoFaviconViewCore = {
-  createFaviconViewCore() {
+  createFaviconViewCore(options) {
+    const config = options || {};
     return {
       setFallbackNodeVisible() {},
       setFaviconLoadState() {},
@@ -80,7 +92,12 @@ sandbox.LumnoFaviconViewCore = {
       },
       attachFaviconData() {},
       preloadIcon() {},
-      warmIconCache() {}
+      warmIconCache() {},
+      detectDefaultExtensionFavicon(img, url) {
+        return typeof config.detectDefaultExtensionFavicon === 'function'
+          ? config.detectDefaultExtensionFavicon(img, url)
+          : Promise.resolve(false);
+      }
     };
   }
 };
@@ -135,6 +152,9 @@ const runtime = sandbox.LumnoNewtabFaviconView.createFaviconViewRuntime({
   isBlockedLocalFaviconUrl() {
     return false;
   },
+  detectDefaultExtensionFavicon(_img, url) {
+    return Promise.resolve(url === extensionUrl);
+  },
   preloadThemeFromFavicon() {},
   faviconCandidateLoadTimeoutMs: 1000
 });
@@ -149,7 +169,8 @@ const runtime = sandbox.LumnoNewtabFaviconView.createFaviconViewRuntime({
   img._xThemeFaviconErrorHandler();
   assert.strictEqual(img.src, extensionUrl);
 
-  img._xThemeFaviconErrorHandler();
+  img.dispatchEvent('load');
+  await wait(4);
   assert.strictEqual(img.src, gstaticUrl);
   assert.strictEqual(/google\.com\/s2\/favicons|favicon\.is\//i.test(img.src), false);
   console.log('newtab favicon candidate order tests passed');

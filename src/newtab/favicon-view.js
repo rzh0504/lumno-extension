@@ -44,6 +44,7 @@
         faviconDataCache,
         faviconDataPending,
         iconPreloadCache,
+        detectDefaultExtensionFavicon: config.detectDefaultExtensionFavicon,
         ignoreLastWorkingWhenFallback: true
       })
       : null;
@@ -478,15 +479,52 @@
       tried.add(nextSrc);
       clearThemeAwareCandidateLoadTimer(img);
 
+      const scheduleDefaultExtensionFaviconCheck = () => {
+        if (!candidate || candidate.kind !== 'extension' || !state.gstaticFavicon) {
+          return;
+        }
+        setTimer(() => {
+          if (!img || !state.isSessionCurrent()) {
+            return;
+          }
+          const currentSrc = img.getAttribute('data-favicon-current-src') || img.src || '';
+          if (currentSrc !== nextSrc) {
+            return;
+          }
+          faviconViewCore.detectDefaultExtensionFavicon(img, nextSrc).then((isDefault) => {
+            if (!isDefault || !img || !state.isSessionCurrent()) {
+              return;
+            }
+            const latestSrc = img.getAttribute('data-favicon-current-src') || img.src || '';
+            if (latestSrc !== nextSrc) {
+              return;
+            }
+            if (typeof img._xThemeFaviconErrorHandler === 'function') {
+              img._xThemeFaviconErrorHandler();
+            }
+          });
+        }, 0);
+      };
+      const handleExtensionLoad = () => {
+        scheduleDefaultExtensionFaviconCheck();
+      };
+      if (candidate && candidate.kind === 'extension' && state.gstaticFavicon) {
+        img.addEventListener('load', handleExtensionLoad, { once: true });
+      }
       const applied = setFaviconSrcWithAnimation(img, nextSrc, { persist: false });
       const reused = !applied && canReuseCurrentFavicon(img, nextSrc);
       if (!applied && !reused) {
+        img.removeEventListener('load', handleExtensionLoad);
         return false;
       }
       if (reused) {
+        img.removeEventListener('load', handleExtensionLoad);
         showResolvedFavicon(img);
       } else if (applied) {
         scheduleThemeAwareCandidateLoadTimer(img, state, nextSrc);
+        if (candidate && candidate.kind === 'extension' && img.complete && img.naturalWidth > 0) {
+          scheduleDefaultExtensionFaviconCheck();
+        }
       }
       return true;
     }

@@ -59,7 +59,8 @@
         hasThemeForHost,
         faviconDataCache,
         faviconDataPending,
-        iconPreloadCache
+        iconPreloadCache,
+        detectDefaultExtensionFavicon: config.detectDefaultExtensionFavicon
       })
       : null;
 
@@ -398,16 +399,53 @@
       }
       tried.add(nextUrl);
       clearOverlayCandidateLoadTimer(img);
+      const scheduleDefaultExtensionFaviconCheck = () => {
+        if (!candidate || candidate.kind !== 'extension' || !state.gstaticFavicon) {
+          return;
+        }
+        setTimer(() => {
+          if (!img || !state.isSessionCurrent()) {
+            return;
+          }
+          const currentSrc = img.getAttribute('data-favicon-current-src') || img.src || '';
+          if (currentSrc !== nextUrl) {
+            return;
+          }
+          faviconViewCore.detectDefaultExtensionFavicon(img, nextUrl).then((isDefault) => {
+            if (!isDefault || !img || !state.isSessionCurrent()) {
+              return;
+            }
+            const latestSrc = img.getAttribute('data-favicon-current-src') || img.src || '';
+            if (latestSrc !== nextUrl) {
+              return;
+            }
+            if (typeof img._xOverlayThemeFaviconErrorHandler === 'function') {
+              img._xOverlayThemeFaviconErrorHandler();
+            }
+          });
+        }, 0);
+      };
+      const handleExtensionLoad = () => {
+        scheduleDefaultExtensionFaviconCheck();
+      };
+      if (candidate && candidate.kind === 'extension' && state.gstaticFavicon) {
+        img.addEventListener('load', handleExtensionLoad, { once: true });
+      }
       const applied = setFaviconSrcWithAnimation(img, nextUrl, { persist: false });
       const reused = !applied && canReuseCurrentFavicon(img, nextUrl);
       if (!applied && !reused) {
+        img.removeEventListener('load', handleExtensionLoad);
         return false;
       }
       if (reused) {
+        img.removeEventListener('load', handleExtensionLoad);
         showResolvedFavicon(img);
       } else {
         setFaviconVisibility(img, 'visible');
         scheduleOverlayCandidateLoadTimer(img, state, nextUrl);
+        if (candidate && candidate.kind === 'extension' && img.complete && img.naturalWidth > 0) {
+          scheduleDefaultExtensionFaviconCheck();
+        }
       }
       return true;
     }

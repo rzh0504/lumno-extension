@@ -34,15 +34,97 @@
     const preloadThemeFromFavicon = typeof config.preloadThemeFromFavicon === 'function' ? config.preloadThemeFromFavicon : noop;
     const getThemeFaviconUrl = typeof config.getThemeFaviconUrl === 'function' ? config.getThemeFaviconUrl : (() => '');
     const hasThemeForHost = typeof config.hasThemeForHost === 'function' ? config.hasThemeForHost : (() => false);
+    const customDetectDefaultExtensionFavicon = typeof config.detectDefaultExtensionFavicon === 'function'
+      ? config.detectDefaultExtensionFavicon
+      : null;
     const faviconDataCache = config.faviconDataCache || new Map();
     const faviconDataPending = config.faviconDataPending || new Map();
     const iconPreloadCache = config.iconPreloadCache || new Map();
+    const extensionFaviconPlaceholderProbeCache = new Map();
     const ignoreLastWorkingWhenFallback = Boolean(config.ignoreLastWorkingWhenFallback);
 
     function createImage() {
       return typeof ImageCtor === 'function'
         ? new ImageCtor()
         : (doc && typeof doc.createElement === 'function' ? doc.createElement('img') : {});
+    }
+
+    function buildExtensionFaviconPlaceholderProbeUrl(faviconUrl) {
+      try {
+        const parsed = new URL(String(faviconUrl || ''));
+        if (parsed.protocol !== 'chrome-extension:' || !parsed.pathname.startsWith('/_favicon/')) {
+          return '';
+        }
+        parsed.searchParams.set('pageUrl', 'https://lumno.invalid/__favicon_placeholder_probe__');
+        return parsed.toString();
+      } catch (e) {
+        return '';
+      }
+    }
+
+    function getCanvasImageSignature(image) {
+      if (!image || !doc || typeof doc.createElement !== 'function') {
+        return '';
+      }
+      try {
+        const canvas = doc.createElement('canvas');
+        canvas.width = 16;
+        canvas.height = 16;
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        if (!context) {
+          return '';
+        }
+        context.clearRect(0, 0, 16, 16);
+        context.drawImage(image, 0, 0, 16, 16);
+        const data = context.getImageData(0, 0, 16, 16).data;
+        let hash = 2166136261;
+        for (let i = 0; i < data.length; i += 1) {
+          hash ^= data[i];
+          hash = Math.imul(hash, 16777619) >>> 0;
+        }
+        return `${hash}:${data.length}`;
+      } catch (e) {
+        return '';
+      }
+    }
+
+    function loadImageSignature(url) {
+      return new Promise((resolve) => {
+        const probe = createImage();
+        if (!probe) {
+          resolve('');
+          return;
+        }
+        probe.onload = () => resolve(getCanvasImageSignature(probe));
+        probe.onerror = () => resolve('');
+        probe.src = url;
+      });
+    }
+
+    function getExtensionPlaceholderSignature(faviconUrl) {
+      const probeUrl = buildExtensionFaviconPlaceholderProbeUrl(faviconUrl);
+      if (!probeUrl) {
+        return Promise.resolve('');
+      }
+      if (!extensionFaviconPlaceholderProbeCache.has(probeUrl)) {
+        extensionFaviconPlaceholderProbeCache.set(probeUrl, loadImageSignature(probeUrl));
+      }
+      return extensionFaviconPlaceholderProbeCache.get(probeUrl);
+    }
+
+    function detectDefaultExtensionFavicon(img, faviconUrl) {
+      if (customDetectDefaultExtensionFavicon) {
+        return Promise.resolve(customDetectDefaultExtensionFavicon(img, faviconUrl))
+          .then(Boolean)
+          .catch(() => false);
+      }
+      const currentSignature = getCanvasImageSignature(img);
+      if (!currentSignature) {
+        return Promise.resolve(false);
+      }
+      return getExtensionPlaceholderSignature(faviconUrl)
+        .then((placeholderSignature) => Boolean(placeholderSignature && placeholderSignature === currentSignature))
+        .catch(() => false);
     }
 
     function setFallbackNodeVisible(node, visible) {
@@ -406,7 +488,8 @@
       attachFaviconData,
       preloadIcon,
       warmIconCache,
-      dedupeFaviconCandidateUrls
+      dedupeFaviconCandidateUrls,
+      detectDefaultExtensionFavicon
     });
   }
 
