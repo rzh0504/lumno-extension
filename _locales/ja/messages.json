@@ -843,7 +843,7 @@
     "message": "任意。例：Bilibili、YouTubeなど"
   },
   "shortcuts_insert_query": {
-    "message": "{query}を挿入"
+    "message": "検索変数を挿入"
   },
   "shortcuts_add": {
     "message": "サイト内検索を追加"

@@ -14,6 +14,10 @@ const content = fs.readFileSync(
   path.join(__dirname, '..', 'src', 'onboarding', 'onboarding-content.js'),
   'utf8'
 );
+const sharedSuggestionsCss = fs.readFileSync(
+  path.join(__dirname, '..', 'src', 'overlay', 'suggestions-view.css'),
+  'utf8'
+);
 const lumnoWebWordmarkAsset = fs.readFileSync(
   path.join(__dirname, '..', 'assets', 'images', 'lumno-web-textlogo.svg'),
   'utf8'
@@ -1680,6 +1684,36 @@ assert.match(
 );
 assert.match(
   script,
+  /const ONBOARDING_OVERLAY_DEMO_PANEL_ID = '_x_extension_onboarding_overlay_demo_2026_unique_';/,
+  'right-side onboarding overlay demo should use a dedicated id separate from the live overlay panel'
+);
+assert.match(
+  script,
+  /panel\.id = ONBOARDING_OVERLAY_DEMO_PANEL_ID;/,
+  'right-side onboarding overlay demo should assign the dedicated panel id'
+);
+assert.match(
+  sharedSuggestionsCss,
+  /Onboarding reuses these suggestion row styles[\s\S]*?verify src\/onboarding\/onboarding\.html\?slide=1/,
+  'shared overlay suggestion styles should remind maintainers to verify the onboarding overlay demo'
+);
+assert.match(
+  sharedSuggestionsCss,
+  /:is\(#_x_extension_overlay_2024_unique_,\s*#_x_extension_onboarding_overlay_demo_2026_unique_\)\s+\.x-ov-suggestion-item\s*\{/,
+  'shared overlay suggestion item styles should also target the onboarding overlay demo id'
+);
+assert.match(
+  sharedSuggestionsCss,
+  /:is\(#_x_extension_overlay_2024_unique_,\s*#_x_extension_onboarding_overlay_demo_2026_unique_\)\s+\.x-ov-suggestion-left\s*\{/,
+  'shared overlay suggestion layout styles should also target the onboarding overlay demo id'
+);
+assert.match(
+  sharedSuggestionsCss,
+  /:is\(#_x_extension_overlay_2024_unique_,\s*#_x_extension_onboarding_overlay_demo_2026_unique_\)\s+\.x-ov-suggestion-action-button\s*\{/,
+  'shared overlay suggestion action button styles should also target the onboarding overlay demo id'
+);
+assert.match(
+  script,
   /createLumnoOverlayResult\(/,
   'right-side onboarding visual should render individual fake overlay result rows'
 );
@@ -1700,7 +1734,7 @@ assert.match(
 );
 assert.match(
   html,
-  /#_x_extension_overlay_2024_unique_ \.lumno-overlay-result \.x-ov-suggestion-icon-slot\[data-emphasis="true"\]\[data-favicon="false"\]\s*\{[\s\S]*?background-color:\s*#ffffff;[\s\S]*?\}/,
+  /#_x_extension_onboarding_overlay_demo_2026_unique_ \.lumno-overlay-result \.x-ov-suggestion-icon-slot\[data-emphasis="true"\]\[data-favicon="false"\]\s*\{[\s\S]*?background-color:\s*#ffffff;[\s\S]*?\}/,
   'fake overlay non-favicon icons should use the same rounded rectangle background as the real overlay active state'
 );
 assert.match(
@@ -1735,7 +1769,7 @@ assert.match(
 );
 assert.match(
   html,
-  /#_x_extension_overlay_2024_unique_ \.lumno-overlay-result \.x-ov-history-delete-slot\[data-visible="false"\]\s*\{[\s\S]*?display:\s*none;[\s\S]*?\}/,
+  /#_x_extension_onboarding_overlay_demo_2026_unique_ \.lumno-overlay-result \.x-ov-history-delete-slot\[data-visible="false"\]\s*\{[\s\S]*?display:\s*none;[\s\S]*?\}/,
   'collapsed fake history delete slots should not contribute a flex gap after the visit button'
 );
 assert.match(
@@ -2140,7 +2174,7 @@ assert.match(
 );
 assert.match(
   html,
-  /\.lumno-overlay-result\s*\{[\s\S]*?--onboarding-overlay-result-hover-ease:\s*cubic-bezier\(0\.16,\s*1,\s*0\.3,\s*1\);[\s\S]*?background-color 380ms var\(--onboarding-overlay-result-hover-ease\)[\s\S]*?border-color 380ms var\(--onboarding-overlay-result-hover-ease\)[\s\S]*?box-shadow 420ms var\(--onboarding-overlay-result-hover-ease\)[\s\S]*?\}[\s\S]*?#_x_extension_overlay_2024_unique_ \.lumno-overlay-result\[data-active="true"\]\s*\{[\s\S]*?box-shadow:[\s\S]*?rgba\(86,\s*139,\s*220,\s*0\.12\)[\s\S]*?\}[\s\S]*?\.lumno-overlay-result \.x-ov-suggestion-source-tag,[\s\S]*?\.lumno-overlay-result \.x-ov-suggestion-action-button\s*\{[\s\S]*?background-color 320ms cubic-bezier\(0\.16,\s*1,\s*0\.3,\s*1\)[\s\S]*?color 260ms ease-out/,
+  /\.lumno-overlay-result\s*\{[\s\S]*?--onboarding-overlay-result-hover-ease:\s*cubic-bezier\(0\.16,\s*1,\s*0\.3,\s*1\);[\s\S]*?background-color 380ms var\(--onboarding-overlay-result-hover-ease\)[\s\S]*?border-color 380ms var\(--onboarding-overlay-result-hover-ease\)[\s\S]*?box-shadow 420ms var\(--onboarding-overlay-result-hover-ease\)[\s\S]*?\}[\s\S]*?#_x_extension_onboarding_overlay_demo_2026_unique_ \.lumno-overlay-result\[data-active="true"\]\s*\{[\s\S]*?box-shadow:[\s\S]*?rgba\(86,\s*139,\s*220,\s*0\.12\)[\s\S]*?\}[\s\S]*?\.lumno-overlay-result \.x-ov-suggestion-source-tag,[\s\S]*?\.lumno-overlay-result \.x-ov-suggestion-action-button\s*\{[\s\S]*?background-color 320ms cubic-bezier\(0\.16,\s*1,\s*0\.3,\s*1\)[\s\S]*?color 260ms ease-out/,
   'overlay hover rows should use a softer transition for highlight, border, shadow, tags, and action buttons'
 );
 assert.match(

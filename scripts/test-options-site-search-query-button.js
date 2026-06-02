@@ -10,6 +10,7 @@ const buttonId = '_x_extension_site_search_insert_query_2026_unique_';
 const buttonClass = '_x_extension_site_search_insert_query_2026_unique_';
 const ghostClass = '_x_extension_shortcut_ghost_2026_unique_';
 const templateHeaderClass = '_x_extension_site_search_template_header_2026_unique_';
+const templateLabelClass = '_x_extension_site_search_template_label_2026_unique_';
 const templateInputId = '_x_extension_site_search_template_2024_unique_';
 
 function getRule(selector) {
@@ -21,9 +22,12 @@ function getRule(selector) {
 
 assert.match(
   optionsHtml,
-  new RegExp(`<div class="[^"]*_x_extension_shortcut_label_row_2024_unique_[^"]*${templateHeaderClass}[^"]*">[\\s\\S]*?<button[^>]+id="${buttonId}"[^>]+type="button"[^>]+class="[^"]*_x_extension_shortcut_submit_2024_unique_[^"]*${ghostClass}[^"]*${buttonClass}[^"]*"[^>]*>[\\s\\S]*?<span data-i18n="shortcuts_insert_query">插入 \\{query\\}<\\/span>[\\s\\S]*?<i class="ri-icon ri-size-14 ri-braces-line"`),
-  'custom site search form should expose a right-aligned compact ghost button with polished copy'
+  new RegExp(`<div class="[^"]*_x_extension_shortcut_label_row_2024_unique_[^"]*${templateHeaderClass}[^"]*">[\\s\\S]*?<div class="${templateLabelClass}">[\\s\\S]*?<\\/div>[\\s\\S]*?<button[^>]+id="${buttonId}"[^>]+type="button"[^>]+class="[^"]*_x_extension_shortcut_submit_2024_unique_[^"]*${ghostClass}[^"]*${buttonClass}[^"]*"[^>]*>[\\s\\S]*?<span data-i18n="shortcuts_insert_query">插入查询变量<\\/span>[\\s\\S]*?<i class="ri-icon ri-size-14 ri-add-line"`),
+  'custom site search form should place the compact ghost button on the right side of the template header'
 );
+const buttonMarkup = optionsHtml.match(new RegExp(`<button[^>]+id="${buttonId}"[\\s\\S]*?<\\/button>`));
+assert.ok(buttonMarkup, 'query insert button should exist');
+assert.doesNotMatch(buttonMarkup[0], /ri-braces-line/, 'query insert button should not show a duplicate braces icon');
 
 assert.match(
   optionsHtml,
@@ -31,14 +35,13 @@ assert.match(
   'the query insert button should live beside the template input it edits'
 );
 
-const labelRowRule = getRule('._x_extension_shortcut_label_row_2024_unique_');
-assert.match(labelRowRule, /width:\s*100%;/, 'shortcut label rows should span the field width for right-aligned form actions');
 const templateHeaderRule = getRule(`.${templateHeaderClass}`);
 assert.match(
   templateHeaderRule,
-  /grid-template-columns:\s*auto auto minmax\(0,\s*1fr\) auto;/,
-  'site search template header should reserve flexible space before the query button'
+  /justify-content:\s*space-between;/,
+  'site search template header should separate the label group from the right-side query button'
 );
+assert.match(templateHeaderRule, /width:\s*100%;/, 'site search template header should span the field width');
 
 const ghostRule = getRule(`.${ghostClass}`);
 [
@@ -49,7 +52,8 @@ const ghostRule = getRule(`.${ghostClass}`);
   assert.match(ghostRule, pattern, 'shortcut ghost buttons should stay visually quiet and compact');
 });
 const buttonRule = getRule(`.${buttonClass}`);
-assert.match(buttonRule, /justify-self:\s*end;/, 'query insert button should align to the right edge of the template header');
+assert.match(buttonRule, /margin-left:\s*auto;/, 'query insert button should sit on the right side of the template header');
+assert.doesNotMatch(buttonRule, /text-align:\s*right;/, 'query insert button should move as a control without right-aligning its label');
 
 assert.match(
   optionsJs,
@@ -67,9 +71,16 @@ assert.match(
   'clicking the query ghost button should insert the query token'
 );
 
-['en', 'ja', 'zh_CN', 'zh_TW'].forEach((locale) => {
+const expectedMessages = {
+  en: 'Insert query variable',
+  ja: '検索変数を挿入',
+  zh_CN: '插入查询变量',
+  zh_TW: '插入查詢變數'
+};
+
+Object.entries(expectedMessages).forEach(([locale, message]) => {
   const messages = JSON.parse(fs.readFileSync(path.join(repoRoot, '_locales', locale, 'messages.json'), 'utf8'));
-  assert.ok(messages.shortcuts_insert_query && messages.shortcuts_insert_query.message, `${locale} should localize the query insert button`);
+  assert.strictEqual(messages.shortcuts_insert_query && messages.shortcuts_insert_query.message, message, `${locale} should localize the query insert button`);
 });
 
 console.log('options site search query button tests passed');

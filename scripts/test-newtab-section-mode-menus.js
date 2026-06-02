@@ -170,6 +170,7 @@ function createFakeElement(tagName, ownerDocument) {
   const attributes = new Map();
   const classes = new Set();
   const properties = new Map();
+  let classNameValue = '';
   const element = {
     tagName: String(tagName || '').toUpperCase(),
     nodeType: 1,
@@ -191,11 +192,18 @@ function createFakeElement(tagName, ownerDocument) {
         names.forEach((name) => {
           String(name || '').split(/\s+/).filter(Boolean).forEach((part) => classes.add(part));
         });
-        element.className = Array.from(classes).join(' ');
+        classNameValue = Array.from(classes).join(' ');
       },
       contains: (name) => classes.has(name)
     },
-    className: '',
+    get className() {
+      return classNameValue;
+    },
+    set className(value) {
+      classNameValue = String(value || '');
+      classes.clear();
+      classNameValue.split(/\s+/).filter(Boolean).forEach((part) => classes.add(part));
+    },
     style: {
       left: '',
       right: '',
@@ -210,6 +218,13 @@ function createFakeElement(tagName, ownerDocument) {
       child.parentNode = element;
       child.ownerDocument = ownerDocument;
       children.push(child);
+      return child;
+    },
+    removeChild(child) {
+      const index = children.indexOf(child);
+      assert.ok(index >= 0, 'fake element should only remove existing children');
+      children.splice(index, 1);
+      child.parentNode = null;
       return child;
     },
     insertBefore(child, reference) {
@@ -268,6 +283,7 @@ function createFakeElement(tagName, ownerDocument) {
 
 function createFakeDocument() {
   const fakeDocument = {
+    body: null,
     createElement(tagName) {
       return createFakeElement(tagName, fakeDocument);
     },
@@ -282,6 +298,7 @@ function createFakeDocument() {
     querySelectorAll: () => [],
     addEventListener() {}
   };
+  fakeDocument.body = createFakeElement('body', fakeDocument);
   return fakeDocument;
 }
 
@@ -337,6 +354,62 @@ assert.strictEqual(
   wrapper.getAttribute('data-open'),
   '',
   'refreshing a static custom select should not mark the menu open'
+);
+
+const portalSelect = customSelectController.createSelect({
+  id: '_x_extension_portal_select_test_2026_unique_',
+  menuPortal: true,
+  menuPortalZIndex: 10020,
+  menuPortalOffset: 8,
+  menuAlign: 'left',
+  menuWidth: 'content',
+  menuMinWidth: 120,
+  options: [
+    { value: 'folder', label: 'Folder' },
+    { value: 'list', label: 'List' }
+  ],
+  value: 'folder'
+});
+fakeDocument.body.appendChild(portalSelect.wrapper);
+portalSelect.trigger.getBoundingClientRect = () => ({
+  left: 48,
+  right: 72,
+  top: 64,
+  bottom: 88,
+  width: 24,
+  height: 24
+});
+customSelectController.setOpen(portalSelect.wrapper, true);
+assert.strictEqual(
+  portalSelect.menu.parentNode,
+  fakeDocument.body,
+  'portal custom select menus should move to document.body while open so they escape local stacking contexts'
+);
+assert.strictEqual(
+  portalSelect.menu.style.getPropertyValue('position'),
+  'fixed',
+  'portal custom select menus should be fixed-positioned to the trigger viewport rect'
+);
+assert.strictEqual(
+  portalSelect.menu.style.getPropertyValue('z-index'),
+  '10020',
+  'portal custom select menus should accept an explicit z-index above the newtab search stack'
+);
+assert.strictEqual(
+  portalSelect.menu.style.getPropertyValue('left'),
+  '48px',
+  'left-aligned portal custom select menus should align to the trigger left edge'
+);
+assert.strictEqual(
+  portalSelect.menu.style.getPropertyValue('top'),
+  '96px',
+  'portal custom select menus should preserve the section menu vertical gap below the trigger'
+);
+customSelectController.setOpen(portalSelect.wrapper, false);
+assert.strictEqual(
+  portalSelect.menu.parentNode,
+  portalSelect.wrapper,
+  'closing a portal custom select should restore the menu to its wrapper'
 );
 
 assertContains(
@@ -483,6 +556,26 @@ assertContains(
   newtabJs,
   'menuMaxWidth: SECTION_MODE_MENU_MAX_WIDTH_PX',
   'new tab section mode menus should use the shared maximum width'
+);
+assertContains(
+  newtabJs,
+  'SECTION_MODE_MENU_PORTAL_Z_INDEX',
+  'new tab should define a shared z-index for portaled section mode menus'
+);
+assertContains(
+  newtabJs,
+  'menuPortal: true',
+  'new tab section mode menus should render through a body portal to escape bottom-dock and wallpaper stacking contexts'
+);
+assertContains(
+  newtabJs,
+  'menuPortalZIndex: SECTION_MODE_MENU_PORTAL_Z_INDEX',
+  'new tab section mode menus should use the shared portal z-index'
+);
+assertContains(
+  newtabJs,
+  'menuPortalOffset: SECTION_MODE_MENU_PORTAL_OFFSET_PX',
+  'new tab section mode menus should keep the same visual gap when portaled'
 );
 assert.ok(
   !newtabJs.includes('createSectionModeMenu'),
@@ -663,6 +756,41 @@ assertContains(
   bookmarkCascadeLevelCss,
   'row-gap: 4px;',
   'bookmark cascade menu rows should keep visible vertical spacing'
+);
+assertContains(
+  bookmarkCascadeLevelCss,
+  '--x-extension-menu-surface-closed-transform: translate3d(var(--x-nt-bookmark-cascade-closed-x), var(--x-nt-bookmark-cascade-closed-y), 0) scale(var(--x-nt-bookmark-cascade-closed-scale-x), var(--x-nt-bookmark-cascade-closed-scale-y));',
+  'bookmark cascade levels should own an origin-aware closed transform instead of inheriting the shared vertical dropdown motion'
+);
+assertContains(
+  newtabHtml,
+  '.x-nt-bookmark-cascade-level[data-vertical="above"][data-horizontal="left"]',
+  'bookmark cascade root menus opening above a folder should grow from the bottom-left edge'
+);
+assertContains(
+  newtabHtml,
+  '.x-nt-bookmark-cascade-level[data-vertical="above"][data-horizontal="right"]',
+  'bookmark cascade root menus opening above a folder should grow from the bottom-right edge'
+);
+assertContains(
+  newtabHtml,
+  '.x-nt-bookmark-cascade-level[data-side="right"]',
+  'bookmark cascade submenus opening to the right should grow horizontally from their parent item'
+);
+assertContains(
+  newtabHtml,
+  '.x-nt-bookmark-cascade-level[data-side="left"]',
+  'bookmark cascade submenus opening to the left should grow horizontally from their parent item'
+);
+assertContains(
+  newtabHtml,
+  '--x-nt-bookmark-cascade-closed-x: -8px;',
+  'right-opening bookmark cascade submenus should enter from the parent item side'
+);
+assertContains(
+  newtabHtml,
+  '--x-nt-bookmark-cascade-closed-x: 8px;',
+  'left-opening bookmark cascade submenus should enter from the parent item side'
 );
 assert.ok(
   !newtabHtml.includes('min-width: 210px;'),

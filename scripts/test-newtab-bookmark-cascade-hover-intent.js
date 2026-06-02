@@ -51,6 +51,306 @@ function getJsConstNumber(source, name) {
   return Number.parseInt(match[1], 10);
 }
 
+function createFakeEvent(type, values) {
+  return {
+    type,
+    defaultPrevented: false,
+    propagationStopped: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    },
+    stopPropagation() {
+      this.propagationStopped = true;
+    },
+    ...(values || {})
+  };
+}
+
+function parseSelector(selector) {
+  const source = String(selector || '').trim();
+  const attrMatch = source.match(/\[([^=\]]+)="([^"]*)"\]/);
+  const attr = attrMatch ? { name: attrMatch[1], value: attrMatch[2] } : null;
+  const withoutAttr = attr ? source.replace(attrMatch[0], '') : source;
+  const classMatch = withoutAttr.match(/\.([A-Za-z0-9_-]+)/);
+  const className = classMatch ? classMatch[1] : '';
+  const tag = withoutAttr.replace(/\.[A-Za-z0-9_-]+/, '').trim().toUpperCase();
+  return { attr, className, tag };
+}
+
+function createFakeElement(tagName, ownerDocument) {
+  const children = [];
+  const attributes = new Map();
+  const listeners = new Map();
+  const classes = new Set();
+  const styleValues = new Map();
+  let classNameValue = '';
+  let textContentValue = '';
+  let rect = { left: 0, top: 0, width: 210, height: 32 };
+  const element = {
+    tagName: String(tagName || '').toUpperCase(),
+    nodeType: 1,
+    children,
+    childNodes: children,
+    ownerDocument,
+    parentNode: null,
+    get className() {
+      return classNameValue;
+    },
+    set className(value) {
+      classNameValue = String(value || '');
+      classes.clear();
+      classNameValue.split(/\s+/).filter(Boolean).forEach((part) => classes.add(part));
+    },
+    innerHTML: '',
+    get textContent() {
+      return textContentValue || children.map((child) => child.textContent || '').join('');
+    },
+    set textContent(value) {
+      textContentValue = String(value || '');
+    },
+    title: '',
+    type: '',
+    tabIndex: 0,
+    _connected: false,
+    get isConnected() {
+      return element._connected ||
+        element === ownerDocument.body ||
+        Boolean(element.parentNode && element.parentNode.isConnected);
+    },
+    get firstChild() {
+      return children[0] || null;
+    },
+    get offsetWidth() {
+      return rect.width;
+    },
+    get offsetHeight() {
+      return rect.height;
+    },
+    classList: {
+      add: (...names) => {
+        names.forEach((name) => {
+          String(name || '').split(/\s+/).filter(Boolean).forEach((part) => classes.add(part));
+        });
+        classNameValue = Array.from(classes).join(' ');
+      },
+      remove: (...names) => {
+        names.forEach((name) => classes.delete(name));
+        classNameValue = Array.from(classes).join(' ');
+      },
+      contains: (name) => classes.has(name)
+    },
+    style: {
+      setProperty: (name, value) => styleValues.set(name, String(value)),
+      removeProperty: (name) => styleValues.delete(name),
+      getPropertyValue: (name) => styleValues.get(name) || ''
+    },
+    setRect(nextRect) {
+      rect = { ...rect, ...(nextRect || {}) };
+    },
+    appendChild(child) {
+      child.parentNode = element;
+      child.ownerDocument = ownerDocument;
+      children.push(child);
+      return child;
+    },
+    insertBefore(child, reference) {
+      child.parentNode = element;
+      child.ownerDocument = ownerDocument;
+      const index = children.indexOf(reference);
+      if (index < 0) {
+        children.push(child);
+      } else {
+        children.splice(index, 0, child);
+      }
+      return child;
+    },
+    removeChild(child) {
+      const index = children.indexOf(child);
+      if (index >= 0) {
+        children.splice(index, 1);
+        child.parentNode = null;
+      }
+      return child;
+    },
+    setAttribute(name, value) {
+      attributes.set(name, String(value));
+    },
+    getAttribute(name) {
+      return attributes.get(name) || '';
+    },
+    removeAttribute(name) {
+      attributes.delete(name);
+    },
+    addEventListener(type, listener) {
+      const eventName = String(type || '');
+      listeners.set(eventName, [...(listeners.get(eventName) || []), listener]);
+    },
+    dispatchEvent(event) {
+      const nextEvent = event || createFakeEvent('');
+      nextEvent.target = nextEvent.target || element;
+      (listeners.get(nextEvent.type) || []).forEach((listener) => listener(nextEvent));
+      return !nextEvent.defaultPrevented;
+    },
+    focus() {
+      ownerDocument.activeElement = element;
+      element.dispatchEvent(createFakeEvent('focus', { target: element }));
+    },
+    matches(selector) {
+      if (selector === ':hover') {
+        return false;
+      }
+      const parsed = parseSelector(selector);
+      if (parsed.tag && element.tagName !== parsed.tag) {
+        return false;
+      }
+      if (parsed.className && !classes.has(parsed.className)) {
+        return false;
+      }
+      if (parsed.attr && element.getAttribute(parsed.attr.name) !== parsed.attr.value) {
+        return false;
+      }
+      return true;
+    },
+    contains(target) {
+      if (target === element) {
+        return true;
+      }
+      return children.some((child) => child.contains && child.contains(target));
+    },
+    querySelector(selector) {
+      return element.querySelectorAll(selector)[0] || null;
+    },
+    querySelectorAll(selector) {
+      const matches = [];
+      function visit(node) {
+        if (node.matches && node.matches(selector)) {
+          matches.push(node);
+        }
+        (node.children || []).forEach(visit);
+      }
+      children.forEach(visit);
+      return matches;
+    },
+    getBoundingClientRect() {
+      return {
+        left: rect.left,
+        top: rect.top,
+        right: rect.left + rect.width,
+        bottom: rect.top + rect.height,
+        width: rect.width,
+        height: rect.height
+      };
+    }
+  };
+  return element;
+}
+
+function createFakeDocument() {
+  const listeners = new Map();
+  const fakeDocument = {
+    activeElement: null,
+    body: null,
+    documentElement: { clientWidth: 1024, clientHeight: 720 },
+    createElement(tagName) {
+      return createFakeElement(tagName, fakeDocument);
+    },
+    createElementNS(_namespace, tagName) {
+      return createFakeElement(tagName, fakeDocument);
+    },
+    addEventListener(type, listener) {
+      const eventName = String(type || '');
+      listeners.set(eventName, [...(listeners.get(eventName) || []), listener]);
+    },
+    dispatchEvent(event) {
+      const nextEvent = event || createFakeEvent('');
+      nextEvent.target = nextEvent.target || fakeDocument.activeElement || fakeDocument.body;
+      (listeners.get(nextEvent.type) || []).forEach((listener) => listener(nextEvent));
+      return !nextEvent.defaultPrevented;
+    }
+  };
+  fakeDocument.body = createFakeElement('body', fakeDocument);
+  fakeDocument.body._connected = true;
+  return fakeDocument;
+}
+
+function createFakeClock() {
+  let now = 0;
+  let nextTimerId = 1;
+  const timers = [];
+  function runDueTimers() {
+    timers.sort((a, b) => a.due - b.due);
+    for (let index = 0; index < timers.length; index += 1) {
+      const timer = timers[index];
+      if (timer.cleared || timer.due > now) {
+        continue;
+      }
+      timers.splice(index, 1);
+      index -= 1;
+      timer.callback();
+      timers.sort((a, b) => a.due - b.due);
+    }
+  }
+  return {
+    now: () => now,
+    setTimeout(callback, delay) {
+      const id = nextTimerId;
+      nextTimerId += 1;
+      timers.push({
+        id,
+        due: now + Math.max(0, Number(delay) || 0),
+        callback,
+        cleared: false
+      });
+      return id;
+    },
+    clearTimeout(id) {
+      timers.forEach((timer) => {
+        if (timer.id === id) {
+          timer.cleared = true;
+        }
+      });
+    },
+    advance(ms) {
+      now += Math.max(0, Number(ms) || 0);
+      runDueTimers();
+    }
+  };
+}
+
+function getMenuLevels(documentObj) {
+  return documentObj.body.querySelectorAll('.x-nt-bookmark-cascade-level');
+}
+
+function getMenuItems(levelElement) {
+  return levelElement ? levelElement.querySelectorAll('.x-nt-bookmark-cascade-item') : [];
+}
+
+function getActiveLabel(levelElement) {
+  const active = levelElement && levelElement.querySelector('.x-nt-bookmark-cascade-item[data-active="true"]');
+  return active ? active.textContent : '';
+}
+
+function setLevelLayout(levelElement, rect) {
+  if (!levelElement) {
+    return;
+  }
+  const levelRect = { left: 40, top: 70, width: 210, height: 140, ...(rect || {}) };
+  levelElement.setRect(levelRect);
+  getMenuItems(levelElement).forEach((item, index) => {
+    item.setRect({
+      left: levelRect.left,
+      top: levelRect.top + 34 + (index * 32),
+      width: levelRect.width,
+      height: 32
+    });
+  });
+}
+
+async function flushPromises() {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 assert.strictEqual(
   typeof buildCascadeSafeTriangle,
   'function',
@@ -232,6 +532,23 @@ assertContains(
   '.x-nt-bookmark-cascade-debug-button',
   'newtab CSS should style the bookmark cascade debug switch'
 );
+{
+  const cascadeItemRule = getCssRuleBody(newtabHtml, '.x-nt-bookmark-cascade-item');
+  assertContains(
+    cascadeItemRule,
+    'transition: color 120ms ease;',
+    'bookmark cascade row text color transitions should remain available'
+  );
+  assert.ok(
+    !/transition:\s*[^;]*background-color/.test(cascadeItemRule),
+    'bookmark cascade row hover background should appear immediately without a background-color transition'
+  );
+}
+assertContains(
+  newtabHtml,
+  '.x-nt-bookmark-cascade-item[data-hover-suppressed="true"]:hover',
+  'newtab CSS should suppress competing row hover visuals while safe-triangle protection is active'
+);
 assert.ok(
   getCssZIndex(newtabHtml, '.x-nt-bookmark-cascade-debug-svg') >
     getCssZIndex(newtabHtml, '.x-nt-bookmark-cascade-level'),
@@ -244,4 +561,286 @@ assert.ok(
   );
 }
 
-console.log('newtab bookmark cascade hover intent tests passed');
+function createCascadeRuntimeFixture() {
+  const documentObj = createFakeDocument();
+  const clock = createFakeClock();
+  const openedLevels = [];
+  const anchor = documentObj.createElement('button');
+  anchor.setRect({ left: 20, top: 20, width: 120, height: 40 });
+  documentObj.body.appendChild(anchor);
+
+  const itemsByFolder = {
+    root: [
+      { id: 'research', title: 'Research', type: 'folder' },
+      { id: 'archive', title: 'Archive', url: 'https://example.com/archive' }
+    ],
+    research: [
+      { id: 'amazon', title: 'Amazon Menu Aim', url: 'https://example.com/amazon' }
+    ]
+  };
+
+  const runtime = createBookmarkCascadeMenuRuntime({
+    documentObj,
+    windowObj: {
+      innerWidth: 1024,
+      innerHeight: 720,
+      performance: { now: clock.now },
+      setTimeout: clock.setTimeout,
+      clearTimeout: clock.clearTimeout,
+      requestAnimationFrame: () => 0,
+      cancelAnimationFrame() {},
+      getComputedStyle: () => ({ transform: 'none' })
+    },
+    positionUtils: {
+      placeRootCascadeMenu: () => ({ left: 40, top: 70, side: 'right', horizontal: 'left', vertical: 'below' }),
+      placeCascadeSubmenu: () => ({ left: 252, top: 70, side: 'right', horizontal: 'right', vertical: 'below' }),
+      getTranslateNeutralRect: (rect) => rect,
+      buildCascadeSafeTriangle,
+      isPointInsideCascadeSafeTriangle
+    },
+    menuSurface: {
+      applyContentWidth() {},
+      open(element) {
+        openedLevels.push(element);
+        element.setAttribute('data-open', 'true');
+      }
+    },
+    t: (_key, fallback) => fallback || '',
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl: () => '',
+    getSiteDisplayName: (_host, title) => title || '',
+    getUrlDisplay: (url) => url,
+    getRiSvg: () => '',
+    getFigmaFolderSvg: () => '',
+    initFolderPathMorph() {},
+    playFolderPathMorph() {},
+    attachFaviconWithFallbacks() {},
+    ensureReady: () => Promise.resolve(true),
+    getItems: (folderId) => itemsByFolder[String(folderId || '')] || [],
+    navigateToUrl() {}
+  });
+
+  return { anchor, clock, documentObj, openedLevels, runtime };
+}
+
+async function openCascadeWithSubmenu() {
+  const fixture = createCascadeRuntimeFixture();
+  fixture.runtime.open({ id: 'root', title: 'Root' }, fixture.anchor);
+  await flushPromises();
+
+  let levels = getMenuLevels(fixture.documentObj);
+  setLevelLayout(levels[0], { left: 40, top: 70, width: 210, height: 140 });
+
+  const rootItems = getMenuItems(levels[0]);
+  rootItems[0].dispatchEvent(createFakeEvent('click', { target: rootItems[0] }));
+
+  levels = getMenuLevels(fixture.documentObj);
+  setLevelLayout(levels[0], { left: 40, top: 70, width: 210, height: 140 });
+  setLevelLayout(levels[1], { left: 252, top: 104, width: 210, height: 120 });
+
+  return fixture;
+}
+
+(async () => {
+  {
+    const { clock, documentObj } = await openCascadeWithSubmenu();
+    let levels = getMenuLevels(documentObj);
+    let rootItems = getMenuItems(levels[0]);
+    documentObj.dispatchEvent(createFakeEvent('pointermove', {
+      clientX: 120,
+      clientY: 120,
+      target: rootItems[0]
+    }));
+    rootItems[0].dispatchEvent(createFakeEvent('pointerleave', {
+      clientX: 220,
+      clientY: 138,
+      pointerType: 'mouse',
+      target: rootItems[0]
+    }));
+    rootItems[1].dispatchEvent(createFakeEvent('pointerenter', {
+      clientX: 220,
+      clientY: 138,
+      pointerType: 'mouse',
+      target: rootItems[1]
+    }));
+
+    clock.advance(getJsConstNumber(cascadeMenuJs, 'BOOKMARK_CASCADE_HOVER_DELAY_MS'));
+
+    levels = getMenuLevels(documentObj);
+    rootItems = getMenuItems(levels[0]);
+    assert.strictEqual(
+      levels.length,
+      2,
+      'diagonal pointer movement toward an open submenu should keep safe-triangle protection after the base hover delay'
+    );
+    assert.strictEqual(
+      getActiveLabel(levels[0]),
+      'Research',
+      'safe-triangle protection should not switch the parent row while the pointer is moving toward the submenu'
+    );
+  }
+
+  {
+    const { clock, documentObj } = await openCascadeWithSubmenu();
+    let levels = getMenuLevels(documentObj);
+    let rootItems = getMenuItems(levels[0]);
+    documentObj.dispatchEvent(createFakeEvent('pointermove', {
+      clientX: 120,
+      clientY: 120,
+      target: rootItems[0]
+    }));
+    rootItems[0].dispatchEvent(createFakeEvent('pointerleave', {
+      clientX: 170,
+      clientY: 138,
+      pointerType: 'mouse',
+      target: rootItems[0]
+    }));
+    rootItems[1].dispatchEvent(createFakeEvent('pointerenter', {
+      clientX: 170,
+      clientY: 138,
+      pointerType: 'mouse',
+      target: rootItems[1]
+    }));
+
+    clock.advance(getJsConstNumber(cascadeMenuJs, 'BOOKMARK_CASCADE_HOVER_DELAY_MS'));
+
+    levels = getMenuLevels(documentObj);
+    rootItems = getMenuItems(levels[0]);
+    assert.strictEqual(
+      levels.length,
+      2,
+      'mid-lane diagonal movement toward an open submenu should stay protected before the pointer reaches the submenu edge'
+    );
+    assert.strictEqual(
+      getActiveLabel(levels[0]),
+      'Research',
+      'mid-lane diagonal protection should keep the active parent folder while the pointer moves toward its submenu'
+    );
+    assert.strictEqual(
+      rootItems[1].getAttribute('data-hover-suppressed'),
+      'true',
+      'safe-triangle protection should suppress the next row native hover visual while it keeps the current submenu active'
+    );
+  }
+
+  {
+    const { documentObj } = await openCascadeWithSubmenu();
+    let levels = getMenuLevels(documentObj);
+    let rootItems = getMenuItems(levels[0]);
+    documentObj.dispatchEvent(createFakeEvent('pointermove', {
+      clientX: 120,
+      clientY: 120,
+      target: rootItems[0]
+    }));
+    rootItems[0].dispatchEvent(createFakeEvent('pointerleave', {
+      clientX: 170,
+      clientY: 138,
+      pointerType: 'mouse',
+      target: rootItems[0]
+    }));
+    rootItems[1].dispatchEvent(createFakeEvent('pointerenter', {
+      clientX: 170,
+      clientY: 138,
+      pointerType: 'mouse',
+      target: rootItems[1]
+    }));
+    rootItems[1].dispatchEvent(createFakeEvent('pointerleave', {
+      clientX: 252,
+      clientY: 138,
+      pointerType: 'mouse',
+      target: rootItems[1]
+    }));
+
+    levels = getMenuLevels(documentObj);
+    rootItems = getMenuItems(levels[0]);
+    assert.strictEqual(
+      rootItems[1].getAttribute('data-hover-suppressed'),
+      '',
+      'leaving a protected sibling row should clear its temporary hover suppression'
+    );
+  }
+
+  {
+    const { clock, documentObj } = await openCascadeWithSubmenu();
+    let levels = getMenuLevels(documentObj);
+    let rootItems = getMenuItems(levels[0]);
+    documentObj.dispatchEvent(createFakeEvent('pointermove', {
+      clientX: 120,
+      clientY: 120,
+      target: rootItems[0]
+    }));
+    rootItems[0].dispatchEvent(createFakeEvent('pointerleave', {
+      clientX: 150,
+      clientY: 138,
+      pointerType: 'mouse',
+      target: rootItems[0]
+    }));
+
+    levels = getMenuLevels(documentObj);
+    rootItems = getMenuItems(levels[0]);
+    assert.strictEqual(
+      levels.length,
+      1,
+      'vertical pointer leave should clear the old submenu immediately when the pointer is not moving toward it'
+    );
+    assert.strictEqual(
+      getActiveLabel(levels[0]),
+      '',
+      'vertical pointer leave should remove the old row highlight before waiting for the next hover intent'
+    );
+
+    rootItems[1].dispatchEvent(createFakeEvent('pointerenter', {
+      clientX: 150,
+      clientY: 138,
+      pointerType: 'mouse',
+      target: rootItems[1]
+    }));
+
+    clock.advance(getJsConstNumber(cascadeMenuJs, 'BOOKMARK_CASCADE_HOVER_DELAY_MS'));
+
+    levels = getMenuLevels(documentObj);
+    rootItems = getMenuItems(levels[0]);
+    assert.strictEqual(
+      levels.length,
+      1,
+      'vertical pointer movement between rows should switch after the base hover delay instead of waiting out safe-triangle protection'
+    );
+    assert.strictEqual(
+      getActiveLabel(levels[0]),
+      'Archive',
+      'vertical sibling hover should activate the newly hovered row'
+    );
+  }
+
+  {
+    const { documentObj, openedLevels } = await openCascadeWithSubmenu();
+    let levels = getMenuLevels(documentObj);
+    let rootItems = getMenuItems(levels[0]);
+    const openCountAfterFirstSubmenu = openedLevels.length;
+    rootItems[0].setAttribute('data-active', 'false');
+    rootItems[0].dispatchEvent(createFakeEvent('click', { target: rootItems[0] }));
+
+    levels = getMenuLevels(documentObj);
+    rootItems = getMenuItems(levels[0]);
+    assert.strictEqual(
+      openedLevels.length,
+      openCountAfterFirstSubmenu,
+      'clicking a folder whose submenu is already expanded should reuse the existing submenu instead of replaying its open animation'
+    );
+    assert.strictEqual(
+      levels.length,
+      2,
+      'reusing an already expanded folder submenu should keep the child level mounted'
+    );
+    assert.strictEqual(
+      getActiveLabel(levels[0]),
+      'Research',
+      'reusing an already expanded folder submenu should restore the parent folder active state'
+    );
+  }
+
+  console.log('newtab bookmark cascade hover intent tests passed');
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

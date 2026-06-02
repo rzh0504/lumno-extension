@@ -13,6 +13,10 @@
   const MENU_TITLE_CLASS = '_x_extension_select_menu_title_2024_unique_';
   const OPTION_CLASS = '_x_extension_select_option_2024_unique_';
   const ICON_CLASS = '_x_extension_select_icon_2024_unique_';
+  const PORTAL_ATTRIBUTE = 'data-menu-portal';
+  const PORTAL_Z_INDEX_ATTRIBUTE = 'data-menu-portal-z-index';
+  const PORTAL_OFFSET_ATTRIBUTE = 'data-menu-portal-offset';
+  const PORTAL_ACTIVE_ATTRIBUTE = 'data-menu-portal-active';
 
   function getDocument(options) {
     return (options && options.documentObj) || root.document || null;
@@ -114,6 +118,15 @@
     if (config.menuAlign || config.align) {
       wrapper.setAttribute('data-menu-align', align);
     }
+    if (config.menuPortal) {
+      wrapper.setAttribute(PORTAL_ATTRIBUTE, 'body');
+    }
+    if (config.menuPortalZIndex !== undefined && config.menuPortalZIndex !== null) {
+      wrapper.setAttribute(PORTAL_Z_INDEX_ATTRIBUTE, String(config.menuPortalZIndex));
+    }
+    if (config.menuPortalOffset !== undefined && config.menuPortalOffset !== null) {
+      wrapper.setAttribute(PORTAL_OFFSET_ATTRIBUTE, String(config.menuPortalOffset));
+    }
     if (config.iconOnly) {
       wrapper.setAttribute('data-icon-only', 'true');
     }
@@ -155,7 +168,7 @@
     trigger.appendChild(icon);
 
     const menu = documentObj.createElement('div');
-    menu.className = `${MENU_CLASS} ${MENU_SURFACE_CLASS}`;
+    menu.className = appendClassName(`${MENU_CLASS} ${MENU_SURFACE_CLASS}`, config.menuClassName);
     menu.setAttribute('role', 'listbox');
 
     wrapper.appendChild(select);
@@ -193,8 +206,10 @@
     const windowObj = getWindow(config);
     const requestFrame = getRequestAnimationFrame(windowObj);
     const boundWrappers = new WeakSet();
+    const portalMenus = new WeakMap();
     let openCustomSelect = null;
     let documentEventsBound = false;
+    let viewportEventsBound = false;
 
     function getWrappers(input) {
       if (!documentObj) {
@@ -221,7 +236,10 @@
         ? (documentObj.getElementById(selectId) || wrapper.querySelector('select'))
         : wrapper.querySelector('select');
       const trigger = wrapper.querySelector(`.${TRIGGER_CLASS}`);
-      const menu = wrapper.querySelector(`.${MENU_CLASS}`);
+      const menu = wrapper.querySelector(`.${MENU_CLASS}`) || portalMenus.get(wrapper) || null;
+      if (menu) {
+        portalMenus.set(wrapper, menu);
+      }
       return { select, trigger, menu };
     }
 
@@ -298,6 +316,62 @@
       return wrapper ? String(wrapper.getAttribute('data-menu-max-width') || '').trim() : '';
     }
 
+    function isCustomSelectPortalEnabled(wrapper) {
+      return Boolean(wrapper && wrapper.getAttribute(PORTAL_ATTRIBUTE) === 'body');
+    }
+
+    function getCustomSelectPortalNumber(wrapper, attributeName, fallback) {
+      const value = Number(wrapper ? wrapper.getAttribute(attributeName) : NaN);
+      return Number.isFinite(value) ? value : fallback;
+    }
+
+    function setStyleProperty(element, name, value) {
+      if (!element || !element.style || typeof element.style.setProperty !== 'function') {
+        return;
+      }
+      element.style.setProperty(name, value);
+    }
+
+    function removeStyleProperty(element, name) {
+      if (!element || !element.style || typeof element.style.removeProperty !== 'function') {
+        return;
+      }
+      element.style.removeProperty(name);
+    }
+
+    function attachCustomSelectPortalMenu(wrapper, menu) {
+      if (!isCustomSelectPortalEnabled(wrapper) || !menu || !documentObj || !documentObj.body) {
+        return false;
+      }
+      portalMenus.set(wrapper, menu);
+      if (menu.parentNode !== documentObj.body) {
+        if (menu.parentNode && typeof menu.parentNode.removeChild === 'function') {
+          menu.parentNode.removeChild(menu);
+        }
+        documentObj.body.appendChild(menu);
+      }
+      menu.setAttribute(PORTAL_ACTIVE_ATTRIBUTE, 'true');
+      return true;
+    }
+
+    function restoreCustomSelectPortalMenu(wrapper, menu) {
+      if (!isCustomSelectPortalEnabled(wrapper) || !menu || !wrapper) {
+        return;
+      }
+      if (menu.parentNode !== wrapper) {
+        if (menu.parentNode && typeof menu.parentNode.removeChild === 'function') {
+          menu.parentNode.removeChild(menu);
+        }
+        wrapper.appendChild(menu);
+      }
+      menu.removeAttribute(PORTAL_ACTIVE_ATTRIBUTE);
+      removeStyleProperty(menu, 'position');
+      removeStyleProperty(menu, 'left');
+      removeStyleProperty(menu, 'right');
+      removeStyleProperty(menu, 'top');
+      removeStyleProperty(menu, 'z-index');
+    }
+
     function getCustomSelectMenuAlign(wrapper, alignOptions) {
       const settings = alignOptions || {};
       const raw = wrapper
@@ -339,6 +413,68 @@
       menu.style.left = 'auto';
       menu.style.right = '0';
       return nextAlign;
+    }
+
+    function updateCustomSelectPortalPlacement(wrapper) {
+      if (!wrapper || !isCustomSelectPortalEnabled(wrapper) ||
+          wrapper.getAttribute('data-open') !== 'true') {
+        return;
+      }
+      const { trigger, menu } = getCustomSelectElements(wrapper);
+      if (!trigger || !menu || !attachCustomSelectPortalMenu(wrapper, menu)) {
+        return;
+      }
+      const triggerRect = trigger.getBoundingClientRect();
+      const menuRect = menu.getBoundingClientRect();
+      const viewportWidth = Math.max(
+        0,
+        (windowObj && windowObj.innerWidth) ||
+          (documentObj.documentElement && documentObj.documentElement.clientWidth) ||
+          0
+      );
+      const viewportHeight = Math.max(
+        0,
+        (windowObj && windowObj.innerHeight) ||
+          (documentObj.documentElement && documentObj.documentElement.clientHeight) ||
+          0
+      );
+      const padding = 8;
+      const offset = getCustomSelectPortalNumber(wrapper, PORTAL_OFFSET_ATTRIBUTE, 6);
+      const menuWidth = Math.max(
+        Number(menuRect && menuRect.width) || 0,
+        Number.parseFloat(menu.style.width) || 0,
+        Number.parseFloat(menu.style.minWidth) || 0,
+        Number(triggerRect && triggerRect.width) || 0
+      );
+      const menuHeight = Math.max(Number(menuRect && menuRect.height) || 0, 0);
+      const align = getCustomSelectMenuAlign(wrapper);
+      let left = Number(triggerRect.left) || 0;
+      if (align === 'right') {
+        left = (Number(triggerRect.right) || left) - menuWidth;
+      } else if (align === 'middle') {
+        left = left + ((Number(triggerRect.width) || 0) / 2) - (menuWidth / 2);
+      }
+      if (viewportWidth > 0) {
+        left = Math.max(padding, Math.min(left, viewportWidth - menuWidth - padding));
+      } else {
+        left = Math.max(padding, left);
+      }
+      let top = (Number(triggerRect.bottom) || 0) + offset;
+      if (viewportHeight > 0 &&
+          menuHeight > 0 &&
+          top + menuHeight > viewportHeight - padding &&
+          (Number(triggerRect.top) || 0) - offset - menuHeight >= padding) {
+        top = (Number(triggerRect.top) || 0) - offset - menuHeight;
+      }
+      setStyleProperty(menu, 'position', 'fixed');
+      setStyleProperty(menu, 'left', `${Math.round(left)}px`);
+      setStyleProperty(menu, 'right', 'auto');
+      setStyleProperty(menu, 'top', `${Math.round(top)}px`);
+      setStyleProperty(
+        menu,
+        'z-index',
+        String(Math.round(getCustomSelectPortalNumber(wrapper, PORTAL_Z_INDEX_ATTRIBUTE, 10000)))
+      );
     }
 
     function setCustomSelectEffectiveMenuWidth(wrapper, widthMode) {
@@ -493,10 +629,16 @@
       if (!openCustomSelect) {
         return;
       }
+      const closingSelect = openCustomSelect;
+      const { menu } = getCustomSelectElements(closingSelect);
       openCustomSelect.setAttribute('data-open', 'false');
       const trigger = openCustomSelect.querySelector(`.${TRIGGER_CLASS}`);
       if (trigger) {
         trigger.setAttribute('aria-expanded', 'false');
+      }
+      if (menu) {
+        menu.setAttribute('data-open', 'false');
+        restoreCustomSelectPortalMenu(closingSelect, menu);
       }
       openCustomSelect = null;
     }
@@ -522,7 +664,16 @@
           const selectedIndex = select.selectedIndex >= 0 ? select.selectedIndex : 0;
           setCustomSelectActiveIndex(wrapper, selectedIndex);
         }
-        requestFrame(() => updateCustomSelectMenuWidth(wrapper));
+        if (menu && isCustomSelectPortalEnabled(wrapper)) {
+          attachCustomSelectPortalMenu(wrapper, menu);
+          updateCustomSelectMenuWidth(wrapper);
+          updateCustomSelectPortalPlacement(wrapper);
+          menu.setAttribute('data-open', 'true');
+        }
+        requestFrame(() => {
+          updateCustomSelectMenuWidth(wrapper);
+          updateCustomSelectPortalPlacement(wrapper);
+        });
         openCustomSelect = wrapper;
       } else if (openCustomSelect === wrapper) {
         closeCustomSelect();
@@ -588,6 +739,7 @@
       });
       syncCustomSelectUI(select, wrapper);
       updateCustomSelectMenuWidth(wrapper);
+      updateCustomSelectPortalPlacement(wrapper);
     }
 
     function bindWrapper(wrapper) {
@@ -672,6 +824,19 @@
       });
     }
 
+    function bindViewportEvents() {
+      if (viewportEventsBound || !windowObj || typeof windowObj.addEventListener !== 'function') {
+        return;
+      }
+      viewportEventsBound = true;
+      windowObj.addEventListener('resize', () => {
+        updateCustomSelectPortalPlacement(openCustomSelect);
+      });
+      windowObj.addEventListener('scroll', () => {
+        updateCustomSelectPortalPlacement(openCustomSelect);
+      }, true);
+    }
+
     function refresh(wrappers) {
       const targets = getWrappers(wrappers);
       targets.forEach((wrapper) => {
@@ -683,6 +848,7 @@
         buildCustomSelectMenu(select, wrapper);
       });
       bindDocumentEvents();
+      bindViewportEvents();
       if (typeof config.afterRefresh === 'function') {
         config.afterRefresh();
       }
@@ -723,6 +889,7 @@
         bindWrapper(created.wrapper);
         buildCustomSelectMenu(created.select, created.wrapper);
         bindDocumentEvents();
+        bindViewportEvents();
       }
       return created;
     }

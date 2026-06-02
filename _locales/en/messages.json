@@ -843,7 +843,7 @@
     "message": "Optional — e.g. Bilibili, YouTube"
   },
   "shortcuts_insert_query": {
-    "message": "Insert {query}"
+    "message": "Insert query variable"
   },
   "shortcuts_add": {
     "message": "Add site search"

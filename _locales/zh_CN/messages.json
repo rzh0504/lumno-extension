@@ -843,7 +843,7 @@
     "message": "选填，如 小破站、油管等"
   },
   "shortcuts_insert_query": {
-    "message": "插入 {query}"
+    "message": "插入查询变量"
   },
   "shortcuts_add": {
     "message": "添加站内搜索"

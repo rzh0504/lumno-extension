@@ -244,6 +244,8 @@
   const BOOKMARK_HOVER_RECENT_TRANSFER_WINDOW_MS = 220;
   const SECTION_MODE_MENU_MIN_WIDTH_PX = 168;
   const SECTION_MODE_MENU_MAX_WIDTH_PX = 240;
+  const SECTION_MODE_MENU_PORTAL_Z_INDEX = 10020;
+  const SECTION_MODE_MENU_PORTAL_OFFSET_PX = 8;
   const SEARCH_LAYOUT_MIN_TOP_PX = 28;
   const SEARCH_LAYOUT_MIN_BOTTOM_PX = 20;
   const SEARCH_LAYOUT_UPSHIFT_RATIO = 0.06;
@@ -4699,10 +4701,14 @@
       className: 'x-nt-section-mode-select',
       iconOnly: true,
       triggerIconClass: 'ri-more-line',
+      menuClassName: 'x-nt-section-mode-portal',
       menuAlign: 'left',
       menuWidth: 'content',
       menuMinWidth: SECTION_MODE_MENU_MIN_WIDTH_PX,
       menuMaxWidth: SECTION_MODE_MENU_MAX_WIDTH_PX,
+      menuPortal: true,
+      menuPortalZIndex: SECTION_MODE_MENU_PORTAL_Z_INDEX,
+      menuPortalOffset: SECTION_MODE_MENU_PORTAL_OFFSET_PX,
       menuTitle: title,
       value: currentValue,
       ariaLabel: title,

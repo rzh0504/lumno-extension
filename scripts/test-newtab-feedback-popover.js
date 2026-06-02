@@ -34,6 +34,85 @@ assertContains(
 
 assertContains(
   newtabHtml,
+  'height: 54px;',
+  'collapsed feedback popover should reserve vertical breathing room so feedback icons are not clipped'
+);
+
+assertContains(
+  newtabHtml,
+  'padding: 10px 8px;',
+  'collapsed feedback popover should keep horizontal sizing while adding vertical breathing room'
+);
+
+assertContains(
+  newtabHtml,
+  'contain: layout;',
+  'collapsed feedback popover should not use paint containment because it clips icon rings and shadows'
+);
+
+assertContains(
+  newtabHtml,
+  'overflow: visible;',
+  'collapsed feedback popover should allow icon rings and shadows to paint beyond the action row'
+);
+
+assert.match(
+  newtabHtml,
+  /\.x-nt-feedback-control\[data-detail-open="true"\] \.x-nt-feedback-popover \{[\s\S]*?overflow: hidden;/,
+  'expanded feedback detail should keep clipping for the QR panel while the collapsed action row can paint freely'
+);
+
+assert.match(
+  newtabHtml,
+  /\.x-nt-feedback-action \{[\s\S]*?position: relative;[\s\S]*?overflow: visible;[\s\S]*?background: transparent;[\s\S]*?border: 0;/,
+  'feedback action buttons should let the visual circle paint outside the 34px hit target'
+);
+
+assert.match(
+  newtabHtml,
+  /\.x-nt-feedback-action::before \{[\s\S]*?inset: -1px;[\s\S]*?background: linear-gradient\(180deg, #ffffff 0%, #ecedef 100%\);/,
+  'feedback action visual circles should be drawn by an outward pseudo-element to avoid hard-clipped edges'
+);
+
+assert.match(
+  newtabHtml,
+  /\.x-nt-feedback-action-community::before \{[\s\S]*?inset: -1px;/,
+  'feedback community action ring should extend past the button box instead of being inset at the edge'
+);
+
+assertContains(
+  newtabHtml,
+  '0 0 0 1px #040404,',
+  'feedback community action should draw the black ring outside the circle face'
+);
+
+assert.ok(
+  !newtabHtml.includes('inset 0 0 0 1px #040404'),
+  'feedback community action should not draw the black ring as an inset edge that looks clipped'
+);
+
+assertContains(
+  newtabHtml,
+  'inset 0 1px 0 rgba(255, 255, 255, 0.22)',
+  'feedback community action should keep the top highlight subtle after the circle is expanded'
+);
+
+assertContains(
+  newtabHtml,
+  'inset 0 1px 2.4px rgba(255, 255, 255, 0.12)',
+  'feedback community action should keep the soft highlight subtle after the circle is expanded'
+);
+
+assert.ok(
+  !newtabHtml.includes('inset 0 1px 0 rgba(255, 255, 255, 0.52)') &&
+    !newtabHtml.includes('inset 0 1px 2.4px rgba(255, 255, 255, 0.36)') &&
+    !newtabHtml.includes('inset 0 1px 0 rgba(255, 255, 255, 0.32)') &&
+    !newtabHtml.includes('inset 0 1px 2.4px rgba(255, 255, 255, 0.2)'),
+  'feedback community action should not keep the old stronger highlight on the expanded circle face'
+);
+
+assertContains(
+  newtabHtml,
   'width 260ms cubic-bezier(0.22, 1, 0.36, 1), height 260ms cubic-bezier(0.22, 1, 0.36, 1)',
   'feedback popover size animation should use a non-bouncy resize easing'
 );

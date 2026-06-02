@@ -12,6 +12,7 @@
   const BOOKMARK_CASCADE_CLOSE_DELAY_MS = 360;
   const BOOKMARK_CASCADE_SAFE_RECHECK_MS = 80;
   const BOOKMARK_CASCADE_SAFE_MAX_MS = 1200;
+  const BOOKMARK_CASCADE_SAFE_EDGE_ZONE_PX = 90;
 
   function noop() {}
 
@@ -221,6 +222,19 @@
       });
     }
 
+    function isBookmarkCascadePointNearSubmenuEdge(point, parentRect, side) {
+      if (!point || !parentRect || parentRect.width <= 0) {
+        return false;
+      }
+      const edgeZone = Math.min(
+        BOOKMARK_CASCADE_SAFE_EDGE_ZONE_PX,
+        Math.max(56, parentRect.width * 0.43)
+      );
+      return side === 'left'
+        ? point.x <= parentRect.left + edgeZone
+        : point.x >= parentRect.right - edgeZone;
+    }
+
     function shouldProtectBookmarkCascadeLevel(levelIndex, point) {
       if (typeof positionUtils.isPointInsideCascadeSafeTriangle !== 'function') {
         return false;
@@ -237,6 +251,11 @@
       const childRect = getBookmarkCascadeElementRect(childEntry.levelElement);
       if (isPointInsideRect(currentPoint, childRect)) {
         return true;
+      }
+      const submenuSide = getBookmarkCascadeSubmenuSide(childEntry, childRect);
+      const parentRect = getBookmarkCascadeElementRect(parentEntry.levelElement);
+      if (!isBookmarkCascadePointNearSubmenuEdge(currentPoint, parentRect, submenuSide)) {
+        return false;
       }
       const triangle = buildBookmarkCascadeSafeTriangleForLevel(
         levelIndex,
@@ -409,6 +428,9 @@
       if (bookmarkCascadeHoverIntentTimer) {
         clearTimer(bookmarkCascadeHoverIntentTimer);
         bookmarkCascadeHoverIntentTimer = 0;
+      }
+      if (bookmarkCascadeHoverIntentTask && bookmarkCascadeHoverIntentTask.triggerElement) {
+        setBookmarkCascadeItemHoverSuppressed(bookmarkCascadeHoverIntentTask.triggerElement, false);
       }
       bookmarkCascadeHoverIntentTask = null;
       scheduleBookmarkCascadeDelayDebugLabel();
@@ -827,6 +849,27 @@
       return levelElement.querySelector('.x-nt-bookmark-cascade-item[data-active="true"]');
     }
 
+    function setBookmarkCascadeItemHoverSuppressed(itemButton, suppressed) {
+      if (!itemButton || typeof itemButton.setAttribute !== 'function') {
+        return;
+      }
+      if (suppressed) {
+        itemButton.setAttribute('data-hover-suppressed', 'true');
+        return;
+      }
+      if (typeof itemButton.removeAttribute === 'function') {
+        itemButton.removeAttribute('data-hover-suppressed');
+      } else {
+        itemButton.setAttribute('data-hover-suppressed', 'false');
+      }
+    }
+
+    function clearBookmarkCascadeLevelHoverSuppression(levelElement) {
+      getBookmarkCascadeLevelItems(levelElement).forEach((button) => {
+        setBookmarkCascadeItemHoverSuppressed(button, false);
+      });
+    }
+
     function focusBookmarkCascadeItem(itemButton) {
       if (!itemButton || typeof itemButton.focus !== 'function') {
         return;
@@ -844,6 +887,7 @@
       }
       getBookmarkCascadeLevelItems(levelElement).forEach((button) => {
         const active = button === activeButton;
+        setBookmarkCascadeItemHoverSuppressed(button, false);
         button.setAttribute('data-active', active ? 'true' : 'false');
         button.tabIndex = active ? 0 : -1;
         const icon = button.querySelector('.x-nt-bookmark-cascade-icon--folder');
@@ -865,6 +909,32 @@
       if (activeButton && options && options.focus) {
         focusBookmarkCascadeItem(activeButton);
       }
+    }
+
+    function clearBookmarkCascadePointerActiveItem(levelElement, nextButton, event) {
+      const entry = getBookmarkCascadeLevelEntryByElement(levelElement);
+      const activeButton = entry ? entry.activeButton : null;
+      if (!entry || !activeButton || activeButton === nextButton) {
+        return;
+      }
+      const point = updateBookmarkCascadePointer(event);
+      if (shouldProtectBookmarkCascadeLevel(entry.levelIndex, point)) {
+        setBookmarkCascadeItemHoverSuppressed(nextButton, Boolean(nextButton));
+        return;
+      }
+      clearBookmarkCascadeLevelHoverSuppression(levelElement);
+      clearBookmarkCascadeLevelsFrom(entry.levelIndex + 1);
+      activeButton.setAttribute('data-active', 'false');
+      activeButton.tabIndex = -1;
+      if (activeButton.getAttribute('aria-haspopup') === 'menu') {
+        activeButton.setAttribute('aria-expanded', 'false');
+      }
+      const icon = activeButton.querySelector('.x-nt-bookmark-cascade-icon--folder');
+      if (icon) {
+        playFolderPathMorph(icon, false);
+      }
+      entry.activeButton = null;
+      updateBookmarkCascadeDebugTriangle();
     }
 
     function selectFirstBookmarkCascadeItemInLevel(levelIndex, options) {
@@ -1079,8 +1149,11 @@
           }
           const existingChildEntry = getBookmarkCascadeLevelEntry(safeLevelIndex + 1);
           if (existingChildEntry &&
-              String(existingChildEntry.folderId || '') === String(item.id || '') &&
-              itemButton.getAttribute('data-active') === 'true') {
+              String(existingChildEntry.folderId || '') === String(item.id || '')) {
+            if (itemButton.getAttribute('data-active') !== 'true') {
+              setBookmarkCascadeLevelActiveItem(levelElement, itemButton);
+              itemButton.setAttribute('aria-expanded', 'true');
+            }
             if (openOptions && openOptions.focusChild) {
               selectFirstBookmarkCascadeItemInLevel(existingChildEntry.levelIndex, { focus: true });
             }
@@ -1123,6 +1196,7 @@
           arrow.setAttribute('aria-hidden', 'true');
           itemButton.appendChild(arrow);
           itemButton.addEventListener('pointerenter', (event) => {
+            clearBookmarkCascadePointerActiveItem(levelElement, itemButton, event);
             scheduleBookmarkCascadeHoverIntent({
               levelIndex: safeLevelIndex,
               triggerElement: itemButton,
@@ -1130,8 +1204,10 @@
               run: openNestedLevel
             }, event);
           });
-          itemButton.addEventListener('pointerleave', () => {
+          itemButton.addEventListener('pointerleave', (event) => {
             cancelBookmarkCascadeHoverIntentFor(itemButton);
+            setBookmarkCascadeItemHoverSuppressed(itemButton, false);
+            clearBookmarkCascadePointerActiveItem(levelElement, null, event);
           });
           itemButton.addEventListener('focus', () => {
             cancelBookmarkCascadeHoverIntent();
@@ -1154,6 +1230,7 @@
           });
         } else {
           itemButton.addEventListener('pointerenter', (event) => {
+            clearBookmarkCascadePointerActiveItem(levelElement, itemButton, event);
             scheduleBookmarkCascadeHoverIntent({
               levelIndex: safeLevelIndex,
               triggerElement: itemButton,
@@ -1161,8 +1238,10 @@
               run: activateLeafItem
             }, event);
           });
-          itemButton.addEventListener('pointerleave', () => {
+          itemButton.addEventListener('pointerleave', (event) => {
             cancelBookmarkCascadeHoverIntentFor(itemButton);
+            setBookmarkCascadeItemHoverSuppressed(itemButton, false);
+            clearBookmarkCascadePointerActiveItem(levelElement, null, event);
           });
           itemButton.addEventListener('focus', () => {
             cancelBookmarkCascadeHoverIntent();
