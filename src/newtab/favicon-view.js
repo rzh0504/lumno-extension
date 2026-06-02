@@ -38,6 +38,7 @@
         setPersistedFaviconUrl,
         setPersistedFaviconData,
         shouldPersistFaviconUrl: () => true,
+        requestFaviconData: config.requestFaviconData,
         preloadThemeFromFavicon,
         getThemeFaviconUrl: getGstaticFaviconUrl,
         hasThemeForHost: (hostKey) => Boolean(config.hasThemeForHost && config.hasThemeForHost(hostKey)),
@@ -502,20 +503,24 @@
             ? faviconViewCore.detectDefaultExtensionFavicon(img, nextSrc)
             : faviconViewCore.requestFaviconData(nextSrc).then((dataUrl) => !dataUrl);
           defaultCheckPromise.catch(() => false).then((isDefault) => {
-            if (!isDefault || !img || !state.isSessionCurrent()) {
+            if (!img || !state.isSessionCurrent()) {
               return;
             }
             const latestSrc = img.getAttribute('data-favicon-current-src') || img.src || '';
             if (latestSrc !== nextSrc) {
               return;
             }
-            if (candidate.kind === 'gstatic') {
-              finalizeDefaultThemeAwareFaviconFailure(img, state, nextSrc);
+            if (isDefault) {
+              if (candidate.kind === 'gstatic') {
+                finalizeDefaultThemeAwareFaviconFailure(img, state, nextSrc);
+                return;
+              }
+              if (typeof img._xThemeFaviconErrorHandler === 'function') {
+                img._xThemeFaviconErrorHandler();
+              }
               return;
             }
-            if (typeof img._xThemeFaviconErrorHandler === 'function') {
-              img._xThemeFaviconErrorHandler();
-            }
+            showResolvedFavicon(img);
           });
         }, 0);
       };
@@ -525,7 +530,10 @@
       if (shouldCheckDefaultProxy) {
         img.addEventListener('load', handleProxyLoad, { once: true });
       }
-      const applied = setFaviconSrcWithAnimation(img, nextSrc, { persist: false });
+      const applied = setFaviconSrcWithAnimation(img, nextSrc, {
+        persist: false,
+        deferResolve: shouldCheckDefaultProxy
+      });
       const reused = !applied && canReuseCurrentFavicon(img, nextSrc);
       if (!applied && !reused) {
         img.removeEventListener('load', handleProxyLoad);
@@ -533,7 +541,12 @@
       }
       if (reused) {
         img.removeEventListener('load', handleProxyLoad);
-        showResolvedFavicon(img);
+        if (shouldCheckDefaultProxy) {
+          showPendingFallbackIcon(img);
+          scheduleDefaultProxyFaviconCheck();
+        } else {
+          showResolvedFavicon(img);
+        }
       } else if (applied) {
         scheduleThemeAwareCandidateLoadTimer(img, state, nextSrc);
         if (shouldCheckDefaultProxy && img.complete && img.naturalWidth > 0) {

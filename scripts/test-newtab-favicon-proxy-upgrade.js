@@ -11,7 +11,7 @@ function createFakeImage() {
   const listeners = new Map();
   return {
     src: '',
-    complete: true,
+    complete: false,
     naturalWidth: 16,
     naturalHeight: 16,
     isConnected: true,
@@ -46,6 +46,11 @@ function createFakeImage() {
       }
     },
     dispatchEvent(type) {
+      if (type === 'load') {
+        this.complete = true;
+        this.naturalWidth = this.naturalWidth || 16;
+        this.naturalHeight = this.naturalHeight || 16;
+      }
       const set = listeners.get(type);
       if (!set) {
         return;
@@ -56,7 +61,10 @@ function createFakeImage() {
 }
 
 const sandbox = {
-  console,
+  console: {
+    ...console,
+    warn() {}
+  },
   setTimeout,
   clearTimeout,
   URL
@@ -75,16 +83,50 @@ sandbox.LumnoFaviconViewCore = {
           ? config.requestFaviconData.apply(null, arguments)
           : Promise.resolve(null);
       },
-      setFaviconSrcWithAnimation(img, nextSrc) {
+      setFaviconSrcWithAnimation(img, nextSrc, optionsArg) {
+        const shouldDeferResolve = Boolean(optionsArg && optionsArg.deferResolve);
+        const currentSrc = img.getAttribute('data-favicon-current-src') || '';
+        const isFallbackVisible = img.getAttribute('data-fallback-icon') === 'true';
+        const isPlaceholderVisible = img.getAttribute('data-favicon-placeholder') === 'true';
+        if (currentSrc === nextSrc) {
+          if ((isFallbackVisible || isPlaceholderVisible) && img.complete && img.naturalWidth > 0) {
+            if (!shouldDeferResolve && typeof config.showResolvedFavicon === 'function') {
+              config.showResolvedFavicon(img);
+            }
+            return false;
+          }
+          if (!isFallbackVisible && !isPlaceholderVisible) {
+            return false;
+          }
+        }
+        if (typeof config.showPendingFallbackIcon === 'function') {
+          config.showPendingFallbackIcon(img);
+        }
         img._xFaviconLoadToken = (img._xFaviconLoadToken || 0) + 1;
+        const token = img._xFaviconLoadToken;
+        const finalize = () => {
+          if (token !== img._xFaviconLoadToken) {
+            return;
+          }
+          if (!shouldDeferResolve && typeof config.showResolvedFavicon === 'function') {
+            config.showResolvedFavicon(img);
+          }
+          img.setAttribute('data-favicon-current-src', nextSrc);
+        };
+        img.addEventListener('load', finalize, { once: true });
+        img.complete = false;
         img.src = nextSrc;
-        img.setAttribute('data-favicon-current-src', nextSrc);
-        img.removeAttribute('data-fallback-icon');
-        img.removeAttribute('data-favicon-placeholder');
         return true;
       },
-      canReuseCurrentFavicon() {
-        return false;
+      canReuseCurrentFavicon(img, nextSrc) {
+        const currentSrc = img.getAttribute('data-favicon-current-src') || img.src || '';
+        if (currentSrc !== nextSrc) {
+          return false;
+        }
+        if (img.getAttribute('data-fallback-icon') === 'true' || img.getAttribute('data-favicon-placeholder') === 'true') {
+          return false;
+        }
+        return true;
       },
       getLastWorkingFaviconSrc(img) {
         return img ? (img.getAttribute('data-favicon-current-src') || '') : '';
@@ -168,6 +210,9 @@ function createRuntime(options) {
       return false;
     },
     detectDefaultExtensionFavicon(_img, url) {
+      if (typeof config.detectDefaultExtensionFavicon === 'function') {
+        return config.detectDefaultExtensionFavicon(_img, url);
+      }
       return Promise.resolve(url === extensionUrl);
     },
     requestFaviconData: config.requestFaviconData,
@@ -196,6 +241,67 @@ function createRuntime(options) {
   assert.strictEqual(img.src, gstaticUrl);
   assert.strictEqual(/google\.com\/s2\/favicons|favicon\.is\//i.test(img.src), false);
 
+  img.dispatchEvent('load');
+  await wait(4);
+  assert.strictEqual(img.getAttribute('data-favicon-placeholder'), null);
+  assert.strictEqual(img.getAttribute('data-fallback-icon'), null);
+
+  const realExtensionRuntime = createRuntime({
+    detectDefaultExtensionFavicon() {
+      return Promise.resolve(false);
+    },
+    requestFaviconData() {
+      return Promise.resolve(null);
+    }
+  });
+  const realExtensionImg = createFakeImage();
+  realExtensionRuntime.attachFaviconWithFallbacks(realExtensionImg, pageUrl, 'futurecomm.cn', {
+    primaryUrl
+  });
+  assert.strictEqual(realExtensionImg.src, primaryUrl);
+
+  realExtensionImg._xThemeFaviconErrorHandler();
+  assert.strictEqual(realExtensionImg.src, extensionUrl);
+  assert.strictEqual(realExtensionImg.getAttribute('data-favicon-placeholder'), 'true');
+
+  realExtensionImg.dispatchEvent('load');
+  await wait(4);
+  assert.strictEqual(realExtensionImg.src, extensionUrl);
+  assert.strictEqual(realExtensionImg.getAttribute('data-favicon-placeholder'), null);
+  assert.strictEqual(realExtensionImg.getAttribute('data-fallback-icon'), null);
+
+  let resolveExtensionDefaultCheck = null;
+  const delayedExtensionRuntime = createRuntime({
+    detectDefaultExtensionFavicon(_img, url) {
+      if (url !== extensionUrl) {
+        return Promise.resolve(false);
+      }
+      return new Promise((resolve) => {
+        resolveExtensionDefaultCheck = resolve;
+      });
+    },
+    requestFaviconData(url) {
+      return Promise.resolve(url === gstaticUrl ? 'data:image/png;base64,real' : null);
+    }
+  });
+  const delayedExtensionImg = createFakeImage();
+  delayedExtensionRuntime.attachFaviconWithFallbacks(delayedExtensionImg, pageUrl, 'futurecomm.cn', {
+    primaryUrl
+  });
+  assert.strictEqual(delayedExtensionImg.src, primaryUrl);
+
+  delayedExtensionImg._xThemeFaviconErrorHandler();
+  assert.strictEqual(delayedExtensionImg.src, extensionUrl);
+  assert.strictEqual(delayedExtensionImg.getAttribute('data-favicon-placeholder'), 'true');
+
+  delayedExtensionImg.dispatchEvent('load');
+  await wait(4);
+  assert.strictEqual(delayedExtensionImg.src, extensionUrl);
+  assert.strictEqual(delayedExtensionImg.getAttribute('data-favicon-placeholder'), 'true');
+  resolveExtensionDefaultCheck(true);
+  await wait(4);
+  assert.strictEqual(delayedExtensionImg.src, gstaticUrl);
+
   const placeholderRuntime = createRuntime({
     requestFaviconData() {
       return Promise.resolve(null);
@@ -217,6 +323,38 @@ function createRuntime(options) {
   await wait(4);
   assert.strictEqual(placeholderImg.getAttribute('data-fallback-icon'), 'true');
   assert.strictEqual(placeholderImg.getAttribute('data-favicon-placeholder'), null);
+
+  let resolveGstaticData = null;
+  const delayedGstaticRuntime = createRuntime({
+    requestFaviconData(url) {
+      if (url !== gstaticUrl) {
+        return Promise.resolve(null);
+      }
+      return new Promise((resolve) => {
+        resolveGstaticData = resolve;
+      });
+    }
+  });
+  const delayedGstaticImg = createFakeImage();
+  delayedGstaticRuntime.attachFaviconWithFallbacks(delayedGstaticImg, pageUrl, 'futurecomm.cn', {
+    primaryUrl
+  });
+  assert.strictEqual(delayedGstaticImg.src, primaryUrl);
+
+  delayedGstaticImg._xThemeFaviconErrorHandler();
+  assert.strictEqual(delayedGstaticImg.src, extensionUrl);
+
+  delayedGstaticImg._xThemeFaviconErrorHandler();
+  assert.strictEqual(delayedGstaticImg.src, gstaticUrl);
+  assert.strictEqual(delayedGstaticImg.getAttribute('data-favicon-placeholder'), 'true');
+
+  delayedGstaticImg.dispatchEvent('load');
+  await wait(4);
+  assert.strictEqual(delayedGstaticImg.src, gstaticUrl);
+  assert.strictEqual(delayedGstaticImg.getAttribute('data-favicon-placeholder'), 'true');
+  resolveGstaticData(null);
+  await wait(4);
+  assert.strictEqual(delayedGstaticImg.getAttribute('data-fallback-icon'), 'true');
 
   const staleRuntime = createRuntime({
     requestFaviconData() {

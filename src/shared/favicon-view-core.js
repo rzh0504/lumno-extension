@@ -13,6 +13,9 @@
     const win = config.windowObj || (root && root.window) || root || {};
     const chromeApi = config.chromeApi || (root && root.chrome) || {};
     const ImageCtor = win.Image || (root && root.Image) || null;
+    const customRequestFaviconData = typeof config.requestFaviconData === 'function'
+      ? config.requestFaviconData
+      : null;
     const requestFrame = typeof win.requestAnimationFrame === 'function'
       ? win.requestAnimationFrame.bind(win)
       : (callback) => win.setTimeout(callback, 16);
@@ -215,6 +218,9 @@
       if (!url || url.startsWith('data:') || isBlockedLocalFaviconUrl(url)) {
         return Promise.resolve(null);
       }
+      if (customRequestFaviconData) {
+        return Promise.resolve(customRequestFaviconData(url)).catch(() => null);
+      }
       if (faviconDataCache.has(url)) {
         return Promise.resolve(faviconDataCache.get(url));
       }
@@ -256,6 +262,7 @@
         return false;
       }
       const shouldPersist = !(optionsArg && optionsArg.persist === false);
+      const shouldDeferResolve = Boolean(optionsArg && optionsArg.deferResolve);
       const sourceUrl = String((optionsArg && optionsArg.sourceUrl) || '').trim();
       const currentSrc = img.getAttribute('data-favicon-current-src') || '';
       const isFallbackVisible = img.getAttribute('data-fallback-icon') === 'true';
@@ -266,7 +273,9 @@
         currentSrc !== nextSrc;
       if (currentSrc === nextSrc) {
         if ((isFallbackVisible || isPlaceholderVisible) && img.complete && img.naturalWidth > 0) {
-          showResolvedFavicon(img);
+          if (!shouldDeferResolve) {
+            showResolvedFavicon(img);
+          }
           return false;
         }
         if (!isFallbackVisible && !isPlaceholderVisible) {
@@ -284,7 +293,9 @@
         if (!img || token !== img._xFaviconLoadToken) {
           return;
         }
-        showResolvedFavicon(img);
+        if (!shouldDeferResolve) {
+          showResolvedFavicon(img);
+        }
         img.setAttribute('data-favicon-current-src', nextSrc);
         if (nextSrc.startsWith('data:') && sourceUrl) {
           img.setAttribute('data-favicon-data-source', sourceUrl);
@@ -301,7 +312,7 @@
             setPersistedFaviconUrl(persistKey, nextSrc);
           }
         }
-        if (!shouldAnimate) {
+        if (shouldDeferResolve || !shouldAnimate) {
           setFaviconLoadState(img, '');
           img.style.setProperty('filter', 'none');
           img.style.setProperty('opacity', '1');
