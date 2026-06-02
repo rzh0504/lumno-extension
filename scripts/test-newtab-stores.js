@@ -300,7 +300,7 @@ function testRecentViewPassesBrowserPageFaviconCandidate() {
   };
   const grid = createFakeElement('div');
   const calls = [];
-  const browserPageIcon = 'data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%20128%20128%22%2F%3E';
+  const browserPageIcon = 'chrome-extension://abc/_favicon/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128';
   const view = sandbox.LumnoNewtabRecentSitesView.createRecentSitesView({
     documentObj,
     windowObj: {
@@ -404,7 +404,7 @@ function testBookmarkViewPassesBrowserPageFaviconCandidate() {
   };
   const grid = createFakeElement('div');
   const calls = [];
-  const browserPageIcon = 'data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%20128%20128%22%2F%3E';
+  const browserPageIcon = 'chrome-extension://abc/_favicon/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128';
   const view = sandbox.LumnoNewtabBookmarksView.createBookmarksView({
     documentObj,
     windowObj: {

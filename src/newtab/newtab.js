@@ -6153,7 +6153,12 @@
 
   function getBrowserPageFaviconUrl(pageUrl) {
     return typeof FAVICON_UTILS.getBrowserPageFaviconUrl === 'function'
-      ? FAVICON_UTILS.getBrowserPageFaviconUrl(pageUrl)
+      ? FAVICON_UTILS.getBrowserPageFaviconUrl(pageUrl, {
+        getRuntimeUrl: chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function'
+          ? chrome.runtime.getURL.bind(chrome.runtime)
+          : null,
+        size: FAVICON_PROXY_SIZE
+      })
       : '';
   }
 

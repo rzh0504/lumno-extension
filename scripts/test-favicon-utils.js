@@ -44,10 +44,18 @@ assert.strictEqual(
   utils.getChromeFaviconUrl('http://192.168.1.8/dashboard'),
   'chrome://favicon2/?pageUrl=http%3A%2F%2F192.168.1.8%2Fdashboard&size=128'
 );
-const browserPageFaviconUrl = utils.getBrowserPageFaviconUrl('chrome://extensions/');
-assert.strictEqual(browserPageFaviconUrl.startsWith('data:image/svg+xml,'), true);
-assert.strictEqual(browserPageFaviconUrl.includes('chrome%3A%2F%2Fextensions'), false);
-assert.strictEqual(utils.getBrowserPageFaviconUrl('chrome://newtab/').startsWith('data:image/svg+xml,'), true);
+const browserPageFaviconUrl = utils.getBrowserPageFaviconUrl('chrome://extensions/', {
+  getRuntimeUrl: (path) => `chrome-extension://abc${path}`
+});
+assert.strictEqual(
+  browserPageFaviconUrl,
+  'chrome-extension://abc/_favicon/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128'
+);
+assert.strictEqual(browserPageFaviconUrl.startsWith('data:'), false);
+assert.strictEqual(
+  utils.getBrowserPageFaviconUrl('chrome://extensions/'),
+  'chrome://favicon2/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128'
+);
 assert.strictEqual(utils.getBrowserPageFaviconUrl('https://example.com/'), '');
 assert.strictEqual(utils.getChromeFaviconUrl(''), '');
 assert.strictEqual(
