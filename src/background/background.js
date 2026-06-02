@@ -549,9 +549,6 @@ const SEARCH_SELECTION_STATS_STORAGE_KEY = '_x_extension_search_selection_stats_
 const FAVICON_VISIT_DIRTY_STORAGE_KEY = '_x_extension_favicon_visit_dirty_2026_unique_';
 const FAVICON_VISIT_DIRTY_TTL_MS = 1000 * 60 * 60 * 24;
 const FAVICON_VISIT_DIRTY_MAX_ENTRIES = 600;
-const FAVICON_RESOLVE_STORAGE_KEY = '_x_extension_favicon_resolve_cache_2026_unique_';
-const FAVICON_RESOLVE_TTL_MS = 1000 * 60 * 60 * 24 * 14;
-const FAVICON_RESOLVE_MAX_ENTRIES = 800;
 const PINNED_TAB_SNAPSHOT_STORAGE_KEY = '_x_extension_pinned_tab_snapshot_2026_unique_';
 const REMOVED_AI_SYNC_STORAGE_KEYS = [
   '_x_extension_ai_search_mode_2026_unique_',
@@ -2822,16 +2819,10 @@ migrateStorageIfNeeded([
   SITE_SEARCH_DISABLED_STORAGE_KEY,
   SEARCH_BLACKLIST_STORAGE_KEY
 ]);
-const FAVICON_GOOGLE_SIZE = 128;
+const FAVICON_PROXY_SIZE = 128;
 const faviconDataCache = new Map();
 const faviconPending = new Map();
 const titlePinyinCache = new Map();
-const faviconResolveCache = new Map();
-const faviconResolvePending = new Map();
-const faviconResolvePersistCache = new Map();
-let faviconResolvePersistLoaded = false;
-let faviconResolvePersistLoadPromise = null;
-let faviconResolvePersistWriteTimer = null;
 const siteThemeColorCache = new Map();
 const siteThemeColorPending = new Map();
 const blockedLocalFaviconLogCache = new Set();
@@ -2935,7 +2926,30 @@ function arrayBufferToBase64(buffer) {
   return btoa(binary);
 }
 
-function getGoogleFaviconUrl(hostname) {
+function getExtensionFaviconUrl(pageUrl) {
+  if (!pageUrl || !/^https?:\/\//i.test(pageUrl)) {
+    return '';
+  }
+  return typeof FAVICON_UTILS.getExtensionFaviconUrl === 'function'
+    ? FAVICON_UTILS.getExtensionFaviconUrl(pageUrl, {
+      getRuntimeUrl: chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function'
+        ? chrome.runtime.getURL.bind(chrome.runtime)
+        : null,
+      size: FAVICON_PROXY_SIZE
+    })
+    : '';
+}
+
+function getGstaticFaviconUrl(pageUrl) {
+  if (!pageUrl || !/^https?:\/\//i.test(pageUrl)) {
+    return '';
+  }
+  return typeof FAVICON_UTILS.getGstaticFaviconUrl === 'function'
+    ? FAVICON_UTILS.getGstaticFaviconUrl(pageUrl, { size: FAVICON_PROXY_SIZE })
+    : '';
+}
+
+function getHostFaviconUrl(hostname) {
   const normalized = normalizeFaviconHost(hostname);
   if (!normalized) {
     return '';
@@ -2945,179 +2959,13 @@ function getGoogleFaviconUrl(hostname) {
       ? chrome.runtime.getURL('assets/images/lumno.png')
       : 'https://lumno.kubai.design/favicon.png';
   }
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(normalized)}&sz=${FAVICON_GOOGLE_SIZE}`;
-}
-
-function getFaviconIsUrl(hostname) {
-  const normalized = normalizeFaviconHost(hostname);
-  if (!normalized) {
-    return '';
-  }
-  return `https://favicon.is/${encodeURIComponent(normalized)}`;
+  return getGstaticFaviconUrl(`https://${normalized}/`);
 }
 
 function isFaviconProxyUrl(url) {
   return typeof FAVICON_UTILS.isFaviconProxyUrl === 'function'
     ? FAVICON_UTILS.isFaviconProxyUrl(url)
     : false;
-}
-
-function isPersistableResolvedFaviconUrl(url) {
-  const value = String(url || '').trim();
-  if (!value || value.startsWith('data:') || /^chrome:\/\/favicon2\//i.test(value)) {
-    return false;
-  }
-  if (isBlockedLocalFaviconUrl(value)) {
-    return false;
-  }
-  try {
-    const parsed = new URL(value);
-    return /^https?:$/i.test(parsed.protocol) && !shouldBlockFaviconForHost(parsed.hostname);
-  } catch (e) {
-    return false;
-  }
-}
-
-function normalizeResolvedFaviconUrlsForPersist(urls) {
-  const seen = new Set();
-  const result = [];
-  (Array.isArray(urls) ? urls : []).forEach((url) => {
-    const value = String(url || '').trim();
-    if (!isPersistableResolvedFaviconUrl(value) || seen.has(value)) {
-      return;
-    }
-    seen.add(value);
-    result.push(value);
-  });
-  return result.slice(0, 8);
-}
-
-function getValidFaviconResolvePersistEntries(rawEntries) {
-  const now = Date.now();
-  const input = rawEntries && typeof rawEntries === 'object' ? rawEntries : {};
-  const valid = [];
-  Object.keys(input).forEach((key) => {
-    const item = input[key];
-    if (!item || typeof item !== 'object') {
-      return;
-    }
-    const updatedAt = Number(item.updatedAt || 0);
-    const urls = normalizeResolvedFaviconUrlsForPersist(item.urls);
-    if (!key || urls.length === 0 || !Number.isFinite(updatedAt)) {
-      return;
-    }
-    if (now - updatedAt > FAVICON_RESOLVE_TTL_MS) {
-      return;
-    }
-    valid.push({ key, urls, updatedAt });
-  });
-  valid.sort((a, b) => b.updatedAt - a.updatedAt);
-  return valid.slice(0, FAVICON_RESOLVE_MAX_ENTRIES);
-}
-
-function loadFaviconResolvePersistCache() {
-  if (faviconResolvePersistLoadPromise) {
-    return faviconResolvePersistLoadPromise;
-  }
-  if (!localStorageArea) {
-    faviconResolvePersistLoaded = true;
-    faviconResolvePersistLoadPromise = Promise.resolve();
-    return faviconResolvePersistLoadPromise;
-  }
-  if (faviconResolvePersistLoaded) {
-    faviconResolvePersistLoadPromise = Promise.resolve();
-    return faviconResolvePersistLoadPromise;
-  }
-  faviconResolvePersistLoadPromise = new Promise((resolve) => {
-    localStorageArea.get([FAVICON_RESOLVE_STORAGE_KEY], (result) => {
-      const payload = result && result[FAVICON_RESOLVE_STORAGE_KEY];
-      const entries = getValidFaviconResolvePersistEntries(payload && payload.entries ? payload.entries : null);
-      entries.forEach((item) => {
-        faviconResolvePersistCache.set(item.key, {
-          urls: item.urls,
-          updatedAt: item.updatedAt
-        });
-      });
-      faviconResolvePersistLoaded = true;
-      resolve();
-    });
-  }).catch(() => undefined);
-  return faviconResolvePersistLoadPromise;
-}
-
-function schedulePersistFaviconResolveCache() {
-  if (!localStorageArea) {
-    return;
-  }
-  if (faviconResolvePersistWriteTimer !== null) {
-    return;
-  }
-  faviconResolvePersistWriteTimer = setTimeout(() => {
-    faviconResolvePersistWriteTimer = null;
-    const entries = Array.from(faviconResolvePersistCache.entries())
-      .map(([key, value]) => ({
-        key: String(key || ''),
-        urls: normalizeResolvedFaviconUrlsForPersist(value && value.urls),
-        updatedAt: Number(value && value.updatedAt ? value.updatedAt : 0)
-      }))
-      .filter((item) => item.key && item.urls.length > 0 && Number.isFinite(item.updatedAt))
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .slice(0, FAVICON_RESOLVE_MAX_ENTRIES);
-    const serialized = {};
-    entries.forEach((item) => {
-      serialized[item.key] = {
-        urls: item.urls,
-        updatedAt: item.updatedAt
-      };
-    });
-    localStorageArea.set({
-      [FAVICON_RESOLVE_STORAGE_KEY]: {
-        version: 1,
-        entries: serialized,
-        updatedAt: Date.now()
-      }
-    });
-  }, 800);
-}
-
-function getPersistedFaviconResolveUrls(cacheKey) {
-  const key = String(cacheKey || '');
-  if (!key) {
-    return Promise.resolve([]);
-  }
-  return loadFaviconResolvePersistCache().then(() => {
-    const entry = faviconResolvePersistCache.get(key);
-    if (!entry) {
-      return [];
-    }
-    const updatedAt = Number(entry.updatedAt || 0);
-    if (!Number.isFinite(updatedAt) || Date.now() - updatedAt > FAVICON_RESOLVE_TTL_MS) {
-      faviconResolvePersistCache.delete(key);
-      schedulePersistFaviconResolveCache();
-      return [];
-    }
-    return normalizeResolvedFaviconUrlsForPersist(entry.urls);
-  }).catch(() => []);
-}
-
-function setPersistedFaviconResolveUrls(cacheKey, urls) {
-  const key = String(cacheKey || '');
-  const normalizedUrls = normalizeResolvedFaviconUrlsForPersist(urls);
-  if (!key || normalizedUrls.length === 0) {
-    return;
-  }
-  faviconResolvePersistCache.set(key, {
-    urls: normalizedUrls,
-    updatedAt: Date.now()
-  });
-  if (faviconResolvePersistCache.size > FAVICON_RESOLVE_MAX_ENTRIES * 2) {
-    const compact = Array.from(faviconResolvePersistCache.entries())
-      .sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0))
-      .slice(0, FAVICON_RESOLVE_MAX_ENTRIES);
-    faviconResolvePersistCache.clear();
-    compact.forEach(([keyItem, value]) => faviconResolvePersistCache.set(keyItem, value));
-  }
-  schedulePersistFaviconResolveCache();
 }
 
 function normalizeHost(hostname) {
@@ -3594,49 +3442,11 @@ function normalizeFaviconHost(hostname) {
     : String(hostname || '').toLowerCase().replace(/^www\./i, '');
 }
 
-function getChromeFaviconUrl(url) {
-  return typeof FAVICON_UTILS.getChromeFaviconUrl === 'function'
-    ? FAVICON_UTILS.getChromeFaviconUrl(url)
-    : '';
-}
-
 function normalizeThemePreference(theme) {
   const settings = globalThis.LumnoSettings || {};
   return typeof settings.normalizeThemePreference === 'function'
     ? settings.normalizeThemePreference(theme)
     : '';
-}
-
-function hasThemeTokenInUrl(url, token) {
-  return typeof FAVICON_UTILS.hasThemeTokenInUrl === 'function'
-    ? FAVICON_UTILS.hasThemeTokenInUrl(url, token)
-    : false;
-}
-
-function shouldSkipThemeUpgradeCandidate(candidateUrl, preferredTheme, currentUrl) {
-  return typeof FAVICON_UTILS.shouldSkipThemeUpgradeCandidate === 'function'
-    ? FAVICON_UTILS.shouldSkipThemeUpgradeCandidate(candidateUrl, normalizeThemePreference(preferredTheme), currentUrl)
-    : false;
-}
-
-function getKnownThemedFaviconCandidates(hostname, preferredTheme) {
-  return typeof FAVICON_UTILS.getKnownThemedFaviconCandidateScores === 'function'
-    ? FAVICON_UTILS.getKnownThemedFaviconCandidateScores(hostname, normalizeThemePreference(preferredTheme), {
-      getRuntimeUrl: (path) => chrome.runtime.getURL(path)
-    })
-    : [];
-}
-
-function buildRootFaviconCandidates(hostname, preferredTheme) {
-  return typeof FAVICON_UTILS.getRootFaviconCandidateScores === 'function'
-    ? FAVICON_UTILS.getRootFaviconCandidateScores(hostname, normalizeThemePreference(preferredTheme))
-    : [];
-}
-
-function parseHtmlIconCandidates(html, pageUrl, preferredTheme) {
-  return typeof FAVICON_UTILS.parseHtmlIconCandidateScores === 'function'
-    ? FAVICON_UTILS.parseHtmlIconCandidateScores(html, pageUrl, normalizeThemePreference(preferredTheme))
-    : [];
 }
 
 function parseCssThemeColor(color) {
@@ -3799,9 +3609,7 @@ function resolveSiteThemeColor(targetUrl, hostOverride, preferredTheme) {
   return promise;
 }
 
-function buildFaviconFallbackCandidates(pageUrl, hostOverride, fallbackUrl, preferredTheme, options) {
-  const includeChromeFallback = !options || options.includeChromeFallback !== false;
-  const normalizedTheme = normalizeThemePreference(preferredTheme);
+function buildFaviconFallbackCandidates(pageUrl, hostOverride, fallbackUrl) {
   const candidates = [];
   const inputUrl = String(pageUrl || '').trim();
   const fallback = String(fallbackUrl || '').trim();
@@ -3816,18 +3624,12 @@ function buildFaviconFallbackCandidates(pageUrl, hostOverride, fallbackUrl, pref
   if (host && shouldBlockFaviconForHost(host)) {
     return [];
   }
-  if (host) {
-    candidates.push(...getKnownThemedFaviconCandidates(host, normalizedTheme));
-    candidates.push(...buildRootFaviconCandidates(host, normalizedTheme));
-    candidates.push({ url: getGoogleFaviconUrl(host), score: 8 });
-    candidates.push({ url: getFaviconIsUrl(host), score: 1 });
+  if (fallback && !isBlockedLocalFaviconUrl(fallback)) {
+    candidates.push({ url: fallback, score: 30 });
   }
-  if (inputUrl && includeChromeFallback) {
-    // Keep Chrome's built-in favicon resolver as a last-resort runtime fallback.
-    candidates.push({ url: getChromeFaviconUrl(inputUrl), score: -4 });
-  }
-  if (fallback) {
-    candidates.push({ url: fallback, score: 10 });
+  if (inputUrl) {
+    candidates.push({ url: getExtensionFaviconUrl(inputUrl), score: 20 });
+    candidates.push({ url: getGstaticFaviconUrl(inputUrl), score: 10 });
   }
   return candidates.filter((item) => item && item.url);
 }
@@ -3849,9 +3651,7 @@ function dedupeAndSortFaviconCandidates(candidates) {
     .map((item) => item.url);
 }
 
-function resolveFaviconCandidates(targetUrl, hostOverride, fallbackUrl, preferredTheme, options) {
-  const includeChromeFallback = !options || options.includeChromeFallback !== false;
-  const forceFresh = Boolean(options && options.forceFresh);
+function resolveFaviconCandidates(targetUrl, hostOverride, fallbackUrl) {
   const inputUrl = String(targetUrl || '').trim();
   if (!inputUrl) {
     return Promise.resolve([]);
@@ -3869,77 +3669,9 @@ function resolveFaviconCandidates(targetUrl, hostOverride, fallbackUrl, preferre
     logBlockedLocalFavicon(targetUrl || hostOverride || '', 'resolveFaviconCandidates');
     return Promise.resolve([]);
   }
-  const normalizedTheme = normalizeThemePreference(preferredTheme);
-  const normalizedHost = normalizeFaviconHost(hostOverride || parsed.hostname);
-  const cacheKey = `${normalizedHost}::${parsed.origin}::${normalizedTheme || 'auto'}::chrome=${includeChromeFallback ? '1' : '0'}`;
-  const buildResolvedWithExtra = (urls, cachedScore) => {
-    const extra = buildFaviconFallbackCandidates(inputUrl, hostOverride, fallbackUrl, normalizedTheme, { includeChromeFallback: includeChromeFallback });
-    return dedupeAndSortFaviconCandidates([
-      ...((Array.isArray(urls) ? urls : []).map((url) => ({ url: url, score: cachedScore }))),
-      ...extra
-    ]);
-  };
-  if (!forceFresh && faviconResolveCache.has(cacheKey)) {
-    return Promise.resolve(buildResolvedWithExtra(faviconResolveCache.get(cacheKey), 80));
-  }
-  if (!forceFresh && faviconResolvePending.has(cacheKey)) {
-    return faviconResolvePending.get(cacheKey);
-  }
-  const resolveFreshCandidates = () => {
-    if (!canFetchPageForFavicon(inputUrl)) {
-      const fallbackCandidates = buildFaviconFallbackCandidates(inputUrl, hostOverride, fallbackUrl, normalizedTheme, { includeChromeFallback: includeChromeFallback });
-      const resolved = dedupeAndSortFaviconCandidates(fallbackCandidates);
-      faviconResolveCache.set(cacheKey, resolved.slice(0, 8));
-      setPersistedFaviconResolveUrls(cacheKey, resolved);
-      return Promise.resolve(resolved);
-    }
-    return fetch(inputUrl, { cache: forceFresh ? 'reload' : 'force-cache' })
-      .then((response) => {
-        if (!response || !response.ok) {
-          return '';
-        }
-        return response.text();
-      })
-      .then((html) => {
-        const parsedCandidates = parseHtmlIconCandidates(html, inputUrl, normalizedTheme);
-        const fallbackCandidates = buildFaviconFallbackCandidates(inputUrl, hostOverride, fallbackUrl, normalizedTheme, { includeChromeFallback: includeChromeFallback });
-        const resolved = dedupeAndSortFaviconCandidates([...parsedCandidates, ...fallbackCandidates]);
-        faviconResolveCache.set(cacheKey, resolved.slice(0, 8));
-        setPersistedFaviconResolveUrls(cacheKey, resolved);
-        return resolved;
-      })
-      .catch(() => {
-        const fallbackCandidates = buildFaviconFallbackCandidates(inputUrl, hostOverride, fallbackUrl, normalizedTheme, { includeChromeFallback: includeChromeFallback });
-        const resolved = dedupeAndSortFaviconCandidates(fallbackCandidates);
-        faviconResolveCache.set(cacheKey, resolved.slice(0, 8));
-        setPersistedFaviconResolveUrls(cacheKey, resolved);
-        return resolved;
-      });
-  };
-  const promise = (forceFresh ? Promise.resolve([]) : getPersistedFaviconResolveUrls(cacheKey))
-    .then((persistedUrls) => {
-      if (persistedUrls.length > 0) {
-        faviconResolveCache.set(cacheKey, persistedUrls.slice(0, 8));
-        return buildResolvedWithExtra(persistedUrls, 80);
-      }
-      return resolveFreshCandidates();
-    })
-    .then((resolved) => {
-      if (!forceFresh) {
-        faviconResolvePending.delete(cacheKey);
-      }
-      return resolved;
-    })
-    .catch(() => {
-      if (!forceFresh) {
-        faviconResolvePending.delete(cacheKey);
-      }
-      return resolveFreshCandidates();
-    });
-  if (!forceFresh) {
-    faviconResolvePending.set(cacheKey, promise);
-  }
-  return promise;
+  return Promise.resolve(
+    dedupeAndSortFaviconCandidates(buildFaviconFallbackCandidates(inputUrl, hostOverride, fallbackUrl))
+  );
 }
 
 function escapeRegExp(text) {
@@ -5065,10 +4797,12 @@ async function getSearchSuggestions(query) {
       try {
         const urlObj = new URL(url);
         const host = normalizeHost(urlObj.hostname);
-        return shouldBlockFaviconForHost(host) ? '' : getGoogleFaviconUrl(host);
+        return shouldBlockFaviconForHost(host)
+          ? ''
+          : (getExtensionFaviconUrl(urlObj.href) || getGstaticFaviconUrl(urlObj.href));
       } catch (e) {
         const fallbackHost = extractHostFromInput(url);
-        return shouldBlockFaviconForHost(fallbackHost) ? '' : `${url}/favicon.ico`;
+        return shouldBlockFaviconForHost(fallbackHost) ? '' : getHostFaviconUrl(fallbackHost);
       }
     }
 

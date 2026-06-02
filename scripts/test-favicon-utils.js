@@ -19,10 +19,23 @@ assert.strictEqual(utils.normalizeFaviconHost('www.Example.com'), 'example.com')
 assert.strictEqual(utils.normalizeFaviconHost('app.feishu.cn'), 'feishu.cn');
 
 assert.strictEqual(utils.isFaviconProxyUrl('https://www.google.com/s2/favicons?domain=example.com'), true);
+assert.strictEqual(utils.isFaviconProxyUrl('chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Fexample.com%2F'), true);
+assert.strictEqual(utils.isFaviconProxyUrl('https://t2.gstatic.cn/faviconV2?url=https%3A%2F%2Fexample.com%2F'), true);
 assert.strictEqual(utils.isFaviconProxyUrl('https://example.com/favicon.ico'), false);
 
-assert.strictEqual(utils.getChromeFaviconUrl('https://example.com/a b'), 'chrome://favicon2/?size=128&scale_factor=2x&show_fallback_monogram=1&url=https%3A%2F%2Fexample.com%2Fa%20b');
-assert.strictEqual(utils.getChromeFaviconUrl('chrome://extensions/'), '');
+assert.strictEqual(
+  utils.getExtensionFaviconUrl('https://example.com/a b', {
+    getRuntimeUrl: (path) => `chrome-extension://abc${path}`
+  }),
+  'chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Fexample.com%2Fa+b&size=128'
+);
+assert.strictEqual(utils.getExtensionFaviconUrl('chrome://extensions/', {
+  getRuntimeUrl: (path) => `chrome-extension://abc${path}`
+}), '');
+assert.strictEqual(
+  utils.getGstaticFaviconUrl('https://example.com/a b'),
+  'https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=https%3A%2F%2Fexample.com%2Fa+b&size=128'
+);
 
 assert.strictEqual(utils.shouldBlockFaviconForHost('localhost'), true);
 assert.strictEqual(utils.shouldBlockFaviconForHost('192.168.1.8'), true);
@@ -38,6 +51,14 @@ assert.strictEqual(utils.isBlockedLocalFaviconUrl('chrome://favicon2/?url=localh
 assert.strictEqual(
   utils.isBlockedLocalFaviconUrl('chrome://favicon2/?url=https%3A%2F%2Fexample.com%2F'),
   false
+);
+assert.strictEqual(
+  utils.isBlockedLocalFaviconUrl('chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Fexample.com%2F&size=128'),
+  false
+);
+assert.strictEqual(
+  utils.isBlockedLocalFaviconUrl('chrome-extension://abc/_favicon/?pageUrl=http%3A%2F%2F192.168.1.8%2F&size=128'),
+  true
 );
 assert.strictEqual(utils.isBlockedLocalFaviconUrl('https://example.com/favicon.ico'), false);
 
@@ -77,16 +98,16 @@ assert.ok(htmlIconCandidates.some((candidate) => candidate.url === 'https://exam
 
 assert.strictEqual(
   utils.getThemeFaviconCandidateUrls([
-    'https://www.google.com/s2/favicons?domain=mp.weixin.qq.com&sz=128',
+    'chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Fmp.weixin.qq.com%2F&size=128',
+    'https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=https%3A%2F%2Fmp.weixin.qq.com%2F&size=128',
     'chrome://favicon2/?url=https%3A%2F%2Fmp.weixin.qq.com%2F',
     'https://res.wx.qq.com/a/wx_fed/assets/res/OTE0YTAw.png',
-    'https://favicon.is/mp.weixin.qq.com',
     'https://res.wx.qq.com/a/wx_fed/assets/res/OTE0YTAw.png'
   ]).join('\n'),
   [
     'https://res.wx.qq.com/a/wx_fed/assets/res/OTE0YTAw.png',
-    'https://www.google.com/s2/favicons?domain=mp.weixin.qq.com&sz=128',
-    'https://favicon.is/mp.weixin.qq.com'
+    'chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Fmp.weixin.qq.com%2F&size=128',
+    'https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=https%3A%2F%2Fmp.weixin.qq.com%2F&size=128'
   ].join('\n')
 );
 

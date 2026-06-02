@@ -2,12 +2,9 @@ const assert = require('assert');
 const fs = require('fs');
 const vm = require('vm');
 
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function createFakeImage() {
   const attributes = new Map();
+  const listeners = new Map();
   return {
     src: '',
     complete: true,
@@ -32,35 +29,17 @@ function createFakeImage() {
     removeAttribute(name) {
       attributes.delete(name);
     },
-    addEventListener() {},
-    removeEventListener() {}
-  };
-}
-
-function createProbeImage() {
-  let onloadHandler = null;
-  return {
-    referrerPolicy: '',
-    set onload(handler) {
-      onloadHandler = handler;
-    },
-    get onload() {
-      return onloadHandler;
-    },
-    set onerror(handler) {
-      this._onerror = handler;
-    },
-    get onerror() {
-      return this._onerror;
-    },
-    set src(value) {
-      this._src = String(value || '');
-      if (onloadHandler) {
-        onloadHandler();
+    addEventListener(type, listener) {
+      if (!listeners.has(type)) {
+        listeners.set(type, new Set());
       }
+      listeners.get(type).add(listener);
     },
-    get src() {
-      return this._src || '';
+    removeEventListener(type, listener) {
+      const set = listeners.get(type);
+      if (set) {
+        set.delete(listener);
+      }
     }
   };
 }
@@ -75,9 +54,6 @@ sandbox.globalThis = sandbox;
 sandbox.LumnoFaviconViewCore = {
   createFaviconViewCore() {
     return {
-      createImage() {
-        return createProbeImage();
-      },
       setFallbackNodeVisible() {},
       setFaviconLoadState() {},
       applyFaviconOpticalShift() {},
@@ -96,25 +72,15 @@ sandbox.LumnoFaviconViewCore = {
       canReuseCurrentFavicon() {
         return false;
       },
-      getLastWorkingFaviconSrc(img) {
-        return (img && (img.getAttribute('data-favicon-current-src') || img.src)) || '';
+      getLastWorkingFaviconSrc() {
+        return '';
       },
       restoreWorkingFaviconOrFallback() {
         return false;
       },
       attachFaviconData() {},
       preloadIcon() {},
-      warmIconCache() {},
-      dedupeFaviconCandidateUrls(urls) {
-        const seen = new Set();
-        return (urls || []).filter((url) => {
-          if (!url || seen.has(url)) {
-            return false;
-          }
-          seen.add(url);
-          return true;
-        });
-      }
+      warmIconCache() {}
     };
   }
 };
@@ -123,8 +89,10 @@ vm.runInNewContext(fs.readFileSync('src/newtab/favicon-view.js', 'utf8'), sandbo
   filename: 'src/newtab/favicon-view.js'
 });
 
-const realDataUrl = 'data:image/png;base64,cmVhbC1mdXR1cmVjb21tLWljb24=';
-const googleFallbackUrl = 'https://www.google.com/s2/favicons?domain=futurecomm.cn&sz=128';
+const pageUrl = 'https://m2.futurecomm.cn/#/center';
+const primaryUrl = 'https://m2.futurecomm.cn/favicon.ico';
+const extensionUrl = `chrome-extension://abc/_favicon/?pageUrl=${encodeURIComponent(pageUrl)}&size=128`;
+const gstaticUrl = `https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=${encodeURIComponent(pageUrl)}&size=128`;
 
 const runtime = sandbox.LumnoNewtabFaviconView.createFaviconViewRuntime({
   document: {
@@ -141,39 +109,25 @@ const runtime = sandbox.LumnoNewtabFaviconView.createFaviconViewRuntime({
   },
   chromeApi: {
     runtime: {
-      sendMessage(message, callback) {
-        if (message && message.action === 'resolveFaviconCandidates') {
-          callback({ urls: [] });
-        }
+      getURL(path) {
+        return `chrome-extension://abc${path}`;
       }
     }
   },
   getRiSvg() {
     return '';
   },
-  getGoogleFaviconUrl() {
-    return googleFallbackUrl;
+  getExtensionFaviconUrl() {
+    return extensionUrl;
   },
-  getFaviconIsUrl() {
-    return 'https://favicon.is/futurecomm.cn';
+  getGstaticFaviconUrl() {
+    return gstaticUrl;
   },
   getHostFromUrl(url) {
     return new URL(url).hostname;
   },
-  normalizeFaviconHost(host) {
-    return String(host || '').toLowerCase();
-  },
-  getFaviconPreferredTheme() {
-    return 'light';
-  },
-  getKnownThemedFaviconCandidates() {
-    return [];
-  },
-  getRootFaviconCandidates() {
-    return [];
-  },
   isFaviconProxyUrl(url) {
-    return /google\.com\/s2\/favicons|favicon\.is\//i.test(String(url || ''));
+    return /_favicon\/|gstatic\.cn\/faviconV2/i.test(String(url || ''));
   },
   shouldBlockFaviconForHost() {
     return false;
@@ -181,49 +135,24 @@ const runtime = sandbox.LumnoNewtabFaviconView.createFaviconViewRuntime({
   isBlockedLocalFaviconUrl() {
     return false;
   },
-  hasThemeTokenInUrl() {
-    return false;
-  },
-  shouldSkipThemeUpgradeCandidate() {
-    return false;
-  },
-  hostHasExplicitDarkFavicon() {
-    return false;
-  },
-  isChromeMonogramFaviconUrl() {
-    return false;
-  },
-  getPersistedFaviconEntry() {
-    return null;
-  },
-  getPersistedFaviconDataEntry() {
-    return {
-      dataUrl: realDataUrl,
-      updatedAt: Date.now()
-    };
-  },
-  isHostFaviconVisitDirty() {
-    return false;
-  },
-  clearHostFaviconVisitDirty() {},
   preloadThemeFromFavicon() {},
-  faviconSoftRevalidateDelayMs: 0
+  faviconCandidateLoadTimeoutMs: 1000
 });
 
 (async () => {
   const img = createFakeImage();
-  runtime.attachFaviconWithFallbacks(img, 'https://m2.futurecomm.cn/#/center', 'futurecomm.cn');
-  assert.strictEqual(img.src, realDataUrl);
+  runtime.attachFaviconWithFallbacks(img, pageUrl, 'futurecomm.cn', {
+    primaryUrl
+  });
+  assert.strictEqual(img.src, primaryUrl);
 
-  await wait(10);
+  img._xThemeFaviconErrorHandler();
+  assert.strictEqual(img.src, extensionUrl);
 
-  assert.notStrictEqual(
-    img.src,
-    googleFallbackUrl,
-    'proxy favicon fallbacks must not replace an already rendered favicon during revalidation'
-  );
+  img._xThemeFaviconErrorHandler();
+  assert.strictEqual(img.src, gstaticUrl);
   assert.strictEqual(/google\.com\/s2\/favicons|favicon\.is\//i.test(img.src), false);
-  console.log('newtab favicon proxy upgrade tests passed');
+  console.log('newtab favicon candidate order tests passed');
 })().catch((error) => {
   console.error(error);
   process.exit(1);

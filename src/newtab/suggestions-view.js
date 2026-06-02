@@ -631,27 +631,19 @@
         } catch (e) {
           hostForTab = '';
         }
-        const useFallback = !tab.favIconUrl || shouldBlockFaviconForHost(hostForTab);
+        const useFallback = shouldBlockFaviconForHost(hostForTab);
         const favicon = createFaviconImage(index, { fallbackSize: useFallback });
         if (useFallback) {
           applyFallbackIcon(favicon);
         } else {
-          setFaviconSrcWithAnimation(favicon, tab.favIconUrl);
-          favicon.addEventListener('load', function() {
-            applyFaviconOpticalShift(favicon);
+          attachFaviconWithFallbacks(favicon, tab.url || '', hostForTab, {
+            primaryUrl: tab.favIconUrl || ''
           });
         }
         const iconSlot = createIconSlot(favicon, !useFallback);
         leftSide.appendChild(iconSlot);
         suggestionItem._xIconWrap = iconSlot;
         suggestionItem._xIconIsFavicon = !useFallback;
-        favicon.onerror = function() {
-          reportMissingIcon('tab', tab && tab.url ? tab.url : '', favicon.src);
-          applyFallbackIcon(favicon);
-          favicon.setAttribute('data-fallback-size', 'true');
-          suggestionItem._xIconIsFavicon = false;
-          iconSlot.setAttribute('data-favicon', 'false');
-        };
 
         const title = documentRef.createElement('span');
         title.className = 'x-nt-suggestion-title';
@@ -857,7 +849,9 @@
           } else {
             const favicon = createFaviconImage(index, { objectFitContain: true });
             const faviconPageUrl = suggestion && suggestion.url ? suggestion.url : (suggestion.favicon || '');
-            attachFaviconWithFallbacks(favicon, faviconPageUrl, suggestionHost);
+            attachFaviconWithFallbacks(favicon, faviconPageUrl, suggestionHost, {
+              primaryUrl: suggestion.favicon || ''
+            });
             iconNode = favicon;
           }
         } else {
