@@ -11,10 +11,8 @@
     const chromeApi = config.chromeApi || (typeof chrome !== 'undefined' ? chrome : {});
     const getRiSvg = typeof config.getRiSvg === 'function' ? config.getRiSvg : (() => '');
     const getHostFromUrl = typeof config.getHostFromUrl === 'function' ? config.getHostFromUrl : (() => '');
-    const getGoogleFaviconUrl = typeof config.getGoogleFaviconUrl === 'function' ? config.getGoogleFaviconUrl : (() => '');
-    const getFaviconIsUrl = typeof config.getFaviconIsUrl === 'function' ? config.getFaviconIsUrl : (() => '');
-    const getSiteFaviconUrl = typeof config.getSiteFaviconUrl === 'function' ? config.getSiteFaviconUrl : (() => '');
-    const normalizeFaviconHost = typeof config.normalizeFaviconHost === 'function' ? config.normalizeFaviconHost : ((value) => String(value || ''));
+    const getExtensionFaviconUrl = typeof config.getExtensionFaviconUrl === 'function' ? config.getExtensionFaviconUrl : (() => '');
+    const getGstaticFaviconUrl = typeof config.getGstaticFaviconUrl === 'function' ? config.getGstaticFaviconUrl : (() => '');
     const shouldBlockFaviconForHost = typeof config.shouldBlockFaviconForHost === 'function' ? config.shouldBlockFaviconForHost : (() => false);
     const isFaviconProxyUrl = typeof config.isFaviconProxyUrl === 'function' ? config.isFaviconProxyUrl : (() => false);
     const isBlockedLocalFaviconUrl = typeof config.isBlockedLocalFaviconUrl === 'function'
@@ -23,31 +21,12 @@
     const isChromeMonogramFaviconUrl = typeof config.isChromeMonogramFaviconUrl === 'function'
       ? config.isChromeMonogramFaviconUrl
       : ((url) => /^chrome:\/\/favicon2\//i.test(String(url || '').trim()));
-    const getKnownThemedFaviconCandidates = typeof config.getKnownThemedFaviconCandidates === 'function'
-      ? config.getKnownThemedFaviconCandidates
-      : null;
-    const getRootFaviconCandidates = typeof config.getRootFaviconCandidates === 'function'
-      ? config.getRootFaviconCandidates
-      : (() => []);
-    const hostHasExplicitDarkFavicon = typeof config.hostHasExplicitDarkFavicon === 'function'
-      ? config.hostHasExplicitDarkFavicon
-      : null;
-    const shouldSkipThemeUpgradeCandidate = typeof config.shouldSkipThemeUpgradeCandidate === 'function'
-      ? config.shouldSkipThemeUpgradeCandidate
-      : (() => false);
-    const isOverlayDarkMode = typeof config.isOverlayDarkMode === 'function' ? config.isOverlayDarkMode : (() => false);
     const preloadThemeFromFavicon = typeof config.preloadThemeFromFavicon === 'function' ? config.preloadThemeFromFavicon : noop;
     const hasThemeForHost = typeof config.hasThemeForHost === 'function' ? config.hasThemeForHost : (() => false);
     const getOverlayPanel = typeof config.getOverlayPanel === 'function' ? config.getOverlayPanel : (() => null);
-    const getPersistedFaviconEntry = typeof config.getPersistedFaviconEntry === 'function'
-      ? config.getPersistedFaviconEntry
-      : (() => null);
     const setPersistedFaviconUrl = typeof config.setPersistedFaviconUrl === 'function'
       ? config.setPersistedFaviconUrl
       : noop;
-    const getPersistedFaviconDataEntry = typeof config.getPersistedFaviconDataEntry === 'function'
-      ? config.getPersistedFaviconDataEntry
-      : (() => null);
     const setPersistedFaviconData = typeof config.setPersistedFaviconData === 'function'
       ? config.setPersistedFaviconData
       : noop;
@@ -55,10 +34,11 @@
     const faviconDataPending = config.faviconDataPending || new Map();
     const iconPreloadCache = config.iconPreloadCache || new Map();
     const faviconFallbackNodeMap = config.faviconFallbackNodeMap || new WeakMap();
-    const resolvedFaviconUrlCache = config.resolvedFaviconUrlCache ||
-      win._x_extension_overlay_favicon_url_cache_2024_unique_ ||
-      new Map();
-    win._x_extension_overlay_favicon_url_cache_2024_unique_ = resolvedFaviconUrlCache;
+    const setTimer = typeof win.setTimeout === 'function' ? win.setTimeout.bind(win) : setTimeout;
+    const clearTimer = typeof win.clearTimeout === 'function' ? win.clearTimeout.bind(win) : clearTimeout;
+    const faviconCandidateLoadTimeoutMs = Number.isFinite(config.faviconCandidateLoadTimeoutMs)
+      ? Math.max(0, config.faviconCandidateLoadTimeoutMs)
+      : 2600;
     const faviconViewCoreApi = root.LumnoFaviconViewCore || {};
     const faviconViewCore = typeof faviconViewCoreApi.createFaviconViewCore === 'function'
       ? faviconViewCoreApi.createFaviconViewCore({
@@ -74,18 +54,16 @@
         setPersistedFaviconUrl,
         setPersistedFaviconData,
         shouldPersistFaviconUrl: (url) => !isChromeMonogramFaviconUrl(url) && !isFaviconProxyUrl(url),
+        requestFaviconData: config.requestFaviconData,
         preloadThemeFromFavicon,
-        getThemeFaviconUrl: getSiteFaviconUrl,
+        getThemeFaviconUrl: getGstaticFaviconUrl,
         hasThemeForHost,
         faviconDataCache,
         faviconDataPending,
-        iconPreloadCache
+        iconPreloadCache,
+        detectDefaultExtensionFavicon: config.detectDefaultExtensionFavicon
       })
       : null;
-
-    function createImage() {
-      return faviconViewCore.createImage();
-    }
 
     function setFaviconLoadState(img, state) {
       faviconViewCore.setFaviconLoadState(img, state);
@@ -161,6 +139,7 @@
       if (!img) {
         return;
       }
+      clearOverlayCandidateLoadTimer(img);
       const fallbackNode = findFallbackIconNode(img);
       if (fallbackNode) {
         setFallbackNodeVisible(fallbackNode, false);
@@ -199,6 +178,7 @@
       if (!img) {
         return;
       }
+      clearOverlayCandidateLoadTimer(img);
       const node = ensureFallbackIconNode(img);
       img.removeAttribute('data-favicon-placeholder');
       img.setAttribute('data-fallback-icon', 'true');
@@ -220,14 +200,6 @@
       }
     }
 
-    function isFaviconHidden(img) {
-      return Boolean(img && (
-        img.getAttribute('data-favicon-visibility') === 'hidden' ||
-        img.getAttribute('data-fallback-icon') === 'true' ||
-        img.getAttribute('data-favicon-placeholder') === 'true'
-      ));
-    }
-
     function applyFaviconOpticalShift(img) {
       faviconViewCore.applyFaviconOpticalShift(img);
     }
@@ -236,50 +208,67 @@
       faviconViewCore.applyFaviconOpticalAlignment(img);
     }
 
-    function dedupeOverlayFaviconCandidateUrls(urls) {
-      return faviconViewCore.dedupeFaviconCandidateUrls(urls);
-    }
-
-    function getKnownOverlayThemedFaviconCandidates(hostname, preferredTheme) {
-      if (getKnownThemedFaviconCandidates) {
-        return getKnownThemedFaviconCandidates(hostname, preferredTheme);
+    function getSafeOverlayFaviconCandidateUrl(value) {
+      const raw = String(value || '').trim();
+      if (!raw || isBlockedLocalFaviconUrl(raw)) {
+        return '';
       }
-      const host = normalizeFaviconHost(hostname);
-      if (!host) {
-        return [];
+      if (raw.startsWith('data:')) {
+        return raw;
       }
-      if (host === 'lumno.kubai.design') {
-        const lumnoIconUrl = (chromeApi && chromeApi.runtime && typeof chromeApi.runtime.getURL === 'function')
-          ? chromeApi.runtime.getURL('assets/images/lumno.png')
-          : 'https://lumno.kubai.design/favicon.png';
-        return [lumnoIconUrl];
-      }
-      if (host === 'github.com' || host.endsWith('.github.com')) {
-        if (preferredTheme === 'dark') {
-          return [
-            'https://github.githubassets.com/favicons/favicon-dark.svg',
-            'https://github.githubassets.com/favicons/favicon.svg',
-            'https://github.githubassets.com/favicons/favicon.png'
-          ];
+      try {
+        const parsed = new URL(raw);
+        if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') && shouldBlockFaviconForHost(parsed.hostname)) {
+          return '';
         }
-        return [
-          'https://github.githubassets.com/favicons/favicon.svg',
-          'https://github.githubassets.com/favicons/favicon-dark.svg',
-          'https://github.githubassets.com/favicons/favicon.png'
-        ];
+        return raw;
+      } catch (e) {
+        return '';
       }
-      return [];
     }
 
-    function overlayHostHasExplicitDarkFavicon(hostname) {
-      if (hostHasExplicitDarkFavicon) {
-        return hostHasExplicitDarkFavicon(hostname);
+    function getRuntimeExtensionFaviconUrl(pageUrl) {
+      const page = String(pageUrl || '').trim();
+      if (!/^https?:\/\//i.test(page)) {
+        return '';
       }
-      const host = normalizeFaviconHost(hostname);
-      if (!host) {
-        return false;
+      const configured = getSafeOverlayFaviconCandidateUrl(getExtensionFaviconUrl(page));
+      if (configured) {
+        return configured;
       }
-      return host === 'github.com' || host.endsWith('.github.com');
+      if (!chromeApi.runtime || typeof chromeApi.runtime.getURL !== 'function') {
+        return '';
+      }
+      try {
+        const faviconUrl = new URL(chromeApi.runtime.getURL('/_favicon/'));
+        faviconUrl.searchParams.set('pageUrl', page);
+        faviconUrl.searchParams.set('size', '128');
+        return getSafeOverlayFaviconCandidateUrl(faviconUrl.toString());
+      } catch (e) {
+        return '';
+      }
+    }
+
+    function getRuntimeGstaticFaviconUrl(pageUrl) {
+      const page = String(pageUrl || '').trim();
+      if (!/^https?:\/\//i.test(page)) {
+        return '';
+      }
+      const configured = getSafeOverlayFaviconCandidateUrl(getGstaticFaviconUrl(page));
+      if (configured) {
+        return configured;
+      }
+      try {
+        const faviconUrl = new URL('https://t2.gstatic.cn/faviconV2');
+        faviconUrl.searchParams.set('client', 'SOCIAL');
+        faviconUrl.searchParams.set('type', 'FAVICON');
+        faviconUrl.searchParams.set('fallback_opts', 'TYPE,SIZE,URL');
+        faviconUrl.searchParams.set('url', page);
+        faviconUrl.searchParams.set('size', '128');
+        return getSafeOverlayFaviconCandidateUrl(faviconUrl.toString());
+      } catch (e) {
+        return '';
+      }
     }
 
     function requestFaviconData(url) {
@@ -310,54 +299,17 @@
       img._xOverlayThemeFaviconSession = (img._xOverlayThemeFaviconSession || 0) + 1;
       const session = img._xOverlayThemeFaviconSession;
       const normalizedHostKey = hostKey || getHostFromUrl(pageUrl);
-      const preferredTheme = isOverlayDarkMode() ? 'dark' : 'light';
-      const faviconHostKey = normalizeFaviconHost(normalizedHostKey || '');
-      const cacheKey = `${String(normalizedHostKey || '')}::${String(pageUrl || '')}::${String(fallbackUrl || '')}::${preferredTheme}`;
-      const persistentCacheKey = faviconHostKey ? `${preferredTheme}::${faviconHostKey}` : '';
-      const persistedEntry = persistentCacheKey ? getPersistedFaviconEntry(persistentCacheKey) : null;
-      const persistedDataEntry = persistentCacheKey ? getPersistedFaviconDataEntry(persistentCacheKey) : null;
-      const persistedFavicon = persistedEntry &&
-        persistedEntry.url &&
-        !isBlockedLocalFaviconUrl(persistedEntry.url) &&
-        !isChromeMonogramFaviconUrl(persistedEntry.url) &&
-        !isFaviconProxyUrl(persistedEntry.url)
-        ? persistedEntry.url
-        : '';
-      const persistedDataUrl = persistedDataEntry && persistedDataEntry.dataUrl
-        ? persistedDataEntry.dataUrl
-        : '';
-      const shouldBypassCachedUrl = faviconHostKey === 'lumno.kubai.design';
-      const cachedUrl = resolvedFaviconUrlCache.get(cacheKey) || '';
-      const safeCachedUrl = (
-        shouldBypassCachedUrl ||
-        isBlockedLocalFaviconUrl(cachedUrl) ||
-        isChromeMonogramFaviconUrl(cachedUrl) ||
-        isFaviconProxyUrl(cachedUrl)
-      )
-        ? ''
-        : cachedUrl;
-      const safeFallbackUrl = isBlockedLocalFaviconUrl(fallbackUrl) ? '' : String(fallbackUrl || '');
-      const fallbackIsProxy = isFaviconProxyUrl(safeFallbackUrl);
 
       return {
         pageUrl: String(pageUrl || ''),
         hostKey: String(normalizedHostKey || ''),
-        faviconHostKey,
-        fallbackUrl: safeFallbackUrl,
-        preferredTheme,
+        fallbackUrl: getSafeOverlayFaviconCandidateUrl(fallbackUrl),
+        primaryUrl: getSafeOverlayFaviconCandidateUrl(fallbackUrl),
+        extensionFavicon: getRuntimeExtensionFaviconUrl(pageUrl),
+        gstaticFavicon: getRuntimeGstaticFaviconUrl(pageUrl),
         previousWorkingSrc: getLastWorkingFaviconSrc(img),
-        cacheKey,
-        persistentCacheKey,
-        persistedFavicon,
-        persistedDataUrl,
-        safeCachedUrl,
-        primaryFallbackUrl: fallbackIsProxy ? '' : safeFallbackUrl,
-        proxyFallbackUrl: fallbackIsProxy ? safeFallbackUrl : '',
-        googleFavicon: normalizedHostKey ? getGoogleFaviconUrl(normalizedHostKey) : '',
-        faviconIsFavicon: normalizedHostKey ? getFaviconIsUrl(normalizedHostKey) : '',
+        hasFailedHandler: typeof onFailed === 'function',
         handleFailed: typeof onFailed === 'function' ? onFailed : function() {},
-        shouldPreferDarkTokenUpgrades: preferredTheme === 'dark' &&
-          overlayHostHasExplicitDarkFavicon(normalizedHostKey),
         isSessionCurrent() {
           return Boolean(img && img._xOverlayThemeFaviconSession === session);
         },
@@ -372,86 +324,75 @@
       img.setAttribute('data-x-ov-favicon-page-url', state.pageUrl);
       img.setAttribute('data-x-ov-favicon-host', state.hostKey);
       img.setAttribute('data-x-ov-favicon-fallback-url', state.fallbackUrl);
-      if (state.persistentCacheKey) {
-        img.setAttribute('data-x-ov-favicon-cache-key', state.persistentCacheKey);
-      } else {
-        img.removeAttribute('data-x-ov-favicon-cache-key');
-      }
-    }
-
-    function primePersistedOverlayFaviconData(img, state) {
-      if (!state.persistedDataUrl) {
-        return false;
-      }
-      if (state.persistedFavicon && !faviconDataCache.has(state.persistedFavicon)) {
-        faviconDataCache.set(state.persistedFavicon, state.persistedDataUrl);
-      }
-      const applied = setFaviconSrcWithAnimation(img, state.persistedDataUrl, { persist: false });
-      const reused = !applied && canReuseCurrentFavicon(img, state.persistedDataUrl);
-      if (reused) {
-        showResolvedFavicon(img);
-      }
-      if (applied || reused) {
-        preloadThemeFromFavicon(state.persistedFavicon || state.fallbackUrl || state.googleFavicon, state.persistedDataUrl, state.hostKey);
-      }
-      return applied || reused;
+      img.removeAttribute('data-x-ov-favicon-cache-key');
     }
 
     function buildOverlayThemeAwareFaviconCandidatePlan(state) {
-      const siteSvgFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon.svg` : '';
-      const siteDarkSvgFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon-dark.svg` : '';
-      const siteLightSvgFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon-light.svg` : '';
-      const sitePngFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon.png` : '';
-      const site32PngFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon-32x32.png` : '';
-      const site16PngFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon-16x16.png` : '';
-      const siteIcoFavicon = state.faviconHostKey ? `https://${state.faviconHostKey}/favicon.ico` : '';
-      const siteAppleTouchIcon = state.faviconHostKey ? `https://${state.faviconHostKey}/apple-touch-icon.png` : '';
-      const siteAppleTouchIconPrecomposed = state.faviconHostKey ? `https://${state.faviconHostKey}/apple-touch-icon-precomposed.png` : '';
-      const siteIconPng = state.faviconHostKey ? `https://${state.faviconHostKey}/icon.png` : '';
-      const sharedRootCandidates = getRootFaviconCandidates(state.faviconHostKey, state.preferredTheme);
-      const fallbackRootCandidates = state.preferredTheme === 'dark'
-        ? [
-          siteDarkSvgFavicon,
-          siteSvgFavicon,
-          sitePngFavicon,
-          siteIcoFavicon,
-          site32PngFavicon,
-          site16PngFavicon,
-          siteAppleTouchIcon,
-          siteAppleTouchIconPrecomposed,
-          siteIconPng,
-          siteLightSvgFavicon
-        ]
-        : [
-          siteLightSvgFavicon,
-          siteSvgFavicon,
-          sitePngFavicon,
-          siteIcoFavicon,
-          site32PngFavicon,
-          site16PngFavicon,
-          siteAppleTouchIcon,
-          siteAppleTouchIconPrecomposed,
-          siteIconPng,
-          siteDarkSvgFavicon
-        ];
-      const rootCandidates = sharedRootCandidates.length > 0 ? sharedRootCandidates : fallbackRootCandidates;
-      const knownThemedCandidates = getKnownOverlayThemedFaviconCandidates(state.faviconHostKey, state.preferredTheme);
-
-      return {
-        localCandidates: dedupeOverlayFaviconCandidateUrls([
-          state.persistedFavicon,
-          state.safeCachedUrl,
-          state.primaryFallbackUrl,
-          ...knownThemedCandidates,
-          ...rootCandidates,
-          state.googleFavicon,
-          state.proxyFallbackUrl,
-          state.faviconIsFavicon
-        ]).filter((candidate) => !isBlockedLocalFaviconUrl(candidate))
-      };
+      const seen = new Set();
+      return [
+        { kind: 'primary', url: state.primaryUrl },
+        { kind: 'extension', url: state.extensionFavicon },
+        { kind: 'gstatic', url: state.gstaticFavicon }
+      ].filter((candidate) => {
+        const url = getSafeOverlayFaviconCandidateUrl(candidate.url);
+        if (!url || seen.has(url)) {
+          return false;
+        }
+        seen.add(url);
+        candidate.url = url;
+        return true;
+      });
     }
 
-    function tryApplyOverlayThemeAwareFaviconCandidate(img, state, tried, nextUrl) {
+    function clearOverlayCandidateLoadTimer(img) {
+      if (!img || img._xOverlayThemeFaviconLoadTimer === null || img._xOverlayThemeFaviconLoadTimer === undefined) {
+        return;
+      }
+      clearTimer(img._xOverlayThemeFaviconLoadTimer);
+      img._xOverlayThemeFaviconLoadTimer = null;
+    }
+
+    function isOverlayCandidateLoaded(img, nextUrl) {
+      if (!img || !nextUrl) {
+        return false;
+      }
+      const resolvedSrc = img.getAttribute('data-favicon-current-src') || '';
+      if (resolvedSrc === nextUrl) {
+        return true;
+      }
+      return Boolean(img.complete && img.naturalWidth > 0);
+    }
+
+    function scheduleOverlayCandidateLoadTimer(img, state, nextUrl) {
+      if (!img || !state || !nextUrl || faviconCandidateLoadTimeoutMs <= 0) {
+        return;
+      }
+      clearOverlayCandidateLoadTimer(img);
+      const expectedToken = img._xFaviconLoadToken || 0;
+      const expectedSrc = String(nextUrl);
+      img._xOverlayThemeFaviconLoadTimer = setTimer(() => {
+        img._xOverlayThemeFaviconLoadTimer = null;
+        if (!img || !state.isSessionCurrent()) {
+          return;
+        }
+        if ((img._xFaviconLoadToken || 0) !== expectedToken) {
+          return;
+        }
+        const currentRenderedSrc = String(img.getAttribute('src') || img.src || '');
+        if (currentRenderedSrc && currentRenderedSrc !== expectedSrc) {
+          return;
+        }
+        if (isOverlayCandidateLoaded(img, expectedSrc)) {
+          return;
+        }
+        if (typeof img._xOverlayThemeFaviconErrorHandler === 'function') {
+          img._xOverlayThemeFaviconErrorHandler();
+        }
+      }, faviconCandidateLoadTimeoutMs);
+    }
+
+    function tryApplyOverlayThemeAwareFaviconCandidate(img, state, tried, candidate) {
+      const nextUrl = candidate && candidate.url ? String(candidate.url) : '';
       if (!nextUrl || !img || !state.isSessionCurrent()) {
         return false;
       }
@@ -459,104 +400,98 @@
         return false;
       }
       tried.add(nextUrl);
-      const applied = setFaviconSrcWithAnimation(img, nextUrl);
+      clearOverlayCandidateLoadTimer(img);
+
+      const shouldCheckDefaultProxy = candidate &&
+        (candidate.kind === 'extension' || candidate.kind === 'gstatic');
+      let defaultProxyCheckStarted = false;
+      const scheduleDefaultProxyFaviconCheck = () => {
+        if (!shouldCheckDefaultProxy) {
+          return;
+        }
+        if (defaultProxyCheckStarted) {
+          return;
+        }
+        defaultProxyCheckStarted = true;
+        setTimer(() => {
+          if (!img || !state.isSessionCurrent()) {
+            return;
+          }
+          const currentSrc = img.getAttribute('data-favicon-current-src') || img.src || '';
+          if (currentSrc !== nextUrl) {
+            return;
+          }
+          const defaultCheckPromise = candidate.kind === 'extension'
+            ? faviconViewCore.detectDefaultExtensionFavicon(img, nextUrl)
+            : faviconViewCore.requestFaviconData(nextUrl).then((dataUrl) => !dataUrl);
+          defaultCheckPromise.catch(() => false).then((isDefault) => {
+            if (!img || !state.isSessionCurrent()) {
+              return;
+            }
+            const latestSrc = img.getAttribute('data-favicon-current-src') || img.src || '';
+            if (latestSrc !== nextUrl) {
+              return;
+            }
+            if (isDefault) {
+              if (candidate.kind === 'gstatic') {
+                finalizeOverlayDefaultProxyFaviconFailure(img, state);
+                return;
+              }
+              if (typeof img._xOverlayThemeFaviconErrorHandler === 'function') {
+                img._xOverlayThemeFaviconErrorHandler();
+              }
+              return;
+            }
+            showResolvedFavicon(img);
+          });
+        }, 0);
+      };
+      const handleProxyLoad = () => {
+        scheduleDefaultProxyFaviconCheck();
+      };
+      if (shouldCheckDefaultProxy) {
+        img.addEventListener('load', handleProxyLoad, { once: true });
+      }
+      const applied = setFaviconSrcWithAnimation(img, nextUrl, {
+        persist: false,
+        deferResolve: shouldCheckDefaultProxy
+      });
       const reused = !applied && canReuseCurrentFavicon(img, nextUrl);
       if (!applied && !reused) {
+        img.removeEventListener('load', handleProxyLoad);
         return false;
       }
       if (reused) {
-        showResolvedFavicon(img);
-      } else {
-        setFaviconVisibility(img, 'visible');
-      }
-      if (!isChromeMonogramFaviconUrl(nextUrl) && state.cacheKey) {
-        if (!isFaviconProxyUrl(nextUrl)) {
-          resolvedFaviconUrlCache.set(state.cacheKey, nextUrl);
+        img.removeEventListener('load', handleProxyLoad);
+        if (shouldCheckDefaultProxy) {
+          showPendingFallbackIcon(img);
+          scheduleDefaultProxyFaviconCheck();
+        } else {
+          showResolvedFavicon(img);
         }
-      }
-      const isProxyCandidate = isFaviconProxyUrl(nextUrl);
-      if (!nextUrl.startsWith('data:') && !isChromeMonogramFaviconUrl(nextUrl) && !isProxyCandidate) {
-        attachFaviconData(img, nextUrl, state.hostKey);
+      } else {
+        if (!shouldCheckDefaultProxy) {
+          setFaviconVisibility(img, 'visible');
+        }
+        scheduleOverlayCandidateLoadTimer(img, state, nextUrl);
+        if (shouldCheckDefaultProxy && img.complete && img.naturalWidth > 0) {
+          scheduleDefaultProxyFaviconCheck();
+        }
       }
       return true;
     }
 
-    function requestResolvedOverlayThemeAwareFaviconCandidates(state) {
-      if (!state.pageUrl) {
-        return Promise.resolve([]);
-      }
-      return new Promise((resolve) => {
-        if (!chromeApi.runtime || typeof chromeApi.runtime.sendMessage !== 'function') {
-          resolve([]);
-          return;
-        }
-        chromeApi.runtime.sendMessage(
-          {
-            action: 'resolveFaviconCandidates',
-            url: state.pageUrl,
-            host: state.hostKey,
-            fallbackUrl: state.fallbackUrl,
-            preferredTheme: state.preferredTheme
-          },
-          (response) => {
-            const resolved = response && Array.isArray(response.urls) ? response.urls : [];
-            resolve(
-              dedupeOverlayFaviconCandidateUrls(resolved)
-                .filter((candidate) => candidate && !isBlockedLocalFaviconUrl(candidate))
-            );
-          }
-        );
-      });
-    }
-
-    function tryUpgradeOverlayThemeAwareFaviconCandidates(img, state, candidateUrls) {
-      const currentSrc = img && img.src ? String(img.src) : '';
-      const upgrades = dedupeOverlayFaviconCandidateUrls(candidateUrls).filter((candidate) => {
-        if (!candidate || candidate === currentSrc || isChromeMonogramFaviconUrl(candidate) || isFaviconProxyUrl(candidate)) {
-          return false;
-        }
-        if (state.shouldPreferDarkTokenUpgrades && !/(^|[._/-])dark([._/-]|$)/i.test(String(candidate || ''))) {
-          return false;
-        }
-        if (shouldSkipThemeUpgradeCandidate(candidate, state.preferredTheme, currentSrc)) {
-          return false;
-        }
-        return true;
-      });
-      if (upgrades.length === 0) {
+    function finalizeOverlayDefaultProxyFaviconFailure(img, state) {
+      clearOverlayCandidateLoadTimer(img);
+      if (state.hasFailedHandler) {
+        state.handleFailed();
         return;
       }
-
-      const tryUpgrade = (index) => {
-        if (!state.isSessionMounted() || index >= upgrades.length) {
-          return;
-        }
-        const candidate = upgrades[index];
-        const probe = createImage();
-        probe.referrerPolicy = 'no-referrer';
-        probe.onload = () => {
-          if (!state.isSessionMounted()) {
-            return;
-          }
-          setFaviconSrcWithAnimation(img, candidate);
-          setFaviconVisibility(img, 'visible');
-          if (state.cacheKey && !isFaviconProxyUrl(candidate)) {
-            resolvedFaviconUrlCache.set(state.cacheKey, candidate);
-          }
-          if (!candidate.startsWith('data:') && !isChromeMonogramFaviconUrl(candidate) && !isFaviconProxyUrl(candidate)) {
-            attachFaviconData(img, candidate, state.hostKey);
-          }
-        };
-        probe.onerror = () => {
-          tryUpgrade(index + 1);
-        };
-        probe.src = candidate;
-      };
-
-      tryUpgrade(0);
+      applyFallbackIcon(img);
     }
 
     function finalizeOverlayThemeAwareFaviconFailure(img, state) {
+      clearOverlayCandidateLoadTimer(img);
       restoreWorkingFaviconOrFail(img, state.previousWorkingSrc, state.handleFailed);
     }
 
@@ -564,76 +499,31 @@
       if (!img) {
         return;
       }
+      if (img._xOverlayThemeFaviconErrorHandler) {
+        img.removeEventListener('error', img._xOverlayThemeFaviconErrorHandler);
+        img._xOverlayThemeFaviconErrorHandler = null;
+      }
+      clearOverlayCandidateLoadTimer(img);
+
       const state = createOverlayThemeAwareFaviconState(img, pageUrl, hostKey, fallbackUrl, onFailed);
       if (state.hostKey && shouldBlockFaviconForHost(state.hostKey)) {
         state.handleFailed();
         return;
       }
       syncOverlayThemeAwareFaviconAttributes(img, state);
-      if (primePersistedOverlayFaviconData(img, state)) {
-        return;
-      }
-      const candidatePlan = buildOverlayThemeAwareFaviconCandidatePlan(state);
+      const candidates = buildOverlayThemeAwareFaviconCandidatePlan(state);
       const tried = new Set();
-      const shouldRequestResolvedCandidatesImmediately = Boolean(state.pageUrl && !state.persistedFavicon);
-      let resolvedCandidates = [];
-      let resolvedCandidatesLoaded = !shouldRequestResolvedCandidatesImmediately;
-      let resolvedCandidatesRequested = false;
-
-      if (img._xOverlayThemeFaviconErrorHandler) {
-        img.removeEventListener('error', img._xOverlayThemeFaviconErrorHandler);
-        img._xOverlayThemeFaviconErrorHandler = null;
-      }
+      let candidateIndex = 0;
 
       const tryNextAvailableCandidate = () => {
-        const candidatePool = dedupeOverlayFaviconCandidateUrls([
-          ...candidatePlan.localCandidates,
-          ...resolvedCandidates
-        ]);
-        for (let i = 0; i < candidatePool.length; i += 1) {
-          if (tryApplyOverlayThemeAwareFaviconCandidate(img, state, tried, candidatePool[i])) {
+        while (candidateIndex < candidates.length) {
+          const candidate = candidates[candidateIndex];
+          candidateIndex += 1;
+          if (tryApplyOverlayThemeAwareFaviconCandidate(img, state, tried, candidate)) {
             return true;
           }
         }
         return false;
-      };
-
-      const requestResolvedCandidatesOnce = () => {
-        if (!state.pageUrl || resolvedCandidatesRequested) {
-          return false;
-        }
-        resolvedCandidatesRequested = true;
-        resolvedCandidatesLoaded = false;
-        requestResolvedOverlayThemeAwareFaviconCandidates(state)
-          .then((resolved) => {
-            if (!state.isSessionCurrent()) {
-              return;
-            }
-            resolvedCandidates = resolved;
-            resolvedCandidatesLoaded = true;
-
-            if (!appliedInitial || isFaviconHidden(img)) {
-              if (!tryNextAvailableCandidate()) {
-                finalizeOverlayThemeAwareFaviconFailure(img, state);
-              }
-              return;
-            }
-
-            tryUpgradeOverlayThemeAwareFaviconCandidates(img, state, [
-              ...resolvedCandidates,
-              ...candidatePlan.localCandidates
-            ]);
-          })
-          .catch(() => {
-            resolvedCandidatesLoaded = true;
-            if (!state.isSessionCurrent()) {
-              return;
-            }
-            if (!appliedInitial || isFaviconHidden(img)) {
-              finalizeOverlayThemeAwareFaviconFailure(img, state);
-            }
-          });
-        return true;
       };
 
       const handleImageError = () => {
@@ -641,15 +531,6 @@
           return;
         }
         if (tryNextAvailableCandidate()) {
-          return;
-        }
-        if (state.pageUrl && !resolvedCandidatesRequested) {
-          showPendingFallbackIcon(img);
-          requestResolvedCandidatesOnce();
-          return;
-        }
-        if (!resolvedCandidatesLoaded) {
-          showPendingFallbackIcon(img);
           return;
         }
         finalizeOverlayThemeAwareFaviconFailure(img, state);
@@ -660,20 +541,7 @@
 
       const appliedInitial = tryNextAvailableCandidate();
       if (!appliedInitial) {
-        if (state.pageUrl) {
-          showPendingFallbackIcon(img);
-        } else {
-          applyFallbackIcon(img);
-        }
-      }
-      if (!state.pageUrl) {
-        if (!appliedInitial) {
-          finalizeOverlayThemeAwareFaviconFailure(img, state);
-        }
-        return;
-      }
-      if (!appliedInitial || shouldRequestResolvedCandidatesImmediately) {
-        requestResolvedCandidatesOnce();
+        finalizeOverlayThemeAwareFaviconFailure(img, state);
       }
     }
 

@@ -19,6 +19,8 @@
   function isFaviconProxyUrl(url) {
     return /google\.com\/s2\/favicons/i.test(String(url || '')) ||
       /gstatic\.com\/favicon/i.test(String(url || '')) ||
+      /gstatic\.cn\/faviconv2/i.test(String(url || '')) ||
+      /^chrome-extension:\/\/[^/]+\/_favicon\//i.test(String(url || '').trim()) ||
       /favicon\.is\//i.test(String(url || ''));
   }
 
@@ -26,11 +28,48 @@
     return /^chrome:\/\/favicon2\//i.test(String(url || '').trim());
   }
 
-  function getChromeFaviconUrl(url) {
-    if (!url || !/^https?:\/\//i.test(url)) {
+  function getExtensionFaviconUrl(pageUrl, options) {
+    if (!pageUrl || !/^https?:\/\//i.test(pageUrl)) {
       return '';
     }
-    return `chrome://favicon2/?size=128&scale_factor=2x&show_fallback_monogram=1&url=${encodeURIComponent(url)}`;
+    const getRuntimeUrl = options && typeof options.getRuntimeUrl === 'function'
+      ? options.getRuntimeUrl
+      : null;
+    if (!getRuntimeUrl) {
+      return '';
+    }
+    const size = Number.isFinite(Number(options && options.size))
+      ? Math.max(1, Math.round(Number(options.size)))
+      : 128;
+    try {
+      const faviconUrl = new URL(getRuntimeUrl('/_favicon/'));
+      faviconUrl.searchParams.set('pageUrl', pageUrl);
+      faviconUrl.searchParams.set('size', String(size));
+      return faviconUrl.toString();
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function getGstaticFaviconUrl(pageUrl, options) {
+    if (!pageUrl || !/^https?:\/\//i.test(pageUrl)) {
+      return '';
+    }
+    const size = Number.isFinite(Number(options && options.size))
+      ? Math.max(1, Math.round(Number(options.size)))
+      : 128;
+    const host = options && options.host ? String(options.host) : 't2.gstatic.cn';
+    try {
+      const faviconUrl = new URL(`https://${host}/faviconV2`);
+      faviconUrl.searchParams.set('client', 'SOCIAL');
+      faviconUrl.searchParams.set('type', 'FAVICON');
+      faviconUrl.searchParams.set('fallback_opts', 'TYPE,SIZE,URL');
+      faviconUrl.searchParams.set('url', pageUrl);
+      faviconUrl.searchParams.set('size', String(size));
+      return faviconUrl.toString();
+    } catch (e) {
+      return '';
+    }
   }
 
   function normalizeFaviconThemePreference(theme) {
@@ -645,22 +684,25 @@
     try {
       const parsed = new URL(raw);
       const protocol = String(parsed.protocol || '').toLowerCase();
-      if (protocol === 'chrome:' && parsed.hostname === 'favicon2') {
-        const nested = parsed.searchParams.get('url') || '';
-        if (nested) {
-          const nestedHostCandidate = getFaviconUrlHostCandidate(nested);
-          if (nestedHostCandidate && shouldBlockFaviconForHost(nestedHostCandidate)) {
+      const nestedUrl = parsed.searchParams.get('pageUrl') || parsed.searchParams.get('url') || '';
+      if (nestedUrl) {
+        const nestedHostCandidate = getFaviconUrlHostCandidate(nestedUrl);
+        if (nestedHostCandidate && shouldBlockFaviconForHost(nestedHostCandidate)) {
+          return true;
+        }
+        try {
+          const nestedParsed = new URL(nestedUrl);
+          if (shouldBlockFaviconForHost(nestedParsed.hostname)) {
             return true;
           }
-          try {
-            const nestedUrl = new URL(nested);
-            if (shouldBlockFaviconForHost(nestedUrl.hostname)) {
-              return true;
-            }
-          } catch (e) {
-            // Ignore malformed nested URL.
-          }
+        } catch (e) {
+          // Ignore malformed nested URL.
         }
+      }
+      if (protocol === 'chrome-extension:' && parsed.pathname.startsWith('/_favicon/')) {
+        return false;
+      }
+      if (protocol === 'chrome:' && parsed.hostname === 'favicon2') {
         return false;
       }
       if ((protocol === 'http:' || protocol === 'https:') && shouldBlockFaviconForHost(parsed.hostname)) {
@@ -677,7 +719,8 @@
   }
 
   return Object.freeze({
-    getChromeFaviconUrl,
+    getExtensionFaviconUrl,
+    getGstaticFaviconUrl,
     getHtmlAttributeValue,
     getKnownThemedFaviconCandidateScores,
     getKnownThemedFaviconCandidateUrls,

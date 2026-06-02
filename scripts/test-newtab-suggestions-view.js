@@ -223,14 +223,14 @@ async function testLocalUrlSuggestionUsesFallbackTheme() {
   );
 }
 
-async function testGoogleFallbackFaviconUsesFallbackTheme() {
+async function testProxyFallbackFaviconUsesFallbackTheme() {
   const document = createFakeDocument();
   const container = document.createElement('div');
   container.setConnected(true);
   const items = [];
   const defaultTheme = faviconTheme.createDefaultTheme();
   const urlHighlightTheme = faviconTheme.createUrlHighlightTheme();
-  const googleFallbackFavicon = 'https://www.google.com/s2/favicons?domain=dyjs.cuc.edu.cn&sz=128';
+  const proxyFallbackFavicon = 'https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=https%3A%2F%2Fdyjs.cuc.edu.cn%2F&size=128';
   let requestedTheme = false;
 
   const view = suggestionsView.createSuggestionsView({
@@ -246,11 +246,11 @@ async function testGoogleFallbackFaviconUsesFallbackTheme() {
     getImmediateThemeForSuggestion: () => defaultTheme,
     getThemeForSuggestion: (suggestion) => {
       requestedTheme = true;
-      assert.strictEqual(suggestion.favicon, googleFallbackFavicon);
+      assert.strictEqual(suggestion.favicon, proxyFallbackFavicon);
       return Promise.resolve(defaultTheme);
     },
     shouldUseUrlFallbackThemeForSuggestion: (suggestion, theme) =>
-      Boolean(theme && theme._xIsDefault && suggestion && suggestion.favicon === googleFallbackFavicon),
+      Boolean(theme && theme._xIsDefault && suggestion && suggestion.favicon === proxyFallbackFavicon),
     getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
       defaultTheme,
       isDarkMode: () => false
@@ -274,7 +274,7 @@ async function testGoogleFallbackFaviconUsesFallbackTheme() {
       title: '研究生应用管理平台',
       url: 'https://dyjs.cuc.edu.cn/gsapp/sys/emaphome/portal/',
       isTopSite: true,
-      favicon: googleFallbackFavicon
+      favicon: proxyFallbackFavicon
     }]
   });
   view.updateSelection(-1);
@@ -286,12 +286,12 @@ async function testGoogleFallbackFaviconUsesFallbackTheme() {
   assert.strictEqual(
     item._xTheme,
     urlHighlightTheme,
-    'Google fallback favicon suggestions should use the URL fallback highlight theme'
+    'proxy fallback favicon suggestions should use the URL fallback highlight theme'
   );
   assert.strictEqual(
     item.style.getPropertyValue('--x-nt-suggestion-active-bg'),
     urlHighlightTheme.highlightBg,
-    'Google fallback active row should use the fallback theme highlight background'
+    'proxy fallback active row should use the fallback theme highlight background'
   );
 }
 
@@ -506,7 +506,7 @@ async function testOpenNewTabVisitButtonReflectsCurrentTabModifier() {
 }
 
 testLocalUrlSuggestionUsesFallbackTheme()
-  .then(testGoogleFallbackFaviconUsesFallbackTheme)
+  .then(testProxyFallbackFaviconUsesFallbackTheme)
   .then(testVisitButtonAndEnterTagShareOverlayVisibilityRules)
   .then(testAiProviderVisitButtonUsesWebAppLabel)
   .then(testOpenNewTabVisitButtonReflectsCurrentTabModifier)

@@ -1889,18 +1889,27 @@
     'kimiPrompt'
   ]);
 
+  function getGstaticFaviconUrlForHost(hostname, size) {
+    const host = String(hostname || '').trim();
+    if (!host) {
+      return '';
+    }
+    const iconSize = Number.isFinite(Number(size)) ? Math.max(1, Math.round(Number(size))) : 64;
+    return `https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=${encodeURIComponent(`https://${host}/`)}&size=${iconSize}`;
+  }
+
   const DEFAULT_SITE_SEARCH_PROVIDERS = Object.freeze([
     { key: 'yt', aliases: ['youtube'], name: 'YouTube', template: 'https://www.youtube.com/results?search_query={query}' },
     { key: 'bb', aliases: ['bilibili', 'bili'], name: 'Bilibili', template: 'https://search.bilibili.com/all?keyword={query}' },
     { key: 'gh', aliases: ['github'], name: 'GitHub', template: 'https://github.com/search?q={query}' },
-    { key: 'gpt', aliases: ['chatgpt', 'openai'], name: 'ChatGPT', template: 'https://chatgpt.com/?hints=search&ref=ext&q={query}', action: 'openAndSubmit', submitStrategy: 'chatgptPrompt', iconUrl: 'https://www.google.com/s2/favicons?domain=chatgpt.com&sz=64' },
-    { key: 'gm', aliases: ['gemini'], name: 'Gemini', template: 'https://gemini.google.com/app', action: 'openAndSubmit', submitStrategy: 'geminiPrompt', iconUrl: 'https://www.google.com/s2/favicons?domain=gemini.google.com&sz=64' },
-    { key: 'dbai', aliases: ['doubao', '豆包'], name: '豆包', template: 'https://www.doubao.com/chat/', action: 'openAndSubmit', submitStrategy: 'doubaoPrompt', iconUrl: 'https://www.google.com/s2/favicons?domain=www.doubao.com&sz=64' },
-    { key: 'qw', aliases: ['qianwen', 'qwen', '千问'], name: '千问', template: 'https://www.qianwen.com/?q={query}', action: 'openAndSubmit', submitStrategy: 'qianwenQuery', iconUrl: 'https://www.google.com/s2/favicons?domain=www.qianwen.com&sz=64' },
-    { key: 'yb', aliases: ['yuanbao', 'tencent', '腾讯元宝', '元宝'], name: '元宝', template: 'https://yuanbao.tencent.com/chat/', action: 'openAndSubmit', submitStrategy: 'yuanbaoPrompt', iconUrl: 'https://www.google.com/s2/favicons?domain=yuanbao.tencent.com&sz=64' },
-    { key: 'mx', aliases: ['minimax', 'mini max'], name: 'MiniMax', template: 'https://chat.minimax.io/', action: 'openAndSubmit', submitStrategy: 'minimaxPrompt', iconUrl: 'https://www.google.com/s2/favicons?domain=chat.minimax.io&sz=64' },
-    { key: 'ds', aliases: ['deepseek', 'deep seek', '深度求索'], name: 'DeepSeek', template: 'https://chat.deepseek.com/', action: 'openAndSubmit', submitStrategy: 'deepseekPrompt', iconUrl: 'https://www.google.com/s2/favicons?domain=chat.deepseek.com&sz=64' },
-    { key: 'kimi', aliases: ['moonshot', '月之暗面'], name: 'Kimi', template: 'https://www.kimi.com/', action: 'openAndSubmit', submitStrategy: 'kimiPrompt', iconUrl: 'https://www.google.com/s2/favicons?domain=www.kimi.com&sz=64' },
+    { key: 'gpt', aliases: ['chatgpt', 'openai'], name: 'ChatGPT', template: 'https://chatgpt.com/?hints=search&ref=ext&q={query}', action: 'openAndSubmit', submitStrategy: 'chatgptPrompt', iconUrl: getGstaticFaviconUrlForHost('chatgpt.com') },
+    { key: 'gm', aliases: ['gemini'], name: 'Gemini', template: 'https://gemini.google.com/app', action: 'openAndSubmit', submitStrategy: 'geminiPrompt', iconUrl: getGstaticFaviconUrlForHost('gemini.google.com') },
+    { key: 'dbai', aliases: ['doubao', '豆包'], name: '豆包', template: 'https://www.doubao.com/chat/', action: 'openAndSubmit', submitStrategy: 'doubaoPrompt', iconUrl: getGstaticFaviconUrlForHost('www.doubao.com') },
+    { key: 'qw', aliases: ['qianwen', 'qwen', '千问'], name: '千问', template: 'https://www.qianwen.com/?q={query}', action: 'openAndSubmit', submitStrategy: 'qianwenQuery', iconUrl: getGstaticFaviconUrlForHost('www.qianwen.com') },
+    { key: 'yb', aliases: ['yuanbao', 'tencent', '腾讯元宝', '元宝'], name: '元宝', template: 'https://yuanbao.tencent.com/chat/', action: 'openAndSubmit', submitStrategy: 'yuanbaoPrompt', iconUrl: getGstaticFaviconUrlForHost('yuanbao.tencent.com') },
+    { key: 'mx', aliases: ['minimax', 'mini max'], name: 'MiniMax', template: 'https://chat.minimax.io/', action: 'openAndSubmit', submitStrategy: 'minimaxPrompt', iconUrl: getGstaticFaviconUrlForHost('chat.minimax.io') },
+    { key: 'ds', aliases: ['deepseek', 'deep seek', '深度求索'], name: 'DeepSeek', template: 'https://chat.deepseek.com/', action: 'openAndSubmit', submitStrategy: 'deepseekPrompt', iconUrl: getGstaticFaviconUrlForHost('chat.deepseek.com') },
+    { key: 'kimi', aliases: ['moonshot', '月之暗面'], name: 'Kimi', template: 'https://www.kimi.com/', action: 'openAndSubmit', submitStrategy: 'kimiPrompt', iconUrl: getGstaticFaviconUrlForHost('www.kimi.com') },
     { key: 'so', aliases: ['baidu', 'bd'], name: 'Baidu', template: 'https://www.baidu.com/s?wd={query}' },
     { key: 'bi', aliases: ['bing'], name: 'Bing', template: 'https://www.bing.com/search?q={query}' },
     { key: 'gg', aliases: ['google'], name: 'Google', template: 'https://www.google.com/search?q={query}' },

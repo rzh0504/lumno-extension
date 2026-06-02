@@ -3439,7 +3439,9 @@
         const template = normalizeSiteSearchTemplate(String(item.template || '').trim());
         const url = template.replace(/\{query\}/g, 'test');
         const hostname = new URL(url).hostname;
-        return hostname ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=64` : '';
+        return hostname
+          ? `https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=${encodeURIComponent(`https://${hostname}/`)}&size=64`
+          : '';
       } catch (error) {
         return '';
       }

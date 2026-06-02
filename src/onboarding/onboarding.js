@@ -132,7 +132,7 @@
   function getNewtabPreviewFaviconUrl(url) {
     const value = String(url || '').trim();
     return value
-      ? `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(value)}&sz=64`
+      ? `https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=${encodeURIComponent(value)}&size=64`
       : '';
   }
 

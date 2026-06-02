@@ -118,39 +118,25 @@ const runtime = sandbox.LumnoNewtabFaviconView.createFaviconViewRuntime({
   },
   chromeApi: {
     runtime: {
-      sendMessage(message, callback) {
-        if (message && message.action === 'resolveFaviconCandidates') {
-          callback({ urls: [] });
-        }
+      getURL(path) {
+        return `chrome-extension://abc${path}`;
       }
     }
   },
   getRiSvg() {
     return '';
   },
-  getGoogleFaviconUrl() {
-    return 'https://www.google.com/s2/favicons?domain=example.test&sz=128';
+  getExtensionFaviconUrl(pageUrl) {
+    return `chrome-extension://abc/_favicon/?pageUrl=${encodeURIComponent(pageUrl)}&size=128`;
   },
-  getFaviconIsUrl() {
-    return '';
+  getGstaticFaviconUrl(pageUrl) {
+    return `https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=${encodeURIComponent(pageUrl)}&size=128`;
   },
   getHostFromUrl(url) {
     return new URL(url).hostname;
   },
-  normalizeFaviconHost(host) {
-    return String(host || '').toLowerCase();
-  },
-  getFaviconPreferredTheme() {
-    return 'light';
-  },
-  getKnownThemedFaviconCandidates() {
-    return ['https://slow.example.test/favicon.svg'];
-  },
-  getRootFaviconCandidates() {
-    return ['https://example.test/favicon.ico'];
-  },
   isFaviconProxyUrl(url) {
-    return /google\.com\/s2\/favicons|favicon\.is\//i.test(String(url || ''));
+    return /_favicon\/|gstatic\.cn\/faviconV2/i.test(String(url || ''));
   },
   shouldBlockFaviconForHost() {
     return false;
@@ -158,28 +144,9 @@ const runtime = sandbox.LumnoNewtabFaviconView.createFaviconViewRuntime({
   isBlockedLocalFaviconUrl() {
     return false;
   },
-  hasThemeTokenInUrl() {
-    return false;
-  },
-  shouldSkipThemeUpgradeCandidate() {
-    return false;
-  },
-  hostHasExplicitDarkFavicon() {
-    return false;
-  },
   isChromeMonogramFaviconUrl() {
     return false;
   },
-  getPersistedFaviconEntry() {
-    return null;
-  },
-  getPersistedFaviconDataEntry() {
-    return null;
-  },
-  isHostFaviconVisitDirty() {
-    return false;
-  },
-  clearHostFaviconVisitDirty() {},
   preloadThemeFromFavicon() {},
   faviconCandidateLoadTimeoutMs: 12
 });
@@ -187,9 +154,9 @@ const runtime = sandbox.LumnoNewtabFaviconView.createFaviconViewRuntime({
 (async () => {
   const img = createFakeImage();
   runtime.attachFaviconWithFallbacks(img, 'https://example.test/page', 'example.test');
-  assert.strictEqual(img.src, 'https://slow.example.test/favicon.svg');
+  assert.strictEqual(img.src, 'chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Fexample.test%2Fpage&size=128');
   await wait(18);
-  assert.strictEqual(img.src, 'https://example.test/favicon.ico');
+  assert.strictEqual(img.src, 'https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=https%3A%2F%2Fexample.test%2Fpage&size=128');
   img._xThemeFaviconSession += 1;
   await wait(20);
   console.log('newtab favicon view timeout ok');

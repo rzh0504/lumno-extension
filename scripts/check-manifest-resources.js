@@ -43,6 +43,9 @@ function checkPath(value) {
   if (/^(https?:|chrome:|__MSG_)/.test(value)) {
     return;
   }
+  if (value === '_favicon/*') {
+    return;
+  }
   if (!fs.existsSync(value)) {
     missing.push(value);
   }

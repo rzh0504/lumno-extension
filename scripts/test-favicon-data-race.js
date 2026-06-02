@@ -109,11 +109,13 @@ const core = sandbox.LumnoFaviconViewCore.createFaviconViewCore({
 
 (async () => {
   const img = createFakeImage();
-  const proxyUrl = 'https://www.google.com/s2/favicons?domain=futurecomm.cn&sz=128';
+  const proxyUrl = 'chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Fm2.futurecomm.cn%2F&size=128';
   const realUrl = 'https://m2.futurecomm.cn/favicon.ico';
-  const proxyDataUrl = 'data:image/png;base64,ZmFrZS1nb29nbGUtZmFsbGJhY2s=';
+  const proxyDataUrl = 'data:image/png;base64,ZmFrZS1wcm94eS1mYWxsYmFjaw==';
 
   assert.strictEqual(core.setFaviconSrcWithAnimation(img, proxyUrl), true);
+  assert.strictEqual(img.getAttribute('width'), '128');
+  assert.strictEqual(img.getAttribute('height'), '128');
   core.attachFaviconData(img, proxyUrl, 'futurecomm.cn');
   assert.strictEqual(core.setFaviconSrcWithAnimation(img, realUrl), true);
   assert.strictEqual(img.src, realUrl);
