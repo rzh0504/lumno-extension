@@ -77,13 +77,18 @@ sandbox.LumnoFaviconViewCore = {
       setFallbackNodeVisible() {},
       setFaviconLoadState() {},
       applyFaviconOpticalShift() {},
-      applyFaviconOpticalAlignment() {},
+      applyFaviconOpticalAlignment(img) {
+        img.setAttribute('width', '128');
+        img.setAttribute('height', '128');
+      },
       requestFaviconData() {
         return typeof config.requestFaviconData === 'function'
           ? config.requestFaviconData.apply(null, arguments)
           : Promise.resolve(null);
       },
       setFaviconSrcWithAnimation(img, nextSrc, optionsArg) {
+        img.setAttribute('width', '128');
+        img.setAttribute('height', '128');
         const shouldDeferResolve = Boolean(optionsArg && optionsArg.deferResolve);
         const currentSrc = img.getAttribute('data-favicon-current-src') || '';
         const isFallbackVisible = img.getAttribute('data-fallback-icon') === 'true';

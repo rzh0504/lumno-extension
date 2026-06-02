@@ -6,6 +6,7 @@
   root.LumnoFaviconViewCore = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function(root) {
   function noop() {}
+  const FAVICON_INTRINSIC_SIZE = 128;
 
   function createFaviconViewCore(options) {
     const config = options || {};
@@ -50,6 +51,14 @@
       return typeof ImageCtor === 'function'
         ? new ImageCtor()
         : (doc && typeof doc.createElement === 'function' ? doc.createElement('img') : {});
+    }
+
+    function setFaviconIntrinsicSize(img) {
+      if (!img || typeof img.setAttribute !== 'function') {
+        return;
+      }
+      img.setAttribute('width', String(FAVICON_INTRINSIC_SIZE));
+      img.setAttribute('height', String(FAVICON_INTRINSIC_SIZE));
     }
 
     function buildExtensionFaviconPlaceholderProbeUrl(faviconUrl) {
@@ -209,6 +218,7 @@
       if (!img) {
         return;
       }
+      setFaviconIntrinsicSize(img);
       img.style.setProperty('object-fit', 'contain');
       img.style.setProperty('object-position', 'center center');
       applyFaviconOpticalShift(img);
@@ -261,6 +271,7 @@
       if (!img || !nextSrc || isBlockedLocalFaviconUrl(nextSrc)) {
         return false;
       }
+      setFaviconIntrinsicSize(img);
       const shouldPersist = !(optionsArg && optionsArg.persist === false);
       const shouldDeferResolve = Boolean(optionsArg && optionsArg.deferResolve);
       const sourceUrl = String((optionsArg && optionsArg.sourceUrl) || '').trim();

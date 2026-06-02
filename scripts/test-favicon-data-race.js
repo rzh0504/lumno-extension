@@ -114,6 +114,8 @@ const core = sandbox.LumnoFaviconViewCore.createFaviconViewCore({
   const proxyDataUrl = 'data:image/png;base64,ZmFrZS1wcm94eS1mYWxsYmFjaw==';
 
   assert.strictEqual(core.setFaviconSrcWithAnimation(img, proxyUrl), true);
+  assert.strictEqual(img.getAttribute('width'), '128');
+  assert.strictEqual(img.getAttribute('height'), '128');
   core.attachFaviconData(img, proxyUrl, 'futurecomm.cn');
   assert.strictEqual(core.setFaviconSrcWithAnimation(img, realUrl), true);
   assert.strictEqual(img.src, realUrl);
