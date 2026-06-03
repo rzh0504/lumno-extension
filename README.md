@@ -1,6 +1,33 @@
-# Lumno | 聚焦搜索 & 新标签页
+<p align="center">
+  <img src="./assets/images/lumno.png" alt="Lumno logo" width="96" height="96" />
+</p>
 
-语言：[简体中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)
+<h1 align="center">Lumno</h1>
+
+<p align="center">
+  聚焦搜索 & 极简新标签页
+  <br />
+  在任意网页快速搜索、直达网址、切换标签页，并增强新标签页体验。
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Manifest-MV3-111827?style=flat-square" alt="Manifest V3" />
+  <img src="https://img.shields.io/badge/Browser-Chromium-2563eb?style=flat-square" alt="Chromium" />
+  <img src="https://img.shields.io/badge/Language-JavaScript-f59e0b?style=flat-square" alt="JavaScript" />
+  <img src="https://img.shields.io/badge/License-GPL--3.0-16a34a?style=flat-square" alt="GPL-3.0" />
+</p>
+
+<p align="center">
+  <a href="README.md">简体中文</a> |
+  <a href="README.en.md">English</a> |
+  <a href="README.ja.md">日本語</a>
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/2f32b28c-2655-4ffe-9f07-678793367f10" alt="Lumno preview 1" width="100%" />
+  <br />
+  <img src="https://github.com/user-attachments/assets/0c00c851-27c2-430a-a2a6-4e98c026514e" alt="Lumno preview 2" width="100%" />
+</p>
 
 Lumno 是一个面向 Chromium 浏览器的 Manifest V3 扩展，把「聚焦搜索命令栏」和「极简新标签页」放在一起：你可以从任意网页快速搜索书签、历史、常用网站、已打开标签页、站内搜索和 AI 助手，也可以把新标签页整理成更好用的工作入口。
 
@@ -29,6 +56,10 @@ Lumno 是一个面向 Chromium 浏览器的 Manifest V3 扩展，把「聚焦搜
 浏览器可能会占用或限制扩展快捷键。请在 `chrome://extensions/shortcuts`、`edge://extensions/shortcuts` 或对应浏览器的扩展快捷键页面中修改。
 
 ## 安装使用
+
+也可以从 Chrome Web Store 安装：[Install Lumno on Chrome Web Store](https://chromewebstore.google.com/detail/nggfkkbmogmadfoikakkfegkoilfcfao?utm_source=item-share-cb)
+
+手动安装：
 
 1. 克隆或下载本仓库。
 2. 打开 `chrome://extensions/`，或在 Edge/Brave/Vivaldi/Opera 等 Chromium 浏览器中打开对应的扩展管理页。
@@ -78,6 +109,20 @@ npm run test:onboarding-content
 | `assets/data/` | 内置站内搜索和浏览器快捷入口数据 |
 | `assets/wallpapers/` | 新标签页内置壁纸与缩略图 |
 | `scripts/` | 校验、审计、打包和回归测试脚本 |
+
+## 鸣谢
+
+- 作者与维护者：[Kubai087](https://github.com/kubai087)
+- 内置图标集：[Remix Icon](https://remixicon.com/)
+- 内置字体：Open Sans
+
+## GitHub Star 变化
+
+<p align="center">
+  <a href="https://www.star-history.com/#kubai087/lumno-extension&Date">
+    <img src="https://api.star-history.com/svg?repos=kubai087/lumno-extension&type=Date" alt="Star History Chart" />
+  </a>
+</p>
 
 ## 许可证
 

@@ -1,6 +1,33 @@
-# Lumno | Command Bar & New Tab
+<p align="center">
+  <img src="./assets/images/lumno.png" alt="Lumno logo" width="96" height="96" />
+</p>
 
-Languages: [简体中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)
+<h1 align="center">Lumno</h1>
+
+<p align="center">
+  Command Bar & New Tab
+  <br />
+  Open the command bar from any page, search faster, jump to URLs, switch tabs, and upgrade the new tab experience.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Manifest-MV3-111827?style=flat-square" alt="Manifest V3" />
+  <img src="https://img.shields.io/badge/Browser-Chromium-2563eb?style=flat-square" alt="Chromium" />
+  <img src="https://img.shields.io/badge/Language-JavaScript-f59e0b?style=flat-square" alt="JavaScript" />
+  <img src="https://img.shields.io/badge/License-GPL--3.0-16a34a?style=flat-square" alt="GPL-3.0" />
+</p>
+
+<p align="center">
+  <a href="README.md">简体中文</a> |
+  <a href="README.en.md">English</a> |
+  <a href="README.ja.md">日本語</a>
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/2f32b28c-2655-4ffe-9f07-678793367f10" alt="Lumno preview 1" width="100%" />
+  <br />
+  <img src="https://github.com/user-attachments/assets/0c00c851-27c2-430a-a2a6-4e98c026514e" alt="Lumno preview 2" width="100%" />
+</p>
 
 Lumno is a Manifest V3 extension for Chromium browsers. It combines a focused browser command bar with a minimal new tab page, so you can search bookmarks, history, top sites, open tabs, site-search shortcuts, and AI assistants from one place.
 
@@ -29,6 +56,10 @@ Current version: `0.9.12`
 Browsers may reserve or limit extension shortcuts. Change them at `chrome://extensions/shortcuts`, `edge://extensions/shortcuts`, or the equivalent shortcuts page in your browser.
 
 ## Installation
+
+Install from the Chrome Web Store: [Install Lumno on Chrome Web Store](https://chromewebstore.google.com/detail/nggfkkbmogmadfoikakkfegkoilfcfao?utm_source=item-share-cb)
+
+For manual installation:
 
 1. Clone or download this repository.
 2. Open `chrome://extensions/`, or the equivalent extension management page in Edge, Brave, Vivaldi, Opera, or another Chromium browser.
@@ -78,6 +109,20 @@ npm run test:onboarding-content
 | `assets/data/` | Built-in site-search and browser shortcut data |
 | `assets/wallpapers/` | Built-in new tab wallpapers and thumbnails |
 | `scripts/` | Checks, audits, packaging, and regression tests |
+
+## Credits
+
+- Created and maintained by [Kubai087](https://github.com/kubai087)
+- Bundled icon set: [Remix Icon](https://remixicon.com/)
+- Bundled typeface: Open Sans
+
+## Star History
+
+<p align="center">
+  <a href="https://www.star-history.com/#kubai087/lumno-extension&Date">
+    <img src="https://api.star-history.com/svg?repos=kubai087/lumno-extension&type=Date" alt="Star History Chart" />
+  </a>
+</p>
 
 ## License
 
