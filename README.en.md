@@ -1,0 +1,84 @@
+# Lumno | Command Bar & New Tab
+
+Languages: [简体中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)
+
+Lumno is a Manifest V3 extension for Chromium browsers. It combines a focused browser command bar with a minimal new tab page, so you can search bookmarks, history, top sites, open tabs, site-search shortcuts, and AI assistants from one place.
+
+Current version: `0.9.12`
+
+## Highlights
+
+- Focused command bar: open an overlay on injectable pages to visit URLs, search keywords, switch open tabs, open browser internal pages, and jump into Lumno settings.
+- Smart search results: combines bookmarks, history, top sites, browser suggestions, and open tabs, with source filters, first-result priority, selection-based ranking, pinyin matching, and blacklist filtering.
+- Site search and AI search: ships with shortcuts for YouTube, Bilibili, GitHub, Google, Bing, Baidu, Zhihu, Douban, Juejin, Taobao, X, Reddit, Wikipedia, and more. AI entries include ChatGPT, Gemini, Doubao, Qianwen, Yuanbao, MiniMax, DeepSeek, and Kimi. Custom templates and aliases are supported.
+- New tab page: includes a search box, recent/most-visited site cards, bookmark grids and cascading folder menus, bookmark paging, pinned/hidden recent sites, feedback links, and adjustable content width.
+- Appearance and wallpapers: supports system/light/dark themes, global or new-tab-only theme scope, built-in wallpapers, local wallpaper import, overlay opacity, grain/halftone/ASCII filters, search-box width, and Lumno wordmark visibility.
+- Web Clip PiP: on supported HTTPS top-level pages, select part of a page and float it in a Document Picture-in-Picture window for reference and comparison.
+- Auto video Picture-in-Picture: when you switch tabs while video is playing, Lumno attempts automatic video PiP on sites such as YouTube, Bilibili, Youku, Tencent Video, Douyin, TikTok, Netflix, Vimeo, Prime Video, Disney+, and Twitch.
+- Browser enhancements: restore pinned web tabs after restart, fall back from restricted pages to the new tab page, copy the current page URL, and open extension shortcut/details pages.
+- Localization: the extension UI supports Simplified Chinese, Traditional Chinese, English, Japanese, and browser-language mode. This README supports Simplified Chinese, English, and Japanese switching.
+
+## Shortcuts
+
+| Action | Default shortcut |
+| --- | --- |
+| Open the command bar | `Cmd+Shift+K` / `Ctrl+Shift+K` |
+| Open the command bar with the current page URL | `Cmd+Shift+L` / `Ctrl+Shift+L` |
+| Copy the current page URL | `Cmd+Shift+C` / `Ctrl+Shift+C` |
+
+Browsers may reserve or limit extension shortcuts. Change them at `chrome://extensions/shortcuts`, `edge://extensions/shortcuts`, or the equivalent shortcuts page in your browser.
+
+## Installation
+
+1. Clone or download this repository.
+2. Open `chrome://extensions/`, or the equivalent extension management page in Edge, Brave, Vivaldi, Opera, or another Chromium browser.
+3. Enable Developer mode.
+4. Choose "Load unpacked" and select the repository root.
+5. Optional: open Lumno settings to configure language, theme, new tab content, site search, blacklist rules, PiP, and shortcut behavior.
+
+To use the command bar on local HTML, PDF, or `file://` pages, enable "Allow access to file URLs" on the extension details page.
+
+## Development
+
+The project currently has no frontend build step. Browser extension source files are loaded directly, and Node scripts handle syntax checks, resource checks, audits, packaging, and regression tests.
+
+```bash
+npm run check
+npm run audit:i18n
+npm run audit:style
+npm run package:store
+```
+
+Common targeted tests:
+
+```bash
+npm run test:settings
+npm run test:search
+npm run test:site-search-store
+npm run test:message-router
+npm run test:newtab-layout
+npm run test:onboarding-content
+```
+
+`npm run package:store` reads the version from `manifest.json` and creates `dist/lumno-store-v<version>.zip`. It requires `zip` and `zipinfo` to be available on the system.
+
+## Project Structure
+
+| Path | Purpose |
+| --- | --- |
+| `manifest.json` | Manifest V3 configuration, permissions, commands, content scripts, and new tab override |
+| `src/background/` | Service worker, command routing, search data, site/AI search, PiP ownership, pinned-tab recovery |
+| `src/newtab/` | New tab UI, search, recent sites, bookmarks, wallpapers, feedback, and page notices |
+| `src/overlay/` | In-page command bar overlay, suggestion list, theme/language sync, and site fixes |
+| `src/content/` | Page hotkey listener, Web Clip PiP, and auto video PiP |
+| `src/options/` | Extension settings page |
+| `src/onboarding/` | Install and update onboarding |
+| `src/shared/` | Shared settings, search, favicon, menu, tooltip, and URL guard modules |
+| `_locales/` | Extension UI copy |
+| `assets/data/` | Built-in site-search and browser shortcut data |
+| `assets/wallpapers/` | Built-in new tab wallpapers and thumbnails |
+| `scripts/` | Checks, audits, packaging, and regression tests |
+
+## License
+
+This project is licensed under [GPL-3.0](LICENSE).

@@ -4460,6 +4460,18 @@
   }
 
   const FAVICON_PROXY_SIZE = 128;
+  let pageFaviconUrlResolver = null;
+
+  function getPageFaviconUrlResolver() {
+    if (!pageFaviconUrlResolver && typeof FAVICON_UTILS.createFaviconUrlResolver === 'function') {
+      pageFaviconUrlResolver = FAVICON_UTILS.createFaviconUrlResolver({
+        chromeApi: chrome,
+        size: FAVICON_PROXY_SIZE,
+        shouldBlockFaviconForHost
+      });
+    }
+    return pageFaviconUrlResolver;
+  }
 
   function getThemeSourceForSuggestion(suggestion) {
     if (suggestion && suggestion.provider) {
@@ -6117,60 +6129,28 @@
   }
 
   function getExtensionFaviconUrl(pageUrl) {
-    const canonicalPageUrl = getCanonicalPageUrlForFavicon(pageUrl);
-    if (!canonicalPageUrl || !/^https?:\/\//i.test(canonicalPageUrl)) {
-      return '';
-    }
-    return typeof FAVICON_UTILS.getExtensionFaviconUrl === 'function'
-      ? FAVICON_UTILS.getExtensionFaviconUrl(canonicalPageUrl, {
-        getRuntimeUrl: chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function'
-          ? chrome.runtime.getURL.bind(chrome.runtime)
-          : null,
-        size: FAVICON_PROXY_SIZE
-      })
-      : '';
+    const resolver = getPageFaviconUrlResolver();
+    return resolver ? resolver.getExtensionFaviconUrl(pageUrl) : '';
   }
 
   function getGstaticFaviconUrl(pageUrl) {
-    const canonicalPageUrl = getCanonicalPageUrlForFavicon(pageUrl);
-    if (!canonicalPageUrl || !/^https?:\/\//i.test(canonicalPageUrl)) {
-      return '';
-    }
-    return typeof FAVICON_UTILS.getGstaticFaviconUrl === 'function'
-      ? FAVICON_UTILS.getGstaticFaviconUrl(canonicalPageUrl, { size: FAVICON_PROXY_SIZE })
-      : '';
+    const resolver = getPageFaviconUrlResolver();
+    return resolver ? resolver.getGstaticFaviconUrl(pageUrl) : '';
   }
 
   function getChromeFaviconUrl(pageUrl) {
-    const canonicalPageUrl = getCanonicalPageUrlForFavicon(pageUrl) || String(pageUrl || '').trim();
-    if (!canonicalPageUrl) {
-      return '';
-    }
-    return typeof FAVICON_UTILS.getChromeFaviconUrl === 'function'
-      ? FAVICON_UTILS.getChromeFaviconUrl(canonicalPageUrl, { size: FAVICON_PROXY_SIZE })
-      : '';
+    const resolver = getPageFaviconUrlResolver();
+    return resolver ? resolver.getChromeFaviconUrl(pageUrl) : '';
   }
 
   function getBrowserPageFaviconUrl(pageUrl) {
-    return typeof FAVICON_UTILS.getBrowserPageFaviconUrl === 'function'
-      ? FAVICON_UTILS.getBrowserPageFaviconUrl(pageUrl, {
-        getRuntimeUrl: chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function'
-          ? chrome.runtime.getURL.bind(chrome.runtime)
-          : null,
-        size: FAVICON_PROXY_SIZE
-      })
-      : '';
+    const resolver = getPageFaviconUrlResolver();
+    return resolver ? resolver.getBrowserPageFaviconUrl(pageUrl) : '';
   }
 
   function getPageFaviconCandidateUrl(pageUrl) {
-    const page = String(pageUrl || '').trim();
-    if (!page) {
-      return '';
-    }
-    if (/^https?:\/\//i.test(page)) {
-      return getExtensionFaviconUrl(page) || getChromeFaviconUrl(page) || getGstaticFaviconUrl(page);
-    }
-    return getChromeFaviconUrl(page);
+    const resolver = getPageFaviconUrlResolver();
+    return resolver ? resolver.getPageFaviconCandidateUrl(pageUrl) : '';
   }
 
   function getHostFaviconUrl(hostname) {

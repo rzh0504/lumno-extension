@@ -99,6 +99,10 @@ sandbox.LumnoFaviconViewCore = {
   }
 };
 
+vm.runInNewContext(fs.readFileSync('src/shared/favicon-utils.js', 'utf8'), sandbox, {
+  filename: 'src/shared/favicon-utils.js'
+});
+
 vm.runInNewContext(fs.readFileSync('src/newtab/favicon-view.js', 'utf8'), sandbox, {
   filename: 'src/newtab/favicon-view.js'
 });

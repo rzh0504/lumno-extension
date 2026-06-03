@@ -1,0 +1,84 @@
+# Lumno | コマンドバー & 新しいタブ
+
+言語：[简体中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)
+
+Lumno は Chromium ブラウザ向けの Manifest V3 拡張機能です。集中して使えるブラウザコマンドバーとミニマルな新しいタブを組み合わせ、ブックマーク、履歴、よく使うサイト、開いているタブ、サイト内検索、AI アシスタントをひとつの入口から探せます。
+
+現在のバージョン：`0.9.12`
+
+## 主な機能
+
+- 集中コマンドバー：注入可能なページ上でオーバーレイ検索を開き、URL への移動、キーワード検索、開いているタブへの切り替え、ブラウザ内部ページや Lumno 設定への移動ができます。
+- スマート検索結果：ブックマーク、履歴、よく使うサイト、ブラウザ候補、開いているタブを統合し、結果ソースの絞り込み、先頭結果の優先度、選択履歴によるランキング、ピンイン検索、ブラックリスト除外に対応します。
+- サイト内検索 / AI 検索：YouTube、Bilibili、GitHub、Google、Bing、Baidu、Zhihu、Douban、Juejin、Taobao、X、Reddit、Wikipedia などのショートカットを内蔵。AI 入口として ChatGPT、Gemini、豆包、千問、元宝、MiniMax、DeepSeek、Kimi も利用できます。カスタムテンプレートと別名も追加できます。
+- 新しいタブ：検索ボックス、最近/よく使うサイトカード、ブックマークのグリッドとフォルダ階層メニュー、ブックマークページング、最近サイトの固定/非表示、フィードバック入口、コンテンツ幅の調整を備えています。
+- 外観と壁紙：システム/ライト/ダークテーマ、全体または新しいタブのみのテーマ適用、内蔵壁紙、ローカル壁紙、オーバーレイ透明度、粒子/ハーフトーン/ASCII フィルター、検索ボックス幅、Lumno ロゴ表示の切り替えに対応します。
+- Web Clip PiP：対応している HTTPS のトップレベルページでページの一部を選択し、Document Picture-in-Picture ウィンドウとして浮かせて参照や比較に使えます。
+- 動画の自動画中画：動画再生中に別タブへ移動したとき、YouTube、Bilibili、Youku、Tencent Video、Douyin、TikTok、Netflix、Vimeo、Prime Video、Disney+、Twitch などで自動的に動画 PiP へ入ることを試みます。
+- ブラウザ補助：再起動後の固定タブ復元、制限ページから新しいタブへのフォールバック、現在ページ URL のコピー、拡張機能ショートカット/詳細ページのオープンに対応します。
+- 多言語：拡張 UI は簡体字中国語、繁体字中国語、英語、日本語、ブラウザ言語への追従に対応します。この README は簡体字中国語、英語、日本語で切り替えできます。
+
+## ショートカット
+
+| 操作 | 既定のショートカット |
+| --- | --- |
+| コマンドバーを開く | `Cmd+Shift+K` / `Ctrl+Shift+K` |
+| 現在ページの URL を入れてコマンドバーを開く | `Cmd+Shift+L` / `Ctrl+Shift+L` |
+| 現在ページの URL をコピー | `Cmd+Shift+C` / `Ctrl+Shift+C` |
+
+ブラウザによっては拡張機能のショートカットが予約または制限される場合があります。`chrome://extensions/shortcuts`、`edge://extensions/shortcuts`、または利用中ブラウザのショートカット設定ページで変更してください。
+
+## インストール
+
+1. このリポジトリを clone またはダウンロードします。
+2. `chrome://extensions/`、または Edge、Brave、Vivaldi、Opera など Chromium ブラウザの拡張機能管理ページを開きます。
+3. デベロッパーモードを有効にします。
+4. 「パッケージ化されていない拡張機能を読み込む」を選び、リポジトリのルートディレクトリを指定します。
+5. 必要に応じて Lumno の設定ページを開き、言語、テーマ、新しいタブの内容、サイト内検索、ブラックリスト、PiP、ショートカット動作を調整します。
+
+ローカル HTML、PDF、`file://` ページでコマンドバーを使う場合は、拡張機能の詳細ページで「ファイルの URL へのアクセスを許可する」を有効にしてください。
+
+## 開発
+
+このプロジェクトには現在フロントエンドのビルド手順はありません。拡張機能のソースはブラウザに直接読み込まれ、構文チェック、リソース検証、監査、パッケージング、回帰テストは Node スクリプトで行います。
+
+```bash
+npm run check
+npm run audit:i18n
+npm run audit:style
+npm run package:store
+```
+
+よく使う個別テスト：
+
+```bash
+npm run test:settings
+npm run test:search
+npm run test:site-search-store
+npm run test:message-router
+npm run test:newtab-layout
+npm run test:onboarding-content
+```
+
+`npm run package:store` は `manifest.json` のバージョンを読み取り、`dist/lumno-store-v<version>.zip` を生成します。このコマンドにはシステム上の `zip` と `zipinfo` が必要です。
+
+## ディレクトリ構成
+
+| パス | 役割 |
+| --- | --- |
+| `manifest.json` | Manifest V3 設定、権限、コマンド、コンテンツスクリプト、新しいタブの上書き |
+| `src/background/` | Service worker、コマンドルーティング、検索データ、サイト/AI 検索、PiP 所有権、固定タブ復元 |
+| `src/newtab/` | 新しいタブ UI、検索、最近サイト、ブックマーク、壁紙、フィードバック、ページ通知 |
+| `src/overlay/` | ページ内コマンドバー、候補リスト、テーマ/言語同期、サイト別補正 |
+| `src/content/` | ページショートカット監視、Web Clip PiP、動画の自動 PiP |
+| `src/options/` | 拡張機能の設定ページ |
+| `src/onboarding/` | インストール/アップデート時のオンボーディング |
+| `src/shared/` | 設定、検索、favicon、メニュー、ツールチップ、URL ガードなどの共通モジュール |
+| `_locales/` | 拡張 UI 文言 |
+| `assets/data/` | 内蔵サイト内検索とブラウザショートカットのデータ |
+| `assets/wallpapers/` | 新しいタブの内蔵壁紙とサムネイル |
+| `scripts/` | チェック、監査、パッケージング、回帰テスト |
+
+## ライセンス
+
+このプロジェクトは [GPL-3.0](LICENSE) ライセンスで公開されています。

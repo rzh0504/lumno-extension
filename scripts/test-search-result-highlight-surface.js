@@ -23,7 +23,15 @@ const newtabActiveSuggestionBlock = getCssRuleBlock(
 );
 const overlaySuggestionBlock = getCssRuleBlock(
   overlayCss,
-  '#_x_extension_overlay_2024_unique_ .x-ov-suggestion-item'
+  ':is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-item'
+);
+const overlayDarkActiveFaviconBlock = getCssRuleBlock(
+  overlayCss,
+  ':is(#_x_extension_overlay_2024_unique_[data-theme="dark"], #_x_extension_onboarding_overlay_demo_2026_unique_[data-theme="dark"]) .x-ov-suggestion-item[data-row-state="active"] .x-ov-suggestion-icon-slot[data-favicon="true"]'
+);
+const newtabDarkActiveFaviconBlock = getCssRuleBlock(
+  newtabHtml,
+  'body[data-theme="dark"] .x-nt-suggestion-item[data-row-state="active"] .x-nt-suggestion-icon-slot[data-favicon="true"]'
 );
 
 assert.match(
@@ -63,6 +71,18 @@ assert.match(
 );
 
 assert.match(
+  overlayDarkActiveFaviconBlock,
+  /background-color:\s*#FFFFFF;/,
+  'overlay dark active favicon slots should render on a white rounded rectangle'
+);
+
+assert.match(
+  newtabDarkActiveFaviconBlock,
+  /background-color:\s*#FFFFFF;/,
+  'newtab dark active favicon slots should render on a white rounded rectangle'
+);
+
+assert.match(
   overlayJs,
   /function setSuggestionRowColors\(item,\s*bg,\s*border\)[\s\S]*?--x-ov-suggestion-row-bg[\s\S]*?--x-ov-suggestion-row-border/,
   'overlay row color helper should only control background and border'
@@ -72,6 +92,24 @@ assert.match(
   overlayJs,
   /function applySearchSuggestionHighlight\(item,\s*theme\)[\s\S]*?setSuggestionRowColors\(item,\s*highlight\.bg,\s*highlight\.border\);/,
   'overlay active suggestions should not apply an extra shadow'
+);
+
+assert.match(
+  overlayJs,
+  /function applySearchSuggestionHighlight\(item,\s*theme\)[\s\S]*?item\.setAttribute\('data-row-state',\s*'active'\);/,
+  'overlay active suggestions should expose row state for dark favicon styling'
+);
+
+assert.match(
+  overlayJs,
+  /function resetSearchSuggestion\(item\)[\s\S]*?item\.removeAttribute\('data-row-state'\);/,
+  'overlay inactive suggestions should clear row state for dark favicon styling'
+);
+
+assert.match(
+  overlayJs,
+  /iconSlot\.setAttribute\('data-favicon',\s*isFaviconIcon \? 'true' : 'false'\);/,
+  'overlay favicon slots should expose whether their child is a favicon'
 );
 
 assert.doesNotMatch(

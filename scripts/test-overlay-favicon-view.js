@@ -110,6 +110,9 @@ function createRuntime(options) {
       };
     }
   };
+  vm.runInNewContext(fs.readFileSync(path.join(repoRoot, 'src/shared/favicon-utils.js'), 'utf8'), sandbox, {
+    filename: 'src/shared/favicon-utils.js'
+  });
   vm.runInNewContext(fs.readFileSync(path.join(repoRoot, 'src/overlay/favicon-view.js'), 'utf8'), sandbox, {
     filename: 'src/overlay/favicon-view.js'
   });
@@ -245,23 +248,23 @@ function testOverlayRendererUsesExtensionFaviconProxyForBrowserPages() {
   const overlayJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/search-panel.js'), 'utf8');
   assert.match(
     overlayJs,
-    /function isBrowserInternalPageUrl\(url\)[\s\S]*?chrome:\/\/[\s\S]*?about:/,
-    'overlay renderer should identify browser-internal page URLs'
+    /function getOverlayFaviconUrlResolver\(\)[\s\S]*?FAVICON_UTILS\.createFaviconUrlResolver[\s\S]*?shouldBlockFaviconForHost: shouldBlockOverlayFaviconForHost/,
+    'overlay renderer should use the shared favicon URL resolver with overlay blocking rules'
   );
   assert.match(
     overlayJs,
-    /function isBlockedOverlayFaviconPageUrl\(url\)[\s\S]*?isBrowserInternalPageUrl\(raw\)[\s\S]*?return false;/,
-    'overlay renderer should not block _favicon URLs whose pageUrl is a browser-internal page'
+    /function isBrowserInternalPageUrl\(url\)[\s\S]*?resolver\.isBrowserInternalPageUrl\(url\)/,
+    'overlay renderer should share browser-internal page URL detection'
   );
   assert.match(
     overlayJs,
-    /function getBrowserPageFaviconUrl\(pageUrl\)[\s\S]*?FAVICON_UTILS\.getBrowserPageFaviconUrl[\s\S]*?getRuntimeUrl:/,
-    'overlay renderer should build the same extension _favicon proxy URL used by newtab browser-page cards'
+    /function isBlockedOverlayFaviconUrl\(url\)[\s\S]*?resolver\.isBlockedFaviconUrl\(url\)/,
+    'overlay renderer should share nested favicon URL blocking rules'
   );
   assert.match(
     overlayJs,
-    /if \(isBrowserInternalPageUrl\(page\)\) \{[\s\S]*?return getBrowserPageFaviconUrl\(page\) \|\| getChromeFaviconUrl\(page\);/,
-    'browser-page favicon candidates should prefer the extension _favicon proxy before chrome://favicon2'
+    /function getPageFaviconCandidateUrl\(pageUrl\)[\s\S]*?resolver\.getPageFaviconCandidateUrl\(pageUrl\)/,
+    'browser-page favicon candidates should come from the shared resolver'
   );
 }
 

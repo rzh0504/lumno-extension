@@ -2820,12 +2820,24 @@ migrateStorageIfNeeded([
   SEARCH_BLACKLIST_STORAGE_KEY
 ]);
 const FAVICON_PROXY_SIZE = 128;
+let backgroundFaviconUrlResolver = null;
 const faviconDataCache = new Map();
 const faviconPending = new Map();
 const titlePinyinCache = new Map();
 const siteThemeColorCache = new Map();
 const siteThemeColorPending = new Map();
 const blockedLocalFaviconLogCache = new Set();
+
+function getBackgroundFaviconUrlResolver() {
+  if (!backgroundFaviconUrlResolver && typeof FAVICON_UTILS.createFaviconUrlResolver === 'function') {
+    backgroundFaviconUrlResolver = FAVICON_UTILS.createFaviconUrlResolver({
+      chromeApi: chrome,
+      size: FAVICON_PROXY_SIZE,
+      shouldBlockFaviconForHost
+    });
+  }
+  return backgroundFaviconUrlResolver;
+}
 
 function logBlockedLocalFavicon(url, source) {
   const key = `${source || 'unknown'}::${String(url || '')}`;
@@ -2927,62 +2939,23 @@ function arrayBufferToBase64(buffer) {
 }
 
 function getExtensionFaviconUrl(pageUrl) {
-  if (!pageUrl || !/^https?:\/\//i.test(pageUrl)) {
-    return '';
-  }
-  return typeof FAVICON_UTILS.getExtensionFaviconUrl === 'function'
-    ? FAVICON_UTILS.getExtensionFaviconUrl(pageUrl, {
-      getRuntimeUrl: chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function'
-        ? chrome.runtime.getURL.bind(chrome.runtime)
-        : null,
-      size: FAVICON_PROXY_SIZE
-    })
-    : '';
+  const resolver = getBackgroundFaviconUrlResolver();
+  return resolver ? resolver.getExtensionFaviconUrl(pageUrl) : '';
 }
 
 function isBrowserInternalPageUrl(url) {
-  if (typeof FAVICON_UTILS.isBrowserInternalPageUrl === 'function') {
-    return FAVICON_UTILS.isBrowserInternalPageUrl(url);
-  }
-  const lower = String(url || '').trim().toLowerCase();
-  return lower.startsWith('chrome://') ||
-    lower.startsWith('edge://') ||
-    lower.startsWith('brave://') ||
-    lower.startsWith('vivaldi://') ||
-    lower.startsWith('opera://') ||
-    lower.startsWith('about:');
-}
-
-function getBrowserPageFaviconUrl(pageUrl) {
-  const page = String(pageUrl || '').trim();
-  if (!isBrowserInternalPageUrl(page)) {
-    return '';
-  }
-  if (typeof FAVICON_UTILS.getBrowserPageFaviconUrl === 'function') {
-    return FAVICON_UTILS.getBrowserPageFaviconUrl(page, {
-      getRuntimeUrl: chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function'
-        ? chrome.runtime.getURL.bind(chrome.runtime)
-        : null,
-      size: FAVICON_PROXY_SIZE
-    });
-  }
-  try {
-    const faviconUrl = new URL('chrome://favicon2/');
-    faviconUrl.searchParams.set('pageUrl', page);
-    faviconUrl.searchParams.set('size', String(FAVICON_PROXY_SIZE));
-    return faviconUrl.toString();
-  } catch (e) {
-    return '';
-  }
+  const resolver = getBackgroundFaviconUrlResolver();
+  return resolver ? resolver.isBrowserInternalPageUrl(url) : false;
 }
 
 function getGstaticFaviconUrl(pageUrl) {
-  if (!pageUrl || !/^https?:\/\//i.test(pageUrl)) {
-    return '';
-  }
-  return typeof FAVICON_UTILS.getGstaticFaviconUrl === 'function'
-    ? FAVICON_UTILS.getGstaticFaviconUrl(pageUrl, { size: FAVICON_PROXY_SIZE })
-    : '';
+  const resolver = getBackgroundFaviconUrlResolver();
+  return resolver ? resolver.getGstaticFaviconUrl(pageUrl) : '';
+}
+
+function getPageFaviconCandidateUrl(pageUrl) {
+  const resolver = getBackgroundFaviconUrlResolver();
+  return resolver ? resolver.getPageFaviconCandidateUrl(pageUrl) : '';
 }
 
 function getHostFaviconUrl(hostname) {
@@ -4831,14 +4804,14 @@ async function getSearchSuggestions(query) {
         return getOwnExtensionFaviconUrl();
       }
       if (isBrowserInternalPageUrl(url)) {
-        return getBrowserPageFaviconUrl(url);
+        return getPageFaviconCandidateUrl(url);
       }
       try {
         const urlObj = new URL(url);
         const host = normalizeHost(urlObj.hostname);
         return shouldBlockFaviconForHost(host)
           ? ''
-          : (getExtensionFaviconUrl(urlObj.href) || getGstaticFaviconUrl(urlObj.href));
+          : getPageFaviconCandidateUrl(urlObj.href);
       } catch (e) {
         const fallbackHost = extractHostFromInput(url);
         return shouldBlockFaviconForHost(fallbackHost) ? '' : getHostFaviconUrl(fallbackHost);

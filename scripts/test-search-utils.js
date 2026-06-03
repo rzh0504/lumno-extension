@@ -136,6 +136,90 @@ const promoted = search.promoteStrongNavigationMatch(navList, 'example');
 assert.strictEqual(promoted.title, 'Example Home', 'strong navigation promotion should choose representative pages');
 assert.strictEqual(navList[0].title, 'Example Home', 'strong navigation promotion should mutate the list consistently');
 
+function testDirectNavigationUrl(input) {
+  const raw = String(input || '').trim();
+  if (!raw || /\s/.test(raw) || !raw.includes('.')) {
+    return '';
+  }
+  return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+}
+
+const complexUrlInput = 'apps.apple.com/cn/app/%E6%97%A5%E8%BF%99%E9%94%81%E5%B1%8F';
+const unrelatedOpenTabSuggestion = {
+  type: 'history',
+  title: '(1) App Store / X',
+  url: 'https://x.com/i/bookmarks/2057032873014652963',
+  _xMatchedTabId: 42
+};
+const directComplexUrlSuggestion = {
+  type: 'directUrl',
+  title: `打开 https://${complexUrlInput}`,
+  url: `https://${complexUrlInput}`
+};
+assert.strictEqual(
+  search.isDirectNavigationMatch(unrelatedOpenTabSuggestion, complexUrlInput, {
+    getDirectNavigationUrl: testDirectNavigationUrl
+  }),
+  false,
+  'unrelated open tabs should not be treated as matches for a complex URL input'
+);
+assert.strictEqual(
+  search.isDirectNavigationMatch(directComplexUrlSuggestion, complexUrlInput, {
+    getDirectNavigationUrl: testDirectNavigationUrl
+  }),
+  true,
+  'the direct open-url suggestion should be treated as the URL navigation match'
+);
+const complexNavigationList = [unrelatedOpenTabSuggestion, directComplexUrlSuggestion];
+const complexPromoted = search.promoteStrongNavigationMatch(complexNavigationList, complexUrlInput, {
+  getDirectNavigationUrl: testDirectNavigationUrl,
+  getUrlDisplay: search.getDefaultNavigationUrlDisplay
+});
+assert.strictEqual(
+  complexPromoted.url,
+  directComplexUrlSuggestion.url,
+  'complex URL navigation promotion should choose the direct open-url suggestion over unrelated open tabs'
+);
+assert.deepStrictEqual(
+  search.findSearchOpenTabMatchIndex([
+    directComplexUrlSuggestion,
+    unrelatedOpenTabSuggestion
+  ], {
+    rawQuery: complexUrlInput,
+    primaryHighlightIndex: 0,
+    openTabQuickSwitchEnabled: true,
+    getDirectNavigationUrl: testDirectNavigationUrl
+  }),
+  { index: -1, reason: '' },
+  'open-tab promotion should not override a direct URL primary with an unrelated open tab'
+);
+assert.deepStrictEqual(
+  search.findSearchOpenTabMatchIndex([
+    { ...directComplexUrlSuggestion, _xMatchedTabId: 99 },
+    unrelatedOpenTabSuggestion
+  ], {
+    rawQuery: complexUrlInput,
+    primaryHighlightIndex: 0,
+    openTabQuickSwitchEnabled: true,
+    getDirectNavigationUrl: testDirectNavigationUrl
+  }),
+  { index: 0, reason: 'openTab' },
+  'open-tab promotion should still recognize an already-open exact URL navigation match'
+);
+assert.deepStrictEqual(
+  search.findSearchOpenTabMatchIndex([
+    { type: 'newtab', title: 'Search', url: 'https://search.example.com/?q=github' },
+    unrelatedOpenTabSuggestion
+  ], {
+    rawQuery: 'github',
+    primaryHighlightIndex: -1,
+    openTabQuickSwitchEnabled: true,
+    getDirectNavigationUrl: testDirectNavigationUrl
+  }),
+  { index: 1, reason: 'openTab' },
+  'open-tab promotion should continue to work for non-URL queries'
+);
+
 const xRootSuggestion = search.createSearchSuggestion({
   title: '(1) نوف | Nouf (@Nouf0633) / X',
   url: 'https://x.com/'

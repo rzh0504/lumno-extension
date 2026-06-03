@@ -57,6 +57,47 @@ assert.strictEqual(
   'chrome://favicon2/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128'
 );
 assert.strictEqual(utils.getBrowserPageFaviconUrl('https://example.com/'), '');
+assert.strictEqual(typeof utils.createFaviconUrlResolver, 'function');
+const resolver = utils.createFaviconUrlResolver({
+  getRuntimeUrl: (path) => `chrome-extension://abc${path}`,
+  shouldBlockFaviconForHost: (host) => ['extensions', '127.0.0.1'].includes(String(host || '').toLowerCase())
+});
+assert.strictEqual(
+  resolver.getExtensionFaviconUrl('https://example.com/docs'),
+  'chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Fexample.com%2Fdocs&size=128'
+);
+assert.strictEqual(
+  resolver.getPageFaviconCandidateUrl('https://example.com/docs'),
+  'chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Fexample.com%2Fdocs&size=128',
+  'HTTP pages should prefer the extension _favicon candidate'
+);
+assert.strictEqual(
+  resolver.getPageFaviconCandidateUrl('chrome://extensions/'),
+  'chrome-extension://abc/_favicon/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128',
+  'browser-internal pages should use the browser-page _favicon candidate'
+);
+assert.strictEqual(
+  resolver.isBlockedFaviconUrl('chrome-extension://abc/_favicon/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128'),
+  false,
+  'browser-internal favicon candidates must not be blocked by the synthetic host name'
+);
+assert.strictEqual(
+  resolver.getSafeFaviconCandidateUrl('chrome-extension://abc/_favicon/?pageUrl=http%3A%2F%2F127.0.0.1%2F&size=128'),
+  '',
+  'local HTTP favicon candidates should still be blocked when the caller blocks their host'
+);
+const plan = resolver.buildFaviconCandidatePlan({
+  primaryUrl: 'chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Fexample.com%2Fdocs&size=128',
+  browserUrl: 'chrome://favicon2/?pageUrl=https%3A%2F%2Fexample.com%2Fdocs&size=128',
+  pageUrl: 'https://example.com/docs'
+});
+assert.strictEqual(
+  plan.map((candidate) => candidate.kind).join(','),
+  'primary,browser,gstatic',
+  'candidate plans should dedupe extension primary URL before browser/gstatic fallbacks'
+);
+assert.strictEqual(resolver.getFaviconProxyCheckKind(plan[0]), 'extension');
+assert.strictEqual(resolver.getFaviconProxyCheckKind(plan[2]), 'gstatic');
 assert.strictEqual(utils.getChromeFaviconUrl(''), '');
 assert.strictEqual(
   utils.getPageUrlFromFaviconProxyUrl('https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=https%3A%2F%2Fwww.lovart.ai%2Fhome&size=128'),

@@ -1740,6 +1740,69 @@
     }
   }
 
+  function getDirectNavigationUrlForQuery(rawQuery, options) {
+    const settings = options && typeof options === 'object' ? options : {};
+    if (typeof settings.getDirectNavigationUrl !== 'function') {
+      return '';
+    }
+    return String(settings.getDirectNavigationUrl(rawQuery) || '').trim();
+  }
+
+  function isDirectNavigationMatch(suggestion, rawQuery, options) {
+    if (!suggestion || !suggestion.url) {
+      return false;
+    }
+    const settings = options && typeof options === 'object' ? options : {};
+    const directUrl = String(settings.directNavigationUrl || getDirectNavigationUrlForQuery(rawQuery, settings) || '').trim();
+    if (!directUrl) {
+      return false;
+    }
+    return buildComparableNavigationUrl(suggestion.url) === buildComparableNavigationUrl(directUrl);
+  }
+
+  function findSearchOpenTabMatchIndex(list, options) {
+    const suggestions = Array.isArray(list) ? list : [];
+    const settings = options && typeof options === 'object' ? options : {};
+    const rawQuery = String(settings.rawQuery || settings.query || '').trim();
+    const primaryHighlightIndex = Number.isInteger(settings.primaryHighlightIndex)
+      ? settings.primaryHighlightIndex
+      : -1;
+    const directNavigationPrimaryIndex = primaryHighlightIndex >= 0 ? primaryHighlightIndex : 0;
+    const hasDirectNavigationPrimary = Boolean(
+      suggestions[directNavigationPrimaryIndex] &&
+      isDirectNavigationMatch(suggestions[directNavigationPrimaryIndex], rawQuery, settings)
+    );
+    const matchesPrimaryNavigationIntent = (suggestion) => (
+      !hasDirectNavigationPrimary ||
+      isDirectNavigationMatch(suggestion, rawQuery, settings)
+    );
+    const isEligibleOpenTab = (suggestion) => Boolean(
+      suggestion &&
+      suggestion.type !== 'newtab' &&
+      typeof suggestion._xMatchedTabId === 'number' &&
+      matchesPrimaryNavigationIntent(suggestion)
+    );
+
+    if (settings.prioritizeCurrentPageMatch && typeof settings.currentTabId === 'number') {
+      const currentIndex = suggestions.findIndex((suggestion) => (
+        isEligibleOpenTab(suggestion) &&
+        suggestion._xMatchedTabId === settings.currentTabId
+      ));
+      if (currentIndex >= 0) {
+        return { index: currentIndex, reason: 'currentOpenTab' };
+      }
+    }
+
+    if (settings.openTabQuickSwitchEnabled) {
+      const openTabIndex = suggestions.findIndex(isEligibleOpenTab);
+      if (openTabIndex >= 0) {
+        return { index: openTabIndex, reason: 'openTab' };
+      }
+    }
+
+    return { index: -1, reason: '' };
+  }
+
   function getNavigationSuggestionPathDepth(url) {
     try {
       return new URL(String(url || '').trim()).pathname.split('/').filter(Boolean).length;
@@ -1768,25 +1831,25 @@
     }
 
     const queryLower = query.toLowerCase();
-    const directUrl = typeof settings.getDirectNavigationUrl === 'function'
-      ? settings.getDirectNavigationUrl(query)
-      : '';
+    const directUrl = getDirectNavigationUrlForQuery(query, settings);
     const getUrlDisplay = typeof settings.getUrlDisplay === 'function'
       ? settings.getUrlDisplay
       : getDefaultNavigationUrlDisplay;
-    const suggestionUrlKey = buildComparableNavigationUrl(suggestion.url);
     const suggestionUrlText = (getUrlDisplay(suggestion.url) || '').toLowerCase();
     const titleLower = String(suggestion.title || '').toLowerCase();
 
     if (directUrl) {
-      const directUrlKey = buildComparableNavigationUrl(directUrl);
-      if (suggestion.type !== 'directUrl' && suggestionUrlKey === directUrlKey) {
+      const isDirectMatch = isDirectNavigationMatch(suggestion, query, {
+        ...settings,
+        directNavigationUrl: directUrl
+      });
+      if (suggestion.type !== 'directUrl' && isDirectMatch) {
         return 520;
       }
       if (suggestionUrlText && suggestionUrlText === queryLower) {
         return suggestion.type === 'directUrl' ? 420 : 480;
       }
-      if (suggestion.type === 'directUrl' && suggestionUrlKey === directUrlKey) {
+      if (suggestion.type === 'directUrl' && isDirectMatch) {
         return 400;
       }
       if (suggestionUrlText && suggestionUrlText.startsWith(queryLower)) {
@@ -2351,6 +2414,8 @@
     getSearchTermCoverageStats,
     getStrongNavigationMatchScore,
     getDefaultSiteSearchProviders,
+    findSearchOpenTabMatchIndex,
+    isDirectNavigationMatch,
     getInlineSiteSearchCandidate,
     getSearchSuggestionHost,
     getSiteSearchProviderDisplayNameMessage,

@@ -15,14 +15,14 @@ function getFunctionBlock(source, startNeedle, endNeedle) {
 
 assert.match(
   backgroundJs,
-  /function isBrowserInternalPageUrl\(url\)[\s\S]*?FAVICON_UTILS\.isBrowserInternalPageUrl/,
-  'background search suggestions should share browser-internal URL detection with favicon utils'
+  /function getBackgroundFaviconUrlResolver\(\)[\s\S]*?FAVICON_UTILS\.createFaviconUrlResolver[\s\S]*?shouldBlockFaviconForHost/,
+  'background search suggestions should use the shared favicon URL resolver'
 );
 
 assert.match(
   backgroundJs,
-  /function getBrowserPageFaviconUrl\(pageUrl\)[\s\S]*?FAVICON_UTILS\.getBrowserPageFaviconUrl[\s\S]*?getRuntimeUrl:[\s\S]*?FAVICON_PROXY_SIZE/,
-  'background search suggestions should build favicon2-compatible browser page favicons'
+  /function isBrowserInternalPageUrl\(url\)[\s\S]*?resolver\.isBrowserInternalPageUrl\(url\)/,
+  'background search suggestions should share browser-internal URL detection'
 );
 
 const suggestionFaviconBlock = getFunctionBlock(
@@ -33,7 +33,7 @@ const suggestionFaviconBlock = getFunctionBlock(
 
 assert.match(
   suggestionFaviconBlock,
-  /if \(isBrowserInternalPageUrl\(url\)\) \{\s*return getBrowserPageFaviconUrl\(url\);\s*\}/,
+  /if \(isBrowserInternalPageUrl\(url\)\) \{\s*return getPageFaviconCandidateUrl\(url\);\s*\}/,
   'bookmark/history/top-site search results for browser pages should use browser-page favicon candidates'
 );
 
