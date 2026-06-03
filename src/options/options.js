@@ -2215,6 +2215,16 @@
     return mediaQuery.matches ? 'dark' : 'light';
   }
 
+  function getThemeStorageUpdate(mode) {
+    if (SETTINGS && typeof SETTINGS.createGlobalThemeModeStorageUpdate === 'function') {
+      return SETTINGS.createGlobalThemeModeStorageUpdate(mode);
+    }
+    const nextMode = mode === 'dark' || mode === 'light' ? mode : 'system';
+    return {
+      [THEME_STORAGE_KEY]: nextMode
+    };
+  }
+
   function updateThemeButtons(mode) {
     themeButtons.forEach((button) => {
       const isActive = button.getAttribute('data-mode') === mode;
@@ -2252,15 +2262,17 @@
     if (!storageArea) {
       return;
     }
-    storageArea.set({ [THEME_STORAGE_KEY]: mode }, () => {
-      updateThemeButtons(mode);
-      applyResolvedTheme(resolveTheme(mode));
-      if (mode === 'system' && !mediaListenerAttached) {
+    const updates = getThemeStorageUpdate(mode);
+    const nextMode = updates[THEME_STORAGE_KEY];
+    storageArea.set(updates, () => {
+      updateThemeButtons(nextMode);
+      applyResolvedTheme(resolveTheme(nextMode));
+      if (nextMode === 'system' && !mediaListenerAttached) {
         mediaQuery.addEventListener('change', onMediaChange);
         mediaListenerAttached = true;
         return;
       }
-      if (mode !== 'system' && mediaListenerAttached) {
+      if (nextMode !== 'system' && mediaListenerAttached) {
         mediaQuery.removeEventListener('change', onMediaChange);
         mediaListenerAttached = false;
       }

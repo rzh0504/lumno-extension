@@ -230,6 +230,25 @@ function testOverlayRendererDefersFallbackReplacementUntilFaviconIsMounted() {
   );
 }
 
+function testOverlayRendererReusesRuntimeFallbackIcon() {
+  const overlayJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/search-panel.js'), 'utf8');
+  assert.match(
+    overlayJs,
+    /function findAttachedFaviconFallbackIcon\(favicon\)[\s\S]*?_x_extension_overlay_favicon_fallback_2026_unique_/,
+    'overlay fallback replacement should look for the runtime-managed fallback icon'
+  );
+  assert.match(
+    overlayJs,
+    /function showAttachedFaviconFallbackIcon\(favicon\)[\s\S]*?fallbackNode\.setAttribute\('data-visible', 'true'\)[\s\S]*?favicon\.setAttribute\('data-fallback-icon', 'true'\)/,
+    'overlay fallback replacement should show the runtime fallback and hide the failed image'
+  );
+  assert.match(
+    overlayJs,
+    /if \(showAttachedFaviconFallbackIcon\(favicon\)\) \{\s*return true;\s*\}[\s\S]*?fallbackIconFactory/,
+    'overlay fallback replacement should not create a second link icon when the runtime fallback exists'
+  );
+}
+
 function testOverlayRendererBuildsBrowserPageFavicon2WhenMissingExplicitIcon() {
   const overlayJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/search-panel.js'), 'utf8');
   assert.match(
@@ -412,6 +431,7 @@ testOverlayResolvesLocalFaviconThroughDataUrl()
   .then(testOverlayUsesExtensionFaviconProxyForBrowserInternalPagesWithoutExplicitIcon)
   .then(testOverlayRendererLetsLocalFaviconsReachRuntime)
   .then(testOverlayRendererDefersFallbackReplacementUntilFaviconIsMounted)
+  .then(testOverlayRendererReusesRuntimeFallbackIcon)
   .then(testOverlayRendererBuildsBrowserPageFavicon2WhenMissingExplicitIcon)
   .then(testOverlayRendererUsesExtensionFaviconProxyForBrowserPages)
   .then(() => {

@@ -62,4 +62,23 @@ assert.strictEqual(settings.normalizeThemePreference('dark'), 'dark');
 assert.strictEqual(settings.normalizeThemePreference('light'), 'light');
 assert.strictEqual(settings.normalizeThemePreference('system'), '');
 
+assert.strictEqual(settings.normalizeThemeMode('dark'), 'dark');
+assert.strictEqual(settings.normalizeThemeMode('light'), 'light');
+assert.strictEqual(settings.normalizeThemeMode('system'), 'system');
+assert.strictEqual(settings.normalizeThemeMode('other'), 'system');
+assert.deepStrictEqual(
+  settings.createGlobalThemeModeStorageUpdate('dark'),
+  {
+    _x_extension_theme_mode_2024_unique_: 'dark'
+  },
+  'global theme writes should not clear the New Tab-specific appearance override'
+);
+assert.deepStrictEqual(
+  settings.createGlobalThemeModeStorageUpdate('weird'),
+  {
+    _x_extension_theme_mode_2024_unique_: 'system'
+  },
+  'global theme writes should normalize invalid theme modes to system'
+);
+
 console.log('settings tests passed');

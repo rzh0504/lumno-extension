@@ -3282,6 +3282,32 @@
     return newtabThemeScope;
   }
 
+  function getGlobalThemeStorageUpdate(mode) {
+    if (SETTINGS && typeof SETTINGS.createGlobalThemeModeStorageUpdate === 'function') {
+      return SETTINGS.createGlobalThemeModeStorageUpdate(mode);
+    }
+    const nextMode = normalizeThemeMode(mode);
+    return {
+      [THEME_STORAGE_KEY]: nextMode
+    };
+  }
+
+  function setGlobalThemeMode(mode) {
+    const updates = getGlobalThemeStorageUpdate(mode);
+    globalThemeMode = updates[THEME_STORAGE_KEY];
+    if (!storageArea) {
+      applyScopedThemeMode();
+      updateWallpaperLanguageStrings();
+      updateModeCommandSuggestions();
+      return;
+    }
+    storageArea.set(updates, () => {
+      applyScopedThemeMode();
+      updateWallpaperLanguageStrings();
+      updateModeCommandSuggestions();
+    });
+  }
+
   function setThemeMode(mode) {
     const nextMode = normalizeThemeMode(mode);
     const isEditingNewtabTheme = newtabThemeScope === 'home';
@@ -3291,17 +3317,41 @@
     const nextStoredMode = isEditingNewtabTheme && nextMode === 'system'
       ? 'global'
       : nextMode;
-    if (newtabThemeScope === 'home') {
-      newtabThemeMode = normalizeNewtabThemeMode(nextStoredMode);
-    } else {
-      globalThemeMode = nextMode;
+    if (!isEditingNewtabTheme) {
+      setGlobalThemeMode(nextMode);
+      return;
     }
+    newtabThemeMode = normalizeNewtabThemeMode(nextStoredMode);
     if (!storageArea) {
       applyScopedThemeMode();
+      updateWallpaperLanguageStrings();
+      updateModeCommandSuggestions();
       return;
     }
     storageArea.set({ [targetKey]: nextStoredMode }, () => {
       applyScopedThemeMode();
+      updateWallpaperLanguageStrings();
+      updateModeCommandSuggestions();
+    });
+  }
+
+  function setVisibleThemeMode(mode) {
+    const nextMode = normalizeThemeMode(mode);
+    if (isNewtabThemeFollowingGlobal()) {
+      setGlobalThemeMode(nextMode);
+      return;
+    }
+    const nextStoredMode = nextMode === 'system' ? 'global' : nextMode;
+    newtabThemeMode = normalizeNewtabThemeMode(nextStoredMode);
+    if (!storageArea) {
+      applyScopedThemeMode();
+      updateWallpaperLanguageStrings();
+      updateModeCommandSuggestions();
+      return;
+    }
+    storageArea.set({ [NEWTAB_THEME_MODE_STORAGE_KEY]: nextStoredMode }, () => {
+      applyScopedThemeMode();
+      updateWallpaperLanguageStrings();
       updateModeCommandSuggestions();
     });
   }
@@ -7614,7 +7664,7 @@
       return;
     }
     if (suggestion.type === 'modeSwitch') {
-      setThemeMode(suggestion.nextMode);
+      setVisibleThemeMode(suggestion.nextMode);
       focusSearchInputPreservingScroll();
       return;
     }
@@ -8180,7 +8230,7 @@
         }
       }
       if (isModeCommand(query)) {
-        setThemeMode(getNextThemeMode(currentThemeMode));
+        setVisibleThemeMode(getNextThemeMode(currentThemeMode));
         return;
       }
       const executeSuggestion = (selectedSuggestion) => {
@@ -8188,7 +8238,7 @@
           return false;
         }
         if (selectedSuggestion.type === 'modeSwitch') {
-          setThemeMode(selectedSuggestion.nextMode);
+          setVisibleThemeMode(selectedSuggestion.nextMode);
           return true;
         }
         if (selectedSuggestion.type === 'commandNewTab') {

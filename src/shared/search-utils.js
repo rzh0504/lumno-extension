@@ -1745,7 +1745,11 @@
     if (typeof settings.getDirectNavigationUrl !== 'function') {
       return '';
     }
-    return String(settings.getDirectNavigationUrl(rawQuery) || '').trim();
+    try {
+      return String(settings.getDirectNavigationUrl(rawQuery) || '').trim();
+    } catch (e) {
+      return '';
+    }
   }
 
   function isDirectNavigationMatch(suggestion, rawQuery, options) {

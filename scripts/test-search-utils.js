@@ -219,6 +219,20 @@ assert.deepStrictEqual(
   { index: 1, reason: 'openTab' },
   'open-tab promotion should continue to work for non-URL queries'
 );
+assert.doesNotThrow(
+  () => search.findSearchOpenTabMatchIndex([
+    directComplexUrlSuggestion,
+    unrelatedOpenTabSuggestion
+  ], {
+    rawQuery: complexUrlInput,
+    primaryHighlightIndex: 0,
+    openTabQuickSwitchEnabled: true,
+    getDirectNavigationUrl: () => {
+      throw new Error('resolver unavailable');
+    }
+  }),
+  'open-tab promotion should not break overlay rendering when direct URL resolution fails'
+);
 
 const xRootSuggestion = search.createSearchSuggestion({
   title: '(1) نوف | Nouf (@Nouf0633) / X',
