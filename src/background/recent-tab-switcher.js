@@ -51,6 +51,17 @@
     return String(value || '').trim();
   }
 
+  function normalizeThumbnailStatus(value, fallback) {
+    const status = String(value || '').trim().toLowerCase();
+    if (status === 'ok' ||
+        status === 'pending' ||
+        status === 'failed' ||
+        status === 'restricted') {
+      return status;
+    }
+    return fallback || 'missing';
+  }
+
   function normalizeThumbnailEntry(tabId, raw, options) {
     const opts = options && typeof options === 'object' ? options : {};
     const now = Number.isFinite(Number(opts.now)) ? Number(opts.now) : Date.now();
@@ -59,18 +70,24 @@
       return null;
     }
     const dataUrl = typeof raw.dataUrl === 'string' ? raw.dataUrl : '';
-    if (!dataUrl.startsWith('data:image/')) {
+    const hasImage = dataUrl.startsWith('data:image/');
+    const status = normalizeThumbnailStatus(raw.status, hasImage ? 'ok' : 'missing');
+    if (status === 'missing' || (status === 'ok' && !hasImage)) {
       return null;
     }
-    const capturedAt = Number(raw.capturedAt) || now;
-    if (ttlMs > 0 && (now - capturedAt) > ttlMs) {
+    const capturedAt = Number(raw.capturedAt) || (hasImage ? now : 0);
+    const updatedAt = Number(raw.updatedAt) || capturedAt || now;
+    if (ttlMs > 0 && (now - updatedAt) > ttlMs) {
       return null;
     }
     return {
       tabId,
       url: normalizeUrl(raw.url),
-      dataUrl,
-      capturedAt
+      dataUrl: hasImage ? dataUrl : '',
+      capturedAt,
+      updatedAt,
+      status,
+      reason: sanitizeText(raw.reason)
     };
   }
 
@@ -120,7 +137,11 @@
         }
       });
       const sortedEntries = Array.from(thumbnailByTabId.entries())
-        .sort((a, b) => (Number(b[1] && b[1].capturedAt) || 0) - (Number(a[1] && a[1].capturedAt) || 0));
+        .sort((a, b) => {
+          const timeA = Number(a[1] && (a[1].updatedAt || a[1].capturedAt)) || 0;
+          const timeB = Number(b[1] && (b[1].updatedAt || b[1].capturedAt)) || 0;
+          return timeB - timeA;
+        });
       sortedEntries.slice(thumbnailLimit).forEach(([tabId]) => {
         thumbnailByTabId.delete(tabId);
       });
@@ -204,6 +225,7 @@
           return;
         }
         seenIds.add(snapshot.id);
+        const thumbnailState = getThumbnailState(snapshot.id, getResolvedTabUrl(liveTab) || snapshot.url);
         results.push({
           ...snapshot,
           ...liveTab,
@@ -211,7 +233,9 @@
           title: sanitizeText(liveTab.title) || snapshot.title,
           favIconUrl: liveTab.favIconUrl || snapshot.favIconUrl || '',
           _xSwitcherVisitedAt: snapshot.visitedAt,
-          _xSwitcherThumbnail: getThumbnail(snapshot.id, getResolvedTabUrl(liveTab) || snapshot.url)
+          _xSwitcherThumbnail: thumbnailState.dataUrl,
+          _xSwitcherThumbnailStatus: thumbnailState.status,
+          _xSwitcherThumbnailReason: thumbnailState.reason
         });
       });
 
@@ -229,13 +253,16 @@
               return;
             }
             seenIds.add(tab.id);
+            const thumbnailState = getThumbnailState(tab.id, getResolvedTabUrl(tab));
             results.push({
               ...tab,
               url: getResolvedTabUrl(tab),
               title: sanitizeText(tab.title),
               favIconUrl: tab.favIconUrl || '',
               _xSwitcherVisitedAt: Number(tab.lastAccessed) || 0,
-              _xSwitcherThumbnail: getThumbnail(tab.id, getResolvedTabUrl(tab))
+              _xSwitcherThumbnail: thumbnailState.dataUrl,
+              _xSwitcherThumbnailStatus: thumbnailState.status,
+              _xSwitcherThumbnailReason: thumbnailState.reason
             });
           });
       }
@@ -256,7 +283,10 @@
       const entry = normalizeThumbnailEntry(tabId, {
         dataUrl: value,
         url: normalizeUrl(meta.url),
-        capturedAt: Number(capturedAt) || Date.now()
+        capturedAt: Number(capturedAt) || Date.now(),
+        updatedAt: Number(capturedAt) || Date.now(),
+        status: 'ok',
+        reason: ''
       }, {
         ttlMs: thumbnailTtlMs
       });
@@ -269,20 +299,77 @@
       return true;
     }
 
-    function getThumbnail(tabId, expectedUrl) {
+    function setThumbnailStatus(tabId, status, updatedAt, metadata) {
+      if (typeof tabId !== 'number') {
+        return false;
+      }
+      const normalizedStatus = normalizeThumbnailStatus(status, '');
+      if (!normalizedStatus || normalizedStatus === 'missing' || normalizedStatus === 'ok') {
+        return false;
+      }
+      const meta = metadata && typeof metadata === 'object' ? metadata : {};
+      const url = normalizeUrl(meta.url);
+      const existing = normalizeThumbnailEntry(tabId, thumbnailByTabId.get(tabId), {
+        ttlMs: thumbnailTtlMs
+      });
+      const canKeepImage = existing &&
+        existing.dataUrl &&
+        (!url || !existing.url || existing.url === url);
+      const entry = normalizeThumbnailEntry(tabId, {
+        dataUrl: canKeepImage ? existing.dataUrl : '',
+        url: url || (existing ? existing.url : ''),
+        capturedAt: canKeepImage ? existing.capturedAt : 0,
+        updatedAt: Number(updatedAt) || Date.now(),
+        status: normalizedStatus,
+        reason: sanitizeText(meta.reason)
+      }, {
+        ttlMs: thumbnailTtlMs
+      });
+      if (!entry) {
+        thumbnailByTabId.delete(tabId);
+        return false;
+      }
+      thumbnailByTabId.set(tabId, entry);
+      pruneThumbnails(entry.updatedAt);
+      return true;
+    }
+
+    function getThumbnailState(tabId, expectedUrl) {
       const entry = thumbnailByTabId.get(tabId);
       const normalized = normalizeThumbnailEntry(tabId, entry, {
         ttlMs: thumbnailTtlMs
       });
       if (!normalized) {
         thumbnailByTabId.delete(tabId);
-        return '';
+        return {
+          status: 'missing',
+          reason: '',
+          dataUrl: '',
+          capturedAt: 0,
+          updatedAt: 0
+        };
       }
       const url = normalizeUrl(expectedUrl);
       if (url && normalized.url && normalized.url !== url) {
-        return '';
+        return {
+          status: 'stale',
+          reason: 'url-mismatch',
+          dataUrl: '',
+          capturedAt: normalized.capturedAt || 0,
+          updatedAt: normalized.updatedAt || normalized.capturedAt || 0
+        };
       }
-      return normalized.dataUrl || '';
+      return {
+        status: normalized.status || (normalized.dataUrl ? 'ok' : 'missing'),
+        reason: normalized.reason || '',
+        dataUrl: normalized.dataUrl || '',
+        capturedAt: normalized.capturedAt || 0,
+        updatedAt: normalized.updatedAt || normalized.capturedAt || 0
+      };
+    }
+
+    function getThumbnail(tabId, expectedUrl) {
+      return getThumbnailState(tabId, expectedUrl).dataUrl || '';
     }
 
     function getStackSnapshot() {
@@ -345,6 +432,8 @@
       removeTab,
       getRecentTabs,
       setThumbnail,
+      setThumbnailStatus,
+      getThumbnailState,
       getThumbnail,
       getStackSnapshot,
       exportState,

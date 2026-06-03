@@ -84,6 +84,74 @@ function testThumbnailCacheMatchesUrlAndHydratesFromState() {
   );
 }
 
+function testThumbnailStatusPersistsAndReportsStaleness() {
+  const tracker = switcher.createRecentTabTracker({
+    limit: 5,
+    thumbnailLimit: 4,
+    thumbnailTtlMs: Number.MAX_SAFE_INTEGER,
+    shouldIncludeTab: (tab) => Boolean(tab && tab.url)
+  });
+
+  tracker.recordTab({ id: 21, windowId: 10, url: 'https://one.example/', title: 'One' }, 100);
+  tracker.setThumbnailStatus(21, 'pending', 110, {
+    url: 'https://one.example/',
+    reason: 'activated'
+  });
+
+  let recent = tracker.getRecentTabs([
+    { id: 21, windowId: 10, url: 'https://one.example/', title: 'One' }
+  ])[0];
+  assert.strictEqual(recent._xSwitcherThumbnail, '', 'pending thumbnail should not invent an image');
+  assert.strictEqual(recent._xSwitcherThumbnailStatus, 'pending');
+  assert.strictEqual(recent._xSwitcherThumbnailReason, 'activated');
+
+  tracker.setThumbnailStatus(21, 'failed', 120, {
+    url: 'https://one.example/',
+    reason: 'inactive-tab'
+  });
+  recent = tracker.getRecentTabs([
+    { id: 21, windowId: 10, url: 'https://one.example/', title: 'One' }
+  ])[0];
+  assert.strictEqual(recent._xSwitcherThumbnailStatus, 'failed');
+  assert.strictEqual(recent._xSwitcherThumbnailReason, 'inactive-tab');
+
+  tracker.setThumbnail(21, 'data:image/jpeg;base64,b25l', 130, {
+    url: 'https://one.example/'
+  });
+  recent = tracker.getRecentTabs([
+    { id: 21, windowId: 10, url: 'https://one.example/', title: 'One' }
+  ])[0];
+  assert.strictEqual(recent._xSwitcherThumbnail, 'data:image/jpeg;base64,b25l');
+  assert.strictEqual(recent._xSwitcherThumbnailStatus, 'ok');
+  assert.strictEqual(recent._xSwitcherThumbnailReason, '');
+
+  recent = tracker.getRecentTabs([
+    { id: 21, windowId: 10, url: 'https://two.example/', title: 'Two' }
+  ])[0];
+  assert.strictEqual(recent._xSwitcherThumbnail, '', 'stale thumbnails should not be shown after URL changes');
+  assert.strictEqual(recent._xSwitcherThumbnailStatus, 'stale');
+  assert.strictEqual(recent._xSwitcherThumbnailReason, 'url-mismatch');
+
+  tracker.recordTab({ id: 22, windowId: 10, url: 'chrome://extensions/', title: 'Extensions' }, 200);
+  tracker.setThumbnailStatus(22, 'restricted', 210, {
+    url: 'chrome://extensions/',
+    reason: 'chrome-restricted-page'
+  });
+  const state = tracker.exportState({ now: 220 });
+  const hydrated = switcher.createRecentTabTracker({
+    limit: 5,
+    thumbnailLimit: 4,
+    thumbnailTtlMs: Number.MAX_SAFE_INTEGER,
+    shouldIncludeTab: (tab) => Boolean(tab && tab.url)
+  });
+  hydrated.hydrateState(state, { now: 230 });
+  recent = hydrated.getRecentTabs([
+    { id: 22, windowId: 10, url: 'chrome://extensions/', title: 'Extensions' }
+  ])[0];
+  assert.strictEqual(recent._xSwitcherThumbnailStatus, 'restricted');
+  assert.strictEqual(recent._xSwitcherThumbnailReason, 'chrome-restricted-page');
+}
+
 async function testCrossWindowSwitchFocusesWindowBeforeActivatingTab() {
   const calls = [];
   const chromeApi = {
@@ -117,6 +185,7 @@ async function testCrossWindowSwitchFocusesWindowBeforeActivatingTab() {
 (async () => {
   testRecentStackKeepsLatestFiveSwitchableTabs();
   testThumbnailCacheMatchesUrlAndHydratesFromState();
+  testThumbnailStatusPersistsAndReportsStaleness();
   await testCrossWindowSwitchFocusesWindowBeforeActivatingTab();
   console.log('recent tab switcher tests passed');
 })().catch((error) => {

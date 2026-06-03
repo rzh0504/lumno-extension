@@ -72,6 +72,18 @@
     return ((normalized % length) + length) % length;
   }
 
+  function getThumbnailStatus(tab, thumbnail) {
+    const status = String(tab && tab.thumbnailStatus ? tab.thumbnailStatus : '').trim().toLowerCase();
+    if (status === 'ok' ||
+        status === 'pending' ||
+        status === 'failed' ||
+        status === 'restricted' ||
+        status === 'stale') {
+      return status;
+    }
+    return thumbnail && thumbnail.startsWith('data:image/') ? 'ok' : 'missing';
+  }
+
   function buildStyles() {
     return `
       :host {
@@ -85,43 +97,40 @@
       }
       #${PANEL_ID} {
         all: unset;
+        --x-tab-switcher-accent: #2563eb;
         position: fixed;
         left: 50%;
-        top: 18vh;
-        transform: translateX(-50%) translateY(10px) scale(0.98);
+        top: clamp(120px, 30vh, 320px);
+        transform: translateX(-50%) scale(0.985);
         transform-origin: top center;
         z-index: 2147483647;
-        width: min(820px, calc(100vw - 28px));
+        width: min(1120px, calc(100vw - 64px));
         color: #172033;
-        background: rgba(248, 250, 252, 0.94);
-        border: 1px solid rgba(15, 23, 42, 0.12);
-        border-radius: 18px;
-        box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24), 0 2px 12px rgba(15, 23, 42, 0.12);
-        backdrop-filter: blur(28px) saturate(160%);
-        -webkit-backdrop-filter: blur(28px) saturate(160%);
-        padding: 12px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(244, 247, 251, 0.56));
+        border: 1px solid rgba(255, 255, 255, 0.56);
+        border-radius: 24px;
+        box-shadow:
+          0 26px 82px rgba(15, 23, 42, 0.24),
+          0 5px 18px rgba(15, 23, 42, 0.1),
+          inset 0 1px 0 rgba(255, 255, 255, 0.86);
+        backdrop-filter: blur(42px) saturate(185%);
+        -webkit-backdrop-filter: blur(42px) saturate(185%);
+        padding: 16px;
         pointer-events: auto;
         opacity: 0;
-        filter: blur(8px);
-        transition: opacity 140ms ease, filter 180ms ease, transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+        filter: blur(6px);
+        transition: opacity 95ms ease, filter 110ms ease, transform 110ms cubic-bezier(0.22, 1, 0.36, 1);
       }
       #${PANEL_ID}[data-visible="true"] {
         opacity: 1;
         filter: blur(0);
-        transform: translateX(-50%) translateY(0) scale(1);
-      }
-      .x-tab-switcher-title {
-        color: rgba(23, 32, 51, 0.68);
-        font-size: 12px;
-        font-weight: 700;
-        line-height: 1.2;
-        padding: 2px 4px 10px;
-        text-transform: uppercase;
+        transform: translateX(-50%) scale(1);
       }
       .x-tab-switcher-list {
         display: grid;
         grid-template-columns: repeat(var(--x-tab-count, 5), minmax(0, 1fr));
-        gap: 10px;
+        gap: 12px;
         width: 100%;
       }
       .x-tab-switcher-card {
@@ -129,36 +138,58 @@
         min-width: 0;
         display: flex;
         flex-direction: column;
-        gap: 9px;
-        border-radius: 12px;
-        border: 1px solid rgba(15, 23, 42, 0.12);
-        background: rgba(255, 255, 255, 0.72);
-        padding: 8px;
+        gap: 10px;
+        border-radius: 14px;
+        border: 0;
+        outline: 2px solid transparent;
+        outline-offset: 0;
+        background: rgba(255, 255, 255, 0.56);
+        padding: 10px;
         color: #172033;
-        cursor: default;
-        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
-        transition: transform 130ms ease, border-color 130ms ease, background 130ms ease, box-shadow 130ms ease;
+        cursor: pointer;
+        box-shadow:
+          0 5px 14px rgba(15, 23, 42, 0.06),
+          inset 0 1px 0 rgba(255, 255, 255, 0.62);
+        transition: outline-color 70ms ease, background 70ms ease, box-shadow 70ms ease;
       }
       .x-tab-switcher-card[data-active="true"] {
-        transform: translateY(-2px);
-        border-color: rgba(37, 99, 235, 0.58);
-        background: rgba(255, 255, 255, 0.96);
-        box-shadow: 0 14px 34px rgba(37, 99, 235, 0.18), 0 8px 18px rgba(15, 23, 42, 0.1);
+        transform: none;
+        outline: 2px solid var(--x-tab-switcher-accent);
+        background: rgba(255, 255, 255, 0.84);
+        box-shadow:
+          0 9px 24px rgba(15, 23, 42, 0.11),
+          inset 0 1px 0 rgba(255, 255, 255, 0.82);
       }
       .x-tab-switcher-card:focus-visible {
-        outline: 2px solid rgba(37, 99, 235, 0.72);
-        outline-offset: 2px;
+        outline: 2px solid var(--x-tab-switcher-accent);
       }
       .x-tab-switcher-thumb {
         position: relative;
         width: 100%;
-        aspect-ratio: 16 / 10;
+        aspect-ratio: 16 / 9;
         overflow: hidden;
-        border-radius: 8px;
-        border: 1px solid rgba(15, 23, 42, 0.1);
+        border-radius: 10px;
+        border: 1px solid rgba(15, 23, 42, 0.12);
         background:
           linear-gradient(135deg, rgba(37, 99, 235, 0.14), rgba(20, 184, 166, 0.18)),
           linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(226, 232, 240, 0.92));
+      }
+      .x-tab-switcher-thumb[data-thumbnail-status="pending"]::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(110deg, transparent 26%, rgba(255, 255, 255, 0.48) 46%, transparent 66%);
+        transform: translateX(-100%);
+        animation: x-tab-switcher-thumb-pending 900ms ease-in-out infinite;
+        pointer-events: none;
+      }
+      .x-tab-switcher-thumb[data-thumbnail-status="failed"],
+      .x-tab-switcher-thumb[data-thumbnail-status="restricted"],
+      .x-tab-switcher-thumb[data-thumbnail-status="stale"],
+      .x-tab-switcher-thumb[data-thumbnail-status="missing"] {
+        background:
+          linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(20, 184, 166, 0.12)),
+          linear-gradient(180deg, rgba(248, 250, 252, 0.92), rgba(226, 232, 240, 0.96));
       }
       .x-tab-switcher-thumb img[data-kind="thumbnail"] {
         width: 100%;
@@ -175,39 +206,56 @@
         justify-content: center;
       }
       .x-tab-switcher-favicon {
-        width: 34px;
-        height: 34px;
-        border-radius: 8px;
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
         background: rgba(255, 255, 255, 0.9);
         box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+      }
+      @keyframes x-tab-switcher-thumb-pending {
+        from {
+          transform: translateX(-100%);
+        }
+        to {
+          transform: translateX(100%);
+        }
       }
       .x-tab-switcher-meta {
         min-width: 0;
         display: grid;
-        gap: 3px;
+        gap: 4px;
       }
       .x-tab-switcher-name-row {
         min-width: 0;
-        display: flex;
+        display: grid;
+        grid-template-columns: 18px minmax(0, 1fr) auto;
         align-items: center;
         gap: 6px;
       }
+      .x-tab-switcher-title-favicon {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+        object-fit: cover;
+        background: rgba(255, 255, 255, 0.76);
+      }
       .x-tab-switcher-name {
         min-width: 0;
+        display: block;
+        color: #172033;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1.22;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        color: #172033;
-        font-size: 13px;
-        font-weight: 700;
-        line-height: 1.25;
       }
       .x-tab-switcher-current {
         flex: 0 0 auto;
         border-radius: 999px;
-        padding: 2px 6px;
+        padding: 3px 7px;
         color: #0f766e;
-        background: rgba(20, 184, 166, 0.13);
+        background: rgba(20, 184, 166, 0.14);
         font-size: 10px;
         font-weight: 700;
         line-height: 1.2;
@@ -218,44 +266,55 @@
         text-overflow: ellipsis;
         white-space: nowrap;
         color: rgba(23, 32, 51, 0.58);
-        font-size: 11px;
+        font-size: 12px;
         font-weight: 600;
         line-height: 1.25;
       }
       @media (max-width: 720px) {
         #${PANEL_ID} {
-          top: 10vh;
-          width: min(430px, calc(100vw - 20px));
+          top: clamp(84px, 20vh, 160px);
+          width: min(520px, calc(100vw - 24px));
+          padding: 12px;
+          border-radius: 20px;
         }
         .x-tab-switcher-list {
           grid-template-columns: 1fr;
+          gap: 10px;
         }
         .x-tab-switcher-card {
           display: grid;
-          grid-template-columns: 96px minmax(0, 1fr);
+          grid-template-columns: 148px minmax(0, 1fr);
           align-items: center;
+          padding: 9px;
         }
       }
       @media (prefers-color-scheme: dark) {
         #${PANEL_ID} {
           color: #f8fafc;
-          background: rgba(15, 23, 42, 0.9);
-          border-color: rgba(255, 255, 255, 0.14);
-          box-shadow: 0 24px 70px rgba(0, 0, 0, 0.36), 0 2px 12px rgba(0, 0, 0, 0.18);
-        }
-        .x-tab-switcher-title {
-          color: rgba(248, 250, 252, 0.62);
+          background:
+            linear-gradient(180deg, rgba(30, 41, 59, 0.76), rgba(15, 23, 42, 0.58));
+          border-color: rgba(255, 255, 255, 0.16);
+          box-shadow:
+            0 26px 82px rgba(0, 0, 0, 0.38),
+            0 5px 18px rgba(0, 0, 0, 0.18),
+            inset 0 1px 0 rgba(255, 255, 255, 0.12);
         }
         .x-tab-switcher-card {
           color: #f8fafc;
-          background: rgba(30, 41, 59, 0.78);
-          border-color: rgba(255, 255, 255, 0.12);
-          box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+          background: rgba(30, 41, 59, 0.5);
+          box-shadow:
+            0 5px 14px rgba(0, 0, 0, 0.18),
+            inset 0 1px 0 rgba(255, 255, 255, 0.08);
         }
         .x-tab-switcher-card[data-active="true"] {
-          background: rgba(30, 41, 59, 0.98);
-          border-color: rgba(96, 165, 250, 0.64);
-          box-shadow: 0 14px 34px rgba(96, 165, 250, 0.16), 0 8px 18px rgba(0, 0, 0, 0.24);
+          outline-color: #60a5fa;
+          background: rgba(30, 41, 59, 0.72);
+          box-shadow:
+            0 9px 24px rgba(0, 0, 0, 0.26),
+            inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+        .x-tab-switcher-title-favicon {
+          background: rgba(15, 23, 42, 0.32);
         }
         .x-tab-switcher-name {
           color: #f8fafc;
@@ -268,6 +327,14 @@
           background:
             linear-gradient(135deg, rgba(96, 165, 250, 0.18), rgba(45, 212, 191, 0.14)),
             linear-gradient(180deg, rgba(51, 65, 85, 0.9), rgba(15, 23, 42, 0.94));
+        }
+        .x-tab-switcher-thumb[data-thumbnail-status="failed"],
+        .x-tab-switcher-thumb[data-thumbnail-status="restricted"],
+        .x-tab-switcher-thumb[data-thumbnail-status="stale"],
+        .x-tab-switcher-thumb[data-thumbnail-status="missing"] {
+          background:
+            linear-gradient(135deg, rgba(96, 165, 250, 0.14), rgba(45, 212, 191, 0.1)),
+            linear-gradient(180deg, rgba(51, 65, 85, 0.88), rgba(15, 23, 42, 0.96));
         }
       }
     `;
@@ -308,14 +375,11 @@
       panel.style.setProperty('zoom', String(Math.max(0.35, Math.min(4, 1 / zoomRaw))));
     }
 
-    const title = createElement(document, 'div', 'x-tab-switcher-title');
-    title.textContent = getMessage('tab_switcher_title', 'Recent tabs');
-    panel.appendChild(title);
-
     const list = createElement(document, 'div', 'x-tab-switcher-list');
     panel.appendChild(list);
     const buttons = [];
     let selectedIndex = clampSelectedIndex(context.selectedIndex, tabs.length);
+    let didRequestSwitch = false;
 
     function renderSelection() {
       buttons.forEach((button, index) => {
@@ -332,11 +396,15 @@
     }
 
     function switchToSelected() {
+      if (didRequestSwitch) {
+        return;
+      }
       const selected = tabs[selectedIndex];
       if (!selected || typeof selected.id !== 'number') {
         close();
         return;
       }
+      didRequestSwitch = true;
       chrome.runtime.sendMessage({
         action: 'switchToTab',
         tabId: selected.id,
@@ -407,7 +475,7 @@
         return;
       }
       const keyText = String(event.key || '').toLowerCase();
-      if (keyText === 'q') {
+      if (keyText === 'q' || event.key === 'Alt') {
         stopHandledKeyEvent(event);
         switchToSelected();
       }
@@ -429,6 +497,11 @@
 
       const thumb = createElement(document, 'div', 'x-tab-switcher-thumb');
       const thumbnail = typeof tab.thumbnail === 'string' ? tab.thumbnail : '';
+      const thumbnailStatus = getThumbnailStatus(tab, thumbnail);
+      thumb.setAttribute('data-thumbnail-status', thumbnailStatus);
+      if (tab.thumbnailReason) {
+        thumb.setAttribute('data-thumbnail-reason', sanitizeText(tab.thumbnailReason));
+      }
       if (thumbnail && thumbnail.startsWith('data:image/')) {
         const thumbImage = createElement(document, 'img', '');
         thumbImage.setAttribute('data-kind', 'thumbnail');
@@ -449,6 +522,14 @@
 
       const meta = createElement(document, 'div', 'x-tab-switcher-meta');
       const nameRow = createElement(document, 'div', 'x-tab-switcher-name-row');
+      const titleFavicon = tab.favIconUrl
+        ? createElement(document, 'img', 'x-tab-switcher-title-favicon')
+        : createElement(document, 'span', 'x-tab-switcher-title-favicon');
+      if (tab.favIconUrl) {
+        titleFavicon.alt = '';
+        titleFavicon.src = tab.favIconUrl;
+      }
+      nameRow.appendChild(titleFavicon);
       const name = createElement(document, 'div', 'x-tab-switcher-name');
       name.textContent = titleText;
       name.title = titleText;
@@ -464,7 +545,7 @@
       meta.appendChild(hostLabel);
       card.appendChild(meta);
 
-      card.addEventListener('mouseenter', () => {
+      card.addEventListener('pointerenter', () => {
         selectedIndex = index;
         renderSelection();
       });

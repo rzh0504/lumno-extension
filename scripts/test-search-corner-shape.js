@@ -10,6 +10,8 @@ const searchInputCss = fs.readFileSync(path.join(repoRoot, 'src/shared/search-in
 const searchInputUi = fs.readFileSync(path.join(repoRoot, 'src/shared/search-input-ui.js'), 'utf8');
 const compensatedCornerShape = 'superellipse(1.25)';
 const compensatedCornerShapePattern = 'superellipse\\(1\\.25\\)';
+const newtabShellRadius = 'var(--x-nt-search-shell-radius, 32px)';
+const newtabShellTopRadius = 'var(--x-nt-search-shell-top-radius, 28px)';
 
 function assertSupportsCompensatedCornerShape(source, label) {
   assert.match(
@@ -35,37 +37,47 @@ function assertRuleHasRadius(source, selector, radius, label) {
 assertRuleHasRadius(
   newtabHtml,
   '#_x_extension_newtab_root_2024_unique_',
-  '32px',
+  newtabShellRadius,
   'newtab input root surface'
+);
+assert.match(
+  newtabHtml,
+  /:root[\s\S]*?\{[\s\S]*?--x-nt-search-shell-radius:\s*32px;[\s\S]*?--x-nt-search-shell-top-radius:\s*28px;/,
+  'newtab closed and open shells should share the same radius tokens'
+);
+assert.match(
+  newtabHtml,
+  /#_x_extension_newtab_root_2024_unique_[\s\S]*?\{[\s\S]*?min-height:\s*56px;/,
+  'newtab closed input shell should normalize its 32px radius to the same 28px visible top radius as the open shell'
 );
 assertRuleHasRadius(
   newtabHtml,
   '#_x_extension_newtab_search_layer_2024_unique_',
-  '28px',
+  newtabShellTopRadius,
   'newtab inset search layer'
 );
 assertRuleHasRadius(
   newtabHtml,
   'body[data-nt-suggestions-open="true"] #_x_extension_newtab_search_layer_2024_unique_',
-  '28px 28px 0 0',
+  `${newtabShellTopRadius} ${newtabShellTopRadius} 0 0`,
   'newtab open inset search layer'
 );
 assertRuleHasRadius(
   newtabHtml,
   '#_x_extension_newtab_suggestions_surface_2026_unique_',
-  '32px',
+  `${newtabShellTopRadius} ${newtabShellTopRadius} ${newtabShellRadius} ${newtabShellRadius}`,
   'newtab suggestions backplate'
 );
 assertRuleHasRadius(
   newtabHtml,
   '#_x_extension_newtab_suggestions_outline_2026_unique_',
-  '32px',
+  `${newtabShellTopRadius} ${newtabShellTopRadius} ${newtabShellRadius} ${newtabShellRadius}`,
   'newtab suggestions outline'
 );
 assertRuleHasRadius(
   newtabHtml,
   '#_x_extension_newtab_suggestions_container_2024_unique_',
-  '0 0 28px 28px',
+  `0 0 ${newtabShellTopRadius} ${newtabShellTopRadius}`,
   'newtab suggestions content inset'
 );
 assertRuleHasRadius(searchInputCss, '.x-lumno-search-input', '32px 32px 0 0', 'shared search input shell');
