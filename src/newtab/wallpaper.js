@@ -531,6 +531,23 @@
       hideWallpaperSliderValueBubble(slider, { force: true });
     }
 
+    function blurWallpaperPanelActiveElement() {
+      const activeElement = document.activeElement;
+      if (!activeElement || !wallpaperPanel || !wallpaperPanel.contains(activeElement)) {
+        return;
+      }
+      if (typeof activeElement.blur !== 'function') {
+        return;
+      }
+      activeElement.blur();
+    }
+
+    function cancelWallpaperPanelActiveControls() {
+      finishWallpaperSliderValueDrag();
+      wallpaperActiveSlider = null;
+      blurWallpaperPanelActiveElement();
+    }
+
     function bindWallpaperSliderValueBubble(slider) {
       if (!slider) {
         return;
@@ -3161,6 +3178,7 @@
       if (!wallpaperPanel || !wallpaperButton) {
         return;
       }
+      cancelWallpaperPanelActiveControls();
       hideWallpaperSliderValueBubble(null, { force: true });
       wallpaperPanel.setAttribute('data-open', 'false');
       wallpaperButton.setAttribute('data-open', 'false');

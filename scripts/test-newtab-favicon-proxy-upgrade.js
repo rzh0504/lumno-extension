@@ -170,6 +170,9 @@ const pageUrl = 'https://m2.futurecomm.cn/#/center';
 const primaryUrl = 'https://m2.futurecomm.cn/favicon.ico';
 const extensionUrl = `chrome-extension://abc/_favicon/?pageUrl=${encodeURIComponent(pageUrl)}&size=128`;
 const gstaticUrl = `https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=${encodeURIComponent(pageUrl)}&size=128`;
+const browserPageUrl = 'chrome://extensions/';
+const browserPagePrimaryUrl = `chrome-extension://abc/_favicon/?pageUrl=${encodeURIComponent(browserPageUrl)}&size=128`;
+const browserPageFallbackUrl = `chrome://favicon2/?pageUrl=${encodeURIComponent(browserPageUrl)}&size=128`;
 
 function createRuntime(options) {
   const config = options || {};
@@ -383,6 +386,36 @@ function createRuntime(options) {
   staleImg.dispatchEvent('load');
   await wait(4);
   assert.strictEqual(staleImg.getAttribute('data-fallback-icon'), 'true');
+
+  const browserPageRuntime = createRuntime({
+    detectDefaultExtensionFavicon(_img, url) {
+      return Promise.resolve(url === browserPagePrimaryUrl);
+    },
+    requestFaviconData() {
+      return Promise.resolve(null);
+    }
+  });
+  const browserPageImg = createFakeImage();
+  browserPageRuntime.attachFaviconWithFallbacks(browserPageImg, browserPageUrl, '', {
+    primaryUrl: browserPagePrimaryUrl
+  });
+  assert.strictEqual(browserPageImg.src, browserPagePrimaryUrl);
+  assert.strictEqual(
+    browserPageImg.getAttribute('data-favicon-placeholder'),
+    'true',
+    'browser page primary favicon proxy should stay hidden while default proxy detection runs'
+  );
+
+  browserPageImg.dispatchEvent('load');
+  await wait(4);
+  assert.strictEqual(
+    browserPageImg.src,
+    browserPageFallbackUrl,
+    'browser page default primary proxy should fall through to the browser favicon candidate'
+  );
+
+  browserPageImg._xThemeFaviconErrorHandler();
+  assert.strictEqual(browserPageImg.getAttribute('data-fallback-icon'), 'true');
   console.log('newtab favicon candidate order tests passed');
 })().catch((error) => {
   console.error(error);

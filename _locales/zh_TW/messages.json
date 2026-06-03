@@ -974,6 +974,9 @@
   "search_remove_history_tooltip": {
     "message": "移除這筆歷史"
   },
+  "search_remove_top_site_tooltip": {
+    "message": "移除這筆常用"
+  },
   "search_tag_top_site": {
     "message": "常用"
   },

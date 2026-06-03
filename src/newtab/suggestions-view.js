@@ -193,6 +193,33 @@
       : function(theme) {
         return theme || config.defaultTheme || {};
       };
+    const urlGuards = root.LumnoUrlGuards || {};
+    const isBrowserNewtabUrl = typeof config.isBrowserNewtabUrl === 'function'
+      ? config.isBrowserNewtabUrl
+      : (typeof urlGuards.isBrowserNewtabUrl === 'function'
+        ? urlGuards.isBrowserNewtabUrl
+        : function(url) {
+          const lower = String(url || '').trim().toLowerCase().replace(/[?#].*$/, '').replace(/\/+$/, '');
+          return lower === 'chrome://newtab' ||
+            lower === 'chrome://new-tab-page' ||
+            lower === 'edge://newtab' ||
+            lower === 'brave://newtab' ||
+            lower === 'vivaldi://newtab' ||
+            lower === 'opera://startpage';
+        });
+    const isBrowserInternalUrl = typeof config.isBrowserInternalUrl === 'function'
+      ? config.isBrowserInternalUrl
+      : (typeof urlGuards.isBrowserInternalUrl === 'function'
+        ? urlGuards.isBrowserInternalUrl
+        : function(url) {
+          const lower = String(url || '').trim().toLowerCase();
+          return lower.startsWith('chrome://') ||
+            lower.startsWith('edge://') ||
+            lower.startsWith('brave://') ||
+            lower.startsWith('vivaldi://') ||
+            lower.startsWith('opera://') ||
+            lower.startsWith('about:');
+        });
 
     function getDefaultTheme() {
       return config.defaultTheme || {};
@@ -224,6 +251,25 @@
       }
       const host = getHostFromUrl(url);
       return Boolean(host && (isLocalNetworkHost(host) || shouldBlockFaviconForHost(host)));
+    }
+
+    function isTopSiteSuggestion(suggestion) {
+      return Boolean(suggestion && (suggestion.type === 'topSite' || suggestion.isTopSite));
+    }
+
+    function canRemoveSuggestionFromHistory(suggestion) {
+      return Boolean(
+        suggestion &&
+        suggestion.url &&
+        (suggestion.type === 'history' || isTopSiteSuggestion(suggestion))
+      );
+    }
+
+    function getRemoveSuggestionTooltipText(suggestion) {
+      if (isTopSiteSuggestion(suggestion)) {
+        return t('search_remove_top_site_tooltip', '移除该常用');
+      }
+      return t('search_remove_history_tooltip', '移除该历史');
     }
 
     function createSuggestionInlineIcon(iconName, tone) {
@@ -261,6 +307,9 @@
       if (imageOptions.fallbackSize) {
         favicon.setAttribute('data-fallback-size', 'true');
       }
+      if (imageOptions.fallbackIconName) {
+        favicon.setAttribute('data-fallback-icon-name', imageOptions.fallbackIconName);
+      }
       applyFaviconOpticalAlignment(favicon);
       return favicon;
     }
@@ -286,7 +335,29 @@
     }
 
     function getPrimaryFaviconCandidate(url, explicitUrl) {
+      if (isBrowserInternalUrl(url)) {
+        return getChromeFaviconUrl(url) || getBrowserPageFaviconUrl(url) || explicitUrl || '';
+      }
       return getBrowserPageFaviconUrl(url) || explicitUrl || '';
+    }
+
+    function hasTabFavicon(tab) {
+      return Boolean(String((tab && tab.favIconUrl) || '').trim());
+    }
+
+    function shouldUseFallbackIconForTab(tab, host) {
+      return Boolean(
+        shouldBlockFaviconForHost(host) ||
+        (!hasTabFavicon(tab) && isBrowserNewtabUrl(tab && tab.url))
+      );
+    }
+
+    function getBrowserPageFallbackIconName(url) {
+      const raw = String(url || '').trim();
+      if (isBrowserNewtabUrl(raw)) {
+        return 'ri-link';
+      }
+      return isBrowserInternalUrl(raw) ? 'ri-link' : '';
     }
 
     function setIconEmphasis(item, isActive) {
@@ -659,19 +730,23 @@
         } catch (e) {
           hostForTab = '';
         }
-        const useFallback = shouldBlockFaviconForHost(hostForTab);
-        const favicon = createFaviconImage(index, { fallbackSize: useFallback });
+        const useFallback = shouldUseFallbackIconForTab(tab, hostForTab);
+        let iconNode = null;
         if (useFallback) {
-          applyFallbackIcon(favicon);
+          iconNode = createSuggestionInlineIcon(getBrowserPageFallbackIconName(tab && tab.url) || 'ri-link');
         } else {
+          const favicon = createFaviconImage(index, {
+            fallbackIconName: getBrowserPageFallbackIconName(tab && tab.url)
+          });
           attachFaviconWithFallbacks(favicon, tab.url || '', hostForTab, {
             primaryUrl: getPrimaryFaviconCandidate(tab.url || '', tab.favIconUrl || ''),
             browserUrl: !/^https?:\/\//i.test(String(tab.url || '')) || (hostForTab && isLocalNetworkHost(hostForTab))
               ? getChromeFaviconUrl(tab.url || '')
               : ''
           });
+          iconNode = favicon;
         }
-        const iconSlot = createIconSlot(favicon, !useFallback);
+        const iconSlot = createIconSlot(iconNode, !useFallback);
         leftSide.appendChild(iconSlot);
         suggestionItem._xIconWrap = iconSlot;
         suggestionItem._xIconIsFavicon = !useFallback;
@@ -836,9 +911,15 @@
         let iconNode = null;
         let iconWrapper = null;
         if (suggestion.type === 'browserPage' || suggestion.type === 'directUrl') {
-          if (suggestion.favicon) {
+          const shouldRenderBrowserPageFavicon = suggestion.type === 'browserPage' && isBrowserInternalUrl(suggestion.url);
+          if (suggestion.favicon || shouldRenderBrowserPageFavicon) {
             const suggestionHost = suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : '';
-            const favicon = createFaviconImage(index, { objectFitContain: true });
+            const favicon = createFaviconImage(index, {
+              objectFitContain: true,
+              fallbackIconName: suggestion.type === 'browserPage'
+                ? getBrowserPageFallbackIconName(suggestion.url)
+                : ''
+            });
             attachFaviconWithFallbacks(favicon, suggestion.url || suggestion.favicon || '', suggestionHost, {
               primaryUrl: getPrimaryFaviconCandidate(suggestion.url || '', suggestion.favicon || ''),
               browserUrl: getBrowserFaviconCandidateForSuggestion(suggestion, suggestionHost)
@@ -947,7 +1028,7 @@
           suggestionItem._xHistoryTag = historyTag;
         }
 
-        if (suggestion.type === 'topSite' || suggestion.isTopSite) {
+        if (isTopSiteSuggestion(suggestion)) {
           const urlLine = createUrlLine(suggestion.url || '');
           if (urlLine) {
             textWrapper.appendChild(urlLine);
@@ -1061,13 +1142,13 @@
 
         let historyDeleteButton = null;
         let historyDeleteSlot = null;
-        if (suggestion.type === 'history' && !suggestion.isTopSite) {
+        if (canRemoveSuggestionFromHistory(suggestion)) {
           historyDeleteSlot = documentRef.createElement('div');
           historyDeleteSlot.className = 'x-nt-history-delete-slot';
           historyDeleteButton = documentRef.createElement('button');
           historyDeleteButton.type = 'button';
           historyDeleteButton.className = 'x-nt-history-delete-button';
-          const removeHistoryTooltipText = t('search_remove_history_tooltip', '移除该历史');
+          const removeHistoryTooltipText = getRemoveSuggestionTooltipText(suggestion);
           historyDeleteButton.innerHTML = getRiSvg('ri-delete-bin-6-line', 'ri-size-14');
           historyDeleteButton.setAttribute('aria-label', removeHistoryTooltipText);
           historyDeleteButton.addEventListener('mouseenter', function() {

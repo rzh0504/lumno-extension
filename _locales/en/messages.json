@@ -974,6 +974,9 @@
   "search_remove_history_tooltip": {
     "message": "Remove this history entry"
   },
+  "search_remove_top_site_tooltip": {
+    "message": "Remove this frequent result"
+  },
   "search_tag_top_site": {
     "message": "Frequent"
   },

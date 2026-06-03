@@ -136,6 +136,14 @@ function createFakeDocument() {
   };
 }
 
+function triggerEvent(element, name, event) {
+  const handlers = element && element.eventListeners ? element.eventListeners.get(name) : null;
+  if (!handlers) {
+    return;
+  }
+  handlers.forEach((handler) => handler.call(element, event || {}));
+}
+
 function getHostFromUrl(url) {
   try {
     return new URL(url).hostname.toLowerCase();
@@ -328,13 +336,74 @@ async function testDirectUrlSuggestionUsesFaviconWhenAvailable() {
   );
 }
 
-async function testTabSuggestionUsesBrowserFaviconCandidate() {
+async function testBrowserNewtabSuggestionUsesFallbackIconWhenFaviconMissing() {
   const document = createFakeDocument();
   const container = document.createElement('div');
   container.setConnected(true);
   const items = [];
   const defaultTheme = faviconTheme.createDefaultTheme();
   const attached = [];
+  const fallbackImages = [];
+
+  const view = suggestionsView.createSuggestionsView({
+    document,
+    container,
+    items,
+    t: (key, fallback) => fallback || key,
+    getRiSvg: (iconName) => iconName,
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl,
+    getThemeHostForSuggestion: (suggestion) => getHostFromUrl(suggestion && suggestion.url),
+    shouldBlockFaviconForHost: () => false,
+    getImmediateThemeForSuggestion: () => defaultTheme,
+    getThemeForSuggestion: () => Promise.resolve(defaultTheme),
+    getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    getHoverColors: (theme) => faviconTheme.getHoverColors(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
+    applyMarkVariables: () => {},
+    getChromeFaviconUrl: (url) => `chrome://favicon2/?pageUrl=${encodeURIComponent(url)}&size=128`,
+    applyFallbackIcon: (img) => {
+      fallbackImages.push(img);
+      if (img) {
+        img.setAttribute('data-fallback-icon', 'true');
+      }
+    },
+    attachFaviconWithFallbacks: (img, url, host, options) => {
+      attached.push({ img, url, host, browserUrl: options && options.browserUrl });
+    },
+    defaultTheme
+  });
+
+  view.renderTabs([{
+    title: '新标签页',
+    url: 'chrome://newtab/',
+    favIconUrl: ''
+  }]);
+
+  const item = view.getItems()[0];
+  assert.ok(item, 'tab suggestion should render');
+  assert.strictEqual(item._xIconIsFavicon, false, 'new-tab suggestion should render an inline fallback icon');
+  assert.strictEqual(attached.length, 0, 'new-tab suggestion should not request a browser favicon when none exists');
+  assert.strictEqual(fallbackImages.length, 0, 'new-tab suggestion should not rely on the image fallback pipeline');
+  assert.ok(item._xIconWrap, 'new-tab suggestion should render an icon slot');
+  assert.strictEqual(item._xIconWrap.childNodes[0].tagName, 'SPAN');
+  assert.strictEqual(item._xIconWrap.childNodes[0].innerHTML, 'ri-link');
+}
+
+async function testBrowserPageTabUsesChromeFavicon2PrimaryCandidate() {
+  const document = createFakeDocument();
+  const container = document.createElement('div');
+  container.setConnected(true);
+  const items = [];
+  const defaultTheme = faviconTheme.createDefaultTheme();
+  const attached = [];
+  const browserPageIcon = 'chrome-extension://abc/_favicon/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128';
 
   const view = suggestionsView.createSuggestionsView({
     document,
@@ -359,24 +428,101 @@ async function testTabSuggestionUsesBrowserFaviconCandidate() {
     applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
     applyMarkVariables: () => {},
     getChromeFaviconUrl: (url) => `chrome://favicon2/?pageUrl=${encodeURIComponent(url)}&size=128`,
+    getBrowserPageFaviconUrl: () => browserPageIcon,
     attachFaviconWithFallbacks: (img, url, host, options) => {
-      attached.push({ img, url, host, browserUrl: options && options.browserUrl });
+      attached.push({
+        img,
+        url,
+        host,
+        primaryUrl: options && options.primaryUrl,
+        browserUrl: options && options.browserUrl
+      });
     },
     defaultTheme
   });
 
   view.renderTabs([{
-    title: '新标签页',
-    url: 'chrome://newtab/',
-    favIconUrl: ''
+    title: '扩展程序',
+    url: 'chrome://extensions/',
+    favIconUrl: browserPageIcon
   }]);
 
   const item = view.getItems()[0];
-  assert.ok(item, 'tab suggestion should render');
-  assert.strictEqual(item._xIconIsFavicon, true, 'tab suggestion should keep favicon image slot');
-  assert.strictEqual(attached.length, 1, 'tab favicon should be attached through the fallback chain');
-  assert.strictEqual(attached[0].url, 'chrome://newtab/');
-  assert.strictEqual(attached[0].browserUrl, 'chrome://favicon2/?pageUrl=chrome%3A%2F%2Fnewtab%2F&size=128');
+  assert.ok(item, 'browser page tab suggestion should render');
+  assert.strictEqual(item._xIconIsFavicon, true, 'browser page tab should try the favicon chain first');
+  assert.strictEqual(attached.length, 1, 'browser page tab favicon should be attached through the fallback chain');
+  assert.strictEqual(
+    attached[0].primaryUrl,
+    'chrome://favicon2/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128',
+    'browser page tabs should use chrome://favicon2 as the primary favicon candidate'
+  );
+  assert.notStrictEqual(attached[0].primaryUrl, browserPageIcon);
+}
+
+async function testBrowserPageSuggestionUsesChromeFavicon2WhenFaviconMissing() {
+  const document = createFakeDocument();
+  const container = document.createElement('div');
+  container.setConnected(true);
+  const items = [];
+  const defaultTheme = faviconTheme.createDefaultTheme();
+  const attached = [];
+
+  const view = suggestionsView.createSuggestionsView({
+    document,
+    container,
+    items,
+    t: (key, fallback) => fallback || key,
+    getRiSvg: (iconName) => iconName,
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl,
+    getThemeHostForSuggestion: (suggestion) => getHostFromUrl(suggestion && suggestion.url),
+    shouldBlockFaviconForHost: () => false,
+    getImmediateThemeForSuggestion: () => defaultTheme,
+    getThemeForSuggestion: () => Promise.resolve(defaultTheme),
+    getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    getHoverColors: (theme) => faviconTheme.getHoverColors(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
+    applyMarkVariables: () => {},
+    getChromeFaviconUrl: (url) => `chrome://favicon2/?pageUrl=${encodeURIComponent(url)}&size=128`,
+    attachFaviconWithFallbacks: (img, url, host, options) => {
+      attached.push({
+        img,
+        url,
+        host,
+        primaryUrl: options && options.primaryUrl,
+        browserUrl: options && options.browserUrl
+      });
+    },
+    defaultTheme
+  });
+
+  view.render({
+    query: 'extensions',
+    primaryHighlightIndex: 0,
+    primaryHighlightReason: 'browserPage',
+    suggestions: [{
+      type: 'browserPage',
+      title: '扩展程序',
+      url: 'chrome://extensions/',
+      favicon: ''
+    }]
+  });
+
+  const item = view.getItems()[0];
+  assert.ok(item, 'browser page suggestion should render');
+  assert.strictEqual(item._xIconIsFavicon, true, 'browser page suggestions should render a favicon image');
+  assert.strictEqual(attached.length, 1, 'browser page suggestions should attach a favicon even without suggestion.favicon');
+  assert.strictEqual(
+    attached[0].primaryUrl,
+    'chrome://favicon2/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128',
+    'browser page suggestions should use chrome://favicon2 when no favicon was supplied'
+  );
 }
 
 async function testHighlightedSiteSearchUsesFaviconFallbackChain() {
@@ -725,6 +871,107 @@ async function testVisitButtonAndEnterTagShareOverlayVisibilityRules() {
   );
 }
 
+async function testTopSiteSuggestionCanUseHoverDeleteAction() {
+  const document = createFakeDocument();
+  const container = document.createElement('div');
+  container.setConnected(true);
+  const items = [];
+  const defaultTheme = faviconTheme.createDefaultTheme();
+  const deleted = [];
+  let activateCount = 0;
+  const eventState = {
+    preventDefaultCount: 0,
+    stopPropagationCount: 0
+  };
+
+  const view = suggestionsView.createSuggestionsView({
+    document,
+    container,
+    items,
+    t: (key, fallback) => {
+      if (key === 'search_remove_top_site_tooltip') {
+        return '移除该常用';
+      }
+      return fallback || key;
+    },
+    getRiSvg: () => '',
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl,
+    getThemeHostForSuggestion: (suggestion) => getHostFromUrl(suggestion && suggestion.url),
+    shouldBlockFaviconForHost,
+    getImmediateThemeForSuggestion: () => defaultTheme,
+    getThemeForSuggestion: () => Promise.resolve(defaultTheme),
+    getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    getHoverColors: (theme) => faviconTheme.getHoverColors(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
+    applyMarkVariables: () => {},
+    onActivateSuggestion: () => {
+      activateCount += 1;
+    },
+    onDeleteHistory: (suggestion, query) => {
+      deleted.push({ suggestion, query });
+    },
+    actionModel: globalThis.LumnoSuggestionActionModel,
+    defaultTheme
+  });
+
+  const topSiteSuggestion = {
+    type: 'topSite',
+    title: 'Lumno',
+    url: 'https://lumno.example/',
+    isTopSite: true,
+    favicon: ''
+  };
+  view.render({
+    query: 'lumno',
+    primaryHighlightIndex: -1,
+    primaryHighlightReason: 'none',
+    suggestions: [topSiteSuggestion]
+  });
+
+  const item = view.getItems()[0];
+  assert.ok(item, 'top-site suggestion should render');
+  assert.strictEqual(
+    item._xHasHistoryDeleteButton,
+    true,
+    'top-site suggestions should render the same hover delete control as history suggestions'
+  );
+  assert.strictEqual(
+    item._xHistoryDeleteButton.getAttribute('aria-label'),
+    '移除该常用',
+    'top-site delete control should describe removing a frequent result'
+  );
+
+  triggerEvent(item, 'mouseenter');
+  assert.strictEqual(
+    item.getAttribute('data-history-delete-visible'),
+    'true',
+    'hovering a top-site suggestion should reveal the delete control'
+  );
+
+  triggerEvent(item._xHistoryDeleteButton, 'click', {
+    preventDefault() {
+      eventState.preventDefaultCount += 1;
+    },
+    stopPropagation() {
+      eventState.stopPropagationCount += 1;
+    }
+  });
+
+  assert.strictEqual(eventState.preventDefaultCount, 1, 'top-site delete click should prevent row activation');
+  assert.strictEqual(eventState.stopPropagationCount, 1, 'top-site delete click should not bubble to the result row');
+  assert.strictEqual(activateCount, 0, 'top-site delete click should not open the result');
+  assert.strictEqual(deleted.length, 1, 'top-site delete click should request URL removal');
+  assert.strictEqual(deleted[0].suggestion, topSiteSuggestion, 'top-site delete should pass the clicked suggestion');
+  assert.strictEqual(deleted[0].query, 'lumno', 'top-site delete should preserve the current query');
+}
+
 async function testAiProviderVisitButtonUsesWebAppLabel() {
   const document = createFakeDocument();
   const container = document.createElement('div');
@@ -865,12 +1112,15 @@ testSiteSearchProviderIconsUsePageFaviconCandidates();
 
 testLocalUrlSuggestionUsesFallbackTheme()
   .then(testDirectUrlSuggestionUsesFaviconWhenAvailable)
-  .then(testTabSuggestionUsesBrowserFaviconCandidate)
+  .then(testBrowserNewtabSuggestionUsesFallbackIconWhenFaviconMissing)
+  .then(testBrowserPageTabUsesChromeFavicon2PrimaryCandidate)
+  .then(testBrowserPageSuggestionUsesChromeFavicon2WhenFaviconMissing)
   .then(testHighlightedSiteSearchUsesFaviconFallbackChain)
   .then(testAiSiteSearchUsesFaviconFallbackChain)
   .then(testModeSwitchImageFallbackUsesLinkIcon)
   .then(testProxyFallbackFaviconUsesFallbackTheme)
   .then(testVisitButtonAndEnterTagShareOverlayVisibilityRules)
+  .then(testTopSiteSuggestionCanUseHoverDeleteAction)
   .then(testAiProviderVisitButtonUsesWebAppLabel)
   .then(testOpenNewTabVisitButtonReflectsCurrentTabModifier)
   .then(() => {

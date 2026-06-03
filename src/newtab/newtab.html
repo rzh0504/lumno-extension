@@ -2506,7 +2506,7 @@
         overflow: hidden auto;
         scrollbar-gutter: stable both-edges;
         overscroll-behavior: contain;
-        pointer-events: auto;
+        pointer-events: none;
         opacity: 0;
         visibility: hidden;
         filter: blur(6px);
@@ -2520,6 +2520,7 @@
       .x-nt-wallpaper-panel[data-open="true"] {
         opacity: 1;
         visibility: visible;
+        pointer-events: auto;
         filter: blur(0);
         transform: translateY(0) scale(1);
       }

@@ -974,6 +974,9 @@
   "search_remove_history_tooltip": {
     "message": "この履歴を削除"
   },
+  "search_remove_top_site_tooltip": {
+    "message": "このよく使う候補を削除"
+  },
   "search_tag_top_site": {
     "message": "よく使う"
   },
