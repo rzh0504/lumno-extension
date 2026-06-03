@@ -8087,6 +8087,7 @@
       'color': 'var(--x-nt-subtext, #6B7280)'
     },
     rightIconStyleOverrides: {
+      '--x-ext-input-right-icon-inset': '7px',
       cursor: 'pointer'
     },
     onInput: function(event) {
@@ -8799,7 +8800,6 @@
     : null;
 
   if (rightIcon) {
-    rightIcon.style.setProperty('right', '14px');
     rightIcon.addEventListener('click', function(event) {
       event.preventDefault();
       event.stopPropagation();

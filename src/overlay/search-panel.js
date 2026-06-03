@@ -1178,8 +1178,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         'padding-right': '92px'
       },
       rightIconStyleOverrides: {
-        cursor: 'pointer',
-        right: '50px'
+        '--x-ext-input-right-icon-inset': '13px',
+        cursor: 'pointer'
       },
       showUnderlineWhenEmpty: true
     });

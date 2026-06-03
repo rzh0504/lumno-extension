@@ -85,12 +85,12 @@
     rightIcon: [
       ['all', 'unset'],
       ['position', 'absolute'],
-      ['right', '14px'],
-      ['top', '50%'],
-      ['transform', 'translateY(-50%)'],
+      ['right', 'var(--x-ext-input-right-icon-inset, 13px)'],
+      ['top', 'var(--x-ext-input-right-icon-inset, 13px)'],
+      ['transform', 'none'],
       ['width', '30px'],
       ['height', '30px'],
-      ['border-radius', '8px'],
+      ['border-radius', 'var(--x-ext-input-right-icon-radius, 16px)'],
       ['z-index', '2'],
       ['box-sizing', 'border-box'],
       ['margin', '0'],
@@ -125,7 +125,7 @@
       ['vertical-align', 'baseline'],
       ['display', 'block'],
       ['background', 'transparent'],
-      ['border-radius', '28px 28px 0 0'],
+      ['border-radius', '32px 32px 0 0'],
       ['overflow', 'hidden']
     ]
   });
@@ -383,8 +383,8 @@
         ? 'var(--x-ext-input-icon-hover, #4B5563)'
         : 'var(--x-ext-input-icon, #9CA3AF)', useImportantStyles);
       setElementStyle(rightIcon, 'transform', active
-        ? 'translateY(-50%) scale(1.06)'
-        : 'translateY(-50%)', useImportantStyles);
+        ? 'scale(1.06)'
+        : 'none', useImportantStyles);
     };
     setRightIconVisualState(false);
     rightIcon.addEventListener('mouseenter', () => {

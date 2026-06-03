@@ -10,6 +10,7 @@ const injectedScriptFiles = [
   'src/background/shortcut-rules.js',
   'src/background/pip-ownership.js',
   'src/background/pip-main-world.js',
+  'src/background/recent-tab-switcher.js',
   'src/shared/extension-routes.js',
   'src/shared/settings.js',
   'src/shared/search-utils.js',
@@ -33,6 +34,7 @@ const injectedScriptFiles = [
   'src/overlay/lifecycle.js',
   'src/overlay/site-fixes.js',
   'src/overlay/search-panel.js',
+  'src/overlay/tab-switcher.js',
   'src/content/document-pip-picker.js'
 ];
 

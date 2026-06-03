@@ -17,7 +17,7 @@
   vertical-align: baseline;
   display: block;
   background: transparent;
-  border-radius: 28px 28px 0 0;
+  border-radius: 32px 32px 0 0;
   overflow: hidden;
 }
 
@@ -91,12 +91,12 @@
 .x-lumno-search-input__right-icon {
   all: unset;
   position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
+  right: var(--x-ext-input-right-icon-inset, 13px);
+  top: var(--x-ext-input-right-icon-inset, 13px);
+  transform: none;
   width: 30px;
   height: 30px;
-  border-radius: 8px;
+  border-radius: var(--x-ext-input-right-icon-radius, 16px);
   z-index: 2;
   box-sizing: border-box;
   margin: 0;
@@ -117,12 +117,20 @@
 .x-lumno-search-input__right-icon[data-hover-active="true"] {
   background: var(--x-ext-input-icon-hover-bg, rgba(148, 163, 184, 0.16));
   color: var(--x-ext-input-icon-hover, #4b5563);
-  transform: translateY(-50%) scale(1.06);
+  transform: scale(1.06);
 }
 
 .x-lumno-search-input__right-icon * {
   pointer-events: none;
   cursor: pointer;
+}
+
+@supports (corner-shape: superellipse(1.25)) {
+  .x-lumno-search-input,
+  .x-lumno-search-input__container,
+  .x-lumno-search-input__right-icon {
+    corner-shape: superellipse(1.25);
+  }
 }
 
 .x-lumno-search-input-mode__badge {

@@ -1276,5 +1276,20 @@
   },
   "recent_dismiss_pinned_toast": {
     "message": "已取消置頂並移除"
+  },
+  "tab_switcher_title": {
+    "message": "最近分頁"
+  },
+  "tab_switcher_current": {
+    "message": "目前"
+  },
+  "tab_switcher_untitled": {
+    "message": "未命名"
+  },
+  "tab_switcher_favicon_alt": {
+    "message": "網站圖示"
+  },
+  "command_show_tab_switcher": {
+    "message": "開啟最近分頁切換器"
   }
 }

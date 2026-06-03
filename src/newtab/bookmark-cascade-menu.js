@@ -1140,14 +1140,18 @@
       }
       levelElement.setAttribute('data-level', String(safeLevelIndex));
       levelElement.setAttribute('role', 'menu');
+      const contentElement = documentObj.createElement('div');
+      contentElement.className = 'x-nt-bookmark-cascade-content';
+      contentElement.setAttribute('role', 'none');
+      levelElement.appendChild(contentElement);
 
-      appendBookmarkCascadeLevelTitle(levelElement, folderTitle);
+      appendBookmarkCascadeLevelTitle(contentElement, folderTitle);
       const items = getBookmarkCascadeItems(folderId);
       if (items.length === 0) {
         const emptyItem = documentObj.createElement('div');
         emptyItem.className = 'x-nt-bookmark-cascade-empty';
         emptyItem.textContent = t('bookmarks_empty_folder', 'No content');
-        levelElement.appendChild(emptyItem);
+        contentElement.appendChild(emptyItem);
       }
 
       items.forEach((item, index) => {
@@ -1289,7 +1293,7 @@
             navigateLeafItem();
           });
         }
-        levelElement.appendChild(itemButton);
+        contentElement.appendChild(itemButton);
       });
 
       bookmarkCascadeMenu.appendChild(levelElement);

@@ -13,7 +13,7 @@
   scrollbar-width: none;
   -ms-overflow-style: none;
   background: transparent;
-  border-radius: 0 0 28px 28px;
+  border-radius: 0 0 32px 32px;
   padding: 12px;
   box-sizing: border-box;
   display: block;
@@ -30,12 +30,12 @@
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-close-other-tabs {
   all: unset;
   position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
+  right: calc(var(--x-ext-input-right-icon-inset, 13px) + 36px);
+  top: var(--x-ext-input-right-icon-inset, 13px);
+  transform: none;
   width: 30px;
   height: 30px;
-  border-radius: 8px;
+  border-radius: var(--x-ext-input-right-icon-radius, 16px);
   z-index: 2;
   box-sizing: border-box;
   margin: 0;
@@ -57,7 +57,17 @@
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-close-other-tabs[data-hover-active="true"] {
   background: var(--x-ext-input-icon-hover-bg, rgba(148, 163, 184, 0.16));
   color: var(--x-ext-input-icon-hover, #4B5563);
-  transform: translateY(-50%) scale(1.06);
+  transform: scale(1.06);
+}
+
+@supports (corner-shape: superellipse(1.25)) {
+  :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestions-container,
+  :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-empty-state,
+  :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-item,
+  :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-visit-button,
+  :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-close-other-tabs {
+    corner-shape: superellipse(1.25);
+  }
 }
 
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .ri-icon {

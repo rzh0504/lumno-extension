@@ -725,6 +725,11 @@ assertContains(
   'bookmark cascade runtime should render folder titles inside menu levels'
 );
 assertContains(
+  cascadeMenuJs,
+  'x-nt-bookmark-cascade-content',
+  'bookmark cascade runtime should render menu rows inside a clipped scroll layer'
+);
+assertContains(
   newtabHtml,
   '.x-nt-bookmark-cascade-title',
   'new tab should style bookmark cascade folder titles'
@@ -744,18 +749,44 @@ assertContains(
 const bookmarkCascadeLevelCss = getCssRuleBody(newtabHtml, '.x-nt-bookmark-cascade-level');
 assertContains(
   bookmarkCascadeLevelCss,
+  'overflow: hidden;',
+  'bookmark cascade levels should clip the internal scrollbar to the rounded panel'
+);
+const bookmarkCascadeContentCss = getCssRuleBody(newtabHtml, '.x-nt-bookmark-cascade-content');
+assertContains(
+  bookmarkCascadeContentCss,
   'display: flex;',
-  'bookmark cascade levels should lay out rows as a controlled vertical stack'
+  'bookmark cascade scroll content should lay out rows as a controlled vertical stack'
 );
 assertContains(
-  bookmarkCascadeLevelCss,
+  bookmarkCascadeContentCss,
   'flex-direction: column;',
-  'bookmark cascade levels should stack menu rows vertically'
+  'bookmark cascade scroll content should stack menu rows vertically'
 );
 assertContains(
-  bookmarkCascadeLevelCss,
+  bookmarkCascadeContentCss,
   'row-gap: 4px;',
   'bookmark cascade menu rows should keep visible vertical spacing'
+);
+assertContains(
+  bookmarkCascadeContentCss,
+  'overflow-y: auto;',
+  'bookmark cascade scroll content should own native vertical scrolling'
+);
+assertContains(
+  bookmarkCascadeContentCss,
+  'scrollbar-gutter: stable;',
+  'bookmark cascade scroll content should reserve room for the custom scrollbar'
+);
+assertContains(
+  newtabHtml,
+  '.x-nt-bookmark-cascade-content::-webkit-scrollbar-button:vertical:start:decrement',
+  'bookmark cascade scrollbar should reserve a transparent top spacer'
+);
+assertContains(
+  newtabHtml,
+  '.x-nt-bookmark-cascade-content::-webkit-scrollbar-button:vertical:end:increment',
+  'bookmark cascade scrollbar should reserve a transparent bottom spacer'
 );
 assertContains(
   bookmarkCascadeLevelCss,

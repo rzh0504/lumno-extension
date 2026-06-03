@@ -2,6 +2,23 @@
   const api = factory();
   root.LumnoOverlayShell = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function() {
+  function isCornerShapeSupported(doc, shape) {
+    const win = doc && doc.defaultView ? doc.defaultView : (typeof window !== 'undefined' ? window : null);
+    return Boolean(
+      win &&
+      win.CSS &&
+      typeof win.CSS.supports === 'function' &&
+      win.CSS.supports('corner-shape', shape)
+    );
+  }
+
+  function applyCornerShapeIfSupported(element, shape, priority) {
+    if (!element || !element.style || !isCornerShapeSupported(element.ownerDocument, shape)) {
+      return;
+    }
+    element.style.setProperty('corner-shape', shape, priority || '');
+  }
+
   function createOverlayElement(doc, options) {
     const settings = options && typeof options === 'object' ? options : {};
     const overlay = doc.createElement('div');
@@ -23,7 +40,7 @@
       backdrop-filter: blur(var(--x-ov-blur, 24px)) saturate(var(--x-ov-saturate, 165%)) !important;
       -webkit-backdrop-filter: blur(var(--x-ov-blur, 24px)) saturate(var(--x-ov-saturate, 165%)) !important;
       border: 1px solid var(--x-ov-border, rgba(0, 0, 0, 0.08)) !important;
-      border-radius: 28px !important;
+      border-radius: 32px !important;
       box-shadow: var(--x-ov-shadow, 0 17px 120px 0 rgba(0, 0, 0, 0.05), 0 32px 44.5px 0 rgba(0, 0, 0, 0.10), 0 80px 120px 0 rgba(0, 0, 0, 0.15)) !important;
       z-index: 2147483647 !important;
       font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
@@ -54,6 +71,7 @@
       will-change: transform, opacity, filter !important;
       transition: transform 340ms cubic-bezier(0.2, 1, 0.36, 1), opacity 220ms ease, filter 300ms ease !important;
     `;
+    applyCornerShapeIfSupported(overlay, 'superellipse(1.25)', 'important');
 
     return overlay;
   }
