@@ -18,6 +18,7 @@
     "test:newtab-layout": "node scripts/test-newtab-layout.js",
     "test:message-router": "node scripts/test-message-router.js",
     "test:command-target-policy": "node scripts/test-background-command-target-policy.js",
+    "test:background-search-favicon": "node scripts/test-background-search-favicon.js",
     "test:extension-routes": "node scripts/test-extension-routes.js",
     "test:extension-pages": "node scripts/test-extension-pages.js",
     "test:options-onboarding-link": "node scripts/test-options-onboarding-link.js",

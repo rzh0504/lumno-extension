@@ -2940,6 +2940,42 @@ function getExtensionFaviconUrl(pageUrl) {
     : '';
 }
 
+function isBrowserInternalPageUrl(url) {
+  if (typeof FAVICON_UTILS.isBrowserInternalPageUrl === 'function') {
+    return FAVICON_UTILS.isBrowserInternalPageUrl(url);
+  }
+  const lower = String(url || '').trim().toLowerCase();
+  return lower.startsWith('chrome://') ||
+    lower.startsWith('edge://') ||
+    lower.startsWith('brave://') ||
+    lower.startsWith('vivaldi://') ||
+    lower.startsWith('opera://') ||
+    lower.startsWith('about:');
+}
+
+function getBrowserPageFaviconUrl(pageUrl) {
+  const page = String(pageUrl || '').trim();
+  if (!isBrowserInternalPageUrl(page)) {
+    return '';
+  }
+  if (typeof FAVICON_UTILS.getBrowserPageFaviconUrl === 'function') {
+    return FAVICON_UTILS.getBrowserPageFaviconUrl(page, {
+      getRuntimeUrl: chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function'
+        ? chrome.runtime.getURL.bind(chrome.runtime)
+        : null,
+      size: FAVICON_PROXY_SIZE
+    });
+  }
+  try {
+    const faviconUrl = new URL('chrome://favicon2/');
+    faviconUrl.searchParams.set('pageUrl', page);
+    faviconUrl.searchParams.set('size', String(FAVICON_PROXY_SIZE));
+    return faviconUrl.toString();
+  } catch (e) {
+    return '';
+  }
+}
+
 function getGstaticFaviconUrl(pageUrl) {
   if (!pageUrl || !/^https?:\/\//i.test(pageUrl)) {
     return '';
@@ -4793,6 +4829,9 @@ async function getSearchSuggestions(query) {
     function buildSearchSuggestionFavicon(url) {
       if (isOwnExtensionUrl(url)) {
         return getOwnExtensionFaviconUrl();
+      }
+      if (isBrowserInternalPageUrl(url)) {
+        return getBrowserPageFaviconUrl(url);
       }
       try {
         const urlObj = new URL(url);
