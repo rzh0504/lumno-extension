@@ -5,6 +5,8 @@
   }
   root.LumnoFaviconUtils = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function() {
+  const LUMNO_EXTENSION_ICON_PATH = 'assets/images/lumno.png';
+
   function normalizeFaviconHost(hostname) {
     if (!hostname) {
       return '';
@@ -175,6 +177,13 @@
       lower.startsWith('about:');
   }
 
+  function isBrowserExtensionProtocol(protocol) {
+    const normalized = String(protocol || '').toLowerCase();
+    return normalized === 'chrome-extension:' ||
+      normalized === 'moz-extension:' ||
+      normalized === 'ms-browser-extension:';
+  }
+
   function getBrowserPageFaviconUrl(pageUrl, options) {
     const page = String(pageUrl || '').trim();
     if (!isBrowserInternalPageUrl(page)) {
@@ -244,6 +253,69 @@
     }
   }
 
+  function getOwnExtensionRuntimeInfo(options, getRuntimeUrl) {
+    const runtime = options && options.chromeApi && options.chromeApi.runtime
+      ? options.chromeApi.runtime
+      : null;
+    const info = {
+      id: runtime && runtime.id ? String(runtime.id) : '',
+      protocol: 'chrome-extension:'
+    };
+    if (typeof getRuntimeUrl !== 'function') {
+      return info;
+    }
+    ['', '/'].some((path) => {
+      let runtimeUrl = '';
+      try {
+        runtimeUrl = String(getRuntimeUrl(path) || '').trim();
+      } catch (e) {
+        return false;
+      }
+      if (!runtimeUrl) {
+        return false;
+      }
+      try {
+        const parsed = new URL(runtimeUrl);
+        if (!isBrowserExtensionProtocol(parsed.protocol)) {
+          return false;
+        }
+        if (!info.id && parsed.hostname) {
+          info.id = parsed.hostname;
+        }
+        if (!info.protocol || !info.id || parsed.hostname === info.id) {
+          info.protocol = parsed.protocol;
+        }
+        return Boolean(info.id);
+      } catch (e) {
+        return false;
+      }
+    });
+    return info;
+  }
+
+  function getOwnExtensionAssetUrl(path, runtimeInfo, options) {
+    const assetPath = String(path || '').replace(/^\/+/, '');
+    if (!assetPath) {
+      return '';
+    }
+    const runtimeUrl = getRuntimeFaviconUrl(assetPath, options);
+    if (runtimeUrl) {
+      try {
+        const parsed = new URL(runtimeUrl);
+        if (isBrowserExtensionProtocol(parsed.protocol) &&
+            (!runtimeInfo || !runtimeInfo.id || parsed.hostname === runtimeInfo.id)) {
+          return runtimeUrl;
+        }
+      } catch (e) {
+        // Fall through to constructing the known extension asset URL below.
+      }
+    }
+    if (runtimeInfo && runtimeInfo.id) {
+      return `${runtimeInfo.protocol || 'chrome-extension:'}//${runtimeInfo.id}/${assetPath}`;
+    }
+    return runtimeUrl;
+  }
+
   function getKnownThemedFaviconCandidateScores(hostname, preferredTheme, options) {
     const host = normalizeFaviconHost(hostname);
     const mode = normalizeFaviconThemePreference(preferredTheme);
@@ -253,7 +325,7 @@
     if (host === 'lumno.kubai.design') {
       return [
         {
-          url: getRuntimeFaviconUrl('assets/images/lumno.png', options) || 'https://lumno.kubai.design/favicon.png',
+          url: getRuntimeFaviconUrl(LUMNO_EXTENSION_ICON_PATH, options) || 'https://lumno.kubai.design/favicon.png',
           score: 58
         }
       ];
@@ -877,6 +949,7 @@
     const customChromeFaviconUrl = typeof config.getChromeFaviconUrl === 'function'
       ? config.getChromeFaviconUrl
       : null;
+    const ownExtensionRuntime = getOwnExtensionRuntimeInfo(config, getRuntimeUrl);
 
     function getCanonicalFaviconPage(pageUrl) {
       const raw = String(pageUrl || '').trim();
@@ -940,6 +1013,27 @@
         }
       }
       return getChromeFaviconUrl(page, { size });
+    }
+
+    function isResolverOwnExtensionPageUrl(pageUrl) {
+      if (!ownExtensionRuntime.id) {
+        return false;
+      }
+      try {
+        const parsed = new URL(String(pageUrl || '').trim());
+        return isBrowserExtensionProtocol(parsed.protocol) &&
+          String(parsed.hostname || '') === String(ownExtensionRuntime.id) &&
+          !String(parsed.pathname || '').toLowerCase().startsWith('/_favicon/');
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function getResolverOwnExtensionFaviconUrl(pageUrl) {
+      if (!isResolverOwnExtensionPageUrl(pageUrl)) {
+        return '';
+      }
+      return getOwnExtensionAssetUrl(LUMNO_EXTENSION_ICON_PATH, ownExtensionRuntime, { getRuntimeUrl });
     }
 
     function isBlockedFaviconPageUrl(pageUrl) {
@@ -1012,6 +1106,10 @@
       const page = getCanonicalFaviconPage(pageUrl);
       if (!page) {
         return '';
+      }
+      const ownExtensionFavicon = getResolverOwnExtensionFaviconUrl(page);
+      if (ownExtensionFavicon) {
+        return getSafeFaviconCandidateUrl(ownExtensionFavicon);
       }
       if (isBrowserInternalPageUrl(page)) {
         return getSafeFaviconCandidateUrl(getResolverBrowserPageFaviconUrl(page)) ||

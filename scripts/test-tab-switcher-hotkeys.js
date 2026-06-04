@@ -121,6 +121,11 @@ assert.match(
   /respondToExtensionPageRequest[\s\S]*advanced:[\s\S]*open:[\s\S]*suppressed:/,
   'shared tab switcher bridge should pass command advance and open-state status back to extension-page ports'
 );
+assert.match(
+  switcherBridgeSource,
+  /function updateOpenTabSwitcherThumbnail\(request\)[\s\S]*_lumnoTabSwitcherUpdateThumbnail[\s\S]*request\.action === 'updateTabSwitcherThumbnail'/,
+  'shared tab switcher bridge should forward live thumbnail updates into extension-page switchers'
+);
 assert.strictEqual(
   /openTabSwitcherFromCommand|advanceOpenTabSwitcherFromCommand|_x_extension_tab_switcher_advance_command_2026_unique_/.test(contentHotkeySource),
   false,
@@ -176,14 +181,64 @@ assert.strictEqual(
 );
 assert.match(
   backgroundSource,
-  /function setTabSwitcherCaptureVisibility\(tab,\s*hidden\)[\s\S]*action:\s*'setTabSwitcherCaptureVisibility'[\s\S]*chrome\.tabs\.sendMessage[\s\S]*chrome\.scripting\.executeScript/,
-  'background should set tab switcher capture visibility through extension-page ports, content-script messages, and executeScript fallback'
+  /function setTabSwitcherCaptureVisibility\(tab,\s*hidden\)[\s\S]*action:\s*'setTabSwitcherCaptureVisibility'[\s\S]*sendTabSwitcherHostMessage/,
+  'background should set tab switcher capture visibility through the shared host message helper'
 );
 assert.match(
   backgroundSource,
-  /function getOpenTabSwitcherState\(tab\)[\s\S]*action:\s*'getOpenTabSwitcherState'[\s\S]*postTabSwitcherMessageToExtensionPage[\s\S]*chrome\.tabs\.sendMessage[\s\S]*chrome\.scripting\.executeScript/,
-  'background should read open tab switcher state through extension-page ports, content-script messages, and executeScript fallback'
+  /function getOpenTabSwitcherState\(tab\)[\s\S]*action:\s*'getOpenTabSwitcherState'[\s\S]*sendTabSwitcherHostMessage/,
+  'background should read open tab switcher state through the shared host message helper'
 );
+assert.match(
+  backgroundSource,
+  /function postTabSwitcherThumbnailUpdate\(tab,\s*update\)[\s\S]*action:\s*'updateTabSwitcherThumbnail'[\s\S]*sendTabSwitcherHostMessage/,
+  'background should push fresh thumbnail captures through the shared host message helper'
+);
+const hostMessageBlock = getFunctionBlock(
+  backgroundSource,
+  'function sendTabSwitcherHostMessage(tab, payload, optionsArg)',
+  'function setTabSwitcherCaptureVisibility(tab, hidden)'
+);
+assert.match(
+  hostMessageBlock,
+  /postTabSwitcherMessageToExtensionPage/,
+  'background tab switcher host messages should try the extension-page port path'
+);
+assert.match(
+  hostMessageBlock,
+  /chrome\.tabs\.sendMessage/,
+  'background tab switcher host messages should try the content-script message path'
+);
+assert.match(
+  hostMessageBlock,
+  /runTabSwitcherHostScript/,
+  'background tab switcher host messages should share one executeScript fallback path'
+);
+[
+  ['setTabSwitcherCaptureVisibility', 'function setTabSwitcherCaptureVisibility(tab, hidden)'],
+  ['getOpenTabSwitcherState', 'function getOpenTabSwitcherState(tab)'],
+  ['postTabSwitcherThumbnailUpdate', 'function postTabSwitcherThumbnailUpdate(tab, update)']
+].forEach(([name, startNeedle]) => {
+  const block = getFunctionBlock(
+    backgroundSource,
+    startNeedle,
+    name === 'postTabSwitcherThumbnailUpdate'
+      ? 'function waitForTabSwitcherCapturePaint'
+      : name === 'getOpenTabSwitcherState'
+        ? 'function postTabSwitcherThumbnailUpdate'
+        : 'function getOpenTabSwitcherState'
+  );
+  assert.match(
+    block,
+    /sendTabSwitcherHostMessage\(/,
+    `${name} should delegate transport details to the shared host message helper`
+  );
+  assert.strictEqual(
+    /function runExecuteScriptFallback|const runExecuteScriptFallback/.test(block),
+    false,
+    `${name} should not keep local executeScript fallback plumbing`
+  );
+});
 assert.match(
   backgroundSource,
   /function withTabSwitcherHiddenForCapture\(tab,\s*capture\)[\s\S]*setTabSwitcherCaptureVisibility\(tab,\s*true\)[\s\S]*\.finally\(\(\) => setTabSwitcherCaptureVisibility\(tab,\s*false\)\)/,
@@ -203,6 +258,11 @@ assert.match(
   captureSwitcherThumbnailBlock,
   /withTabSwitcherHiddenForCapture\(resolvedTab,[\s\S]*chrome\.tabs\.captureVisibleTab/,
   'thumbnail capture should still hide and restore any late switcher host before calling captureVisibleTab'
+);
+assert.match(
+  captureSwitcherThumbnailBlock,
+  /recentTabTracker\.setThumbnail\(resolvedTab\.id,[\s\S]*postTabSwitcherThumbnailUpdate\(resolvedTab,/,
+  'thumbnail capture success should publish the fresh cover to an already-open switcher'
 );
 assert.strictEqual(
   backgroundSource.includes('triggerTabSwitcherFromPageHotkey'),
@@ -595,6 +655,17 @@ assert.match(
   /content:\s*"";[\s\S]*position:\s*absolute;[\s\S]*inset:\s*var\(--x-tab-switcher-thumb-stroke-inset\);[\s\S]*z-index:\s*2;[\s\S]*border-radius:\s*calc\(var\(--x-tab-switcher-radius-thumb\) \+ var\(--x-tab-switcher-thumb-stroke-radius-offset\)\);[\s\S]*box-sizing:\s*border-box;[\s\S]*border:\s*1px solid var\(--x-tab-switcher-thumb-stroke-color\);[\s\S]*box-shadow:\s*none;/,
   'tab switcher screenshot containers should center a neutral overlay stroke on the thumbnail clipping edge'
 );
+const thumbnailImageBlock = getCssRuleBlock(switcherSource, '.x-tab-switcher-thumb img[data-kind="thumbnail"]');
+assert.match(
+  thumbnailImageBlock,
+  /position:\s*absolute;[\s\S]*inset:\s*0;[\s\S]*opacity:\s*1;[\s\S]*transition:\s*opacity var\(--x-tab-switcher-motion-cover\);/,
+  'tab switcher screenshot images should stack and fade so fresh captures can cover cached thumbnails'
+);
+assert.match(
+  switcherSource,
+  /\.x-tab-switcher-thumb img\[data-kind="thumbnail"\]\[data-entering="true"\]\s*\{[\s\S]*opacity:\s*0;/,
+  'tab switcher fresh screenshot images should start transparent before fading over cached covers'
+);
 assert.strictEqual(
   /box-shadow\s*:/.test(thumbBlock),
   false,
@@ -722,6 +793,16 @@ assert.match(
 );
 assert.match(
   switcherSource,
+  /function updateCardThumbnail\(card,\s*tab,\s*update\)[\s\S]*data-entering[\s\S]*requestAnimationFrame[\s\S]*removeAttribute\('data-entering'\)[\s\S]*remove\(\)/,
+  'tab switcher should transition fresh screenshot updates over the cached thumbnail without rerendering the card'
+);
+assert.match(
+  switcherSource,
+  /host\._lumnoTabSwitcherUpdateThumbnail = function\(update\)[\s\S]*updateCardThumbnail/,
+  'tab switcher should expose an in-page thumbnail update hook while it is open'
+);
+assert.match(
+  switcherSource,
   /\.x-tab-switcher-favicon\[data-broken="true"\],[\s\S]*\.x-tab-switcher-thumb-favicon\[data-broken="true"\][\s\S]*visibility:\s*hidden;/,
   'tab switcher broken favicons should hide while preserving layout'
 );
@@ -774,6 +855,11 @@ localeNames.forEach((locale) => {
     false,
     `${locale} should not keep unused current badge copy`
   );
+  assert.match(
+    localeMessages[locale].settings_tab_switcher_desc.message,
+    /Alt\/⌥\+Q/,
+    `${locale} should mention the Mac Option symbol alongside Alt in the tab switcher shortcut copy`
+  );
 });
 assert.notStrictEqual(
   localeMessages.zh_CN.tab_switcher_title.message,
@@ -785,6 +871,10 @@ assert.ok(
     optionsHtmlSource.includes('data-i18n="settings_tab_switcher_desc"') &&
     optionsHtmlSource.includes('id="_x_extension_tab_switcher_toggle_2026_unique_"'),
   'settings Labs should expose a concise localized tab switcher toggle'
+);
+assert.ok(
+  optionsHtmlSource.includes('按 Alt/⌥+Q 快速切换最近标签页'),
+  'settings Labs fallback copy should include the Mac Option symbol alongside Alt'
 );
 assert.match(
   optionsSource,
@@ -1177,6 +1267,16 @@ assert.match(
 );
 assert.match(
   backgroundSource,
+  /const TAB_SWITCHER_CAPTURE_REASON_COMMAND_IMMEDIATE = 'command-immediate';[\s\S]*const TAB_SWITCHER_CAPTURE_REASON_COMMAND_REFRESH = 'command-refresh';[\s\S]*function isSwitcherCommandCaptureReason\(reason\)/,
+  'Alt+Q command thumbnail capture reasons should be named and checked through one helper'
+);
+assert.match(
+  backgroundSource,
+  /ensureTabSwitcherStateLoaded\(\)[\s\S]*hydrateState\(state,\s*\{[\s\S]*merge:\s*tabSwitcherStateDirtyBeforeLoad === true/,
+  'Alt+Q should merge persisted thumbnails when focus events arrive before switcher state hydration finishes'
+);
+assert.match(
+  backgroundSource,
   /const tabSwitcherThumbnailTimersByTabId = new Map\(\)/,
   'Alt+Q thumbnail scheduling should keep per-tab timers instead of one global timer'
 );
@@ -1267,7 +1367,7 @@ assert.match(
 );
 assert.match(
   triggerSwitcherBlock,
-  /shouldCaptureOwnExtensionPageThumbnailBeforePayload\(activeTab\)[\s\S]*captureSwitcherThumbnailForTab\(activeTab,\s*'command-immediate'\)[\s\S]*activeThumbnailReady\.catch\(\(\) => false\)\.finally\(\(\) => \{[\s\S]*getRecentTabsForSwitcher\(tabList,\s*activeTab\.id\)/,
+  /shouldCaptureOwnExtensionPageThumbnailBeforePayload\(activeTab\)[\s\S]*captureSwitcherThumbnailForTab\([\s\S]*activeTab,[\s\S]*TAB_SWITCHER_CAPTURE_REASON_COMMAND_IMMEDIATE[\s\S]*activeThumbnailReady\.catch\(\(\) => false\)\.finally\(\(\) => \{[\s\S]*getRecentTabsForSwitcher\(tabList,\s*activeTab\.id\)/,
   'Alt+Q should pre-capture missing own extension-page thumbnails before payload construction'
 );
 assert.match(
@@ -1275,15 +1375,15 @@ assert.match(
   /let activeThumbnailReady = Promise\.resolve\(false\);/,
   'Alt+Q normal command path should keep immediate rendering unless the own extension-page pre-capture guard opts in'
 );
-assert.strictEqual(
-  triggerSwitcherBlock.includes("scheduleSwitcherThumbnailCapture(activeTab, 'command')"),
-  false,
-  'Alt+Q should not schedule active-tab thumbnail capture while opening the visible switcher'
+assert.match(
+  backgroundSource,
+  /function requestSwitcherThumbnailRefreshAfterOpen\(tab\)[\s\S]*enqueueSwitcherThumbnailCapture\([\s\S]*TAB_SWITCHER_CAPTURE_REASON_COMMAND_REFRESH/,
+  'Alt+Q should refresh the active tab screenshot after opening without blocking the cached first paint'
 );
-assert.strictEqual(
-  triggerSwitcherBlock.includes("enqueueSwitcherThumbnailCapture(activeTab, 'command')"),
-  false,
-  'Alt+Q command path should leave immediate capture work to the asynchronous scheduler'
+assert.match(
+  triggerSwitcherBlock,
+  /refreshThumbnailTab:\s*activeTab/,
+  'Alt+Q should pass the active tab through so the opener can refresh its cover after first paint'
 );
 
 console.log('tab switcher hotkey tests passed');

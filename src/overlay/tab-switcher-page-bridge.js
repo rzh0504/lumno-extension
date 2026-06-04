@@ -103,6 +103,14 @@
     };
   }
 
+  function updateOpenTabSwitcherThumbnail(request) {
+    const host = document.getElementById(TAB_SWITCHER_HOST_ID);
+    if (!host || typeof host._lumnoTabSwitcherUpdateThumbnail !== 'function') {
+      return { ok: false, reason: 'tab_switcher_host_missing' };
+    }
+    return host._lumnoTabSwitcherUpdateThumbnail(request) || { ok: true };
+  }
+
   function handleTabSwitcherCommandMessage(request) {
     if (!request || typeof request !== 'object') {
       return null;
@@ -118,6 +126,9 @@
     }
     if (request.action === 'getOpenTabSwitcherState') {
       return getOpenTabSwitcherState();
+    }
+    if (request.action === 'updateTabSwitcherThumbnail') {
+      return updateOpenTabSwitcherThumbnail(request);
     }
     return null;
   }

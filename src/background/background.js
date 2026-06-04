@@ -538,138 +538,179 @@ function getOpenTabSwitcherStateInPage(hostId) {
   };
 }
 
-function setTabSwitcherCaptureVisibility(tab, hidden) {
-  const tabId = tab && typeof tab.id === 'number' ? tab.id : null;
-  if (typeof tabId !== 'number') {
-    return Promise.resolve(false);
+function updateTabSwitcherThumbnailInPage(update, hostId) {
+  const host = document.getElementById(hostId);
+  if (!host || typeof host._lumnoTabSwitcherUpdateThumbnail !== 'function') {
+    return { ok: false, reason: 'tab_switcher_host_missing' };
   }
+  return host._lumnoTabSwitcherUpdateThumbnail(update) || { ok: true };
+}
+
+function getFailedOpenTabSwitcherState() {
+  return { ok: false, open: false };
+}
+
+function normalizeTabSwitcherHostOkResponse(response) {
+  return response && response.ok === true ? true : null;
+}
+
+function normalizeOpenTabSwitcherStateResponse(response) {
+  if (!response || response.ok !== true || typeof response.open !== 'boolean') {
+    return null;
+  }
+  return {
+    ok: true,
+    open: response.open === true
+  };
+}
+
+function normalizeTabSwitcherHostOkScriptResults(results) {
+  return Array.isArray(results) &&
+    results.some((item) => item && item.result && item.result.ok === true)
+    ? true
+    : null;
+}
+
+function normalizeOpenTabSwitcherStateScriptResults(results) {
+  const result = Array.isArray(results)
+    ? results.find((item) => (
+      item &&
+      item.result &&
+      item.result.ok === true &&
+      typeof item.result.open === 'boolean'
+    ))
+    : null;
+  return result && result.result
+    ? {
+      ok: true,
+      open: result.result.open === true
+    }
+    : null;
+}
+
+function runTabSwitcherHostScript(tabId, scriptFunc, scriptArgs, normalizeResults, fallbackValue) {
+  if (typeof tabId !== 'number' ||
+      !chrome ||
+      !chrome.scripting ||
+      typeof chrome.scripting.executeScript !== 'function' ||
+      typeof scriptFunc !== 'function') {
+    return Promise.resolve(fallbackValue);
+  }
+  const normalize = typeof normalizeResults === 'function'
+    ? normalizeResults
+    : normalizeTabSwitcherHostOkScriptResults;
+  return new Promise((resolve) => {
+    try {
+      chrome.scripting.executeScript({
+        target: { tabId },
+        func: scriptFunc,
+        args: Array.isArray(scriptArgs) ? scriptArgs : []
+      }, (results) => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          resolve(fallbackValue);
+          return;
+        }
+        const normalized = normalize(results);
+        resolve(normalized === null ? fallbackValue : normalized);
+      });
+    } catch (error) {
+      resolve(fallbackValue);
+    }
+  });
+}
+
+function sendTabSwitcherHostMessage(tab, payload, optionsArg) {
+  const tabId = tab && typeof tab.id === 'number' ? tab.id : null;
+  const options = optionsArg && typeof optionsArg === 'object' ? optionsArg : {};
+  const fallbackValue = Object.prototype.hasOwnProperty.call(options, 'fallbackValue')
+    ? options.fallbackValue
+    : false;
+  if (typeof tabId !== 'number' || !payload || typeof payload !== 'object') {
+    return Promise.resolve(fallbackValue);
+  }
+  const normalizeResponse = typeof options.normalizeResponse === 'function'
+    ? options.normalizeResponse
+    : normalizeTabSwitcherHostOkResponse;
+  const runScriptFallback = () => runTabSwitcherHostScript(
+    tabId,
+    options.scriptFunc,
+    options.scriptArgs,
+    options.normalizeScriptResults,
+    fallbackValue
+  );
+  if (isOwnExtensionPageUrl(getResolvedTabUrl(tab))) {
+    return new Promise((resolve) => {
+      postTabSwitcherMessageToExtensionPage(tab, payload, (ok, _reason, response) => {
+        if (ok) {
+          const normalized = normalizeResponse(response || { ok: true });
+          if (normalized !== null) {
+            resolve(normalized);
+            return;
+          }
+        }
+        runScriptFallback().then(resolve).catch(() => resolve(fallbackValue));
+      });
+    });
+  }
+  if (!chrome || !chrome.tabs || typeof chrome.tabs.sendMessage !== 'function') {
+    return runScriptFallback();
+  }
+  return new Promise((resolve) => {
+    try {
+      chrome.tabs.sendMessage(tabId, payload, (response) => {
+        if (!(chrome.runtime && chrome.runtime.lastError)) {
+          const normalized = normalizeResponse(response);
+          if (normalized !== null) {
+            resolve(normalized);
+            return;
+          }
+        }
+        runScriptFallback().then(resolve).catch(() => resolve(fallbackValue));
+      });
+    } catch (error) {
+      runScriptFallback().then(resolve).catch(() => resolve(fallbackValue));
+    }
+  });
+}
+
+function setTabSwitcherCaptureVisibility(tab, hidden) {
   const payload = {
     action: 'setTabSwitcherCaptureVisibility',
     hidden: Boolean(hidden)
   };
-  if (isOwnExtensionPageUrl(getResolvedTabUrl(tab))) {
-    return new Promise((resolve) => {
-      postTabSwitcherMessageToExtensionPage(tab, payload, (ok) => {
-        if (ok) {
-          resolve(true);
-          return;
-        }
-        runExecuteScriptFallback().then(resolve).catch(() => resolve(false));
-      });
-    });
-  }
-  if (chrome && chrome.tabs && typeof chrome.tabs.sendMessage === 'function') {
-    return new Promise((resolve) => {
-      try {
-        chrome.tabs.sendMessage(tabId, payload, (response) => {
-          const didSet = !(chrome.runtime && chrome.runtime.lastError) &&
-            response &&
-            response.ok === true;
-          if (didSet) {
-            resolve(true);
-            return;
-          }
-          runExecuteScriptFallback().then(resolve).catch(() => resolve(false));
-        });
-      } catch (error) {
-        runExecuteScriptFallback().then(resolve).catch(() => resolve(false));
-      }
-    });
-  }
-  return runExecuteScriptFallback();
-
-  function runExecuteScriptFallback() {
-    if (!chrome || !chrome.scripting || typeof chrome.scripting.executeScript !== 'function') {
-      return Promise.resolve(false);
-    }
-    return new Promise((resolve) => {
-      try {
-        chrome.scripting.executeScript({
-          target: { tabId },
-          func: setTabSwitcherCaptureVisibilityInPage,
-          args: [Boolean(hidden), TAB_SWITCHER_HOST_ID]
-        }, (results) => {
-          const didSet = !(chrome.runtime && chrome.runtime.lastError) &&
-            Array.isArray(results) &&
-            results.some((item) => item && item.result && item.result.ok === true);
-          resolve(Boolean(didSet));
-        });
-      } catch (error) {
-        resolve(false);
-      }
-    });
-  }
+  return sendTabSwitcherHostMessage(tab, payload, {
+    scriptFunc: setTabSwitcherCaptureVisibilityInPage,
+    scriptArgs: [Boolean(hidden), TAB_SWITCHER_HOST_ID],
+    fallbackValue: false
+  });
 }
 
 function getOpenTabSwitcherState(tab) {
-  const tabId = tab && typeof tab.id === 'number' ? tab.id : null;
-  if (typeof tabId !== 'number') {
-    return Promise.resolve({ ok: false, open: false });
-  }
   const payload = {
     action: 'getOpenTabSwitcherState'
   };
-  if (isOwnExtensionPageUrl(getResolvedTabUrl(tab))) {
-    return new Promise((resolve) => {
-      postTabSwitcherMessageToExtensionPage(tab, payload, (ok, _reason, response) => {
-        if (ok && response && typeof response.open === 'boolean') {
-          resolve({
-            ok: true,
-            open: response.open === true
-          });
-          return;
-        }
-        runExecuteScriptFallback().then(resolve).catch(() => resolve({ ok: false, open: false }));
-      });
-    });
-  }
-  if (chrome && chrome.tabs && typeof chrome.tabs.sendMessage === 'function') {
-    return new Promise((resolve) => {
-      try {
-        chrome.tabs.sendMessage(tabId, payload, (response) => {
-          const didRead = !(chrome.runtime && chrome.runtime.lastError) &&
-            response &&
-            response.ok === true &&
-            typeof response.open === 'boolean';
-          if (didRead) {
-            resolve({
-              ok: true,
-              open: response.open === true
-            });
-            return;
-          }
-          runExecuteScriptFallback().then(resolve).catch(() => resolve({ ok: false, open: false }));
-        });
-      } catch (error) {
-        runExecuteScriptFallback().then(resolve).catch(() => resolve({ ok: false, open: false }));
-      }
-    });
-  }
-  return runExecuteScriptFallback();
+  return sendTabSwitcherHostMessage(tab, payload, {
+    scriptFunc: getOpenTabSwitcherStateInPage,
+    scriptArgs: [TAB_SWITCHER_HOST_ID],
+    normalizeResponse: normalizeOpenTabSwitcherStateResponse,
+    normalizeScriptResults: normalizeOpenTabSwitcherStateScriptResults,
+    fallbackValue: getFailedOpenTabSwitcherState()
+  });
+}
 
-  function runExecuteScriptFallback() {
-    if (!chrome || !chrome.scripting || typeof chrome.scripting.executeScript !== 'function') {
-      return Promise.resolve({ ok: false, open: false });
-    }
-    return new Promise((resolve) => {
-      try {
-        chrome.scripting.executeScript({
-          target: { tabId },
-          func: getOpenTabSwitcherStateInPage,
-          args: [TAB_SWITCHER_HOST_ID]
-        }, (results) => {
-          const result = Array.isArray(results) &&
-            results.find((item) => item && item.result && item.result.ok === true);
-          resolve({
-            ok: Boolean(result),
-            open: Boolean(result && result.result && result.result.open === true)
-          });
-        });
-      } catch (error) {
-        resolve({ ok: false, open: false });
-      }
-    });
+function postTabSwitcherThumbnailUpdate(tab, update) {
+  if (!update || typeof update !== 'object') {
+    return Promise.resolve(false);
   }
+  const payload = {
+    action: 'updateTabSwitcherThumbnail',
+    ...update
+  };
+  return sendTabSwitcherHostMessage(tab, payload, {
+    scriptFunc: updateTabSwitcherThumbnailInPage,
+    scriptArgs: [payload, TAB_SWITCHER_HOST_ID],
+    fallbackValue: false
+  });
 }
 
 function waitForTabSwitcherCapturePaint() {
@@ -1013,6 +1054,8 @@ const TAB_SWITCHER_CAPTURE_DELAY_MS = 220;
 const TAB_SWITCHER_CAPTURE_HIDE_PAINT_WAIT_MS = 48;
 const TAB_SWITCHER_CAPTURE_MIN_INTERVAL_MS = 650;
 const TAB_SWITCHER_CAPTURE_JPEG_QUALITY = 42;
+const TAB_SWITCHER_CAPTURE_REASON_COMMAND_IMMEDIATE = 'command-immediate';
+const TAB_SWITCHER_CAPTURE_REASON_COMMAND_REFRESH = 'command-refresh';
 const TAB_SWITCHER_THUMBNAIL_STORAGE_KEY = '_x_extension_tab_switcher_state_2026_unique_';
 const TAB_SWITCHER_THUMBNAIL_LIMIT = 12;
 const TAB_SWITCHER_THUMBNAIL_TTL_MS = 1000 * 60 * 60 * 2;
@@ -1241,8 +1284,10 @@ function ensureTabSwitcherStateLoaded() {
   }
   tabSwitcherStateLoadPromise = getTabSwitcherStateFromStorage()
     .then((state) => {
-      if (!tabSwitcherStateDirtyBeforeLoad && state) {
-        recentTabTracker.hydrateState(state);
+      if (state) {
+        recentTabTracker.hydrateState(state, {
+          merge: tabSwitcherStateDirtyBeforeLoad === true
+        });
       }
       tabSwitcherStateLoaded = true;
       if (tabSwitcherStateDirtyBeforeLoad) {
@@ -2548,8 +2593,14 @@ function isTabSwitcherOpeningForCapture(tab) {
   return Boolean(opening && opening.expiresAt > Date.now());
 }
 
+function isSwitcherCommandCaptureReason(reason) {
+  const requestReason = String(reason || '');
+  return requestReason === TAB_SWITCHER_CAPTURE_REASON_COMMAND_IMMEDIATE ||
+    requestReason === TAB_SWITCHER_CAPTURE_REASON_COMMAND_REFRESH;
+}
+
 function shouldSkipSwitcherThumbnailCaptureForOpenSwitcher(tab, reason) {
-  if (String(reason || '') === 'command-immediate') {
+  if (isSwitcherCommandCaptureReason(reason)) {
     return Promise.resolve(false);
   }
   if (isTabSwitcherOpeningForCapture(tab)) {
@@ -2636,6 +2687,15 @@ function captureSwitcherThumbnailForTab(tab, reason) {
           });
           if (didSet) {
             schedulePersistTabSwitcherState();
+            if (isSwitcherCommandCaptureReason(reason)) {
+              postTabSwitcherThumbnailUpdate(resolvedTab, {
+                tabId: resolvedTab.id,
+                url: getResolvedTabUrl(resolvedTab),
+                thumbnail: thumbnailDataUrl,
+                thumbnailStatus: 'ok',
+                thumbnailReason: ''
+              }).catch(() => {});
+            }
             logSwitcherThumbnailCaptureSuccess(resolvedTab, reason);
           } else {
             logSwitcherThumbnailCaptureFailure(resolvedTab, 'thumbnail-cache-rejected', reason);
@@ -2681,6 +2741,19 @@ function captureSwitcherThumbnailNow(request) {
     id: tabId,
     windowId
   }, request && request.reason).catch(() => {});
+}
+
+function requestSwitcherThumbnailRefreshAfterOpen(tab) {
+  if (!canCaptureSwitcherThumbnail(tab)) {
+    return;
+  }
+  const request = {
+    id: tab.id,
+    windowId: tab.windowId
+  };
+  setTimeout(() => {
+    enqueueSwitcherThumbnailCapture(request, TAB_SWITCHER_CAPTURE_REASON_COMMAND_REFRESH).catch(() => {});
+  }, TAB_SWITCHER_CAPTURE_DELAY_MS);
 }
 
 function scheduleSwitcherThumbnailCapture(tab, reason) {
@@ -3091,6 +3164,9 @@ function triggerShowSearchForTab(tab, source) {
 
 function injectTabSwitcherOnTab(hostTab, items, context) {
   const finishOpen = (ok, reason) => {
+    if (ok) {
+      requestSwitcherThumbnailRefreshAfterOpen(context && context.refreshThumbnailTab);
+    }
     if (context && typeof context.onOpenComplete === 'function') {
       context.onOpenComplete(Boolean(ok), reason || '');
     }
@@ -3330,7 +3406,10 @@ function triggerTabSwitcherForTab(tab, source) {
         if (shouldTrackSwitcherTab(activeTab)) {
           recordRecentSwitcherTab(activeTab);
           if (shouldCaptureOwnExtensionPageThumbnailBeforePayload(activeTab)) {
-            activeThumbnailReady = captureSwitcherThumbnailForTab(activeTab, 'command-immediate');
+            activeThumbnailReady = captureSwitcherThumbnailForTab(
+              activeTab,
+              TAB_SWITCHER_CAPTURE_REASON_COMMAND_IMMEDIATE
+            );
           }
         }
         activeThumbnailReady.catch(() => false).finally(() => {
@@ -3366,6 +3445,7 @@ function triggerTabSwitcherForTab(tab, source) {
                 currentTabId: activeTab.id,
                 selectedIndex,
                 source,
+                refreshThumbnailTab: activeTab,
                 onOpenComplete: finishOpening
               });
             });
@@ -3375,6 +3455,7 @@ function triggerTabSwitcherForTab(tab, source) {
             currentTabId: activeTab.id,
             selectedIndex,
             source,
+            refreshThumbnailTab: activeTab,
             onOpenComplete: finishOpening
           });
         });

@@ -222,7 +222,7 @@
     "message": "喚起聚焦搜尋視窗"
   },
   "settings_shortcuts_browser_desc_prefix": {
-    "message": "在 Chromium 核心瀏覽器（如 Dia、Edge 等）中，需在"
+    "message": "需在"
   },
   "settings_shortcuts_browser_desc_path_extensions": {
     "message": "「擴充功能」"
@@ -276,7 +276,7 @@
     "message": "快捷鍵無效，請按組合鍵（如 Ctrl+K）"
   },
   "settings_restricted_title": {
-    "message": "受限頁快捷鍵行為"
+    "message": "在受限頁行為"
   },
   "settings_restricted_tooltip": {
     "message": "受限頁（如 chrome://、擴充功能商店、部分 file:// 頁面）無法開啟聚焦搜尋；按下快捷鍵將依此處規則處理。"
@@ -475,6 +475,15 @@
   },
   "newtab_ai_quick_jump_feature_hint_close": {
     "message": "關閉 AI 跳轉提示"
+  },
+  "newtab_tab_switcher_feature_hint_badge": {
+    "message": "新功能"
+  },
+  "newtab_tab_switcher_feature_hint_text": {
+    "message": "按 Alt+Q 開啟分頁切換器，直接在最近分頁之間快速跳轉。"
+  },
+  "newtab_tab_switcher_feature_hint_close": {
+    "message": "關閉分頁切換器提示"
   },
   "update_notice_badge": {
     "message": "已更新至 {version}"
@@ -1289,10 +1298,112 @@
   "command_show_tab_switcher": {
     "message": "開啟最近分頁切換器"
   },
+  "shortcut_reference_title": {
+    "message": "快捷鍵列表"
+  },
+  "shortcut_reference_group_search": {
+    "message": "聚焦搜尋"
+  },
+  "shortcut_reference_group_page_link": {
+    "message": "頁面連結"
+  },
+  "shortcut_reference_group_tab_switcher": {
+    "message": "分頁切換器"
+  },
+  "shortcut_reference_group_web_clip": {
+    "message": "網頁剪裁"
+  },
+  "shortcut_reference_unset": {
+    "message": "未設定"
+  },
+  "shortcut_reference_show_search_title": {
+    "message": "喚起聚焦搜尋視窗"
+  },
+  "shortcut_reference_show_search_desc": {
+    "message": "在目前頁面開啟 Lumno"
+  },
+  "shortcut_reference_show_search_prefill_title": {
+    "message": "喚起搜尋並填入目前網頁連結"
+  },
+  "shortcut_reference_show_search_prefill_desc": {
+    "message": "開啟 Lumno，並把目前網頁連結放入輸入框"
+  },
+  "shortcut_reference_copy_url_title": {
+    "message": "複製目前網頁連結"
+  },
+  "shortcut_reference_copy_url_desc": {
+    "message": "不開啟 Lumno，直接複製目前頁面 URL"
+  },
+  "shortcut_reference_tab_switcher_title": {
+    "message": "開啟最近分頁切換器"
+  },
+  "shortcut_reference_tab_switcher_desc": {
+    "message": "開啟最近分頁切換器"
+  },
+  "shortcut_reference_search_navigate_title": {
+    "message": "上下移動候選項"
+  },
+  "shortcut_reference_search_navigate_desc": {
+    "message": "在聚焦搜尋和新分頁中移動目前候選項"
+  },
+  "shortcut_reference_search_confirm_title": {
+    "message": "執行目前候選項"
+  },
+  "shortcut_reference_search_confirm_desc": {
+    "message": "開啟、搜尋、切換分頁或執行命令"
+  },
+  "shortcut_reference_search_tab_mode_title": {
+    "message": "補全或進入搜尋模式"
+  },
+  "shortcut_reference_search_tab_mode_desc": {
+    "message": "補全候選，或進入站內搜尋/已開啟分頁搜尋"
+  },
+  "shortcut_reference_search_close_title": {
+    "message": "關閉或退出模式"
+  },
+  "shortcut_reference_search_close_desc": {
+    "message": "關閉聚焦搜尋，或退出站內搜尋/已開啟分頁搜尋"
+  },
+  "shortcut_reference_search_current_tab_title": {
+    "message": "在目前分頁開啟"
+  },
+  "shortcut_reference_search_current_tab_desc": {
+    "message": "把通常新開分頁的動作改為目前分頁開啟"
+  },
+  "shortcut_reference_search_switch_new_tab_title": {
+    "message": "已開啟分頁結果新開"
+  },
+  "shortcut_reference_search_switch_new_tab_desc": {
+    "message": "當結果匹配已開啟分頁時，在新分頁開啟它的 URL"
+  },
+  "shortcut_reference_tab_switcher_cycle_title": {
+    "message": "在分頁切換器中移動選擇"
+  },
+  "shortcut_reference_tab_switcher_cycle_desc": {
+    "message": "在分頁切換器中移動到上一個或下一個分頁"
+  },
+  "shortcut_reference_tab_switcher_confirm_title": {
+    "message": "切換到選中分頁"
+  },
+  "shortcut_reference_tab_switcher_confirm_desc": {
+    "message": "確認分頁切換器中選中的分頁"
+  },
+  "shortcut_reference_document_pip_parent_title": {
+    "message": "網頁剪裁：選擇外層元素"
+  },
+  "shortcut_reference_document_pip_parent_desc": {
+    "message": "選擇網頁剪裁目標時切到更大的父層元素"
+  },
+  "shortcut_reference_document_pip_child_title": {
+    "message": "網頁剪裁：選擇內層元素"
+  },
+  "shortcut_reference_document_pip_child_desc": {
+    "message": "選擇網頁剪裁目標時切到更小的子層元素"
+  },
   "settings_tab_switcher_title": {
     "message": "AltQ 分頁切換器"
   },
   "settings_tab_switcher_desc": {
-    "message": "按 Alt+Q 快速切換最近分頁。"
+    "message": "按 Alt/⌥+Q 快速切換最近分頁。"
   }
 }

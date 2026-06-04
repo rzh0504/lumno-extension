@@ -222,7 +222,7 @@
     "message": "Open command bar"
   },
   "settings_shortcuts_browser_desc_prefix": {
-    "message": "In Chromium-based browsers such as Dia and Edge, change the shortcut in "
+    "message": "Open "
   },
   "settings_shortcuts_browser_desc_path_extensions": {
     "message": "Extensions"
@@ -276,7 +276,7 @@
     "message": "Invalid shortcut. Use a key combo such as Ctrl+K."
   },
   "settings_restricted_title": {
-    "message": "Shortcut behavior on restricted pages"
+    "message": "Restricted page behavior"
   },
   "settings_restricted_tooltip": {
     "message": "Restricted pages (for example, chrome://) cannot open the command bar. Pressing the shortcut follows the rule set here."
@@ -475,6 +475,15 @@
   },
   "newtab_ai_quick_jump_feature_hint_close": {
     "message": "Dismiss AI quick jump tip"
+  },
+  "newtab_tab_switcher_feature_hint_badge": {
+    "message": "New"
+  },
+  "newtab_tab_switcher_feature_hint_text": {
+    "message": "Press Alt+Q to open the tab switcher and jump through recent tabs without reaching for the mouse."
+  },
+  "newtab_tab_switcher_feature_hint_close": {
+    "message": "Dismiss tab switcher tip"
   },
   "update_notice_badge": {
     "message": "Updated to {version}"
@@ -1289,10 +1298,112 @@
   "command_show_tab_switcher": {
     "message": "Open recent tab switcher"
   },
+  "shortcut_reference_title": {
+    "message": "Shortcut list"
+  },
+  "shortcut_reference_group_search": {
+    "message": "Command bar"
+  },
+  "shortcut_reference_group_page_link": {
+    "message": "Page link"
+  },
+  "shortcut_reference_group_tab_switcher": {
+    "message": "Tab switcher"
+  },
+  "shortcut_reference_group_web_clip": {
+    "message": "Web clip"
+  },
+  "shortcut_reference_unset": {
+    "message": "Not set"
+  },
+  "shortcut_reference_show_search_title": {
+    "message": "Open command bar"
+  },
+  "shortcut_reference_show_search_desc": {
+    "message": "Open Lumno on the current page"
+  },
+  "shortcut_reference_show_search_prefill_title": {
+    "message": "Open with current page URL"
+  },
+  "shortcut_reference_show_search_prefill_desc": {
+    "message": "Open Lumno and prefill the current page URL"
+  },
+  "shortcut_reference_copy_url_title": {
+    "message": "Copy current page URL"
+  },
+  "shortcut_reference_copy_url_desc": {
+    "message": "Copy the current page URL without opening Lumno"
+  },
+  "shortcut_reference_tab_switcher_title": {
+    "message": "Open recent tab switcher"
+  },
+  "shortcut_reference_tab_switcher_desc": {
+    "message": "Open the recent tab switcher"
+  },
+  "shortcut_reference_search_navigate_title": {
+    "message": "Move through suggestions"
+  },
+  "shortcut_reference_search_navigate_desc": {
+    "message": "Move the active result in Lumno search and New Tab"
+  },
+  "shortcut_reference_search_confirm_title": {
+    "message": "Run selected action"
+  },
+  "shortcut_reference_search_confirm_desc": {
+    "message": "Open, search, switch tab, or run the selected command"
+  },
+  "shortcut_reference_search_tab_mode_title": {
+    "message": "Complete or enter search mode"
+  },
+  "shortcut_reference_search_tab_mode_desc": {
+    "message": "Complete a suggestion or enter site/open-tabs search mode"
+  },
+  "shortcut_reference_search_close_title": {
+    "message": "Close or leave mode"
+  },
+  "shortcut_reference_search_close_desc": {
+    "message": "Close Lumno search or leave site/open-tabs search mode"
+  },
+  "shortcut_reference_search_current_tab_title": {
+    "message": "Open in current tab"
+  },
+  "shortcut_reference_search_current_tab_desc": {
+    "message": "Use the current tab for actions that normally open a new tab"
+  },
+  "shortcut_reference_search_switch_new_tab_title": {
+    "message": "Open matched tab result in new tab"
+  },
+  "shortcut_reference_search_switch_new_tab_desc": {
+    "message": "When a result matches an opened tab, open its URL in a new tab"
+  },
+  "shortcut_reference_tab_switcher_cycle_title": {
+    "message": "Move selection in tab switcher"
+  },
+  "shortcut_reference_tab_switcher_cycle_desc": {
+    "message": "Move to the previous or next tab in the tab switcher"
+  },
+  "shortcut_reference_tab_switcher_confirm_title": {
+    "message": "Switch to selected tab"
+  },
+  "shortcut_reference_tab_switcher_confirm_desc": {
+    "message": "Confirm the selected tab in the tab switcher"
+  },
+  "shortcut_reference_document_pip_parent_title": {
+    "message": "Web clip: select outer element"
+  },
+  "shortcut_reference_document_pip_parent_desc": {
+    "message": "Move to a larger parent element while choosing a web clip"
+  },
+  "shortcut_reference_document_pip_child_title": {
+    "message": "Web clip: select inner element"
+  },
+  "shortcut_reference_document_pip_child_desc": {
+    "message": "Move to a smaller child element while choosing a web clip"
+  },
   "settings_tab_switcher_title": {
     "message": "AltQ tab switcher"
   },
   "settings_tab_switcher_desc": {
-    "message": "Press Alt+Q to switch recent tabs."
+    "message": "Press Alt/⌥+Q to switch recent tabs."
   }
 }

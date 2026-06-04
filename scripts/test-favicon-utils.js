@@ -77,6 +77,21 @@ assert.strictEqual(
   'browser-internal pages should use the browser-page _favicon candidate'
 );
 assert.strictEqual(
+  resolver.getPageFaviconCandidateUrl('chrome-extension://abc/src/options/options.html'),
+  'chrome-extension://abc/assets/images/lumno.png',
+  'own extension options page should force the Lumno icon'
+);
+assert.strictEqual(
+  resolver.getPageFaviconCandidateUrl('chrome-extension://abc/src/newtab/newtab.html'),
+  'chrome-extension://abc/assets/images/lumno.png',
+  'own extension newtab page should force the Lumno icon'
+);
+assert.notStrictEqual(
+  resolver.getPageFaviconCandidateUrl('chrome-extension://other/src/options/options.html'),
+  'chrome-extension://abc/assets/images/lumno.png',
+  'other extension pages should not use the Lumno icon'
+);
+assert.strictEqual(
   resolver.isBlockedFaviconUrl('chrome-extension://abc/_favicon/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128'),
   false,
   'browser-internal favicon candidates must not be blocked by the synthetic host name'

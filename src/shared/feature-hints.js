@@ -48,6 +48,27 @@
       linkFallback: 'Support list',
       closeLabelKey: 'newtab_ai_quick_jump_feature_hint_close',
       closeLabelFallback: 'Dismiss AI quick jump tip'
+    }),
+    NEWTAB_TAB_SWITCHER: Object.freeze({
+      id: 'newtab-tab-switcher',
+      introducedIn: '0.9.13',
+      surface: 'newtab',
+      placement: 'newtab settings icon',
+      className: 'x-lumno-feature-hint--newtab-tab-switcher',
+      arrowSide: 'top',
+      arrowAlign: 'end',
+      widthMode: 'fixed',
+      alignMode: 'auto',
+      dismissStorage: 'sync',
+      rememberOnFirstShow: true,
+      roundedArrowTip: true,
+      badgeIcon: 'ri-asterisk',
+      badgeKey: 'newtab_tab_switcher_feature_hint_badge',
+      badgeFallback: 'New',
+      textKey: 'newtab_tab_switcher_feature_hint_text',
+      textFallback: 'Press Alt+Q to open the tab switcher and jump through recent tabs without reaching for the mouse.',
+      closeLabelKey: 'newtab_tab_switcher_feature_hint_close',
+      closeLabelFallback: 'Dismiss tab switcher tip'
     })
   });
 

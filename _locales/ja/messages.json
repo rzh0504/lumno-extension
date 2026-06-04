@@ -222,7 +222,7 @@
     "message": "Lumnoを開く"
   },
   "settings_shortcuts_browser_desc_prefix": {
-    "message": "Chromiumベースのブラウザ（Dia、Edgeなど）では、"
+    "message": "キーは"
   },
   "settings_shortcuts_browser_desc_path_extensions": {
     "message": "「拡張機能」"
@@ -276,7 +276,7 @@
     "message": "キーが無効です。Ctrl+Kなどの組み合わせを押してください"
   },
   "settings_restricted_title": {
-    "message": "制限ページでのキー動作"
+    "message": "制限ページでの動作"
   },
   "settings_restricted_tooltip": {
     "message": "制限ページ（chrome://、拡張機能ストア、一部のfile://ページなど）ではLumnoを開けません。キーを押したときはこの設定に従います。"
@@ -475,6 +475,15 @@
   },
   "newtab_ai_quick_jump_feature_hint_close": {
     "message": "AI移動ヒントを閉じる"
+  },
+  "newtab_tab_switcher_feature_hint_badge": {
+    "message": "新機能"
+  },
+  "newtab_tab_switcher_feature_hint_text": {
+    "message": "Alt+Q でタブ切り替えを開き、最近使ったタブへすばやく移動できます。"
+  },
+  "newtab_tab_switcher_feature_hint_close": {
+    "message": "タブ切り替えヒントを閉じる"
   },
   "update_notice_badge": {
     "message": "{version} に更新済み"
@@ -1289,10 +1298,112 @@
   "command_show_tab_switcher": {
     "message": "最近のタブ切り替えを開く"
   },
+  "shortcut_reference_title": {
+    "message": "キー一覧"
+  },
+  "shortcut_reference_group_search": {
+    "message": "Lumno検索"
+  },
+  "shortcut_reference_group_page_link": {
+    "message": "ページリンク"
+  },
+  "shortcut_reference_group_tab_switcher": {
+    "message": "タブ切り替え"
+  },
+  "shortcut_reference_group_web_clip": {
+    "message": "Webクリップ"
+  },
+  "shortcut_reference_unset": {
+    "message": "未設定"
+  },
+  "shortcut_reference_show_search_title": {
+    "message": "Lumnoを開く"
+  },
+  "shortcut_reference_show_search_desc": {
+    "message": "現在のページでLumnoを開きます"
+  },
+  "shortcut_reference_show_search_prefill_title": {
+    "message": "ページURLを入れて開く"
+  },
+  "shortcut_reference_show_search_prefill_desc": {
+    "message": "Lumnoを開き、現在のページURLを入力します"
+  },
+  "shortcut_reference_copy_url_title": {
+    "message": "現在のページURLをコピー"
+  },
+  "shortcut_reference_copy_url_desc": {
+    "message": "Lumnoを開かずに現在のページURLをコピーします"
+  },
+  "shortcut_reference_tab_switcher_title": {
+    "message": "最近のタブ切り替えを開く"
+  },
+  "shortcut_reference_tab_switcher_desc": {
+    "message": "最近のタブ切り替えを開きます"
+  },
+  "shortcut_reference_search_navigate_title": {
+    "message": "候補を上下に移動"
+  },
+  "shortcut_reference_search_navigate_desc": {
+    "message": "Lumno検索と新しいタブで選択中の候補を移動します"
+  },
+  "shortcut_reference_search_confirm_title": {
+    "message": "選択中の操作を実行"
+  },
+  "shortcut_reference_search_confirm_desc": {
+    "message": "開く、検索、タブ切り替え、またはコマンドを実行します"
+  },
+  "shortcut_reference_search_tab_mode_title": {
+    "message": "補完または検索モードへ"
+  },
+  "shortcut_reference_search_tab_mode_desc": {
+    "message": "候補を補完、またはサイト内/開いているタブ検索に入ります"
+  },
+  "shortcut_reference_search_close_title": {
+    "message": "閉じる、またはモードを終了"
+  },
+  "shortcut_reference_search_close_desc": {
+    "message": "Lumno検索を閉じる、または検索モードを終了します"
+  },
+  "shortcut_reference_search_current_tab_title": {
+    "message": "現在のタブで開く"
+  },
+  "shortcut_reference_search_current_tab_desc": {
+    "message": "通常は新しいタブで開く操作を現在のタブで開きます"
+  },
+  "shortcut_reference_search_switch_new_tab_title": {
+    "message": "一致したタブ結果を新しいタブで開く"
+  },
+  "shortcut_reference_search_switch_new_tab_desc": {
+    "message": "結果が開いているタブに一致したとき、そのURLを新しいタブで開きます"
+  },
+  "shortcut_reference_tab_switcher_cycle_title": {
+    "message": "タブ切り替え内で選択を移動"
+  },
+  "shortcut_reference_tab_switcher_cycle_desc": {
+    "message": "タブ切り替え内で前後のタブへ移動します"
+  },
+  "shortcut_reference_tab_switcher_confirm_title": {
+    "message": "選択したタブへ切り替え"
+  },
+  "shortcut_reference_tab_switcher_confirm_desc": {
+    "message": "タブ切り替えで選択したタブを確定します"
+  },
+  "shortcut_reference_document_pip_parent_title": {
+    "message": "Webクリップ：外側の要素を選択"
+  },
+  "shortcut_reference_document_pip_parent_desc": {
+    "message": "Webクリップ選択中に大きい親要素へ移動します"
+  },
+  "shortcut_reference_document_pip_child_title": {
+    "message": "Webクリップ：内側の要素を選択"
+  },
+  "shortcut_reference_document_pip_child_desc": {
+    "message": "Webクリップ選択中に小さい子要素へ移動します"
+  },
   "settings_tab_switcher_title": {
     "message": "AltQ タブ切り替え"
   },
   "settings_tab_switcher_desc": {
-    "message": "Alt+Q で最近のタブをすばやく切り替えます。"
+    "message": "Alt/⌥+Q で最近のタブをすばやく切り替えます。"
   }
 }

@@ -93,6 +93,28 @@
     return createPreparedImage(doc, 'x-tab-switcher-title-favicon', favIconUrl, '');
   }
 
+  function updateOpenSwitcherThumbnailFromMessage(request) {
+    const host = document.getElementById(HOST_ID);
+    if (!host || typeof host._lumnoTabSwitcherUpdateThumbnail !== 'function') {
+      return { ok: false, reason: 'tab_switcher_host_missing' };
+    }
+    return host._lumnoTabSwitcherUpdateThumbnail(request) || { ok: true };
+  }
+
+  if (chromeApi &&
+      chromeApi.runtime &&
+      chromeApi.runtime.onMessage &&
+      window._x_extension_tab_switcher_thumbnail_update_listener_2026_unique_ !== true) {
+    window._x_extension_tab_switcher_thumbnail_update_listener_2026_unique_ = true;
+    chromeApi.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+      if (!request || request.action !== 'updateTabSwitcherThumbnail') {
+        return;
+      }
+      sendResponse(updateOpenSwitcherThumbnailFromMessage(request));
+      return true;
+    });
+  }
+
   function setButtonActive(button, active) {
     if (!button) {
       return;
@@ -590,6 +612,7 @@
         --x-tab-switcher-visible-scale: 1;
         --x-tab-switcher-motion-card: 180ms cubic-bezier(0.22, 1, 0.36, 1);
         --x-tab-switcher-motion-fade: 150ms ease;
+        --x-tab-switcher-motion-cover: 220ms cubic-bezier(0.22, 1, 0.36, 1);
         --x-tab-switcher-thumb-stroke-inset: -0.5px;
         --x-tab-switcher-thumb-stroke-radius-offset: 0.5px;
         --x-tab-switcher-thumb-stroke-color: rgba(15, 23, 42, 0.2);
@@ -694,11 +717,22 @@
         pointer-events: none;
       }
       .x-tab-switcher-thumb img[data-kind="thumbnail"] {
+        position: absolute;
+        inset: 0;
         width: 100%;
         height: 100%;
         display: block;
         object-fit: cover;
         object-position: top center;
+        opacity: 1;
+        transition: opacity var(--x-tab-switcher-motion-cover);
+        will-change: opacity;
+      }
+      .x-tab-switcher-thumb img[data-kind="thumbnail"][data-entering="true"] {
+        opacity: 0;
+      }
+      .x-tab-switcher-thumb img[data-kind="thumbnail"][data-exiting="true"] {
+        opacity: 0;
       }
       .x-tab-switcher-thumb img[data-broken="true"] {
         display: none;
@@ -896,6 +930,11 @@
       #${PANEL_ID}[data-theme="dark"] .x-tab-switcher-thumb {
         background: color-mix(in srgb, var(--x-tab-switcher-card-accent, var(--x-tab-switcher-accent)) 18%, rgba(15, 23, 42, 0.92));
       }
+      @media (prefers-reduced-motion: reduce) {
+        .x-tab-switcher-thumb img[data-kind="thumbnail"] {
+          transition: none;
+        }
+      }
     `;
   }
 
@@ -944,6 +983,7 @@
     const list = createElement(document, 'div', 'x-tab-switcher-list');
     panel.appendChild(list);
     const buttons = [];
+    const tabById = new Map();
     let selectedIndex = clampSelectedIndex(context.selectedIndex, tabs.length);
     let didRequestSwitch = false;
     let suppressInitialShortcutAdvanceUntilQKeyup = context.suppressInitialShortcutAdvance === true;
@@ -1086,18 +1126,93 @@
       }
     }
 
+    function updateCardThumbnail(card, tab, update) {
+      if (!card || !tab || !update || typeof update !== 'object') {
+        return false;
+      }
+      const thumbnail = typeof update.thumbnail === 'string' ? update.thumbnail : '';
+      if (!thumbnail.startsWith('data:image/')) {
+        return false;
+      }
+      const updateUrl = typeof update.url === 'string' ? update.url : '';
+      if (updateUrl && tab.url && updateUrl !== tab.url) {
+        return false;
+      }
+      const thumb = card.querySelector('.x-tab-switcher-thumb');
+      if (!thumb) {
+        return false;
+      }
+      const previousImages = Array.from(thumb.querySelectorAll('img[data-kind="thumbnail"]'));
+      const currentImage = previousImages[previousImages.length - 1] || null;
+      if (currentImage && currentImage.getAttribute('src') === thumbnail) {
+        return true;
+      }
+      tab.thumbnail = thumbnail;
+      tab.thumbnailStatus = update.thumbnailStatus || 'ok';
+      tab.thumbnailReason = update.thumbnailReason || '';
+      const thumbnailStatus = getThumbnailStatus(tab, thumbnail);
+      card.setAttribute('data-thumbnail-status', thumbnailStatus);
+      thumb.setAttribute('data-thumbnail-status', thumbnailStatus);
+      thumb.removeAttribute('data-thumbnail-reason');
+      const nextImage = createPreparedImage(document, '', thumbnail, '');
+      nextImage.setAttribute('data-kind', 'thumbnail');
+      nextImage.setAttribute('data-entering', 'true');
+      thumb.appendChild(nextImage);
+      const revealImage = () => {
+        previousImages.forEach((image) => {
+          if (image && image !== nextImage) {
+            image.setAttribute('data-exiting', 'true');
+          }
+        });
+        requestAnimationFrame(() => {
+          nextImage.removeAttribute('data-entering');
+          window.setTimeout(() => {
+            previousImages.forEach((image) => {
+              if (image && image !== nextImage) {
+                image.remove();
+              }
+            });
+          }, 260);
+        });
+      };
+      if (typeof nextImage.decode === 'function') {
+        nextImage.decode().catch(() => {}).finally(revealImage);
+      } else {
+        revealImage();
+      }
+      return true;
+    }
+
+    host._lumnoTabSwitcherUpdateThumbnail = function(update) {
+      const tabId = Number(update && update.tabId);
+      if (!Number.isInteger(tabId)) {
+        return { ok: false, reason: 'invalid-tab' };
+      }
+      const tab = tabById.get(tabId);
+      const index = tabs.findIndex((item) => item && item.id === tabId);
+      if (!tab || index < 0 || !buttons[index]) {
+        return { ok: false, reason: 'tab-not-visible' };
+      }
+      return {
+        ok: updateCardThumbnail(buttons[index], tab, update)
+      };
+    };
+
     tabs.forEach((tab, index) => {
       const card = createElement(document, 'button', 'x-tab-switcher-card');
+      tabById.set(tab.id, tab);
       const accentCss = normalizeAccentCss(tab.accentRgb);
       if (accentCss) {
         card.style.setProperty('--x-tab-switcher-card-accent', accentCss);
       }
       card.type = 'button';
       card.setAttribute('role', 'option');
+      card.setAttribute('data-tab-id', String(tab.id));
       const titleText = sanitizeText(tab.title, getMessage('tab_switcher_untitled', 'Untitled'));
       card.setAttribute('aria-label', titleText);
 
       const thumb = createElement(document, 'div', 'x-tab-switcher-thumb');
+      thumb.setAttribute('data-tab-id', String(tab.id));
       const thumbnail = typeof tab.thumbnail === 'string' ? tab.thumbnail : '';
       const thumbnailStatus = getThumbnailStatus(tab, thumbnail);
       card.setAttribute('data-thumbnail-status', thumbnailStatus);
@@ -1173,6 +1288,7 @@
       document.removeEventListener('pointerdown', handlePointerDown, true);
       document.removeEventListener(TAB_SWITCHER_ADVANCE_EVENT, handleExternalAdvance, true);
       switcherThemeController.destroy();
+      delete host._lumnoTabSwitcherUpdateThumbnail;
     };
     window.addEventListener('keydown', handleKeydown, true);
     window.addEventListener('keyup', handleKeyup, true);

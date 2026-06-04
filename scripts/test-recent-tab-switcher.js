@@ -178,6 +178,55 @@ function testThumbnailStatusPersistsAndReportsStaleness() {
   assert.strictEqual(recent._xSwitcherThumbnailReason, 'chrome-restricted-page');
 }
 
+function testDirtyHydrationMergesCachedThumbnailBeforePersisting() {
+  const persisted = switcher.createRecentTabTracker({
+    limit: 5,
+    thumbnailLimit: 4,
+    thumbnailTtlMs: Number.MAX_SAFE_INTEGER,
+    shouldIncludeTab: (tab) => Boolean(tab && tab.url)
+  });
+  persisted.recordTab({ id: 31, windowId: 10, url: 'https://one.example/', title: 'One' }, 100);
+  persisted.recordTab({ id: 32, windowId: 10, url: 'https://two.example/', title: 'Two' }, 90);
+  persisted.setThumbnail(31, 'data:image/jpeg;base64,b25lLW9sZA==', 110, {
+    url: 'https://one.example/'
+  });
+
+  const tracker = switcher.createRecentTabTracker({
+    limit: 5,
+    thumbnailLimit: 4,
+    thumbnailTtlMs: Number.MAX_SAFE_INTEGER,
+    shouldIncludeTab: (tab) => Boolean(tab && tab.url)
+  });
+  tracker.recordTab({ id: 31, windowId: 10, url: 'https://one.example/', title: 'One focused' }, 1000);
+  tracker.setThumbnailStatus(31, 'pending', 1010, {
+    url: 'https://one.example/',
+    reason: 'visible'
+  });
+
+  tracker.hydrateState(persisted.exportState({ now: 120 }), {
+    now: 1020,
+    merge: true
+  });
+
+  const recentTabs = tracker.getRecentTabs([
+    { id: 31, windowId: 10, url: 'https://one.example/', title: 'One focused' },
+    { id: 32, windowId: 10, url: 'https://two.example/', title: 'Two' }
+  ]);
+
+  assert.deepStrictEqual(
+    recentTabs.map((tab) => tab.id),
+    [31, 32],
+    'dirty hydration should keep the just-focused tab first while restoring persisted tabs'
+  );
+  assert.strictEqual(
+    recentTabs[0]._xSwitcherThumbnail,
+    'data:image/jpeg;base64,b25lLW9sZA==',
+    'dirty hydration should keep the cached cover visible while a fresh capture is pending'
+  );
+  assert.strictEqual(recentTabs[0]._xSwitcherThumbnailStatus, 'pending');
+  assert.strictEqual(recentTabs[0]._xSwitcherThumbnailReason, 'visible');
+}
+
 async function testCrossWindowSwitchFocusesWindowBeforeActivatingTab() {
   const calls = [];
   const chromeApi = {
@@ -213,6 +262,7 @@ async function testCrossWindowSwitchFocusesWindowBeforeActivatingTab() {
   testThumbnailCacheMatchesUrlAndHydratesFromState();
   testRecordingSameTabKeepsMatchingThumbnail();
   testThumbnailStatusPersistsAndReportsStaleness();
+  testDirtyHydrationMergesCachedThumbnailBeforePersisting();
   await testCrossWindowSwitchFocusesWindowBeforeActivatingTab();
   console.log('recent tab switcher tests passed');
 })().catch((error) => {

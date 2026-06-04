@@ -127,6 +127,29 @@ function flushMicrotasks() {
   assert.notStrictEqual(syncKey, localKey, 'sync and local dismiss keys should not collide');
   assert.notStrictEqual(syncKey, sessionKey, 'sync and session dismiss keys should not collide');
 
+  const tabSwitcherHint = featureHints.getFeatureHint('newtab-tab-switcher');
+  assert(tabSwitcherHint, 'newtab tab switcher feature hint should be registered');
+  assert.strictEqual(
+    tabSwitcherHint.introducedIn,
+    '0.9.13',
+    'newtab tab switcher feature hint should be keyed to the release version'
+  );
+  assert.strictEqual(
+    tabSwitcherHint.placement,
+    'newtab settings icon',
+    'newtab tab switcher feature hint should anchor to the settings icon'
+  );
+  assert.strictEqual(
+    tabSwitcherHint.className,
+    'x-lumno-feature-hint--newtab-tab-switcher',
+    'newtab tab switcher feature hint should expose a dedicated placement class'
+  );
+  assert.match(
+    tabSwitcherHint.textFallback,
+    /Alt\+Q[\s\S]*tab switcher/i,
+    'newtab tab switcher feature hint fallback should explain the Alt+Q tab switcher'
+  );
+
   const firstDocument = createFakeDocument();
   const firstController = featureHints.createFeatureHint({
     documentObj: firstDocument,

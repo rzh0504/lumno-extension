@@ -222,7 +222,7 @@
     "message": "唤起聚焦搜索窗口"
   },
   "settings_shortcuts_browser_desc_prefix": {
-    "message": "在 Chromium 内核的浏览器（如 Dia、Edge 等）中，需在"
+    "message": "需在"
   },
   "settings_shortcuts_browser_desc_path_extensions": {
     "message": "「扩展程序」"
@@ -276,7 +276,7 @@
     "message": "快捷键无效，请按组合键（如 Ctrl+K）"
   },
   "settings_restricted_title": {
-    "message": "受限页快捷键行为"
+    "message": "在受限页行为"
   },
   "settings_restricted_tooltip": {
     "message": "受限页（如 chrome://、扩展商店、部分 file:// 页面）无法开启聚焦搜索；按下快捷键将按此处规则处理。"
@@ -475,6 +475,15 @@
   },
   "newtab_ai_quick_jump_feature_hint_close": {
     "message": "关闭 AI 跳转提示"
+  },
+  "newtab_tab_switcher_feature_hint_badge": {
+    "message": "新功能"
+  },
+  "newtab_tab_switcher_feature_hint_text": {
+    "message": "按 Alt+Q 打开标签页切换器，直接在最近标签页之间快速跳转。"
+  },
+  "newtab_tab_switcher_feature_hint_close": {
+    "message": "关闭标签页切换器提示"
   },
   "update_notice_badge": {
     "message": "已更新至 {version}"
@@ -1289,10 +1298,112 @@
   "command_show_tab_switcher": {
     "message": "打开最近标签页切换器"
   },
+  "shortcut_reference_title": {
+    "message": "快捷键列表"
+  },
+  "shortcut_reference_group_search": {
+    "message": "聚焦搜索"
+  },
+  "shortcut_reference_group_page_link": {
+    "message": "页面链接"
+  },
+  "shortcut_reference_group_tab_switcher": {
+    "message": "标签切换器"
+  },
+  "shortcut_reference_group_web_clip": {
+    "message": "网页剪裁"
+  },
+  "shortcut_reference_unset": {
+    "message": "未设置"
+  },
+  "shortcut_reference_show_search_title": {
+    "message": "唤起聚焦搜索窗口"
+  },
+  "shortcut_reference_show_search_desc": {
+    "message": "在当前页面打开 Lumno"
+  },
+  "shortcut_reference_show_search_prefill_title": {
+    "message": "唤起搜索并填入当前网页链接"
+  },
+  "shortcut_reference_show_search_prefill_desc": {
+    "message": "打开 Lumno，并把当前网页链接放入输入框"
+  },
+  "shortcut_reference_copy_url_title": {
+    "message": "复制当前网页链接"
+  },
+  "shortcut_reference_copy_url_desc": {
+    "message": "不打开 Lumno，直接复制当前页面 URL"
+  },
+  "shortcut_reference_tab_switcher_title": {
+    "message": "打开最近标签页切换器"
+  },
+  "shortcut_reference_tab_switcher_desc": {
+    "message": "打开最近标签页切换器"
+  },
+  "shortcut_reference_search_navigate_title": {
+    "message": "上下移动候选项"
+  },
+  "shortcut_reference_search_navigate_desc": {
+    "message": "在聚焦搜索和新标签页中移动当前候选项"
+  },
+  "shortcut_reference_search_confirm_title": {
+    "message": "执行当前候选项"
+  },
+  "shortcut_reference_search_confirm_desc": {
+    "message": "打开、搜索、切换标签页或执行命令"
+  },
+  "shortcut_reference_search_tab_mode_title": {
+    "message": "补全或进入搜索模式"
+  },
+  "shortcut_reference_search_tab_mode_desc": {
+    "message": "补全候选，或进入站内搜索/已打开标签页搜索"
+  },
+  "shortcut_reference_search_close_title": {
+    "message": "关闭或退出模式"
+  },
+  "shortcut_reference_search_close_desc": {
+    "message": "关闭聚焦搜索，或退出站内搜索/已打开标签页搜索"
+  },
+  "shortcut_reference_search_current_tab_title": {
+    "message": "在当前标签页打开"
+  },
+  "shortcut_reference_search_current_tab_desc": {
+    "message": "把通常新开标签页的动作改为当前标签页打开"
+  },
+  "shortcut_reference_search_switch_new_tab_title": {
+    "message": "已打开标签页结果新开"
+  },
+  "shortcut_reference_search_switch_new_tab_desc": {
+    "message": "当结果匹配已打开标签页时，在新标签页打开它的 URL"
+  },
+  "shortcut_reference_tab_switcher_cycle_title": {
+    "message": "在标签切换器中移动选择"
+  },
+  "shortcut_reference_tab_switcher_cycle_desc": {
+    "message": "在标签切换器中移动到上一个或下一个标签页"
+  },
+  "shortcut_reference_tab_switcher_confirm_title": {
+    "message": "切换到选中标签页"
+  },
+  "shortcut_reference_tab_switcher_confirm_desc": {
+    "message": "确认标签切换器中选中的标签页"
+  },
+  "shortcut_reference_document_pip_parent_title": {
+    "message": "网页剪裁：选择外层元素"
+  },
+  "shortcut_reference_document_pip_parent_desc": {
+    "message": "选择网页剪裁目标时切到更大的父级元素"
+  },
+  "shortcut_reference_document_pip_child_title": {
+    "message": "网页剪裁：选择内层元素"
+  },
+  "shortcut_reference_document_pip_child_desc": {
+    "message": "选择网页剪裁目标时切到更小的子级元素"
+  },
   "settings_tab_switcher_title": {
     "message": "标签切换器"
   },
   "settings_tab_switcher_desc": {
-    "message": "按 Alt+Q 快速切换最近标签页"
+    "message": "按 Alt/⌥+Q 快速切换最近标签页"
   }
 }

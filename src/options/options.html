@@ -621,6 +621,77 @@
         align-items: center;
         justify-content: center;
       }
+      ._x_extension_shortcuts_section_block_2026_unique_ {
+        width: 100%;
+      }
+      ._x_extension_shortcuts_section_title_row_2026_unique_ {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        width: 100%;
+      }
+      ._x_extension_shortcut_reference_2026_unique_ {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+      ._x_extension_shortcut_reference_list_2026_unique_ {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+      ._x_extension_shortcut_reference_group_title_2026_unique_ {
+        margin: 22px 14px 7px;
+        color: var(--panel-subtext);
+        font-size: 12px;
+        font-weight: 520;
+        line-height: 1.2;
+        opacity: 0.72;
+      }
+      ._x_extension_shortcut_reference_list_2026_unique_ > ._x_extension_shortcut_reference_group_title_2026_unique_:first-child {
+        margin-top: 6px;
+      }
+      ._x_extension_shortcut_reference_item_2026_unique_ {
+        min-height: 48px;
+      }
+      ._x_extension_shortcut_reference_actions_2026_unique_ {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        min-width: 0;
+      }
+      ._x_extension_shortcut_reference_key_field_2026_unique_ {
+        min-width: 124px;
+        height: 33px;
+        padding: 0 11px;
+        box-sizing: border-box;
+        border-radius: 10px;
+        border: 1px solid color-mix(in srgb, var(--tab-border) 82%, transparent);
+        background: color-mix(in srgb, var(--control-bg) 78%, transparent);
+        color: var(--panel-subtext);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: 520;
+        line-height: 1;
+        white-space: nowrap;
+        opacity: 0.84;
+      }
+      ._x_extension_shortcut_restricted_subrow_2026_unique_ {
+        width: 100%;
+        margin-left: 0;
+        box-sizing: border-box;
+      }
+      ._x_extension_shortcut_restricted_subrow_2026_unique_ > div:first-child {
+        margin-left: 28px;
+      }
+      ._x_extension_shortcut_restricted_subrow_2026_unique_ > ._x_extension_inline_tabs_2024_unique_ {
+        margin-left: auto;
+        flex-shrink: 0;
+      }
       ._x_extension_shortcuts_hotkey_input_2024_unique_ {
         position: absolute;
         inset: 0;
@@ -2032,6 +2103,21 @@
           grid-template-columns: 120px;
           justify-content: end;
         }
+        ._x_extension_shortcuts_section_title_row_2026_unique_ {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        ._x_extension_shortcut_reference_actions_2026_unique_,
+        ._x_extension_shortcuts_actions_2024_unique_ {
+          justify-content: flex-start;
+        }
+        ._x_extension_shortcut_restricted_subrow_2026_unique_ {
+          width: 100%;
+          margin-left: 0;
+        }
+        ._x_extension_shortcut_restricted_subrow_2026_unique_ > div:first-child {
+          margin-left: 12px;
+        }
       }
       .ri-icon {
         width: var(--ri-size, 16px);
@@ -2259,21 +2345,16 @@
             <div class="_x_extension_setting_divider_2024_unique_"></div>
           </div>
           <div class="_x_extension_setting_row_2024_unique_">
-            <div>
-              <p class="_x_extension_section_title_2024_unique_ _x_extension_setting_title_with_icon_2024_unique_ _x_extension_shortcuts_title_with_tag_2026_unique_">
-                <span data-i18n="settings_shortcuts_section_title">快捷键设置</span>
-                <span
-                  class="_x_extension_shortcut_badge_2024_unique_ _x_extension_shortcuts_dia_badge_2026_unique_ _x_extension_tooltip_host_2024_unique_"
-                  data-i18n-tooltip="settings_shortcuts_dia_tooltip"
-                  data-tooltip="在 Dia 环境下，受浏览器限制，Lumno 的新标签页功能暂不可用，但浮层功能仍可正常运行。&#10;&#10;若浮层快捷键与 Dia 发生冲突，请按以下步骤解除：&#10;&#10;1. 打开 Dia，前往 Settings；&#10;2. 切换至 Shortcuts 标签页；&#10;3. 移除冲突的快捷键（例如：New Tab 的 CMD + T）"
-                  aria-label="在 Dia 环境下，受浏览器限制，Lumno 的新标签页功能暂不可用，但浮层功能仍可正常运行。若浮层快捷键与 Dia 发生冲突，请按以下步骤解除：1. 打开 Dia，前往 Settings；2. 切换至 Shortcuts 标签页；3. 移除冲突的快捷键（例如：New Tab 的 CMD + T）"
-                  role="img">
-                  <span data-i18n="settings_shortcuts_dia_tag">在 Dia 中使用</span>
-                  <i class="ri-icon ri-size-12 ri-question-line" aria-hidden="true"></i>
-                </span>
-              </p>
+            <div class="_x_extension_shortcuts_section_block_2026_unique_">
+              <div class="_x_extension_shortcuts_section_title_row_2026_unique_">
+                <p class="_x_extension_section_title_2024_unique_" data-i18n="settings_shortcuts_section_title">快捷键设置</p>
+                <button id="_x_extension_open_shortcuts_page_2026_unique_" class="_x_extension_sync_button_2024_unique_ _x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_submit_primary_2024_unique_ _x_extension_shortcuts_link_2026_unique_" type="button">
+                  <span data-i18n="settings_shortcuts_action">前往快捷键设置</span>
+                  <i class="ri-icon ri-size-14 ri-external-link-line" aria-hidden="true"></i>
+                </button>
+              </div>
               <p class="_x_extension_shortcuts_section_desc_2026_unique_">
-                <span data-i18n="settings_shortcuts_browser_desc_prefix">在 Chromium 浏览器中，需在 </span>
+                <span data-i18n="settings_shortcuts_browser_desc_prefix">需在 </span>
                 <span class="_x_extension_shortcuts_section_desc_path_2026_unique_" data-i18n="settings_shortcuts_browser_desc_path_extensions">「扩展程序」</span>
                 <span class="_x_extension_shortcuts_section_desc_path_2026_unique_"> -> </span>
                 <span class="_x_extension_shortcuts_section_desc_path_2026_unique_" data-i18n="settings_shortcuts_browser_desc_path_shortcuts">「键盘快捷键」</span>
@@ -2284,26 +2365,31 @@
           <div class="_x_extension_setting_row_2024_unique_">
             <div>
               <p class="_x_extension_setting_title_2024_unique_ _x_extension_setting_title_with_icon_2024_unique_">
-                <span data-i18n="settings_shortcuts_title">唤起浮层</span>
+                <span data-i18n="settings_shortcuts_title">唤起聚焦搜索窗口</span>
+                <span
+                  class="_x_extension_shortcut_badge_2024_unique_ _x_extension_shortcuts_dia_badge_2026_unique_ _x_extension_tooltip_host_2024_unique_"
+                  data-i18n-tooltip="settings_shortcuts_dia_tooltip"
+                  data-tooltip="在 Dia 环境下，受浏览器限制，Lumno 的新标签页功能暂不可用，但聚焦搜索功能仍可正常运行。&#10;&#10;若快捷键在 Dia 中不可用，请点击上方按钮进入浏览器的快捷键设置页面，将「Open command bar」从 In Dia 改成 Global。"
+                  aria-label="在 Dia 环境下，受浏览器限制，Lumno 的新标签页功能暂不可用，但聚焦搜索功能仍可正常运行。若快捷键在 Dia 中不可用，请点击上方按钮进入浏览器的快捷键设置页面，将「Open command bar」从 In Dia 改成 Global。"
+                  role="img">
+                  <span data-i18n="settings_shortcuts_dia_tag">在 Dia 中使用</span>
+                  <i class="ri-icon ri-size-12 ri-question-line" aria-hidden="true"></i>
+                </span>
               </p>
             </div>
             <div class="_x_extension_sync_actions_2024_unique_ _x_extension_shortcuts_actions_2024_unique_">
               <div id="_x_extension_shortcuts_status_2024_unique_" class="_x_extension_shortcuts_status_chip_2026_unique_" data-i18n="settings_shortcuts_unset">未设置</div>
-              <button id="_x_extension_open_shortcuts_page_2026_unique_" class="_x_extension_sync_button_2024_unique_ _x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_submit_primary_2024_unique_ _x_extension_shortcuts_link_2026_unique_" type="button">
-                <span data-i18n="settings_shortcuts_action">前往设置</span>
-                <i class="ri-icon ri-size-14 ri-external-link-line" aria-hidden="true"></i>
-              </button>
             </div>
           </div>
-          <div class="_x_extension_setting_row_2024_unique_ _x_extension_setting_row_compact_2024_unique_">
+          <div class="_x_extension_setting_row_2024_unique_ _x_extension_setting_row_compact_2024_unique_ _x_extension_shortcut_restricted_subrow_2026_unique_">
             <div>
               <p class="_x_extension_setting_title_2024_unique_ _x_extension_setting_title_with_icon_2024_unique_">
-                <span data-i18n="settings_restricted_title">在受限页按下快捷键效果</span>
+                <span data-i18n="settings_restricted_title">在受限页行为</span>
                 <span
                   class="_x_extension_shortcut_hint_2024_unique_ _x_extension_shortcut_group_action_2024_unique_"
                   data-i18n-tooltip="settings_restricted_tooltip"
-                  data-tooltip="受限页（如 chrome://、扩展商店、部分 file:// 页面）无法开启浮层；按下快捷键将按此处规则处理。"
-                  aria-label="受限页（如 chrome://、扩展商店、部分 file:// 页面）无法开启浮层；按下快捷键将按此处规则处理。"
+                  data-tooltip="受限页（如 chrome://、扩展商店、部分 file:// 页面）无法开启聚焦搜索；按下快捷键将按此处规则处理。"
+                  aria-label="受限页（如 chrome://、扩展商店、部分 file:// 页面）无法开启聚焦搜索；按下快捷键将按此处规则处理。"
                   role="img">
                   <i class="ri-icon ri-size-14 ri-question-line" aria-hidden="true"></i>
                 </span>
@@ -2323,6 +2409,9 @@
                 <option value="none" data-i18n="restricted_action_none">无操作</option>
               </select>
             </div>
+          </div>
+          <div id="_x_extension_shortcut_reference_2026_unique_" class="_x_extension_shortcut_reference_2026_unique_" aria-label="快捷键列表" data-i18n-aria-label="shortcut_reference_title">
+            <div id="_x_extension_shortcut_reference_list_2026_unique_" class="_x_extension_shortcut_reference_list_2026_unique_"></div>
           </div>
           <div id="_x_extension_overlay_tab_priority_row_2024_unique_" class="_x_extension_setting_row_2024_unique_ _x_extension_setting_row_compact_2024_unique_">
             <div>
@@ -2651,7 +2740,7 @@
                   <span data-i18n="settings_tab_switcher_title">标签切换器</span>
                 </span>
               </p>
-              <p class="_x_extension_setting_desc_2024_unique_" data-i18n="settings_tab_switcher_desc">按 Alt+Q 快速切换最近标签页</p>
+              <p class="_x_extension_setting_desc_2024_unique_" data-i18n="settings_tab_switcher_desc">按 Alt/⌥+Q 快速切换最近标签页</p>
             </div>
             <label class="_x_extension_switch_2024_unique_" for="_x_extension_tab_switcher_toggle_2026_unique_">
               <input id="_x_extension_tab_switcher_toggle_2026_unique_" type="checkbox" checked>
@@ -2714,6 +2803,7 @@
     <script src="../shared/search-utils.js"></script>
     <script src="../shared/tooltip.js"></script>
     <script src="../shared/menu-surface.js"></script>
+    <script src="../shared/shortcut-reference.js"></script>
     <script src="../shared/custom-select.js"></script>
     <script src="../shared/checkbox.js"></script>
     <script src="../overlay/tab-switcher.js"></script>

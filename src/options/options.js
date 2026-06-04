@@ -68,6 +68,7 @@
   const clearShortcutButton = document.getElementById('_x_extension_clear_shortcut_2024_unique_');
   const resetShortcutButton = document.getElementById('_x_extension_reset_shortcut_2024_unique_');
   const shortcutsStatus = document.getElementById('_x_extension_shortcuts_status_2024_unique_');
+  const shortcutReferenceList = document.getElementById('_x_extension_shortcut_reference_list_2026_unique_');
   const openOnboardingPageButton = document.getElementById('_x_extension_open_onboarding_page_2026_unique_');
   const openShortcutsPageButton = document.getElementById('_x_extension_open_shortcuts_page_2026_unique_');
   const customSelectWraps = Array.from(document.querySelectorAll('._x_extension_custom_select_2024_unique_'));
@@ -1625,6 +1626,7 @@
       updateBlacklistClearTooltip();
       refreshSyncStatus();
       refreshShortcutsStatus();
+      renderShortcutReferenceList();
       if (confirmCancel) confirmCancel.textContent = getMessage('confirm_cancel', '取消');
       if (confirmOk) confirmOk.textContent = getMessage('confirm_ok', '确认');
       renderSiteSearchList();
@@ -2099,6 +2101,124 @@
         : '';
       const effectiveShortcut = shortcut || defaultShortcut;
       setFallbackShortcutLabel(formatShortcutForDisplay(effectiveShortcut) || effectiveShortcut);
+    });
+  }
+
+  function getShortcutReferencePartLabel(part) {
+    const text = String(part || '').trim();
+    if (!text) {
+      return '';
+    }
+    const display = formatShortcutForDisplay(text);
+    if (display) {
+      return display;
+    }
+    const keyMap = {
+      ArrowUp: '↑',
+      ArrowDown: '↓',
+      ArrowLeft: '←',
+      ArrowRight: '→',
+      Escape: 'Esc',
+      'Arrow keys': '↑↓←→',
+      'release Alt': 'Alt↑'
+    };
+    return keyMap[text] || text;
+  }
+
+  function getShortcutReferenceParts(shortcut) {
+    const value = String(shortcut || '').trim();
+    if (!value) {
+      return [];
+    }
+    return value
+      .split(/\s*\/\s*/)
+      .map(getShortcutReferencePartLabel)
+      .filter(Boolean);
+  }
+
+  function createShortcutReferenceKeyField(shortcut) {
+    const keyField = document.createElement('div');
+    keyField.className = '_x_extension_shortcut_reference_key_field_2026_unique_';
+    const parts = getShortcutReferenceParts(shortcut);
+    keyField.textContent = parts.length > 0
+      ? parts.join(' / ')
+      : getMessage('shortcut_reference_unset', '未设置');
+    if (parts.length === 0) {
+      keyField.setAttribute('data-empty', 'true');
+    }
+    return keyField;
+  }
+
+  function createShortcutReferenceItem(item) {
+    const row = document.createElement('div');
+    row.className = '_x_extension_setting_row_2024_unique_ _x_extension_setting_row_compact_2024_unique_ _x_extension_shortcut_reference_item_2026_unique_';
+    row.setAttribute('data-shortcut-id', item && item.id ? String(item.id) : '');
+    row.setAttribute('data-shortcut-command', item && item.commandName ? String(item.commandName) : '');
+    row.setAttribute('data-shortcut-editable', item && item.editable ? 'true' : 'false');
+
+    const text = document.createElement('div');
+    const title = document.createElement('p');
+    title.className = '_x_extension_setting_title_2024_unique_';
+    title.textContent = getMessage(item.titleKey, item.titleFallback || '');
+    text.appendChild(title);
+
+    const actions = document.createElement('div');
+    actions.className = '_x_extension_shortcut_reference_actions_2026_unique_';
+    actions.appendChild(createShortcutReferenceKeyField(item.shortcut || ''));
+
+    row.appendChild(text);
+    row.appendChild(actions);
+    return row;
+  }
+
+  function createShortcutReferenceGroupTitle(group) {
+    const title = document.createElement('div');
+    title.className = '_x_extension_shortcut_reference_group_title_2026_unique_';
+    title.setAttribute('data-shortcut-group', group && group.id ? String(group.id) : '');
+    title.textContent = getMessage(group.titleKey, group.titleFallback || '');
+    return title;
+  }
+
+  function renderShortcutReferenceGroups(groups) {
+    if (!shortcutReferenceList) {
+      return;
+    }
+    shortcutReferenceList.innerHTML = '';
+    groups.forEach((group) => {
+      const items = (group.items || []).filter((item) => !(item && item.commandName === 'show-search'));
+      if (items.length === 0) {
+        return;
+      }
+      shortcutReferenceList.appendChild(createShortcutReferenceGroupTitle(group));
+      items.forEach((item) => {
+        shortcutReferenceList.appendChild(createShortcutReferenceItem(item));
+      });
+    });
+  }
+
+  function renderShortcutReferenceList() {
+    if (!shortcutReferenceList || !globalThis.LumnoShortcutReference) {
+      return;
+    }
+    const shortcutReference = globalThis.LumnoShortcutReference;
+    const platform = isMacPlatform ? 'mac' : 'default';
+    const renderWithCommands = (commands) => {
+      const groups = shortcutReference.getShortcutReferenceGroups({
+        commands,
+        platform
+      });
+      renderShortcutReferenceGroups(groups);
+    };
+    if (!chrome || !chrome.commands || typeof chrome.commands.getAll !== 'function') {
+      renderWithCommands(null);
+      return;
+    }
+    chrome.commands.getAll((commands) => {
+      if (chrome.runtime && chrome.runtime.lastError) {
+        renderWithCommands(null);
+        return;
+      }
+      renderWithCommands(Array.isArray(commands) ? commands : null);
     });
   }
 
@@ -2913,18 +3033,19 @@
     });
   }
 
-  if (openShortcutsPageButton) {
-    openShortcutsPageButton.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ action: 'openExtensionShortcutsPage' }, (response) => {
-        if (chrome.runtime && chrome.runtime.lastError) {
-          showToast(getMessage('toast_error', '操作失败，请重试'), true);
-          return;
-        }
-        if (!response || response.ok === false) {
-          showToast(getMessage('toast_error', '操作失败，请重试'), true);
-        }
-      });
+  function openExtensionShortcutsPage() {
+    chrome.runtime.sendMessage({ action: 'openExtensionShortcutsPage' }, (response) => {
+      if (chrome.runtime && chrome.runtime.lastError) {
+        showToast(getMessage('toast_error', '操作失败，请重试'), true);
+        return;
+      }
+      if (!response || response.ok === false) {
+        showToast(getMessage('toast_error', '操作失败，请重试'), true);
+      }
     });
+  }
+  if (openShortcutsPageButton) {
+    openShortcutsPageButton.addEventListener('click', openExtensionShortcutsPage);
   }
   if (openOnboardingPageButton) {
     openOnboardingPageButton.addEventListener('click', () => {
@@ -3057,13 +3178,16 @@
   }
 
   loadCurrentShortcut();
+  renderShortcutReferenceList();
   requestAnimationFrame(syncFallbackShortcutWrapWidth);
   window.addEventListener('focus', () => {
     loadCurrentShortcut();
+    renderShortcutReferenceList();
   }, true);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       loadCurrentShortcut();
+      renderShortcutReferenceList();
     }
   }, true);
 

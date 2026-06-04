@@ -384,6 +384,40 @@
       return recentStack.map((item) => ({ ...item }));
     }
 
+    function mergeThumbnailEntries(tabId, baseEntry, overlayEntry, now) {
+      const base = normalizeThumbnailEntry(tabId, baseEntry, {
+        now,
+        ttlMs: thumbnailTtlMs
+      });
+      const overlay = normalizeThumbnailEntry(tabId, overlayEntry, {
+        now,
+        ttlMs: thumbnailTtlMs
+      });
+      if (!base) {
+        return overlay;
+      }
+      if (!overlay) {
+        return base;
+      }
+      const sameTarget = !base.url || !overlay.url || base.url === overlay.url;
+      if (!sameTarget || overlay.dataUrl) {
+        return overlay;
+      }
+      if (!base.dataUrl) {
+        return overlay;
+      }
+      return normalizeThumbnailEntry(tabId, {
+        ...overlay,
+        url: overlay.url || base.url,
+        dataUrl: base.dataUrl,
+        capturedAt: base.capturedAt,
+        updatedAt: Math.max(Number(base.updatedAt) || 0, Number(overlay.updatedAt) || 0)
+      }, {
+        now,
+        ttlMs: thumbnailTtlMs
+      });
+    }
+
     function exportState(optionsArg) {
       const opts = optionsArg && typeof optionsArg === 'object' ? optionsArg : {};
       const now = Number.isFinite(Number(opts.now)) ? Number(opts.now) : Date.now();
@@ -399,13 +433,19 @@
     function hydrateState(state, optionsArg) {
       const opts = optionsArg && typeof optionsArg === 'object' ? optionsArg : {};
       const now = Number.isFinite(Number(opts.now)) ? Number(opts.now) : Date.now();
+      const shouldMerge = opts.merge === true;
       if (!state || typeof state !== 'object') {
         return false;
       }
+      const pendingStack = shouldMerge ? getStackSnapshot() : [];
+      const pendingThumbnails = shouldMerge
+        ? Array.from(thumbnailByTabId.entries()).map(([tabId, entry]) => [tabId, { ...entry }])
+        : [];
       recentStack.splice(0, recentStack.length);
       thumbnailByTabId.clear();
       const stack = Array.isArray(state.stack) ? state.stack : [];
-      stack.forEach((item) => {
+      const stackItems = shouldMerge ? pendingStack.concat(stack) : stack;
+      stackItems.forEach((item) => {
         const snapshot = normalizeTabSnapshot(item, item && item.visitedAt, shouldIncludeTab);
         if (!snapshot) {
           return;
@@ -426,6 +466,12 @@
           now,
           ttlMs: thumbnailTtlMs
         });
+        if (entry) {
+          thumbnailByTabId.set(tabId, entry);
+        }
+      });
+      pendingThumbnails.forEach(([tabId, item]) => {
+        const entry = mergeThumbnailEntries(tabId, thumbnailByTabId.get(tabId), item, now);
         if (entry) {
           thumbnailByTabId.set(tabId, entry);
         }
