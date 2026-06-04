@@ -3379,18 +3379,9 @@
   let fallbackShortcutRefreshAt = 0;
   let autocompleteState = null;
   let inlineSearchState = null;
-  let isComposing = false;
+  const imeKeyGuard = LumnoImeKeyGuard.createImeKeyGuard();
   function isImeCompositionEvent(event) {
-    if (!event) {
-      return isComposing;
-    }
-    return Boolean(
-      isComposing ||
-      event.isComposing ||
-      event.keyCode === 229 ||
-      event.which === 229 ||
-      event.key === 'Process'
-    );
+    return imeKeyGuard.shouldIgnoreKeydown(event);
   }
   let siteSearchState = null;
   let debounceTimer = null;
@@ -8100,7 +8091,7 @@
       if (isDelete) {
         lastDeletionAt = Date.now();
       }
-      if (isComposing) {
+      if (imeKeyGuard.isComposing()) {
         latestQuery = query;
         latestRawQuery = rawValue;
         return;
@@ -9023,13 +9014,13 @@
     });
   });
 
-  inputParts.input.addEventListener('compositionstart', function() {
-    isComposing = true;
+  inputParts.input.addEventListener('compositionstart', function(event) {
+    imeKeyGuard.markCompositionStart(event);
     clearAutocomplete();
   });
 
   inputParts.input.addEventListener('compositionend', function(event) {
-    isComposing = false;
+    imeKeyGuard.markCompositionEnd(event);
     const rawValue = event.target.value;
     const query = rawValue.trim();
     latestQuery = query;

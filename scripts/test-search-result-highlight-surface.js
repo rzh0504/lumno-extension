@@ -35,6 +35,18 @@ const newtabDarkActiveFaviconBlock = getCssRuleBlock(
 );
 
 assert.match(
+  overlayCss,
+  /\.x-ov-suggestion-item\[data-last="true"\],[\s\S]*?\.x-ov-suggestion-item:last-child\s*\{[\s\S]*?margin-bottom:\s*0;/,
+  'overlay suggestion rows should not rely only on data-last to remove the final bottom gap'
+);
+
+assert.match(
+  newtabHtml,
+  /\.x-nt-suggestion-item\[data-last="true"\],[\s\S]*?\.x-nt-suggestion-item:last-child\s*\{[\s\S]*?margin-bottom:\s*0;/,
+  'newtab suggestion rows should not rely only on data-last to remove the final bottom gap'
+);
+
+assert.match(
   newtabActiveSuggestionBlock,
   /background:\s*var\(--x-nt-suggestion-active-bg[\s\S]*?border-color:\s*var\(--x-nt-suggestion-active-border/,
   'newtab active suggestion rows should keep the existing background and border highlight'

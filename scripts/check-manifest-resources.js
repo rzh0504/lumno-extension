@@ -17,6 +17,7 @@ const injectedScriptFiles = [
   'src/shared/site-search-store.js',
   'src/shared/suggestion-action-model.js',
   'src/shared/suggestion-navigation.js',
+  'src/shared/ime-key-guard.js',
   'src/shared/search-input-ui.js',
   'src/shared/search-input-mode.js',
   'src/shared/search-input.css',

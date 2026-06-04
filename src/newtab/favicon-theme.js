@@ -13,6 +13,7 @@
     'douban.com': [0, 181, 29],
     'zhihu.com': [23, 127, 255],
     'bilibili.com': [0, 174, 236],
+    'dribbble.com': [234, 100, 217],
     'youtube.com': [255, 0, 0],
     'youtu.be': [255, 0, 0],
     'google.com': [66, 133, 244],
@@ -32,6 +33,7 @@
     'reddit.com': [255, 69, 0],
     'wikipedia.org': [64, 64, 64],
     'zh.wikipedia.org': [64, 64, 64],
+    'dodopayments.com': [190, 255, 0],
     'x.com': [17, 24, 39],
     'twitter.com': [29, 161, 242]
   };
@@ -128,7 +130,12 @@
 
   function normalizeAccentColor(rgb) {
     if (!rgb || rgb.length !== 3) {
-      return defaultAccentColor;
+      return defaultAccentColor.slice();
+    }
+    const max = Math.max(...rgb);
+    const min = Math.min(...rgb);
+    if (min >= 235 && max >= 245) {
+      return defaultAccentColor.slice();
     }
     const luminance = getLuminance(rgb);
     if (luminance < 0.12) {

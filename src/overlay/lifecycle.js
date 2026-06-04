@@ -64,6 +64,13 @@
       return Number.isFinite(Number(raw)) && Number(raw) > 0 ? Number(raw) : 1;
     }
 
+    function getVisualViewportScale(visualViewport) {
+      const raw = visualViewport && Number.isFinite(Number(visualViewport.scale))
+        ? Number(visualViewport.scale)
+        : 1;
+      return raw > 0 ? raw : 1;
+    }
+
     function shouldIgnoreTabZoomCompensation() {
       return typeof settings.shouldIgnoreTabZoomCompensation === 'function'
         ? Boolean(settings.shouldIgnoreTabZoomCompensation())
@@ -79,7 +86,12 @@
       const viewportHeight = visualViewport && Number.isFinite(visualViewport.height) && visualViewport.height > 0
         ? visualViewport.height
         : (targetWindow.innerHeight || doc.documentElement.clientHeight || 0);
-      return { viewportWidth, viewportHeight };
+      const visualViewportScale = getVisualViewportScale(visualViewport);
+      return {
+        viewportWidth: viewportWidth * visualViewportScale,
+        viewportHeight: viewportHeight * visualViewportScale,
+        visualViewportScale
+      };
     }
 
     function apply(overlayElement) {
@@ -98,8 +110,14 @@
       const tabZoomFactor = Number.isFinite(initialTabZoomFactor) && initialTabZoomFactor > 0
         ? initialTabZoomFactor
         : 1;
-      const zoomScale = tabZoomFactor * dprScaleDelta;
+      const visualViewportScale = Number.isFinite(viewport.visualViewportScale) && viewport.visualViewportScale > 0
+        ? viewport.visualViewportScale
+        : 1;
+      const layoutZoomScale = tabZoomFactor * dprScaleDelta;
+      const zoomScale = layoutZoomScale * visualViewportScale;
       const safeZoomScale = Math.max(0.5, Math.min(3, zoomScale));
+      const safeLayoutZoomScale = Math.max(0.5, Math.min(3, layoutZoomScale));
+      const safeVisualViewportScale = Math.max(0.5, Math.min(3, visualViewportScale));
       const presetUiScale = Number.isFinite(sizePreset.uiScale) && sizePreset.uiScale > 0
         ? sizePreset.uiScale
         : 1;
@@ -109,7 +127,7 @@
       const baseTop = Number.isFinite(baseTopPx) && baseTopPx > 0
         ? baseTopPx
         : (viewport.viewportHeight * 0.2);
-      const compensatedTop = baseTop * safeZoomScale;
+      const compensatedTop = (baseTop * safeLayoutZoomScale) / safeVisualViewportScale;
       const topPx = Math.max(16, Math.min(compensatedTop, Math.max(16, viewport.viewportHeight - 120)));
       overlayElement.style.setProperty('width', `${sizePreset.width}px`, 'important');
       overlayElement.style.setProperty('max-width', `${maxWidth}px`, 'important');

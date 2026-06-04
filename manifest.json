@@ -38,7 +38,7 @@
    "content_scripts": [
       {
          "matches": [ "\u003Call_urls>" ],
-         "js": [ "src/content/hotkey-listener.js" ],
+         "js": [ "src/content/hotkey-listener.js", "src/overlay/tab-switcher.js", "src/overlay/tab-switcher-page-bridge.js" ],
          "run_at": "document_start"
       },
       {

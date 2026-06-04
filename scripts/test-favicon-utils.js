@@ -225,6 +225,47 @@ assert.strictEqual(
   'neutral'
 );
 
+vm.runInNewContext(fs.readFileSync('src/newtab/favicon-theme.js', 'utf8'), sandbox, {
+  filename: 'src/newtab/favicon-theme.js'
+});
+const faviconTheme = sandbox.LumnoNewtabFaviconTheme;
+assert.ok(faviconTheme, 'LumnoNewtabFaviconTheme should be exported');
+assert.strictEqual(
+  faviconTheme.getBrandAccentForHost('dribbble.com').join(','),
+  '234,100,217',
+  'Dribbble should have an immediate pink brand accent'
+);
+assert.strictEqual(
+  faviconTheme.getBrandAccentForHost('cdn.dribbble.com').join(','),
+  '234,100,217',
+  'Dribbble subdomains should inherit the pink brand accent'
+);
+assert.strictEqual(
+  faviconTheme.getBrandAccentForUrl('https://dribbble.com/shots/popular').join(','),
+  '234,100,217',
+  'Dribbble URLs should resolve to the pink brand accent before theme-color cache fallback'
+);
+assert.strictEqual(
+  faviconTheme.getBrandAccentForHost('app.dodopayments.com').join(','),
+  faviconTheme.getBrandAccentForHost('checkout.dodopayments.com').join(','),
+  'Dodo Payments subdomains should inherit one shared brand accent'
+);
+assert.strictEqual(
+  faviconTheme.getBrandAccentForHost('customer.dodopayments.com').join(','),
+  faviconTheme.getBrandAccentForHost('dodopayments.com').join(','),
+  'Dodo Payments customer and root domains should not render with separate colors'
+);
+assert.strictEqual(
+  faviconTheme.buildTheme([255, 255, 255]).accentRgb.join(','),
+  faviconTheme.defaultAccentColor.join(','),
+  'pure white theme colors should render with the shared blue fallback accent'
+);
+assert.strictEqual(
+  faviconTheme.buildTheme([248, 250, 252]).accentRgb.join(','),
+  faviconTheme.defaultAccentColor.join(','),
+  'near-white fallback theme colors should render with the shared blue fallback accent'
+);
+
 vm.runInNewContext(fs.readFileSync('src/shared/favicon-cache.js', 'utf8'), sandbox, {
   filename: 'src/shared/favicon-cache.js'
 });

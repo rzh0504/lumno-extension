@@ -633,15 +633,17 @@
 
   if (chrome && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      if (!request || request.action !== 'copyCurrentPageUrlFromCommand') {
+      if (!request) {
         return;
       }
-      copyCurrentPageUrlWithToast().then((ok) => {
-        sendResponse({ ok: Boolean(ok) });
-      }).catch(() => {
-        sendResponse({ ok: false });
-      });
-      return true;
+      if (request.action === 'copyCurrentPageUrlFromCommand') {
+        copyCurrentPageUrlWithToast().then((ok) => {
+          sendResponse({ ok: Boolean(ok) });
+        }).catch(() => {
+          sendResponse({ ok: false });
+        });
+        return true;
+      }
     });
   }
 

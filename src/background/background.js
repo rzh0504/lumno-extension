@@ -24,6 +24,12 @@ try {
 }
 
 try {
+  importScripts(chrome.runtime.getURL('src/newtab/favicon-theme.js'));
+} catch (error) {
+  console.warn('Lumno: failed to load newtab favicon theme helpers.', error);
+}
+
+try {
   importScripts(chrome.runtime.getURL('src/shared/extension-routes.js'));
 } catch (error) {
   console.warn('Lumno: failed to load extension routes.', error);
@@ -128,6 +134,7 @@ const UPDATE_NOTICE = globalThis.LumnoUpdateNotice || {};
 const COMMAND_TARGET_POLICY = globalThis.LumnoCommandTargetPolicy || {};
 const FAVICON_UTILS = globalThis.LumnoFaviconUtils || {};
 const FAVICON_CACHE = globalThis.LumnoFaviconCache || {};
+const NEWTAB_FAVICON_THEME = globalThis.LumnoNewtabFaviconTheme || {};
 const BACKGROUND_NEWTAB_FALLBACK = globalThis.LumnoBackgroundNewtabFallback || {};
 const isLocalFileLikeTargetUrl = BACKGROUND_NEWTAB_FALLBACK.isLocalFileLikeTargetUrl;
 const checkFileSchemeAccess = BACKGROUND_NEWTAB_FALLBACK.checkFileSchemeAccess;
@@ -265,6 +272,18 @@ function canFetchPageForFavicon(url) {
   return !isRestrictedUrl(url);
 }
 
+function isOwnExtensionPageUrl(url) {
+  if (!url || !chrome || !chrome.runtime || !chrome.runtime.id) {
+    return false;
+  }
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'chrome-extension:' && parsed.hostname === chrome.runtime.id;
+  } catch (error) {
+    return false;
+  }
+}
+
 function getResolvedTabUrl(tab) {
   if (!tab || typeof tab !== 'object') {
     return '';
@@ -301,11 +320,326 @@ function canHostSwitcherSurface(tab) {
   if (!tab || typeof tab.id !== 'number' || typeof tab.windowId !== 'number') {
     return false;
   }
-  return canOpenOverlayOnUrl(getResolvedTabUrl(tab));
+  const url = getResolvedTabUrl(tab);
+  return isOwnExtensionPageUrl(url) || canOpenOverlayOnUrl(url);
 }
 
 function isTabSwitcherEligibleTab(tab) {
   return canHostSwitcherSurface(tab);
+}
+
+function getPortSenderTabId(port) {
+  const senderTab = port && port.sender && port.sender.tab ? port.sender.tab : null;
+  return senderTab && typeof senderTab.id === 'number' ? senderTab.id : null;
+}
+
+function getPortMessageTabId(port, message) {
+  if (message && typeof message.tabId === 'number') {
+    return message.tabId;
+  }
+  return getPortSenderTabId(port);
+}
+
+function clearTabSwitcherExtensionPagePending(record, ok, reason) {
+  if (!record || !record.pending || typeof record.pending.forEach !== 'function') {
+    return;
+  }
+  record.pending.forEach((pending) => {
+    if (!pending) {
+      return;
+    }
+    if (pending.timer) {
+      clearTimeout(pending.timer);
+    }
+    if (typeof pending.callback === 'function') {
+      pending.callback(Boolean(ok), reason || '');
+    }
+  });
+  record.pending.clear();
+}
+
+function deleteTabSwitcherExtensionPagePort(tabId, port) {
+  if (typeof tabId !== 'number') {
+    return;
+  }
+  const record = tabSwitcherExtensionPagePortsByTabId.get(tabId);
+  if (!record || (port && record.port !== port)) {
+    return;
+  }
+  clearTabSwitcherExtensionPagePending(record, false, 'disconnected');
+  tabSwitcherExtensionPagePortsByTabId.delete(tabId);
+}
+
+function registerTabSwitcherExtensionPagePort(port, message) {
+  const tabId = getPortMessageTabId(port, message);
+  if (typeof tabId !== 'number') {
+    return null;
+  }
+  const previous = tabSwitcherExtensionPagePortsByTabId.get(tabId);
+  if (previous && previous.port !== port) {
+    clearTabSwitcherExtensionPagePending(previous, false, 'replaced');
+  }
+  const record = previous && previous.port === port
+    ? previous
+    : {
+      port,
+      tabId,
+      pending: new Map()
+    };
+  record.url = message && typeof message.url === 'string' ? message.url : (record.url || '');
+  record.title = message && typeof message.title === 'string' ? message.title : (record.title || '');
+  tabSwitcherExtensionPagePortsByTabId.set(tabId, record);
+  return record;
+}
+
+function handleTabSwitcherExtensionPagePortMessage(port, message) {
+  if (!message || typeof message !== 'object') {
+    return;
+  }
+  if (message.action === 'registerTabSwitcherExtensionPage') {
+    registerTabSwitcherExtensionPagePort(port, message);
+    return;
+  }
+  if (message.action !== 'tabSwitcherExtensionPageResponse') {
+    return;
+  }
+  const tabId = getPortMessageTabId(port, message);
+  if (typeof tabId !== 'number' || typeof message.requestId !== 'number') {
+    return;
+  }
+  const record = tabSwitcherExtensionPagePortsByTabId.get(tabId);
+  if (!record || record.port !== port || !record.pending) {
+    return;
+  }
+  const pending = record.pending.get(message.requestId);
+  if (!pending) {
+    return;
+  }
+  record.pending.delete(message.requestId);
+  if (pending.timer) {
+    clearTimeout(pending.timer);
+  }
+  if (typeof pending.callback === 'function') {
+    pending.callback(Boolean(message.ok), message.reason || '', message);
+  }
+}
+
+function registerTabSwitcherExtensionPagePortConnection(port) {
+  if (!port || port.name !== TAB_SWITCHER_EXTENSION_PAGE_PORT_NAME) {
+    return;
+  }
+  registerTabSwitcherExtensionPagePort(port, {
+    action: 'registerTabSwitcherExtensionPage',
+    tabId: getPortSenderTabId(port),
+    url: port.sender && typeof port.sender.url === 'string' ? port.sender.url : '',
+    title: ''
+  });
+  port.onMessage.addListener((message) => {
+    handleTabSwitcherExtensionPagePortMessage(port, message);
+  });
+  port.onDisconnect.addListener(() => {
+    deleteTabSwitcherExtensionPagePort(getPortSenderTabId(port), port);
+    Array.from(tabSwitcherExtensionPagePortsByTabId.entries()).forEach(([tabId, record]) => {
+      if (record && record.port === port) {
+        deleteTabSwitcherExtensionPagePort(tabId, port);
+      }
+    });
+  });
+}
+
+function postTabSwitcherMessageToExtensionPage(tab, message, callback) {
+  if (!tab || typeof tab.id !== 'number' || !isOwnExtensionPageUrl(getResolvedTabUrl(tab))) {
+    if (typeof callback === 'function') {
+      callback(false, 'not-extension-page');
+    }
+    return false;
+  }
+  const record = tabSwitcherExtensionPagePortsByTabId.get(tab.id);
+  if (!record || !record.port || typeof record.port.postMessage !== 'function') {
+    if (typeof callback === 'function') {
+      callback(false, 'extension-page-port-missing');
+    }
+    return false;
+  }
+  const requestId = ++tabSwitcherExtensionPageRequestSeq;
+  const payload = {
+    ...(message && typeof message === 'object' ? message : {}),
+    requestId
+  };
+  const timer = setTimeout(() => {
+    if (!record.pending || !record.pending.has(requestId)) {
+      return;
+    }
+    record.pending.delete(requestId);
+    if (typeof callback === 'function') {
+      callback(false, 'extension-page-timeout');
+    }
+  }, 1000);
+  record.pending.set(requestId, {
+    callback,
+    timer
+  });
+  try {
+    record.port.postMessage(payload);
+    return true;
+  } catch (error) {
+    clearTimeout(timer);
+    record.pending.delete(requestId);
+    if (typeof callback === 'function') {
+      callback(false, error && error.message ? error.message : 'extension-page-post-failed');
+    }
+    return false;
+  }
+}
+
+function getTabSwitcherRuntimeVersionOnTab(tab, callback) {
+  const finish = (version, reason) => {
+    if (typeof callback === 'function') {
+      callback(String(version || ''), reason || '');
+    }
+  };
+  if (!tab || typeof tab.id !== 'number') {
+    finish('', 'invalid-tab');
+    return;
+  }
+  const message = { action: 'getTabSwitcherRuntimeVersion' };
+  if (isOwnExtensionPageUrl(getResolvedTabUrl(tab))) {
+    postTabSwitcherMessageToExtensionPage(tab, message, (ok, reason, response) => {
+      finish(ok && response ? response.version : '', reason || '');
+    });
+    return;
+  }
+  if (!chrome || !chrome.tabs || typeof chrome.tabs.sendMessage !== 'function') {
+    finish('', 'tabs-send-message-unavailable');
+    return;
+  }
+  try {
+    chrome.tabs.sendMessage(tab.id, message, (response) => {
+      if (chrome.runtime && chrome.runtime.lastError) {
+        finish('', chrome.runtime.lastError.message || 'runtime-version-message-failed');
+        return;
+      }
+      finish(response && response.ok === true ? response.version : '', response && response.reason ? response.reason : '');
+    });
+  } catch (error) {
+    finish('', error && error.message ? error.message : 'runtime-version-message-threw');
+  }
+}
+
+function setTabSwitcherCaptureVisibilityInPage(hidden, hostId) {
+  const host = document.getElementById(hostId);
+  if (!host) {
+    return { ok: true, reason: 'tab_switcher_host_missing' };
+  }
+  const markerKey = 'lumnoCaptureVisibilityHidden';
+  const valueKey = 'lumnoCapturePreviousVisibility';
+  const priorityKey = 'lumnoCapturePreviousVisibilityPriority';
+  const hadValueKey = 'lumnoCaptureHadVisibility';
+  if (hidden) {
+    if (host.dataset[markerKey] !== 'true') {
+      const previousValue = host.style.getPropertyValue('visibility');
+      host.dataset[markerKey] = 'true';
+      host.dataset[valueKey] = previousValue || '';
+      host.dataset[priorityKey] = host.style.getPropertyPriority('visibility') || '';
+      host.dataset[hadValueKey] = previousValue ? 'true' : 'false';
+    }
+    host.style.setProperty('visibility', 'hidden', 'important');
+    return { ok: true };
+  }
+  if (host.dataset[markerKey] === 'true') {
+    if (host.dataset[hadValueKey] === 'true') {
+      host.style.setProperty(
+        'visibility',
+        host.dataset[valueKey] || '',
+        host.dataset[priorityKey] || ''
+      );
+    } else {
+      host.style.removeProperty('visibility');
+    }
+    delete host.dataset[markerKey];
+    delete host.dataset[valueKey];
+    delete host.dataset[priorityKey];
+    delete host.dataset[hadValueKey];
+  }
+  return { ok: true };
+}
+
+function setTabSwitcherCaptureVisibility(tab, hidden) {
+  const tabId = tab && typeof tab.id === 'number' ? tab.id : null;
+  if (typeof tabId !== 'number') {
+    return Promise.resolve(false);
+  }
+  const payload = {
+    action: 'setTabSwitcherCaptureVisibility',
+    hidden: Boolean(hidden)
+  };
+  if (isOwnExtensionPageUrl(getResolvedTabUrl(tab))) {
+    return new Promise((resolve) => {
+      postTabSwitcherMessageToExtensionPage(tab, payload, (ok) => {
+        if (ok) {
+          resolve(true);
+          return;
+        }
+        runExecuteScriptFallback().then(resolve).catch(() => resolve(false));
+      });
+    });
+  }
+  if (chrome && chrome.tabs && typeof chrome.tabs.sendMessage === 'function') {
+    return new Promise((resolve) => {
+      try {
+        chrome.tabs.sendMessage(tabId, payload, (response) => {
+          const didSet = !(chrome.runtime && chrome.runtime.lastError) &&
+            response &&
+            response.ok === true;
+          if (didSet) {
+            resolve(true);
+            return;
+          }
+          runExecuteScriptFallback().then(resolve).catch(() => resolve(false));
+        });
+      } catch (error) {
+        runExecuteScriptFallback().then(resolve).catch(() => resolve(false));
+      }
+    });
+  }
+  return runExecuteScriptFallback();
+
+  function runExecuteScriptFallback() {
+    if (!chrome || !chrome.scripting || typeof chrome.scripting.executeScript !== 'function') {
+      return Promise.resolve(false);
+    }
+    return new Promise((resolve) => {
+      try {
+        chrome.scripting.executeScript({
+          target: { tabId },
+          func: setTabSwitcherCaptureVisibilityInPage,
+          args: [Boolean(hidden), TAB_SWITCHER_HOST_ID]
+        }, (results) => {
+          const didSet = !(chrome.runtime && chrome.runtime.lastError) &&
+            Array.isArray(results) &&
+            results.some((item) => item && item.result && item.result.ok === true);
+          resolve(Boolean(didSet));
+        });
+      } catch (error) {
+        resolve(false);
+      }
+    });
+  }
+}
+
+function waitForTabSwitcherCapturePaint() {
+  return new Promise((resolve) => {
+    setTimeout(resolve, TAB_SWITCHER_CAPTURE_HIDE_PAINT_WAIT_MS);
+  });
+}
+
+function withTabSwitcherHiddenForCapture(tab, capture) {
+  const runCapture = typeof capture === 'function' ? capture : () => Promise.resolve(false);
+  return setTabSwitcherCaptureVisibility(tab, true)
+    .catch(() => false)
+    .then(() => waitForTabSwitcherCapturePaint())
+    .then(() => runCapture())
+    .finally(() => setTabSwitcherCaptureVisibility(tab, false));
 }
 
 const pipOwnership = globalThis.LumnoPipOwnership && typeof globalThis.LumnoPipOwnership.create === 'function'
@@ -621,10 +955,17 @@ const SHOW_SEARCH_COMMAND_NAME = 'show-search';
 const SHOW_SEARCH_PREFILL_COMMAND_NAME = 'show-search-prefill';
 const SHOW_SEARCH_PREFILL_V_COMMAND_NAME = 'show-search-prefill-v';
 const SHOW_TAB_SWITCHER_COMMAND_NAME = 'show-tab-switcher';
+const TAB_SWITCHER_EXTENSION_PAGE_PORT_NAME = 'lumno-tab-switcher-extension-page';
+const TAB_SWITCHER_HOST_ID = '_x_extension_tab_switcher_host_2026_unique_';
+const TAB_SWITCHER_RUNTIME_VERSION = '2026-06-04-tight-radius-v1';
+const tabSwitcherExtensionPagePortsByTabId = new Map();
+const TAB_SWITCHER_OPENING_GUARD_MS = 2000;
+const tabSwitcherOpeningByWindowKey = new Map();
 const HOTKEY_DUP_GUARD_MS = 180;
 const PAGE_HOTKEY_NEWTAB_RECOVER_MS = 1200;
 const TAB_SWITCHER_LIMIT = 5;
 const TAB_SWITCHER_CAPTURE_DELAY_MS = 220;
+const TAB_SWITCHER_CAPTURE_HIDE_PAINT_WAIT_MS = 48;
 const TAB_SWITCHER_CAPTURE_MIN_INTERVAL_MS = 650;
 const TAB_SWITCHER_CAPTURE_JPEG_QUALITY = 42;
 const TAB_SWITCHER_THUMBNAIL_STORAGE_KEY = '_x_extension_tab_switcher_state_2026_unique_';
@@ -664,6 +1005,7 @@ let tabSwitcherStateLoaded = false;
 let tabSwitcherStateLoadPromise = null;
 let tabSwitcherStatePersistTimer = null;
 let tabSwitcherStateDirtyBeforeLoad = false;
+let tabSwitcherExtensionPageRequestSeq = 0;
 const recentTabTracker = RECENT_TAB_SWITCHER && typeof RECENT_TAB_SWITCHER.createRecentTabTracker === 'function'
   ? RECENT_TAB_SWITCHER.createRecentTabTracker({
     limit: TAB_SWITCHER_LIMIT,
@@ -1707,6 +2049,14 @@ function getSwitcherThumbnailStateForPayload(tab, url) {
   return getSwitcherThumbnailStateForTab(tab.id, url);
 }
 
+function shouldCaptureOwnExtensionPageThumbnailBeforePayload(tab) {
+  if (!tab || tab.active !== true || !isOwnExtensionPageUrl(getResolvedTabUrl(tab))) {
+    return false;
+  }
+  const state = getSwitcherThumbnailStateForPayload(tab, getResolvedTabUrl(tab));
+  return !(state && state.status === 'ok' && typeof state.dataUrl === 'string' && state.dataUrl.startsWith('data:image/'));
+}
+
 function markSwitcherThumbnailStatus(tab, status, requestReason, failureReason) {
   if (!recentTabTracker || typeof recentTabTracker.setThumbnailStatus !== 'function') {
     return false;
@@ -1755,6 +2105,217 @@ function buildSwitcherTabFavicon(tab, url) {
   }
   const fallback = typeof tab.favIconUrl === 'string' ? tab.favIconUrl.trim() : '';
   return isPageVisibleSafeFaviconUrl(fallback) ? fallback : '';
+}
+
+function getSwitcherRegistrableThemeHost(host) {
+  const normalizedHost = normalizeFaviconHost(host);
+  if (!normalizedHost ||
+      normalizedHost === 'localhost' ||
+      normalizedHost.endsWith('.localhost') ||
+      /^\d{1,3}(?:\.\d{1,3}){3}$/.test(normalizedHost) ||
+      normalizedHost.includes(':')) {
+    return normalizedHost;
+  }
+  const labels = normalizedHost.split('.').filter(Boolean);
+  if (labels.length <= 2) {
+    return normalizedHost;
+  }
+  const suffix = labels.slice(-2).join('.');
+  const multipartSuffixes = new Set([
+    'co.uk',
+    'com.au',
+    'com.br',
+    'com.cn',
+    'com.hk',
+    'com.sg',
+    'co.jp',
+    'co.kr',
+    'co.nz',
+    'com.tw',
+    'org.uk',
+    'net.au'
+  ]);
+  const tailLength = multipartSuffixes.has(suffix) && labels.length >= 3 ? 3 : 2;
+  return labels.slice(-tailLength).join('.');
+}
+
+function getSwitcherThemeHostCandidates(host) {
+  const normalizedHost = normalizeFaviconHost(host);
+  const candidates = [];
+  const addCandidate = (candidate) => {
+    const normalized = normalizeFaviconHost(candidate);
+    if (normalized && !candidates.includes(normalized)) {
+      candidates.push(normalized);
+    }
+  };
+  const sharedHost = getSwitcherRegistrableThemeHost(normalizedHost);
+  addCandidate(sharedHost);
+  if (normalizedHost === 'app.dodopayments.com' ||
+      normalizedHost === 'customer.dodopayments.com' ||
+      normalizedHost === 'checkout.dodopayments.com') {
+    addCandidate('dodopayments.com');
+  }
+  addCandidate(normalizedHost);
+  return candidates;
+}
+
+function getCachedSiteThemeColorForSwitcher(host, origin) {
+  const normalizedHost = normalizeFaviconHost(host);
+  const normalizedOrigin = String(origin || '').trim();
+  if (!normalizedHost) {
+    return null;
+  }
+  const candidateHosts = getSwitcherThemeHostCandidates(normalizedHost);
+  for (const candidateHost of candidateHosts) {
+    const exactKey = `${candidateHost}::${normalizedOrigin}::auto`;
+    const exact = normalizedOrigin ? siteThemeColorCache.get(exactKey) : null;
+    if (exact && normalizeThemeAccentRgb(exact.accentRgb)) {
+      return exact;
+    }
+  }
+  for (const [key, value] of siteThemeColorCache.entries()) {
+    if (!value || !normalizeThemeAccentRgb(value.accentRgb)) {
+      continue;
+    }
+    const cachedHost = normalizeFaviconHost(String(key || '').split('::')[0]);
+    if (!cachedHost) {
+      continue;
+    }
+    if (candidateHosts.some((candidateHost) =>
+      cachedHost === candidateHost ||
+        cachedHost.endsWith(`.${candidateHost}`)
+    )) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function getPersistedSiteThemeColorForSwitcher(host) {
+  const runtime = getBackgroundFaviconCacheRuntime();
+  if (!runtime || typeof runtime.getPersistedThemeEntry !== 'function') {
+    return null;
+  }
+  const candidateHosts = getSwitcherThemeHostCandidates(host);
+  for (const candidateHost of candidateHosts) {
+    const entry = runtime.getPersistedThemeEntry(candidateHost);
+    const accentRgb = normalizeThemeAccentRgb(entry && entry.accentRgb);
+    if (accentRgb) {
+      return {
+        accentRgb,
+        source: entry.source || 'cache',
+        neutral: entry.neutral === true,
+        confidence: entry.confidence || getThemeColorConfidence(accentRgb)
+      };
+    }
+  }
+  return null;
+}
+
+function persistSiteThemeColorForSwitcher(host, result) {
+  const runtime = getBackgroundFaviconCacheRuntime();
+  const accentRgb = normalizeThemeAccentRgb(result && result.accentRgb);
+  if (!runtime ||
+      typeof runtime.setPersistedThemeEntry !== 'function' ||
+      !host ||
+      !accentRgb) {
+    return false;
+  }
+  return runtime.setPersistedThemeEntry(host, {
+    accentRgb,
+    source: result.source || 'meta',
+    neutral: result.neutral === true,
+    confidence: result.confidence || getThemeColorConfidence(accentRgb)
+  });
+}
+
+function getNewtabBrandAccentForSwitcher(host, url) {
+  const normalizedHost = normalizeFaviconHost(host);
+  let accentRgb = null;
+  if (normalizedHost && typeof NEWTAB_FAVICON_THEME.getBrandAccentForHost === 'function') {
+    accentRgb = NEWTAB_FAVICON_THEME.getBrandAccentForHost(normalizedHost);
+  }
+  if (!accentRgb && typeof NEWTAB_FAVICON_THEME.getBrandAccentForUrl === 'function') {
+    accentRgb = NEWTAB_FAVICON_THEME.getBrandAccentForUrl(url);
+  }
+  return normalizeThemeAccentRgb(accentRgb);
+}
+
+function normalizeSwitcherAccentRgbForPayload(accentRgb) {
+  const rgb = normalizeThemeAccentRgb(accentRgb);
+  if (!rgb) {
+    return null;
+  }
+  if (getThemeColorConfidence(rgb) === 'neutral') {
+    return normalizeThemeAccentRgb(NEWTAB_FAVICON_THEME.defaultAccentColor) || [59, 130, 246];
+  }
+  return rgb;
+}
+
+function warmSwitcherTabThemeColor(host, url) {
+  const normalizedHost = normalizeFaviconHost(host);
+  const resolved = String(url || '').trim();
+  if (!normalizedHost || !resolved) {
+    return;
+  }
+  let parsed = null;
+  try {
+    parsed = new URL(resolved);
+  } catch (error) {
+    return;
+  }
+  if (!/^https?:$/i.test(parsed.protocol) ||
+      shouldBlockFaviconForHost(parsed.hostname) ||
+      shouldBlockFaviconForHost(normalizedHost)) {
+    return;
+  }
+  const cacheKey = `${normalizedHost}::${parsed.origin}::auto`;
+  if (siteThemeColorCache.has(cacheKey) || siteThemeColorPending.has(cacheKey)) {
+    return;
+  }
+  if (switcherThemeColorWarmups.has(cacheKey)) {
+    return;
+  }
+  switcherThemeColorWarmups.add(cacheKey);
+  resolveSiteThemeColor(resolved, normalizedHost, '')
+    .then((result) => {
+      const accentRgb = normalizeThemeAccentRgb(result && result.accentRgb);
+      const sharedHost = getSwitcherRegistrableThemeHost(normalizedHost);
+      if (accentRgb && sharedHost && sharedHost !== normalizedHost) {
+        const sharedKey = `${sharedHost}::${parsed.origin}::auto`;
+        siteThemeColorCache.set(sharedKey, result);
+        persistSiteThemeColorForSwitcher(sharedHost, result);
+      }
+    })
+    .catch(() => null)
+    .finally(() => {
+      switcherThemeColorWarmups.delete(cacheKey);
+    });
+}
+
+function getSwitcherTabAccentRgb(tab, url) {
+  const resolved = String(url || getResolvedTabUrl(tab) || '').trim();
+  if (!resolved) {
+    return null;
+  }
+  let parsed = null;
+  try {
+    parsed = new URL(resolved);
+  } catch (error) {
+    return null;
+  }
+  if (!/^https?:$/i.test(parsed.protocol) || shouldBlockFaviconForHost(parsed.hostname)) {
+    return null;
+  }
+  const host = normalizeFaviconHost(parsed.hostname);
+  const brandAccent = getNewtabBrandAccentForSwitcher(host, resolved);
+  warmSwitcherTabThemeColor(host, resolved);
+  if (brandAccent) {
+    return brandAccent;
+  }
+  const cached = getCachedSiteThemeColorForSwitcher(host, parsed.origin) ||
+    getPersistedSiteThemeColorForSwitcher(host);
+  return normalizeSwitcherAccentRgbForPayload(cached && cached.accentRgb);
 }
 
 async function prepareSwitcherThumbnailDataUrl(dataUrl) {
@@ -1939,16 +2500,41 @@ function captureSwitcherThumbnailForTab(tab, reason) {
       return;
     }
     tabSwitcherLastCaptureAt = Date.now();
-    chrome.tabs.captureVisibleTab(windowId, {
-      format: 'jpeg',
-      quality: TAB_SWITCHER_CAPTURE_JPEG_QUALITY
-    }, (dataUrl) => {
-      if (chrome.runtime && chrome.runtime.lastError) {
-        logSwitcherThumbnailCaptureFailure(resolvedTab, chrome.runtime.lastError.message || 'capture-visible-tab-failed', reason);
+    withTabSwitcherHiddenForCapture(resolvedTab, () => new Promise((captureResolve) => {
+      try {
+        chrome.tabs.captureVisibleTab(windowId, {
+          format: 'jpeg',
+          quality: TAB_SWITCHER_CAPTURE_JPEG_QUALITY
+        }, (dataUrl) => {
+          if (chrome.runtime && chrome.runtime.lastError) {
+            captureResolve({
+              ok: false,
+              reason: chrome.runtime.lastError.message || 'capture-visible-tab-failed'
+            });
+            return;
+          }
+          captureResolve({
+            ok: true,
+            dataUrl
+          });
+        });
+      } catch (error) {
+        captureResolve({
+          ok: false,
+          reason: error && error.message ? error.message : 'capture-visible-tab-threw'
+        });
+      }
+    })).then((captureResult) => {
+      if (!captureResult || captureResult.ok !== true) {
+        logSwitcherThumbnailCaptureFailure(
+          resolvedTab,
+          captureResult && captureResult.reason ? captureResult.reason : 'capture-visible-tab-failed',
+          reason
+        );
         resolve(false);
         return;
       }
-      prepareSwitcherThumbnailDataUrl(dataUrl).then((thumbnailDataUrl) => {
+      prepareSwitcherThumbnailDataUrl(captureResult.dataUrl).then((thumbnailDataUrl) => {
         if (!thumbnailDataUrl || !recentTabTracker || typeof recentTabTracker.setThumbnail !== 'function') {
           logSwitcherThumbnailCaptureFailure(resolvedTab, 'empty-thumbnail-data', reason);
           resolve(false);
@@ -1968,6 +2554,9 @@ function captureSwitcherThumbnailForTab(tab, reason) {
         logSwitcherThumbnailCaptureFailure(resolvedTab, 'prepare-thumbnail-failed', reason);
         resolve(false);
       });
+    }).catch(() => {
+      logSwitcherThumbnailCaptureFailure(resolvedTab, 'capture-visible-tab-failed', reason);
+      resolve(false);
     });
   });
   if (typeof chrome.tabs.get !== 'function') {
@@ -2043,6 +2632,7 @@ function normalizeSwitcherTabForPayload(tab, currentTabId) {
     url,
     title: String(tab.title || '').replace(/\s+/g, ' ').trim() || url,
     favIconUrl: buildSwitcherTabFavicon(tab, url),
+    accentRgb: getSwitcherTabAccentRgb(tab, url),
     active: Boolean(tab.active),
     pinned: Boolean(tab.pinned),
     current: typeof currentTabId === 'number' && tab.id === currentTabId,
@@ -2154,6 +2744,77 @@ function focusWindowAndActivateTab(tabId, windowId, callback) {
   });
 }
 
+function getTabSwitcherOpeningWindowKey(tab) {
+  if (tab && typeof tab.windowId === 'number') {
+    return `window:${tab.windowId}`;
+  }
+  if (tab && typeof tab.id === 'number') {
+    return `tab:${tab.id}`;
+  }
+  return '';
+}
+
+function finishTabSwitcherOpening(opening) {
+  if (!opening || !opening.key) {
+    return;
+  }
+  const current = tabSwitcherOpeningByWindowKey.get(opening.key);
+  if (current !== opening) {
+    return;
+  }
+  if (opening.timer) {
+    clearTimeout(opening.timer);
+    opening.timer = null;
+  }
+  tabSwitcherOpeningByWindowKey.delete(opening.key);
+}
+
+function beginTabSwitcherOpening(tab, source) {
+  const key = getTabSwitcherOpeningWindowKey(tab);
+  if (!key) {
+    return null;
+  }
+  const now = Date.now();
+  const existing = tabSwitcherOpeningByWindowKey.get(key);
+  if (existing && existing.expiresAt > now) {
+    logHotkeyDebug('tab-switcher-opening-guarded', {
+      tabId: tab && typeof tab.id === 'number' ? tab.id : null,
+      windowId: tab && typeof tab.windowId === 'number' ? tab.windowId : null,
+      source: source || '',
+      age: now - existing.startedAt
+    });
+    return null;
+  }
+  if (existing) {
+    finishTabSwitcherOpening(existing);
+  }
+  const opening = {
+    key,
+    tabId: tab && typeof tab.id === 'number' ? tab.id : null,
+    windowId: tab && typeof tab.windowId === 'number' ? tab.windowId : null,
+    source: source || '',
+    startedAt: now,
+    expiresAt: now + TAB_SWITCHER_OPENING_GUARD_MS,
+    timer: null
+  };
+  opening.timer = setTimeout(() => {
+    finishTabSwitcherOpening(opening);
+  }, TAB_SWITCHER_OPENING_GUARD_MS);
+  tabSwitcherOpeningByWindowKey.set(key, opening);
+  return opening;
+}
+
+function createTabSwitcherOpeningFinisher(opening) {
+  let didFinish = false;
+  return function finishOpeningOnce() {
+    if (didFinish) {
+      return;
+    }
+    didFinish = true;
+    finishTabSwitcherOpening(opening);
+  };
+}
+
 function openOverlayOnTab(activeTab, tabs, source) {
   if (!activeTab || typeof activeTab.id !== 'number') {
     logHotkeyDebug('no-active-tab', { source: source || '' });
@@ -2215,6 +2876,7 @@ function openOverlayOnTab(activeTab, tabs, source) {
     'src/shared/site-search-store.js',
     'src/shared/suggestion-action-model.js',
     'src/shared/suggestion-navigation.js',
+    'src/shared/ime-key-guard.js',
     'src/shared/search-input-ui.js',
     'src/shared/search-input-mode.js',
     'src/shared/feature-hints.js',
@@ -2333,8 +2995,14 @@ function triggerShowSearchForTab(tab, source) {
 }
 
 function injectTabSwitcherOnTab(hostTab, items, context) {
+  const finishOpen = (ok, reason) => {
+    if (context && typeof context.onOpenComplete === 'function') {
+      context.onOpenComplete(Boolean(ok), reason || '');
+    }
+  };
   if (!hostTab || typeof hostTab.id !== 'number') {
     openNewtabFallback();
+    finishOpen(false, 'invalid-host-tab');
     return;
   }
   const tabItems = Array.isArray(items) ? items : [];
@@ -2343,20 +3011,59 @@ function injectTabSwitcherOnTab(hostTab, items, context) {
       hostTabId: hostTab.id,
       source: context && context.source ? context.source : ''
     });
+    finishOpen(false, 'empty');
     return;
   }
-  const runSwitcherScript = (tabZoomFactor) => {
+  const buildSwitcherContext = (tabZoomFactor) => ({
+    tabs: tabItems,
+    currentTabId: context && typeof context.currentTabId === 'number' ? context.currentTabId : hostTab.id,
+    selectedIndex: context && typeof context.selectedIndex === 'number' ? context.selectedIndex : 0,
+    tabZoomFactor: tabZoomFactor,
+    advanceOnExisting: true,
+    suppressInitialShortcutAdvance: context && context.source === 'commands-tab-switcher',
+    runtimeVersion: TAB_SWITCHER_RUNTIME_VERSION,
+    source: context && context.source ? context.source : ''
+  });
+  if (isOwnExtensionPageUrl(getResolvedTabUrl(hostTab))) {
+    postTabSwitcherMessageToExtensionPage(hostTab, {
+      action: 'openTabSwitcherFromCommand',
+      runtimeVersion: TAB_SWITCHER_RUNTIME_VERSION,
+      context: buildSwitcherContext(1)
+    }, (ok, reason) => {
+      if (!ok) {
+        logHotkeyDebug('tab-switcher-extension-page-open-failed', {
+          tabId: hostTab.id,
+          reason: reason || '',
+          source: context && context.source ? context.source : ''
+        });
+        openNewtabFallbackForUrl(getResolvedTabUrl(hostTab));
+        finishOpen(false, reason || 'extension-page-open-failed');
+        return;
+      }
+      logHotkeyDebug('tab-switcher-opened', {
+        tabId: hostTab.id,
+        itemCount: tabItems.length,
+        source: context && context.source ? context.source : '',
+        path: 'extension-page-port'
+      });
+      finishOpen(true, 'extension-page-port');
+    });
+    return;
+  }
+  const runDynamicSwitcherScript = (switcherContext) => {
     chrome.scripting.executeScript({
       target: { tabId: hostTab.id },
       files: ['src/overlay/tab-switcher.js']
     }, () => {
       if (chrome.runtime && chrome.runtime.lastError) {
+        const errorMessage = chrome.runtime.lastError.message || 'unknown';
         logHotkeyDebug('tab-switcher-inject-failed', {
           tabId: hostTab.id,
-          error: chrome.runtime.lastError.message || 'unknown',
+          error: errorMessage,
           source: context && context.source ? context.source : ''
         });
         openNewtabFallbackForUrl(getResolvedTabUrl(hostTab));
+        finishOpen(false, errorMessage);
         return;
       }
       chrome.scripting.executeScript({
@@ -2370,21 +3077,16 @@ function injectTabSwitcherOnTab(hostTab, items, context) {
           toggle(switcherContext);
           return { ok: true };
         },
-        args: [{
-          tabs: tabItems,
-          currentTabId: context && typeof context.currentTabId === 'number' ? context.currentTabId : hostTab.id,
-          selectedIndex: context && typeof context.selectedIndex === 'number' ? context.selectedIndex : 0,
-          tabZoomFactor: tabZoomFactor,
-          advanceOnExisting: true,
-          source: context && context.source ? context.source : ''
-        }]
+        args: [switcherContext]
       }, (results) => {
         if (chrome.runtime && chrome.runtime.lastError) {
+          const errorMessage = chrome.runtime.lastError.message || 'unknown';
           logHotkeyDebug('tab-switcher-run-failed', {
             tabId: hostTab.id,
-            error: chrome.runtime.lastError.message || 'unknown',
+            error: errorMessage,
             source: context && context.source ? context.source : ''
           });
+          finishOpen(false, errorMessage);
           return;
         }
         const result = Array.isArray(results) && results[0] ? results[0].result : null;
@@ -2394,15 +3096,51 @@ function injectTabSwitcherOnTab(hostTab, items, context) {
             error: result.reason || 'unknown',
             source: context && context.source ? context.source : ''
           });
+          finishOpen(false, result.reason || 'run-failed');
           return;
         }
         logHotkeyDebug('tab-switcher-opened', {
           tabId: hostTab.id,
           itemCount: tabItems.length,
-          source: context && context.source ? context.source : ''
+          source: context && context.source ? context.source : '',
+          path: 'executeScript'
         });
+        finishOpen(true, 'executeScript');
       });
     });
+  };
+  const runSwitcherScript = (tabZoomFactor) => {
+    const switcherContext = buildSwitcherContext(tabZoomFactor);
+    if (chrome && chrome.tabs && typeof chrome.tabs.sendMessage === 'function') {
+      getTabSwitcherRuntimeVersionOnTab(hostTab, (version) => {
+        if (version === TAB_SWITCHER_RUNTIME_VERSION) {
+          chrome.tabs.sendMessage(hostTab.id, {
+            action: 'openTabSwitcherFromCommand',
+            runtimeVersion: TAB_SWITCHER_RUNTIME_VERSION,
+            context: switcherContext
+          }, (response) => {
+            const didOpen = !(chrome.runtime && chrome.runtime.lastError) &&
+              response &&
+              response.ok === true;
+            if (didOpen) {
+              logHotkeyDebug('tab-switcher-opened', {
+                tabId: hostTab.id,
+                itemCount: tabItems.length,
+                source: context && context.source ? context.source : '',
+                path: 'message'
+              });
+              finishOpen(true, 'message');
+              return;
+            }
+            runDynamicSwitcherScript(switcherContext);
+          });
+          return;
+        }
+        runDynamicSwitcherScript(switcherContext);
+      });
+      return;
+    }
+    runDynamicSwitcherScript(switcherContext);
   };
   if (chrome.tabs && typeof chrome.tabs.getZoom === 'function') {
     chrome.tabs.getZoom(hostTab.id, (zoomFactor) => {
@@ -2423,38 +3161,105 @@ function advanceExistingTabSwitcherOnTab(tab, source, callback) {
     }
     return;
   }
-  if (!chrome || !chrome.scripting || typeof chrome.scripting.executeScript !== 'function') {
-    if (typeof callback === 'function') {
-      callback(false);
-    }
-    return;
-  }
-  chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    func: () => {
-      const host = document.getElementById('_x_extension_tab_switcher_host_2026_unique_');
-      if (!host || typeof host._lumnoTabSwitcherAdvance !== 'function') {
-        return { ok: false };
-      }
-      host._lumnoTabSwitcherAdvance();
-      return { ok: true };
-    }
-  }, (results) => {
-    const didAdvance = !(chrome.runtime && chrome.runtime.lastError) &&
-      Array.isArray(results) &&
-      results[0] &&
-      results[0].result &&
-      results[0].result.ok === true;
-    if (didAdvance) {
-      logHotkeyDebug('tab-switcher-advanced-fast', {
-        tabId: tab.id,
-        source: source || ''
-      });
-    }
+
+  const finish = (didAdvance) => {
     if (typeof callback === 'function') {
       callback(Boolean(didAdvance));
     }
-  });
+  };
+
+  if (isOwnExtensionPageUrl(getResolvedTabUrl(tab))) {
+    postTabSwitcherMessageToExtensionPage(tab, {
+      action: 'advanceOpenTabSwitcherFromCommand',
+      runtimeVersion: TAB_SWITCHER_RUNTIME_VERSION,
+      offset: 1
+    }, (ok) => {
+      if (ok) {
+        logHotkeyDebug('tab-switcher-advanced-fast', {
+          tabId: tab.id,
+          source: source || '',
+          path: 'extension-page-port'
+        });
+      }
+      finish(ok);
+    });
+    return;
+  }
+
+  const runExecuteScriptFallback = () => {
+    if (!chrome || !chrome.scripting || typeof chrome.scripting.executeScript !== 'function') {
+      finish(false);
+      return;
+    }
+    chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: (runtimeVersion) => {
+        const host = document.getElementById('_x_extension_tab_switcher_host_2026_unique_');
+        if (!host || typeof host._lumnoTabSwitcherAdvance !== 'function') {
+          return { ok: false };
+        }
+        if (host._lumnoTabSwitcherRuntimeVersion !== runtimeVersion) {
+          return { ok: false, reason: 'tab_switcher_runtime_stale' };
+        }
+        const didAdvance = host._lumnoTabSwitcherAdvance(1);
+        return {
+          ok: true,
+          advanced: didAdvance === true,
+          suppressed: didAdvance === false
+        };
+      },
+      args: [TAB_SWITCHER_RUNTIME_VERSION]
+    }, (results) => {
+      const didAdvance = !(chrome.runtime && chrome.runtime.lastError) &&
+        Array.isArray(results) &&
+        results[0] &&
+        results[0].result &&
+        results[0].result.ok === true;
+      if (didAdvance) {
+        logHotkeyDebug('tab-switcher-advanced-fast', {
+          tabId: tab.id,
+          source: source || '',
+          path: 'executeScript'
+        });
+      }
+      finish(didAdvance);
+    });
+  };
+
+  if (chrome && chrome.tabs && typeof chrome.tabs.sendMessage === 'function') {
+    getTabSwitcherRuntimeVersionOnTab(tab, (version) => {
+      if (version === TAB_SWITCHER_RUNTIME_VERSION) {
+        chrome.tabs.sendMessage(tab.id, {
+          action: 'advanceOpenTabSwitcherFromCommand',
+          runtimeVersion: TAB_SWITCHER_RUNTIME_VERSION,
+          offset: 1
+        }, (response) => {
+          const didAdvance = !(chrome.runtime && chrome.runtime.lastError) &&
+            response &&
+            response.ok === true;
+          if (didAdvance) {
+            logHotkeyDebug('tab-switcher-advanced-fast', {
+              tabId: tab.id,
+              source: source || '',
+              path: 'message'
+            });
+            finish(true);
+            return;
+          }
+          if (response && response.ok === false) {
+            finish(false);
+            return;
+          }
+          runExecuteScriptFallback();
+        });
+        return;
+      }
+      runExecuteScriptFallback();
+    });
+    return;
+  }
+
+  runExecuteScriptFallback();
 }
 
 function triggerTabSwitcherForTab(tab, source) {
@@ -2467,6 +3272,11 @@ function triggerTabSwitcherForTab(tab, source) {
     if (didAdvance) {
       return;
     }
+    const opening = beginTabSwitcherOpening(tab, source);
+    if (!opening) {
+      return;
+    }
+    const finishOpening = createTabSwitcherOpeningFinisher(opening);
     ensureTabSwitcherStateLoaded().catch(() => {}).finally(() => {
       chrome.tabs.query({}, (tabs) => {
         if (chrome.runtime && chrome.runtime.lastError) {
@@ -2474,18 +3284,24 @@ function triggerTabSwitcherForTab(tab, source) {
             source: source || '',
             error: chrome.runtime.lastError.message || 'unknown'
           });
+          finishOpening();
           return;
         }
         const tabList = Array.isArray(tabs) ? tabs : [];
         const activeTab = tabList.find((item) => item && item.id === tab.id) || tab;
-        let thumbnailCapturePromise = Promise.resolve(false);
+        let activeThumbnailReady = Promise.resolve(false);
         if (shouldTrackSwitcherTab(activeTab)) {
           recordRecentSwitcherTab(activeTab);
-          thumbnailCapturePromise = enqueueSwitcherThumbnailCapture(activeTab, 'command');
+          if (shouldCaptureOwnExtensionPageThumbnailBeforePayload(activeTab)) {
+            activeThumbnailReady = captureSwitcherThumbnailForTab(activeTab, 'command-immediate');
+          } else {
+            scheduleSwitcherThumbnailCapture(activeTab, 'command');
+          }
         }
-        thumbnailCapturePromise.catch(() => false).then(() => {
+        activeThumbnailReady.catch(() => false).finally(() => {
           const items = getRecentTabsForSwitcher(tabList, activeTab.id);
           if (!items.length) {
+            finishOpening();
             return;
           }
           const activeUrl = getResolvedTabUrl(activeTab);
@@ -2502,17 +3318,20 @@ function triggerTabSwitcherForTab(tab, source) {
           const selectedIndex = getDefaultSwitcherSelectedIndex(items, activeTab.id);
           if (!hostTab || typeof hostTab.id !== 'number') {
             openNewtabFallbackForUrl(activeUrl);
+            finishOpening();
             return;
           }
           if (hostTab.id !== activeTab.id) {
             focusWindowAndActivateTab(hostTab.id, hostTab.windowId, (result) => {
               if (!result || result.ok === false) {
+                finishOpening();
                 return;
               }
               injectTabSwitcherOnTab(hostTab, items, {
                 currentTabId: activeTab.id,
                 selectedIndex,
-                source
+                source,
+                onOpenComplete: finishOpening
               });
             });
             return;
@@ -2520,7 +3339,8 @@ function triggerTabSwitcherForTab(tab, source) {
           injectTabSwitcherOnTab(hostTab, items, {
             currentTabId: activeTab.id,
             selectedIndex,
-            source
+            source,
+            onOpenComplete: finishOpening
           });
         });
       });
@@ -2848,6 +3668,10 @@ chrome.commands.onCommand.addListener(function(command) {
     triggerShowSearchForTab(activeTabs[0], source);
   });
 });
+
+if (chrome && chrome.runtime && chrome.runtime.onConnect) {
+  chrome.runtime.onConnect.addListener(registerTabSwitcherExtensionPagePortConnection);
+}
 
 chrome.tabs.onCreated.addListener((tab) => {
   const recentContext = getRecentPageHotkeyContext(tab && typeof tab.windowId === 'number' ? tab.windowId : null);
@@ -3868,6 +4692,7 @@ const faviconPending = new Map();
 const titlePinyinCache = new Map();
 const siteThemeColorCache = new Map();
 const siteThemeColorPending = new Map();
+const switcherThemeColorWarmups = new Set();
 const blockedLocalFaviconLogCache = new Set();
 let backgroundFaviconCacheRuntime = null;
 
@@ -3887,6 +4712,8 @@ function getBackgroundFaviconCacheRuntime() {
   }
   return backgroundFaviconCacheRuntime;
 }
+
+getBackgroundFaviconCacheRuntime();
 
 function getBackgroundFaviconUrlResolver() {
   if (!backgroundFaviconUrlResolver && typeof FAVICON_UTILS.createFaviconUrlResolver === 'function') {
@@ -4671,9 +5498,13 @@ function resolveSiteThemeColor(targetUrl, hostOverride, preferredTheme) {
       return resolveThemeColorCandidates(candidates);
     })
     .then((result) => {
-      siteThemeColorCache.set(cacheKey, result || null);
+      const finalResult = result || null;
+      siteThemeColorCache.set(cacheKey, finalResult);
+      if (finalResult) {
+        persistSiteThemeColorForSwitcher(normalizedHost, finalResult);
+      }
       siteThemeColorPending.delete(cacheKey);
-      return result || null;
+      return finalResult;
     })
     .catch(() => {
       siteThemeColorCache.set(cacheKey, null);

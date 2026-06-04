@@ -1280,9 +1280,6 @@
   "tab_switcher_title": {
     "message": "最近のタブ"
   },
-  "tab_switcher_current": {
-    "message": "現在"
-  },
   "tab_switcher_untitled": {
     "message": "無題"
   },

@@ -1280,9 +1280,6 @@
   "tab_switcher_title": {
     "message": "Recent tabs"
   },
-  "tab_switcher_current": {
-    "message": "Current"
-  },
   "tab_switcher_untitled": {
     "message": "Untitled"
   },

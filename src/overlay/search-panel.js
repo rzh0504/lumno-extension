@@ -1080,7 +1080,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     let siteSearchTriggerState = null;
     let siteSearchState = null;
     let openTabsSearchModeActive = false;
-    let isComposing = false;
+    const imeKeyGuard = LumnoImeKeyGuard.createImeKeyGuard();
     let selectedIndex = -1; // -1 means input is focused, 0+ means suggestion is selected
     const suggestionItems = [];
     let currentSuggestions = []; // Store current suggestions for keyboard navigation
@@ -1640,16 +1640,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     });
 
     function isImeCompositionEvent(event) {
-      if (!event) {
-        return isComposing;
-      }
-      return Boolean(
-        isComposing ||
-        event.isComposing ||
-        event.keyCode === 229 ||
-        event.which === 229 ||
-        event.key === 'Process'
-      );
+      return imeKeyGuard.shouldIgnoreKeydown(event);
     }
     const defaultPlaceholder = searchInput.placeholder;
     const initialSiteSearchProviders = Array.isArray(overlayContext && overlayContext.siteSearchProviders)
@@ -4079,14 +4070,14 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     function handleSearchInputCompositionStart(event) {
       runSearchInputEventOnce(event, () => {
         syncLiveSearchInputFromEvent(event);
-        isComposing = true;
+        imeKeyGuard.markCompositionStart(event);
         clearAutocomplete();
       });
     }
 
     function handleSearchInputCompositionEnd(event) {
       runSearchInputEventOnce(event, () => {
-        isComposing = false;
+        imeKeyGuard.markCompositionEnd(event);
         const liveInput = syncLiveSearchInputFromEvent(event);
         const rawValue = liveInput ? (liveInput.value || '') : '';
         const query = rawValue.trim();
@@ -4138,7 +4129,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         if (isDelete) {
           lastDeletionAt = Date.now();
         }
-        if (isComposing) {
+        if (imeKeyGuard.isComposing()) {
           latestRawInputValue = rawValue;
           latestOverlayQuery = query;
           return;
