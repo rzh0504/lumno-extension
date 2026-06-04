@@ -38,6 +38,7 @@
     ? bookmarkColumnsSelect.closest('._x_extension_select_wrap_2024_unique_')
     : null;
   const autoPipToggle = document.getElementById('_x_extension_auto_pip_toggle_2024_unique_');
+  const tabSwitcherToggle = document.getElementById('_x_extension_tab_switcher_toggle_2026_unique_');
   const documentPipToggle = document.getElementById('_x_extension_document_pip_toggle_2026_unique_');
   const pinnedTabRecoveryToggle = document.getElementById('_x_extension_pinned_tab_recovery_toggle_2026_unique_');
   const overlayTabQuickSwitchToggle = document.getElementById('_x_extension_overlay_tab_quick_switch_2024_unique_');
@@ -146,6 +147,7 @@
   const PINNED_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_pinned_recent_sites_2026_unique_';
   const HIDDEN_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_hidden_recent_sites_2026_unique_';
   const AUTO_PIP_ENABLED_STORAGE_KEY = '_x_extension_auto_pip_enabled_2026_unique_';
+  const TAB_SWITCHER_ENABLED_STORAGE_KEY = '_x_extension_tab_switcher_enabled_2026_unique_';
   const DOCUMENT_PIP_ENABLED_STORAGE_KEY = '_x_extension_document_pip_enabled_2026_unique_';
   const PINNED_TAB_RECOVERY_ENABLED_STORAGE_KEY = '_x_extension_pinned_tab_recovery_enabled_2026_unique_';
   const OVERLAY_TAB_PRIORITY_STORAGE_KEY = '_x_extension_overlay_tab_priority_2024_unique_';
@@ -185,6 +187,7 @@
     PINNED_RECENT_SITES_STORAGE_KEY,
     HIDDEN_RECENT_SITES_STORAGE_KEY,
     AUTO_PIP_ENABLED_STORAGE_KEY,
+    TAB_SWITCHER_ENABLED_STORAGE_KEY,
     DOCUMENT_PIP_ENABLED_STORAGE_KEY,
     PINNED_TAB_RECOVERY_ENABLED_STORAGE_KEY,
     OVERLAY_TAB_PRIORITY_STORAGE_KEY,
@@ -724,6 +727,12 @@
 
   function normalizeAutoPipEnabled(value) {
     return value !== false;
+  }
+
+  function normalizeTabSwitcherEnabled(value) {
+    return typeof SETTINGS.normalizeTabSwitcherEnabled === 'function'
+      ? SETTINGS.normalizeTabSwitcherEnabled(value)
+      : value !== false;
   }
 
   function normalizeDocumentPipEnabled(value) {
@@ -2420,6 +2429,7 @@
     OVERLAY_SIZE_MODE_STORAGE_KEY,
     SEARCH_RESULT_PRIORITY_STORAGE_KEY,
     AUTO_PIP_ENABLED_STORAGE_KEY,
+    TAB_SWITCHER_ENABLED_STORAGE_KEY,
     DOCUMENT_PIP_ENABLED_STORAGE_KEY,
     PINNED_TAB_RECOVERY_ENABLED_STORAGE_KEY,
     OVERLAY_TAB_PRIORITY_STORAGE_KEY,
@@ -2847,6 +2857,15 @@
         return;
       }
       storageArea.set({ [AUTO_PIP_ENABLED_STORAGE_KEY]: next });
+    });
+  }
+  if (tabSwitcherToggle) {
+    tabSwitcherToggle.addEventListener('change', () => {
+      const next = normalizeTabSwitcherEnabled(tabSwitcherToggle.checked);
+      if (!storageArea) {
+        return;
+      }
+      storageArea.set({ [TAB_SWITCHER_ENABLED_STORAGE_KEY]: next });
     });
   }
   if (documentPipToggle) {
@@ -3339,6 +3358,17 @@
       }
       if (rawValue !== stored) {
         storageArea.set({ [AUTO_PIP_ENABLED_STORAGE_KEY]: stored });
+      }
+      refreshCustomSelects();
+    });
+    storageArea.get([TAB_SWITCHER_ENABLED_STORAGE_KEY], (result) => {
+      const rawValue = result[TAB_SWITCHER_ENABLED_STORAGE_KEY];
+      const stored = normalizeTabSwitcherEnabled(rawValue);
+      if (tabSwitcherToggle) {
+        tabSwitcherToggle.checked = stored;
+      }
+      if (rawValue !== stored) {
+        storageArea.set({ [TAB_SWITCHER_ENABLED_STORAGE_KEY]: stored });
       }
       refreshCustomSelects();
     });
@@ -4618,6 +4648,15 @@
       autoPipToggle.checked = next;
       if (raw !== next && storageArea) {
         storageArea.set({ [AUTO_PIP_ENABLED_STORAGE_KEY]: next });
+      }
+      refreshCustomSelects();
+    }
+    if (changes[TAB_SWITCHER_ENABLED_STORAGE_KEY] && tabSwitcherToggle) {
+      const raw = changes[TAB_SWITCHER_ENABLED_STORAGE_KEY].newValue;
+      const next = normalizeTabSwitcherEnabled(raw);
+      tabSwitcherToggle.checked = next;
+      if (raw !== next && storageArea) {
+        storageArea.set({ [TAB_SWITCHER_ENABLED_STORAGE_KEY]: next });
       }
       refreshCustomSelects();
     }

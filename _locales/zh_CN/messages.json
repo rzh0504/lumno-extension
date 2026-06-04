@@ -150,7 +150,7 @@
     "message": "重启后恢复置顶标签页"
   },
   "settings_pinned_tab_recovery_desc": {
-    "message": "记录可恢复的置顶网页标签页，在浏览器重启后自动补回。"
+    "message": "记录可恢复的置顶网页标签页，在浏览器重启后自动补回"
   },
   "document_pip_picker_hint": {
     "message": "移动鼠标选择元素，点击打开悬浮窗，滚轮切换父级，Esc 取消。"
@@ -1288,5 +1288,11 @@
   },
   "command_show_tab_switcher": {
     "message": "打开最近标签页切换器"
+  },
+  "settings_tab_switcher_title": {
+    "message": "标签切换器"
+  },
+  "settings_tab_switcher_desc": {
+    "message": "按 Alt+Q 快速切换最近标签页"
   }
 }

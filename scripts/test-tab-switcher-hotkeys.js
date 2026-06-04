@@ -11,6 +11,7 @@ const switcherBridgeSource = fs.existsSync(switcherBridgePath)
 const manifestSource = fs.readFileSync('manifest.json', 'utf8');
 const newtabHtmlSource = fs.readFileSync('src/newtab/newtab.html', 'utf8');
 const optionsHtmlSource = fs.readFileSync('src/options/options.html', 'utf8');
+const optionsSource = fs.readFileSync('src/options/options.js', 'utf8');
 const onboardingHtmlSource = fs.readFileSync('src/onboarding/onboarding.html', 'utf8');
 const manifest = JSON.parse(manifestSource);
 const localeNames = ['en', 'ja', 'zh_CN', 'zh_TW'];
@@ -356,6 +357,16 @@ assert.match(
 );
 assert.match(
   panelBlock,
+  /--x-tab-switcher-motion-card:\s*180ms cubic-bezier\(0\.22,\s*1,\s*0\.36,\s*1\);[\s\S]*--x-tab-switcher-motion-fade:\s*150ms ease;[\s\S]*--x-tab-switcher-thumb-stroke-inset:\s*-0\.5px;[\s\S]*--x-tab-switcher-thumb-stroke-radius-offset:\s*0\.5px;[\s\S]*--x-tab-switcher-thumb-stroke-color:\s*rgba\(15,\s*23,\s*42,\s*0\.2\);/,
+  'tab switcher visual timing and thumbnail stroke constants should live in panel tokens instead of scattered patch values'
+);
+assert.match(
+  panelBlock,
+  /--x-tab-switcher-title-icon-size:\s*16px;[\s\S]*--x-tab-switcher-title-icon-gap:\s*5px;/,
+  'tab switcher title favicon sizing should be centralized so responsive overrides stay structural'
+);
+assert.match(
+  panelBlock,
   /top:\s*50%;/,
   'tab switcher panel should sit at the vertical center of the screen'
 );
@@ -391,7 +402,12 @@ assert.strictEqual(
 );
 assert.match(
   panelBlock,
-  /filter:\s*none;[\s\S]*transition:\s*opacity 90ms ease;/,
+  /transition:\s*opacity 90ms ease;/,
+  'tab switcher opening should use a minimal opacity-only transition'
+);
+assert.strictEqual(
+  /transition:[^;]*(?:transform|filter)/.test(panelBlock),
+  false,
   'tab switcher opening should avoid transform and filter transitions that can cause visible jumpiness'
 );
 assert.strictEqual(
@@ -542,7 +558,7 @@ assert.strictEqual(
 );
 assert.match(
   switcherSource,
-  /\.x-tab-switcher-card\s*\{[\s\S]*transition:\s*border-color 140ms ease,\s*background 140ms ease,\s*box-shadow 180ms cubic-bezier\(0\.22,\s*1,\s*0\.36,\s*1\);/,
+  /\.x-tab-switcher-card\s*\{[\s\S]*transition:\s*border-color 140ms ease,\s*background 140ms ease,\s*box-shadow var\(--x-tab-switcher-motion-card\);/,
   'tab switcher hover and selection transitions should ease the highlight shadow without animating unrelated properties'
 );
 assert.match(
@@ -558,11 +574,11 @@ assert.match(
 );
 assert.match(
   activeCardBlock,
-  /0 0 22px color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*18%,\s*transparent\)[\s\S]*0 8px 18px color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*10%,\s*transparent\)/,
-  'tab switcher selected cards should add a smaller theme-color glow instead of a dark drop shadow'
+  /0 0 16px color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*7%,\s*transparent\)[\s\S]*0 4px 10px color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*3%,\s*transparent\)/,
+  'tab switcher selected cards should add a barely-there theme-color glow instead of a dark drop shadow'
 );
-const missingThumbBlock = getCssBlockFromNeedle(switcherSource, '.x-tab-switcher-thumb[data-thumbnail-status="pending"],');
 const thumbBlock = getCssRuleBlock(switcherSource, '.x-tab-switcher-thumb');
+const thumbStrokeBlock = getCssRuleBlock(switcherSource, '.x-tab-switcher-thumb::after');
 const thumbFaviconBlock = getCssRuleBlock(switcherSource, '.x-tab-switcher-thumb-favicon');
 assert.match(
   thumbBlock,
@@ -575,29 +591,24 @@ assert.strictEqual(
   'tab switcher screenshot containers should not draw a thumbnail border'
 );
 assert.match(
-  missingThumbBlock,
-  /background:\s*color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*14%,\s*rgba\(248,\s*250,\s*252,\s*0\.94\)\);/,
-  'tab switcher empty and pending thumbnail surfaces should derive their fill from the per-card theme color'
-);
-assert.match(
-  thumbBlock,
-  /box-shadow:\s*[\s\S]*inset 0 0 0 1px rgba\(255,\s*255,\s*255,\s*0\.42\)[\s\S]*inset 0 1px 0 color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*10%,\s*rgba\(255,\s*255,\s*255,\s*0\.76\)\)/,
-  'tab switcher screenshot containers should add a faint internal stroke'
-);
-assert.match(
-  missingThumbBlock,
-  /box-shadow:\s*[\s\S]*inset 0 0 0 1px rgba\(255,\s*255,\s*255,\s*0\.42\)[\s\S]*inset 0 1px 0 color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*10%,\s*rgba\(255,\s*255,\s*255,\s*0\.76\)\)/,
-  'tab switcher empty and pending thumbnail surfaces should keep the same faint internal stroke'
+  thumbStrokeBlock,
+  /content:\s*"";[\s\S]*position:\s*absolute;[\s\S]*inset:\s*var\(--x-tab-switcher-thumb-stroke-inset\);[\s\S]*z-index:\s*2;[\s\S]*border-radius:\s*calc\(var\(--x-tab-switcher-radius-thumb\) \+ var\(--x-tab-switcher-thumb-stroke-radius-offset\)\);[\s\S]*box-sizing:\s*border-box;[\s\S]*border:\s*1px solid var\(--x-tab-switcher-thumb-stroke-color\);[\s\S]*box-shadow:\s*none;/,
+  'tab switcher screenshot containers should center a neutral overlay stroke on the thumbnail clipping edge'
 );
 assert.strictEqual(
-  /border(?:-color)?\s*:/.test(missingThumbBlock),
+  /box-shadow\s*:/.test(thumbBlock),
   false,
-  'tab switcher empty and pending thumbnail surfaces should not reintroduce a border'
+  'tab switcher thumbnails should leave the edge stroke to the overlay so the line follows one contour'
 );
 assert.strictEqual(
-  /linear-gradient/.test(missingThumbBlock),
+  /\.x-tab-switcher-thumb\[data-thumbnail-status=/.test(switcherSource),
   false,
-  'tab switcher empty and pending thumbnail surfaces should not use the old shared gradient'
+  'tab switcher thumbnail status should not duplicate base thumbnail styling'
+);
+assert.strictEqual(
+  /\.x-tab-switcher-card\[data-thumbnail-status=/.test(switcherSource),
+  false,
+  'tab switcher thumbnail status should not duplicate base card transitions'
 );
 assert.strictEqual(
   /\.x-tab-switcher-card\[data-active="true"\]\s+\.x-tab-switcher-thumb\[data-thumbnail-status=/.test(switcherSource),
@@ -606,7 +617,7 @@ assert.strictEqual(
 );
 assert.match(
   thumbFaviconBlock,
-  /position:\s*absolute;[\s\S]*left:\s*8px;[\s\S]*bottom:\s*8px;[\s\S]*width:\s*24px;[\s\S]*height:\s*24px;[\s\S]*object-fit:\s*cover;[\s\S]*opacity:\s*0;[\s\S]*transform:\s*translate3d\(-2px,\s*4px,\s*0\)\s*scale\(0\.92\);[\s\S]*transition:\s*opacity 150ms ease,\s*transform 180ms cubic-bezier\(0\.22,\s*1,\s*0\.36,\s*1\);[\s\S]*will-change:\s*opacity,\s*transform;/,
+  /position:\s*absolute;[\s\S]*z-index:\s*3;[\s\S]*left:\s*8px;[\s\S]*bottom:\s*8px;[\s\S]*width:\s*24px;[\s\S]*height:\s*24px;[\s\S]*object-fit:\s*cover;[\s\S]*opacity:\s*0;[\s\S]*transform:\s*translate3d\(-2px,\s*4px,\s*0\)\s*scale\(0\.92\);[\s\S]*transition:\s*opacity var\(--x-tab-switcher-motion-fade\),\s*transform var\(--x-tab-switcher-motion-card\);[\s\S]*will-change:\s*opacity,\s*transform;/,
   'tab switcher should stage the favicon as a plain thumbnail overlay with only opacity and transform motion'
 );
 assert.strictEqual(
@@ -621,7 +632,22 @@ assert.match(
 );
 assert.match(
   switcherSource,
-  /@supports \(corner-shape:\s*superellipse\(1\.25\)\)\s*\{[\s\S]*#\$\{PANEL_ID\}[\s\S]*\.x-tab-switcher-card[\s\S]*\.x-tab-switcher-thumb[\s\S]*\.x-tab-switcher-favicon[\s\S]*\.x-tab-switcher-thumb-favicon[\s\S]*corner-shape:\s*superellipse\(1\.25\);[\s\S]*\}/,
+  /\.x-tab-switcher-title-favicon\s*\{[\s\S]*width:\s*var\(--x-tab-switcher-title-icon-size\);[\s\S]*height:\s*var\(--x-tab-switcher-title-icon-size\);[\s\S]*opacity:\s*1;[\s\S]*transition:\s*width var\(--x-tab-switcher-motion-card\),\s*opacity var\(--x-tab-switcher-motion-fade\),\s*transform var\(--x-tab-switcher-motion-card\),\s*filter var\(--x-tab-switcher-motion-card\);/,
+  'tab switcher should keep the title favicon for inactive cards with a matching exit transition'
+);
+assert.match(
+  switcherSource,
+  /\.x-tab-switcher-card\[data-active="true"\]\s+\.x-tab-switcher-name-row\s*\{[\s\S]*grid-template-columns:\s*0 minmax\(0,\s*1fr\);[\s\S]*gap:\s*0;/,
+  'tab switcher should let active titles expand into the title favicon space'
+);
+assert.match(
+  switcherSource,
+  /\.x-tab-switcher-card\[data-active="true"\]\s+\.x-tab-switcher-title-favicon\s*\{[\s\S]*width:\s*0;[\s\S]*opacity:\s*0;[\s\S]*transform:\s*translate3d\(-2px,\s*0,\s*0\)\s*scale\(0\.88\);/,
+  'tab switcher should hide the active title favicon while the thumbnail favicon appears'
+);
+assert.match(
+  switcherSource,
+  /@supports \(corner-shape:\s*superellipse\(1\.25\)\)\s*\{[\s\S]*#\$\{PANEL_ID\}[\s\S]*\.x-tab-switcher-card[\s\S]*\.x-tab-switcher-thumb,[\s\S]*\.x-tab-switcher-thumb::after,[\s\S]*\.x-tab-switcher-favicon[\s\S]*\.x-tab-switcher-title-favicon[\s\S]*corner-shape:\s*superellipse\(1\.25\);[\s\S]*\}/,
   'tab switcher should use the same superellipse corner curve as the overlay'
 );
 assert.match(
@@ -664,40 +690,19 @@ assert.match(
 );
 assert.match(
   darkActiveCardBlock,
-  /0 0 24px color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*24%,\s*transparent\)[\s\S]*0 8px 18px color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*14%,\s*transparent\)/,
-  'tab switcher dark selected cards should use a theme-color glow instead of a black shadow'
-);
-const darkMissingThumbBlock = getCssBlockFromNeedle(switcherSource, '#${PANEL_ID}[data-theme="dark"] .x-tab-switcher-thumb[data-thumbnail-status="pending"],');
-assert.match(
-  darkMissingThumbBlock,
-  /background:\s*color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*18%,\s*rgba\(15,\s*23,\s*42,\s*0\.92\)\);/,
-  'tab switcher dark empty and pending thumbnail surfaces should derive their fill from the per-card theme color'
+  /0 0 18px color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*10%,\s*transparent\)[\s\S]*0 4px 10px color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*5%,\s*transparent\)/,
+  'tab switcher dark selected cards should use a barely-there theme-color glow instead of a black shadow'
 );
 assert.match(
-  darkMissingThumbBlock,
-  /box-shadow:\s*[\s\S]*inset 0 0 0 1px rgba\(255,\s*255,\s*255,\s*0\.1\)[\s\S]*inset 0 1px 0 color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*18%,\s*rgba\(255,\s*255,\s*255,\s*0\.08\)\)/,
-  'tab switcher dark empty and pending thumbnail surfaces should keep a faint internal stroke'
-);
-assert.strictEqual(
-  /linear-gradient/.test(darkMissingThumbBlock),
-  false,
-  'tab switcher dark empty and pending thumbnail surfaces should not use the old shared gradient'
-);
-assert.strictEqual(
-  /border(?:-color)?\s*:/.test(darkMissingThumbBlock),
-  false,
-  'tab switcher dark empty and pending thumbnail surfaces should not reintroduce a border'
+  darkPanelBlock,
+  /--x-tab-switcher-thumb-stroke-color:\s*rgba\(255,\s*255,\s*255,\s*0\.24\);/,
+  'tab switcher dark thumbnails should use a neutral light edge-aligned overlay stroke through the shared token'
 );
 const darkThumbBlock = getCssRuleBlock(switcherSource, '#${PANEL_ID}[data-theme="dark"] .x-tab-switcher-thumb');
 assert.match(
   darkThumbBlock,
   /background:\s*color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*18%,\s*rgba\(15,\s*23,\s*42,\s*0\.92\)\);/,
   'tab switcher dark thumbnail background should always default to the card theme color even when a screenshot exists'
-);
-assert.match(
-  darkThumbBlock,
-  /box-shadow:\s*[\s\S]*inset 0 0 0 1px rgba\(255,\s*255,\s*255,\s*0\.1\)[\s\S]*inset 0 1px 0 color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*18%,\s*rgba\(255,\s*255,\s*255,\s*0\.08\)\)/,
-  'tab switcher dark thumbnail background should include a faint internal stroke'
 );
 assert.strictEqual(
   /border(?:-color)?\s*:/.test(darkThumbBlock),
@@ -751,7 +756,14 @@ assert.strictEqual(
   'tab switcher should not keep current badge i18n wiring after the badge is removed'
 );
 localeNames.forEach((locale) => {
-  ['tab_switcher_title', 'tab_switcher_untitled', 'tab_switcher_favicon_alt', 'command_show_tab_switcher'].forEach((key) => {
+  [
+    'tab_switcher_title',
+    'tab_switcher_untitled',
+    'tab_switcher_favicon_alt',
+    'command_show_tab_switcher',
+    'settings_tab_switcher_title',
+    'settings_tab_switcher_desc'
+  ].forEach((key) => {
     assert.ok(
       localeMessages[locale][key] && String(localeMessages[locale][key].message || '').trim(),
       `${locale} should localize ${key}`
@@ -768,6 +780,37 @@ assert.notStrictEqual(
   localeMessages.en.tab_switcher_title.message,
   'tab switcher title should have Chinese copy instead of falling back to English'
 );
+assert.ok(
+  optionsHtmlSource.includes('data-i18n="settings_tab_switcher_title"') &&
+    optionsHtmlSource.includes('data-i18n="settings_tab_switcher_desc"') &&
+    optionsHtmlSource.includes('id="_x_extension_tab_switcher_toggle_2026_unique_"'),
+  'settings Labs should expose a concise localized tab switcher toggle'
+);
+assert.match(
+  optionsSource,
+  /const tabSwitcherToggle = document\.getElementById\('_x_extension_tab_switcher_toggle_2026_unique_'\);/,
+  'settings page should wire the tab switcher Labs toggle'
+);
+assert.match(
+  optionsSource,
+  /const TAB_SWITCHER_ENABLED_STORAGE_KEY = '_x_extension_tab_switcher_enabled_2026_unique_';/,
+  'settings page should use a dedicated synced storage key for the tab switcher toggle'
+);
+assert.match(
+  optionsSource,
+  /function normalizeTabSwitcherEnabled\(value\)[\s\S]*normalizeTabSwitcherEnabled/,
+  'settings page should normalize the tab switcher toggle with default-on semantics'
+);
+assert.match(
+  optionsSource,
+  /storageArea\.set\(\{ \[TAB_SWITCHER_ENABLED_STORAGE_KEY\]: next \}\)/,
+  'settings page should persist tab switcher toggle changes'
+);
+assert.match(
+  optionsSource,
+  /storageArea\.get\(\[TAB_SWITCHER_ENABLED_STORAGE_KEY\][\s\S]*tabSwitcherToggle\.checked = stored[\s\S]*storageArea\.set\(\{ \[TAB_SWITCHER_ENABLED_STORAGE_KEY\]: stored \}\)/,
+  'settings page should default missing tab switcher storage to enabled for all users'
+);
 assert.strictEqual(
   /\.x-tab-switcher-thumb\[data-thumbnail-status="pending"\]::after/.test(switcherSource),
   false,
@@ -778,20 +821,25 @@ assert.strictEqual(
   false,
   'tab switcher cards without a screenshot should not animate a pending thumbnail state'
 );
+assert.strictEqual(
+  /\.x-tab-switcher-card\[data-thumbnail-status=/.test(switcherSource),
+  false,
+  'tab switcher cards without a screenshot should inherit base highlight motion instead of duplicating state-specific CSS'
+);
 assert.match(
   switcherSource,
-  /\.x-tab-switcher-card\[data-thumbnail-status="pending"\][\s\S]*\.x-tab-switcher-card\[data-thumbnail-status="missing"\][\s\S]*transition:\s*border-color 140ms ease,\s*background 140ms ease,\s*box-shadow 180ms cubic-bezier\(0\.22,\s*1,\s*0\.36,\s*1\);/,
-  'tab switcher cards without a screenshot should still animate highlight changes'
+  /function createPreparedImage\(doc,\s*className,\s*src,\s*altText\)[\s\S]*prepareImage\(createElement\(doc,\s*'img',\s*className\)\)[\s\S]*image\.alt = altText;/,
+  'tab switcher favicon and thumbnail image setup should use a shared prepared-image helper'
 );
-assert.strictEqual(
-  /createElement\(document,\s*'img',\s*'x-tab-switcher-title-favicon'\)|createElement\(document,\s*'span',\s*'x-tab-switcher-title-favicon'\)/.test(switcherSource),
-  false,
-  'tab switcher should not render a favicon before the title'
+assert.match(
+  switcherSource,
+  /function createTitleFavicon\(doc,\s*favIconUrl\)[\s\S]*x-tab-switcher-title-favicon[\s\S]*createPreparedImage\(doc,\s*'x-tab-switcher-title-favicon',\s*favIconUrl,\s*''\)/,
+  'tab switcher title favicon fallback should be encapsulated instead of patched into the render loop'
 );
-assert.strictEqual(
-  /x-tab-switcher-title-favicon/.test(switcherSource),
-  false,
-  'tab switcher should remove title favicon styling so text can use the full row'
+assert.match(
+  switcherSource,
+  /nameRow\.appendChild\(createTitleFavicon\(document,\s*tab\.favIconUrl\)\);/,
+  'tab switcher should render a title favicon before the title for inactive cards'
 );
 assert.match(
   thumbBlock,
@@ -805,8 +853,8 @@ assert.strictEqual(
 );
 assert.match(
   switcherSource,
-  /\.x-tab-switcher-name-row\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/,
-  'tab switcher title row should let the title expand across the full card width'
+  /\.x-tab-switcher-name-row\s*\{[\s\S]*grid-template-columns:\s*var\(--x-tab-switcher-title-icon-size\) minmax\(0,\s*1fr\);/,
+  'tab switcher title row should reserve title favicon space before active expansion'
 );
 const metaBlock = getCssRuleBlock(switcherSource, '.x-tab-switcher-meta');
 const nameRowBlock = getCssRuleBlock(switcherSource, '.x-tab-switcher-name-row');
@@ -819,8 +867,8 @@ assert.match(
 );
 assert.match(
   nameRowBlock,
-  /gap:\s*0;/,
-  'tab switcher title row should not keep a gap for a removed favicon'
+  /gap:\s*var\(--x-tab-switcher-title-icon-gap\);[\s\S]*transition:\s*grid-template-columns var\(--x-tab-switcher-motion-card\),\s*gap var\(--x-tab-switcher-motion-card\);/,
+  'tab switcher title row should animate when the active title favicon collapses'
 );
 assert.match(
   nameBlock,
@@ -861,6 +909,21 @@ assert.match(
   backgroundSource,
   /advanceOnExisting:\s*true/,
   'Alt+Q command re-entry should ask an already-open switcher to advance instead of closing'
+);
+assert.match(
+  backgroundSource,
+  /const TAB_SWITCHER_ENABLED_STORAGE_KEY = '_x_extension_tab_switcher_enabled_2026_unique_';/,
+  'background should read the Labs tab switcher feature flag'
+);
+assert.match(
+  backgroundSource,
+  /let tabSwitcherEnabledCache = true;/,
+  'background tab switcher feature flag should default to enabled'
+);
+assert.match(
+  backgroundSource,
+  /storageArea\.get\(\[[\s\S]*TAB_SWITCHER_ENABLED_STORAGE_KEY[\s\S]*\][\s\S]*tabSwitcherEnabledCache = normalizedTabSwitcher/,
+  'background startup should load and normalize the tab switcher enabled setting'
 );
 assert.match(
   backgroundSource,
@@ -929,7 +992,7 @@ assert.strictEqual(
 );
 assert.match(
   backgroundSource,
-  /function triggerTabSwitcherForTab\(tab,\s*source\)[\s\S]*advanceExistingTabSwitcherOnTab\(tab,\s*source,\s*\(didAdvance\)/,
+  /function triggerTabSwitcherForTab\(tab,\s*source\)[\s\S]*if \(!tabSwitcherEnabledCache\)[\s\S]*tab-switcher-disabled[\s\S]*return;[\s\S]*advanceExistingTabSwitcherOnTab\(tab,\s*source,\s*\(didAdvance\)/,
   'Alt+Q should try the lightweight advance path before rebuilding the switcher payload'
 );
 assert.match(

@@ -978,6 +978,7 @@ const RESTRICTED_ACTION_STORAGE_KEY = '_x_extension_restricted_action_2024_uniqu
 const OVERLAY_TAB_PRIORITY_STORAGE_KEY = '_x_extension_overlay_tab_priority_2024_unique_';
 const TAB_RANK_SCORE_DEBUG_STORAGE_KEY = '_x_extension_tab_rank_score_debug_2026_unique_';
 const AUTO_PIP_ENABLED_STORAGE_KEY = '_x_extension_auto_pip_enabled_2026_unique_';
+const TAB_SWITCHER_ENABLED_STORAGE_KEY = '_x_extension_tab_switcher_enabled_2026_unique_';
 const DOCUMENT_PIP_ENABLED_STORAGE_KEY = '_x_extension_document_pip_enabled_2026_unique_';
 const PINNED_TAB_RECOVERY_ENABLED_STORAGE_KEY = '_x_extension_pinned_tab_recovery_enabled_2026_unique_';
 const FALLBACK_SHORTCUT_STORAGE_KEY = '_x_extension_fallback_hotkey_2024_unique_';
@@ -1028,6 +1029,7 @@ const PINNED_TAB_SNAPSHOT_DEBOUNCE_MS = 600;
 const PINNED_TAB_RESTORE_MAX_TABS = 24;
 let restrictedActionCache = 'default';
 let documentPipEnabledCache = false;
+let tabSwitcherEnabledCache = true;
 let pinnedTabRecoveryEnabledCache = false;
 const hotkeyInvokeAtByTabId = new Map();
 let lastPageHotkeyContext = null;
@@ -1398,6 +1400,13 @@ function ensureTabSwitchStatsLoaded() {
 
 function normalizePinnedTabRecoveryEnabled(value) {
   return value === true;
+}
+
+function normalizeTabSwitcherEnabled(value) {
+  const settings = globalThis.LumnoSettings || {};
+  return typeof settings.normalizeTabSwitcherEnabled === 'function'
+    ? settings.normalizeTabSwitcherEnabled(value)
+    : value !== false;
 }
 
 function applyPinnedTabRecoverySetting(rawValue) {
@@ -1884,7 +1893,12 @@ function sortTabsForOverlay(tabs) {
 }
 
 if (storageArea) {
-  storageArea.get([RESTRICTED_ACTION_STORAGE_KEY, DOCUMENT_PIP_ENABLED_STORAGE_KEY, PINNED_TAB_RECOVERY_ENABLED_STORAGE_KEY], (result) => {
+  storageArea.get([
+    RESTRICTED_ACTION_STORAGE_KEY,
+    DOCUMENT_PIP_ENABLED_STORAGE_KEY,
+    TAB_SWITCHER_ENABLED_STORAGE_KEY,
+    PINNED_TAB_RECOVERY_ENABLED_STORAGE_KEY
+  ], (result) => {
     const stored = result[RESTRICTED_ACTION_STORAGE_KEY];
     const normalized = stored === 'none' ? 'none' : 'default';
     if (normalized !== stored) {
@@ -1897,6 +1911,12 @@ if (storageArea) {
       storageArea.set({ [DOCUMENT_PIP_ENABLED_STORAGE_KEY]: normalizedDocumentPip });
     }
     documentPipEnabledCache = normalizedDocumentPip;
+    const tabSwitcherStored = result[TAB_SWITCHER_ENABLED_STORAGE_KEY];
+    const normalizedTabSwitcher = normalizeTabSwitcherEnabled(tabSwitcherStored);
+    if (tabSwitcherStored !== normalizedTabSwitcher) {
+      storageArea.set({ [TAB_SWITCHER_ENABLED_STORAGE_KEY]: normalizedTabSwitcher });
+    }
+    tabSwitcherEnabledCache = normalizedTabSwitcher;
     const pinnedTabRecoveryStored = result[PINNED_TAB_RECOVERY_ENABLED_STORAGE_KEY];
     applyPinnedTabRecoverySetting(pinnedTabRecoveryStored);
   });
@@ -3274,6 +3294,10 @@ function advanceExistingTabSwitcherOnTab(tab, source, callback) {
 }
 
 function triggerTabSwitcherForTab(tab, source) {
+  if (!tabSwitcherEnabledCache) {
+    logHotkeyDebug('tab-switcher-disabled', { source: source || '' });
+    return;
+  }
   if (!tab || typeof tab.id !== 'number') {
     logHotkeyDebug('tab-switcher-no-active-tab', { source: source || '' });
     openNewtabFallback();
@@ -4683,6 +4707,7 @@ migrateStorageIfNeeded([
   PINNED_RECENT_SITES_STORAGE_KEY,
   HIDDEN_RECENT_SITES_STORAGE_KEY,
   AUTO_PIP_ENABLED_STORAGE_KEY,
+  TAB_SWITCHER_ENABLED_STORAGE_KEY,
   DOCUMENT_PIP_ENABLED_STORAGE_KEY,
   PINNED_TAB_RECOVERY_ENABLED_STORAGE_KEY,
   DEFAULT_SEARCH_ENGINE_STORAGE_KEY,
@@ -6163,6 +6188,14 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     documentPipEnabledCache = normalized;
     if (typeof next !== 'undefined' && next !== normalized && storageArea) {
       storageArea.set({ [DOCUMENT_PIP_ENABLED_STORAGE_KEY]: normalized });
+    }
+  }
+  if (changes[TAB_SWITCHER_ENABLED_STORAGE_KEY]) {
+    const next = changes[TAB_SWITCHER_ENABLED_STORAGE_KEY].newValue;
+    const normalized = normalizeTabSwitcherEnabled(next);
+    tabSwitcherEnabledCache = normalized;
+    if (typeof next !== 'undefined' && next !== normalized && storageArea) {
+      storageArea.set({ [TAB_SWITCHER_ENABLED_STORAGE_KEY]: normalized });
     }
   }
   if (changes[PINNED_TAB_RECOVERY_ENABLED_STORAGE_KEY]) {

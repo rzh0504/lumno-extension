@@ -1288,5 +1288,11 @@
   },
   "command_show_tab_switcher": {
     "message": "Open recent tab switcher"
+  },
+  "settings_tab_switcher_title": {
+    "message": "AltQ tab switcher"
+  },
+  "settings_tab_switcher_desc": {
+    "message": "Press Alt+Q to switch recent tabs."
   }
 }

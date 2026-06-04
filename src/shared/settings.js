@@ -121,6 +121,10 @@
     return value === true;
   }
 
+  function normalizeTabSwitcherEnabled(value) {
+    return value !== false;
+  }
+
   function normalizeThemePreference(value) {
     if (value === 'dark') {
       return 'dark';
@@ -158,6 +162,7 @@
     normalizeSearchResultPriority,
     normalizeSearchResultSourceTypes,
     normalizeTabRankScoreDebugMode,
+    normalizeTabSwitcherEnabled,
     normalizeThemePreference,
     normalizeThemeMode,
     createGlobalThemeModeStorageUpdate

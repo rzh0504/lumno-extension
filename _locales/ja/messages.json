@@ -1288,5 +1288,11 @@
   },
   "command_show_tab_switcher": {
     "message": "最近のタブ切り替えを開く"
+  },
+  "settings_tab_switcher_title": {
+    "message": "AltQ タブ切り替え"
+  },
+  "settings_tab_switcher_desc": {
+    "message": "Alt+Q で最近のタブをすばやく切り替えます。"
   }
 }

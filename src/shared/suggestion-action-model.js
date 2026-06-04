@@ -68,6 +68,9 @@
   function getModifierAdjustedAction(action, options) {
     const rawAction = String(action || '');
     const config = options || {};
+    if (config.openSwitchInNewTab && rawAction === 'switch') {
+      return 'openNewTab';
+    }
     if (config.openInCurrentTab && rawAction === 'openNewTab') {
       return 'go';
     }
@@ -81,6 +84,15 @@
     }
     const action = config.action || getVisitButtonAction(suggestion, config);
     return action === 'openNewTab';
+  }
+
+  function shouldOpenSwitchActionInNewTab(suggestion, options) {
+    const config = options || {};
+    if (!config.openSwitchInNewTab || !suggestion || !suggestion.url) {
+      return false;
+    }
+    const action = config.action || getVisitButtonAction(suggestion, config);
+    return action === 'switch';
   }
 
   function createSearchActionModel(options) {
@@ -161,6 +173,7 @@
     createSearchActionModel,
     getVisitButtonAction,
     getModifierAdjustedAction,
+    shouldOpenSwitchActionInNewTab,
     shouldOpenNewTabActionInCurrentTab,
     shouldShowVisitButton,
     getActionContextKey

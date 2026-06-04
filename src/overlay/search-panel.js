@@ -28,6 +28,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   let overlayUpdateNoticeFrameVisualViewport = null;
   let overlayUpdateNoticeMountTimer = null;
   let openInCurrentTabModifierActive = false;
+  let openSwitchInNewTabModifierActive = false;
   const OVERLAY_HOST_ID = '_x_extension_overlay_host_2026_unique_';
   const OVERLAY_PANEL_ID = '_x_extension_overlay_2024_unique_';
   const OVERLAY_CONTEXT_TOKEN_KEY = '__lumnoOverlayContextToken2026';
@@ -3055,8 +3056,12 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       if (SUGGESTION_ACTION_MODEL &&
           typeof SUGGESTION_ACTION_MODEL.getModifierAdjustedAction === 'function') {
         return SUGGESTION_ACTION_MODEL.getModifierAdjustedAction(action, {
-          openInCurrentTab: openInCurrentTabModifierActive
+          openInCurrentTab: openInCurrentTabModifierActive,
+          openSwitchInNewTab: openSwitchInNewTabModifierActive
         });
+      }
+      if (openSwitchInNewTabModifierActive && action === 'switch') {
+        return 'openNewTab';
       }
       return openInCurrentTabModifierActive && action === 'openNewTab' ? 'go' : action;
     }
@@ -3084,17 +3089,23 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       });
     }
 
-    function setOpenInCurrentTabModifierActive(active) {
-      const nextActive = Boolean(active);
-      if (openInCurrentTabModifierActive === nextActive) {
+    function setSuggestionActionModifiersActive(openInCurrentTabActive, openSwitchInNewTabActive) {
+      const nextOpenInCurrentTabActive = Boolean(openInCurrentTabActive);
+      const nextOpenSwitchInNewTabActive = Boolean(openSwitchInNewTabActive);
+      if (openInCurrentTabModifierActive === nextOpenInCurrentTabActive &&
+          openSwitchInNewTabModifierActive === nextOpenSwitchInNewTabActive) {
         return;
       }
-      openInCurrentTabModifierActive = nextActive;
+      openInCurrentTabModifierActive = nextOpenInCurrentTabActive;
+      openSwitchInNewTabModifierActive = nextOpenSwitchInNewTabActive;
       updateModifierActionLabels();
     }
 
-    function syncOpenInCurrentTabModifierFromEvent(event) {
-      setOpenInCurrentTabModifierActive(Boolean(event && event.altKey));
+    function syncSuggestionActionModifiersFromEvent(event) {
+      setSuggestionActionModifiersActive(
+        Boolean(event && event.altKey),
+        Boolean(event && event.shiftKey)
+      );
     }
 
     function shouldUseCurrentTabForOpenNewTabAction(suggestion, event, item) {
@@ -3110,6 +3121,37 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         });
       }
       return action === 'openNewTab';
+    }
+
+    function shouldUseNewTabForSwitchAction(suggestion, event, item) {
+      if (!event || !event.shiftKey) {
+        return false;
+      }
+      const action = item && item._xVisitButtonAction ? item._xVisitButtonAction : 'switch';
+      if (SUGGESTION_ACTION_MODEL &&
+          typeof SUGGESTION_ACTION_MODEL.shouldOpenSwitchActionInNewTab === 'function') {
+        return SUGGESTION_ACTION_MODEL.shouldOpenSwitchActionInNewTab(suggestion, {
+          action,
+          openSwitchInNewTab: true
+        });
+      }
+      return Boolean(suggestion && suggestion.url && action === 'switch');
+    }
+
+    function openMatchedTabSuggestion(suggestion, event, item, query) {
+      if (shouldUseNewTabForSwitchAction(suggestion, event, item)) {
+        recordSearchSuggestionSelectionFromSuggestion(suggestion, query, 'overlay');
+        chrome.runtime.sendMessage({
+          action: 'createTab',
+          url: suggestion.url,
+          disposition: 'newTab'
+        });
+        return;
+      }
+      chrome.runtime.sendMessage({
+        action: 'switchToTab',
+        tabId: suggestion._xMatchedTabId
+      });
     }
 
     function createSuggestionActionModel(optionsArg) {
@@ -4287,7 +4329,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     document.addEventListener('keydown', captureTabHandler, true);
 
     searchInput.addEventListener('keydown', function(e) {
-      syncOpenInCurrentTabModifierFromEvent(e);
+      syncSuggestionActionModifiersFromEvent(e);
       if (!e.metaKey && !e.ctrlKey && !e.altKey) {
         e.stopPropagation();
       }
@@ -4334,7 +4376,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       }
     });
     searchInput.addEventListener('keyup', function(e) {
-      syncOpenInCurrentTabModifierFromEvent(e);
+      syncSuggestionActionModifiersFromEvent(e);
       if (!e.metaKey && !e.ctrlKey && !e.altKey) {
         e.stopPropagation();
       }
@@ -4362,7 +4404,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     }
 
     keydownHandler = function(e) {
-      syncOpenInCurrentTabModifierFromEvent(e);
+      syncSuggestionActionModifiersFromEvent(e);
       if (isImeCompositionEvent(e)) {
         return;
       }
@@ -4498,10 +4540,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
               return;
             }
             if (shouldSwitchMatchedTabSuggestion(selectedSuggestion, activeSuggestionIndex)) {
-              chrome.runtime.sendMessage({
-                action: 'switchToTab',
-                tabId: selectedSuggestion._xMatchedTabId
-              });
+              openMatchedTabSuggestion(selectedSuggestion, e, activeItem, query);
             } else if (selectedSuggestion.forceSearch && selectedSuggestion.searchQuery) {
               chrome.runtime.sendMessage({
                 action: 'searchOrNavigate',
@@ -4606,7 +4645,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     };
 
     keyupHandler = function(e) {
-      syncOpenInCurrentTabModifierFromEvent(e);
+      syncSuggestionActionModifiersFromEvent(e);
     };
 
     overlayKeyCaptureHandler = function(e) {
@@ -4638,7 +4677,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     document.addEventListener('keydown', keydownHandler);
     document.addEventListener('keyup', keyupHandler);
     overlayModifierBlurHandler = function() {
-      setOpenInCurrentTabModifierActive(false);
+      setSuggestionActionModifiersActive(false, false);
     };
     window.addEventListener('blur', overlayModifierBlurHandler);
 
@@ -6279,10 +6318,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
               return;
             }
             if (shouldSwitchMatchedTabSuggestion(suggestion, index)) {
-              chrome.runtime.sendMessage({
-                action: 'switchToTab',
-                tabId: suggestion._xMatchedTabId
-              });
+              openMatchedTabSuggestion(suggestion, e, suggestionItem, query);
               removeOverlay(overlay);
               document.removeEventListener('click', clickOutsideHandler);
               document.removeEventListener('keydown', keydownHandler);
@@ -6355,10 +6391,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
               return;
             }
             if (shouldSwitchMatchedTabSuggestion(suggestion, index)) {
-              chrome.runtime.sendMessage({
-                action: 'switchToTab',
-                tabId: suggestion._xMatchedTabId
-              });
+              openMatchedTabSuggestion(suggestion, event, suggestionItem, query);
               removeOverlay(overlay);
               document.removeEventListener('click', clickOutsideHandler);
               document.removeEventListener('keydown', keydownHandler);

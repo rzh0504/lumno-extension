@@ -58,6 +58,11 @@ assert.strictEqual(settings.normalizeTabRankScoreDebugMode(true), true);
 assert.strictEqual(settings.normalizeTabRankScoreDebugMode(false), false);
 assert.strictEqual(settings.normalizeTabRankScoreDebugMode('true'), false);
 
+assert.strictEqual(settings.normalizeTabSwitcherEnabled(false), false);
+assert.strictEqual(settings.normalizeTabSwitcherEnabled(true), true);
+assert.strictEqual(settings.normalizeTabSwitcherEnabled(undefined), true);
+assert.strictEqual(settings.normalizeTabSwitcherEnabled('false'), true);
+
 assert.strictEqual(settings.normalizeThemePreference('dark'), 'dark');
 assert.strictEqual(settings.normalizeThemePreference('light'), 'light');
 assert.strictEqual(settings.normalizeThemePreference('system'), '');

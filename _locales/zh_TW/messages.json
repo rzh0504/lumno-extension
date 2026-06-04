@@ -1288,5 +1288,11 @@
   },
   "command_show_tab_switcher": {
     "message": "開啟最近分頁切換器"
+  },
+  "settings_tab_switcher_title": {
+    "message": "AltQ 分頁切換器"
+  },
+  "settings_tab_switcher_desc": {
+    "message": "按 Alt+Q 快速切換最近分頁。"
   }
 }
