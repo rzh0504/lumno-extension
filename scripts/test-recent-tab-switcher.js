@@ -84,6 +84,32 @@ function testThumbnailCacheMatchesUrlAndHydratesFromState() {
   );
 }
 
+function testRecordingSameTabKeepsMatchingThumbnail() {
+  const tracker = switcher.createRecentTabTracker({
+    limit: 5,
+    thumbnailLimit: 4,
+    thumbnailTtlMs: Number.MAX_SAFE_INTEGER,
+    shouldIncludeTab: (tab) => Boolean(tab && tab.url)
+  });
+
+  tracker.recordTab({ id: 12, windowId: 10, url: 'https://one.example/', title: 'One' }, 100);
+  tracker.setThumbnail(12, 'data:image/jpeg;base64,b25l', 120, {
+    url: 'https://one.example/'
+  });
+  tracker.recordTab({ id: 12, windowId: 10, url: 'https://one.example/', title: 'One again' }, 200);
+
+  const recent = tracker.getRecentTabs([
+    { id: 12, windowId: 10, url: 'https://one.example/', title: 'One again' }
+  ])[0];
+
+  assert.strictEqual(
+    recent._xSwitcherThumbnail,
+    'data:image/jpeg;base64,b25l',
+    'recording a tab again should not discard its matching thumbnail'
+  );
+  assert.strictEqual(recent._xSwitcherThumbnailStatus, 'ok');
+}
+
 function testThumbnailStatusPersistsAndReportsStaleness() {
   const tracker = switcher.createRecentTabTracker({
     limit: 5,
@@ -185,6 +211,7 @@ async function testCrossWindowSwitchFocusesWindowBeforeActivatingTab() {
 (async () => {
   testRecentStackKeepsLatestFiveSwitchableTabs();
   testThumbnailCacheMatchesUrlAndHydratesFromState();
+  testRecordingSameTabKeepsMatchingThumbnail();
   testThumbnailStatusPersistsAndReportsStaleness();
   await testCrossWindowSwitchFocusesWindowBeforeActivatingTab();
   console.log('recent tab switcher tests passed');

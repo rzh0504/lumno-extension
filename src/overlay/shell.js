@@ -31,7 +31,7 @@
       position: fixed !important;
       top: 20vh !important;
       left: 50% !important;
-      transform: translateX(-50%) translateY(10px) scale(0.985) !important;
+      transform: translateX(-50%) translateY(10px) scale(var(--x-ov-visible-scale, 1)) scale(0.985) !important;
       transform-origin: top center !important;
       width: ${width}px !important;
       max-width: calc(100vw - 24px) !important;

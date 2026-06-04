@@ -71,6 +71,13 @@
       return raw > 0 ? raw : 1;
     }
 
+    function getVisualViewportOffset(visualViewport, key) {
+      const raw = visualViewport && Number.isFinite(Number(visualViewport[key]))
+        ? Number(visualViewport[key])
+        : 0;
+      return raw > 0 ? raw : 0;
+    }
+
     function shouldIgnoreTabZoomCompensation() {
       return typeof settings.shouldIgnoreTabZoomCompensation === 'function'
         ? Boolean(settings.shouldIgnoreTabZoomCompensation())
@@ -90,7 +97,9 @@
       return {
         viewportWidth: viewportWidth * visualViewportScale,
         viewportHeight: viewportHeight * visualViewportScale,
-        visualViewportScale
+        visualViewportScale,
+        visualViewportOffsetLeft: getVisualViewportOffset(visualViewport, 'offsetLeft'),
+        visualViewportOffsetTop: getVisualViewportOffset(visualViewport, 'offsetTop')
       };
     }
 
@@ -124,16 +133,25 @@
       const finalOverlayZoom = (1 / safeZoomScale) * presetUiScale;
       const safeFinalOverlayZoom = Math.max(0.35, Math.min(4, finalOverlayZoom));
       const maxWidth = Math.max(280, viewport.viewportWidth - 24);
+      const baseLeft = viewport.viewportWidth * 0.5;
+      const compensatedLeft = viewport.visualViewportOffsetLeft +
+        ((baseLeft * safeLayoutZoomScale) / safeVisualViewportScale);
       const baseTop = Number.isFinite(baseTopPx) && baseTopPx > 0
         ? baseTopPx
         : (viewport.viewportHeight * 0.2);
-      const compensatedTop = (baseTop * safeLayoutZoomScale) / safeVisualViewportScale;
+      const compensatedTop = viewport.visualViewportOffsetTop +
+        ((baseTop * safeLayoutZoomScale) / safeVisualViewportScale);
       const topPx = Math.max(16, Math.min(compensatedTop, Math.max(16, viewport.viewportHeight - 120)));
+      const leftPx = Math.max(16, Math.min(compensatedLeft, Math.max(16, viewport.viewportWidth - 16)));
       overlayElement.style.setProperty('width', `${sizePreset.width}px`, 'important');
       overlayElement.style.setProperty('max-width', `${maxWidth}px`, 'important');
       overlayElement.style.setProperty('max-height', `${sizePreset.maxHeightVh}vh`, 'important');
       overlayElement.style.setProperty('top', `${topPx}px`, 'important');
-      overlayElement.style.setProperty('zoom', `${safeFinalOverlayZoom}`, 'important');
+      overlayElement.style.setProperty('left', `${leftPx}px`, 'important');
+      overlayElement.style.setProperty('--x-ov-visible-scale', `${safeFinalOverlayZoom}`, 'important');
+      if (typeof overlayElement.style.removeProperty === 'function') {
+        overlayElement.style.removeProperty('zoom');
+      }
     }
 
     function stop() {

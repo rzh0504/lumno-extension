@@ -1,9 +1,13 @@
 const assert = require('assert');
+const fs = require('fs');
 
 delete globalThis.LumnoOverlayLifecycle;
 require('../src/overlay/lifecycle.js');
 
 const lifecycle = globalThis.LumnoOverlayLifecycle;
+const lifecycleSource = fs.readFileSync('src/overlay/lifecycle.js', 'utf8');
+const shellSource = fs.readFileSync('src/overlay/shell.js', 'utf8');
+const searchPanelSource = fs.readFileSync('src/overlay/search-panel.js', 'utf8');
 
 function createStyleSink() {
   const values = new Map();
@@ -19,6 +23,11 @@ function createStyleSink() {
     },
     getPropertyPriority(name) {
       return values.has(name) ? values.get(name).priority : '';
+    },
+    removeProperty(name) {
+      const oldValue = this.getPropertyValue(name);
+      values.delete(name);
+      return oldValue;
     }
   };
 }
@@ -56,6 +65,8 @@ function createFakeWindow(options) {
       width: Number(settings.visualWidth) || Number(settings.innerWidth) || 1200,
       height: Number(settings.visualHeight) || Number(settings.innerHeight) || 800,
       scale: Number(settings.visualScale) || 1,
+      offsetLeft: Number(settings.visualOffsetLeft) || 0,
+      offsetTop: Number(settings.visualOffsetTop) || 0,
       addEventListener(type, handler) {
         visualViewportListeners.set(type, handler);
       },
@@ -85,6 +96,21 @@ assert.ok(
   lifecycle && typeof lifecycle.createViewportSizeSync === 'function',
   'overlay lifecycle should expose viewport size synchronization'
 );
+assert.doesNotMatch(
+  lifecycleSource,
+  /setProperty\('zoom'/,
+  'overlay viewport compensation should not use CSS zoom because it shifts fixed-position anchors'
+);
+assert.match(
+  shellSource,
+  /scale\(var\(--x-ov-visible-scale,\s*1\)\)/,
+  'overlay shell should compose viewport compensation into transform scale'
+);
+assert.match(
+  searchPanelSource,
+  /translateX\(-50%\) translateY\(0\) scale\(var\(--x-ov-visible-scale,\s*1\)\)/,
+  'overlay reveal state should preserve the transform scale token'
+);
 
 {
   const win = createFakeWindow({
@@ -92,7 +118,9 @@ assert.ok(
     innerHeight: 800,
     visualWidth: 600,
     visualHeight: 400,
-    visualScale: 2
+    visualScale: 2,
+    visualOffsetLeft: 120,
+    visualOffsetTop: 40
   });
   const overlay = createOverlayElement();
   const sync = lifecycle.createViewportSizeSync(win, {
@@ -103,9 +131,24 @@ assert.ok(
   sync.start(overlay);
 
   assert.strictEqual(
-    overlay.style.getPropertyValue('zoom'),
+    overlay.style.getPropertyValue('--x-ov-visible-scale'),
     '0.5',
     'overlay should reverse visual viewport pinch zoom so cmd+wheel does not magnify it'
+  );
+  assert.strictEqual(
+    overlay.style.getPropertyValue('zoom'),
+    '',
+    'overlay should avoid CSS zoom so fixed-position centering stays stable'
+  );
+  assert.strictEqual(
+    overlay.style.getPropertyValue('left'),
+    '420px',
+    'overlay should keep its original 50vw screen position inside the shifted visual viewport'
+  );
+  assert.strictEqual(
+    overlay.style.getPropertyValue('top'),
+    '120px',
+    'overlay should keep its original 20vh screen position inside the shifted visual viewport'
   );
   assert.strictEqual(
     overlay.style.getPropertyValue('max-width'),
@@ -129,17 +172,29 @@ assert.ok(
   });
 
   sync.start(overlay);
-  assert.strictEqual(overlay.style.getPropertyValue('zoom'), '1');
+  assert.strictEqual(overlay.style.getPropertyValue('--x-ov-visible-scale'), '1');
 
   win.visualViewport.width = 600;
   win.visualViewport.height = 400;
   win.visualViewport.scale = 2;
+  win.visualViewport.offsetLeft = 240;
+  win.visualViewport.offsetTop = 80;
   win.triggerVisualViewportResize();
 
   assert.strictEqual(
-    overlay.style.getPropertyValue('zoom'),
+    overlay.style.getPropertyValue('--x-ov-visible-scale'),
     '0.5',
     'overlay should resync when cmd+wheel changes visual viewport scale after mounting'
+  );
+  assert.strictEqual(
+    overlay.style.getPropertyValue('left'),
+    '540px',
+    'overlay should resync the original vw position when the visual viewport offset changes'
+  );
+  assert.strictEqual(
+    overlay.style.getPropertyValue('top'),
+    '160px',
+    'overlay should resync the original vh position when the visual viewport offset changes'
   );
 }
 

@@ -339,10 +339,10 @@ function flushMicrotasks() {
     'update notice should use fixed overlay placement and capsule styling'
   );
   assert(
-    updateNoticeCss.includes('transform: translateX(-50%) translateY(calc(-100% + 2px)) scale(0.985);') &&
-      updateNoticeCss.includes('transform: translateX(-50%) translateY(calc(-100% - 14px)) scale(1);') &&
+    updateNoticeCss.includes('transform: translateX(-50%) translateY(calc(-100% + 2px)) scale(var(--x-ov-visible-scale, 1)) scale(0.985);') &&
+      updateNoticeCss.includes('transform: translateX(-50%) translateY(calc(-100% - 14px)) scale(var(--x-ov-visible-scale, 1));') &&
       updateNoticeCss.includes('filter: blur(6px);'),
-    'overlay update notice should use a slightly higher vertical blur/scale enter motion above the overlay'
+    'overlay update notice should use viewport-compensated blur/scale enter motion above the overlay'
   );
   assert(
     updateNoticeCss.includes('.x-lumno-feature-hint--update-notice-overlay[data-overlay-mounting="true"]') &&

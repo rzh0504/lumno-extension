@@ -28,30 +28,7 @@
     return event;
   }
 
-  function getTabSwitcherRuntimeVersion() {
-    return String(window._x_extension_tab_switcher_runtime_version_2026_unique_ || '');
-  }
-
-  function isTabSwitcherRuntimeStale(request) {
-    return Boolean(
-      request &&
-      request.runtimeVersion &&
-      getTabSwitcherRuntimeVersion() !== request.runtimeVersion
-    );
-  }
-
-  function getTabSwitcherRuntimeStaleResponse() {
-    return {
-      ok: false,
-      reason: 'tab_switcher_runtime_stale',
-      version: getTabSwitcherRuntimeVersion()
-    };
-  }
-
   function advanceOpenTabSwitcherFromCommand(request) {
-    if (isTabSwitcherRuntimeStale(request)) {
-      return getTabSwitcherRuntimeStaleResponse();
-    }
     const host = document.getElementById(TAB_SWITCHER_HOST_ID);
     if (!host) {
       return { ok: false };
@@ -61,18 +38,14 @@
       return {
         ok: true,
         advanced: didAdvance === true,
-        suppressed: didAdvance === false,
-        version: getTabSwitcherRuntimeVersion()
+        suppressed: didAdvance === false
       };
     }
     document.dispatchEvent(createTabSwitcherAdvanceEvent(request && request.offset));
-    return { ok: true, advanced: true, version: getTabSwitcherRuntimeVersion() };
+    return { ok: true, advanced: true };
   }
 
   function openTabSwitcherFromCommand(request) {
-    if (isTabSwitcherRuntimeStale(request)) {
-      return getTabSwitcherRuntimeStaleResponse();
-    }
     const toggle = window._x_extension_toggleTabSwitcher_2026_unique_;
     if (typeof toggle !== 'function') {
       return { ok: false, reason: 'tab_switcher_missing' };
@@ -81,7 +54,7 @@
       ? request.context
       : {};
     toggle(context);
-    return { ok: true, version: getTabSwitcherRuntimeVersion() };
+    return { ok: true };
   }
 
   function setTabSwitcherCaptureVisibility(hidden) {
@@ -122,6 +95,14 @@
     return { ok: true };
   }
 
+  function getOpenTabSwitcherState() {
+    const host = document.getElementById(TAB_SWITCHER_HOST_ID);
+    return {
+      ok: true,
+      open: Boolean(host)
+    };
+  }
+
   function handleTabSwitcherCommandMessage(request) {
     if (!request || typeof request !== 'object') {
       return null;
@@ -132,11 +113,11 @@
     if (request.action === 'openTabSwitcherFromCommand') {
       return openTabSwitcherFromCommand(request);
     }
-    if (request.action === 'getTabSwitcherRuntimeVersion') {
-      return { ok: true, version: getTabSwitcherRuntimeVersion() };
-    }
     if (request.action === 'setTabSwitcherCaptureVisibility') {
       return setTabSwitcherCaptureVisibility(request.hidden);
+    }
+    if (request.action === 'getOpenTabSwitcherState') {
+      return getOpenTabSwitcherState();
     }
     return null;
   }
@@ -185,8 +166,8 @@
       tabId: extensionPageTabId,
       ok: Boolean(response && response.ok),
       reason: response && response.reason ? String(response.reason) : '',
-      version: response && response.version ? String(response.version) : '',
       advanced: response && typeof response.advanced === 'boolean' ? response.advanced : null,
+      open: response && typeof response.open === 'boolean' ? response.open : null,
       suppressed: Boolean(response && response.suppressed)
     });
   }

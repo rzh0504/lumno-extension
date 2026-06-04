@@ -677,6 +677,14 @@
       return items.findIndex((item) => Boolean(item && item._xIsAutocompleteTop));
     }
 
+    function syncSuggestionLastState() {
+      items.forEach((item, index) => {
+        if (item && typeof item.setAttribute === 'function') {
+          item.setAttribute('data-last', index === items.length - 1 ? 'true' : 'false');
+        }
+      });
+    }
+
     function clear() {
       if (container) {
         container.innerHTML = '';
@@ -833,6 +841,7 @@
         }
       });
 
+      syncSuggestionLastState();
       onSetSelectedIndex(-1);
       setSuggestionsVisible(true);
     }
@@ -1225,6 +1234,7 @@
           });
         }
       });
+      syncSuggestionLastState();
     }
 
     return {

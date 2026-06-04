@@ -492,40 +492,6 @@ function postTabSwitcherMessageToExtensionPage(tab, message, callback) {
   }
 }
 
-function getTabSwitcherRuntimeVersionOnTab(tab, callback) {
-  const finish = (version, reason) => {
-    if (typeof callback === 'function') {
-      callback(String(version || ''), reason || '');
-    }
-  };
-  if (!tab || typeof tab.id !== 'number') {
-    finish('', 'invalid-tab');
-    return;
-  }
-  const message = { action: 'getTabSwitcherRuntimeVersion' };
-  if (isOwnExtensionPageUrl(getResolvedTabUrl(tab))) {
-    postTabSwitcherMessageToExtensionPage(tab, message, (ok, reason, response) => {
-      finish(ok && response ? response.version : '', reason || '');
-    });
-    return;
-  }
-  if (!chrome || !chrome.tabs || typeof chrome.tabs.sendMessage !== 'function') {
-    finish('', 'tabs-send-message-unavailable');
-    return;
-  }
-  try {
-    chrome.tabs.sendMessage(tab.id, message, (response) => {
-      if (chrome.runtime && chrome.runtime.lastError) {
-        finish('', chrome.runtime.lastError.message || 'runtime-version-message-failed');
-        return;
-      }
-      finish(response && response.ok === true ? response.version : '', response && response.reason ? response.reason : '');
-    });
-  } catch (error) {
-    finish('', error && error.message ? error.message : 'runtime-version-message-threw');
-  }
-}
-
 function setTabSwitcherCaptureVisibilityInPage(hidden, hostId) {
   const host = document.getElementById(hostId);
   if (!host) {
@@ -562,6 +528,14 @@ function setTabSwitcherCaptureVisibilityInPage(hidden, hostId) {
     delete host.dataset[hadValueKey];
   }
   return { ok: true };
+}
+
+function getOpenTabSwitcherStateInPage(hostId) {
+  const host = document.getElementById(hostId);
+  return {
+    ok: true,
+    open: Boolean(host)
+  };
 }
 
 function setTabSwitcherCaptureVisibility(tab, hidden) {
@@ -622,6 +596,77 @@ function setTabSwitcherCaptureVisibility(tab, hidden) {
         });
       } catch (error) {
         resolve(false);
+      }
+    });
+  }
+}
+
+function getOpenTabSwitcherState(tab) {
+  const tabId = tab && typeof tab.id === 'number' ? tab.id : null;
+  if (typeof tabId !== 'number') {
+    return Promise.resolve({ ok: false, open: false });
+  }
+  const payload = {
+    action: 'getOpenTabSwitcherState'
+  };
+  if (isOwnExtensionPageUrl(getResolvedTabUrl(tab))) {
+    return new Promise((resolve) => {
+      postTabSwitcherMessageToExtensionPage(tab, payload, (ok, _reason, response) => {
+        if (ok && response && typeof response.open === 'boolean') {
+          resolve({
+            ok: true,
+            open: response.open === true
+          });
+          return;
+        }
+        runExecuteScriptFallback().then(resolve).catch(() => resolve({ ok: false, open: false }));
+      });
+    });
+  }
+  if (chrome && chrome.tabs && typeof chrome.tabs.sendMessage === 'function') {
+    return new Promise((resolve) => {
+      try {
+        chrome.tabs.sendMessage(tabId, payload, (response) => {
+          const didRead = !(chrome.runtime && chrome.runtime.lastError) &&
+            response &&
+            response.ok === true &&
+            typeof response.open === 'boolean';
+          if (didRead) {
+            resolve({
+              ok: true,
+              open: response.open === true
+            });
+            return;
+          }
+          runExecuteScriptFallback().then(resolve).catch(() => resolve({ ok: false, open: false }));
+        });
+      } catch (error) {
+        runExecuteScriptFallback().then(resolve).catch(() => resolve({ ok: false, open: false }));
+      }
+    });
+  }
+  return runExecuteScriptFallback();
+
+  function runExecuteScriptFallback() {
+    if (!chrome || !chrome.scripting || typeof chrome.scripting.executeScript !== 'function') {
+      return Promise.resolve({ ok: false, open: false });
+    }
+    return new Promise((resolve) => {
+      try {
+        chrome.scripting.executeScript({
+          target: { tabId },
+          func: getOpenTabSwitcherStateInPage,
+          args: [TAB_SWITCHER_HOST_ID]
+        }, (results) => {
+          const result = Array.isArray(results) &&
+            results.find((item) => item && item.result && item.result.ok === true);
+          resolve({
+            ok: Boolean(result),
+            open: Boolean(result && result.result && result.result.open === true)
+          });
+        });
+      } catch (error) {
+        resolve({ ok: false, open: false });
       }
     });
   }
@@ -957,7 +1002,6 @@ const SHOW_SEARCH_PREFILL_V_COMMAND_NAME = 'show-search-prefill-v';
 const SHOW_TAB_SWITCHER_COMMAND_NAME = 'show-tab-switcher';
 const TAB_SWITCHER_EXTENSION_PAGE_PORT_NAME = 'lumno-tab-switcher-extension-page';
 const TAB_SWITCHER_HOST_ID = '_x_extension_tab_switcher_host_2026_unique_';
-const TAB_SWITCHER_RUNTIME_VERSION = '2026-06-04-tight-radius-v1';
 const tabSwitcherExtensionPagePortsByTabId = new Map();
 const TAB_SWITCHER_OPENING_GUARD_MS = 2000;
 const tabSwitcherOpeningByWindowKey = new Map();
@@ -2475,6 +2519,27 @@ function enqueueSwitcherThumbnailCapture(tab, reason) {
   return queued;
 }
 
+function isTabSwitcherOpeningForCapture(tab) {
+  const key = getTabSwitcherOpeningWindowKey(tab);
+  if (!key) {
+    return false;
+  }
+  const opening = tabSwitcherOpeningByWindowKey.get(key);
+  return Boolean(opening && opening.expiresAt > Date.now());
+}
+
+function shouldSkipSwitcherThumbnailCaptureForOpenSwitcher(tab, reason) {
+  if (String(reason || '') === 'command-immediate') {
+    return Promise.resolve(false);
+  }
+  if (isTabSwitcherOpeningForCapture(tab)) {
+    return Promise.resolve(true);
+  }
+  return getOpenTabSwitcherState(tab)
+    .then((state) => Boolean(state && state.open === true))
+    .catch(() => false);
+}
+
 function captureSwitcherThumbnailForTab(tab, reason) {
   const tabId = tab && typeof tab.id === 'number' ? tab.id : null;
   const windowId = tab && typeof tab.windowId === 'number' ? tab.windowId : null;
@@ -2499,63 +2564,73 @@ function captureSwitcherThumbnailForTab(tab, reason) {
       resolve(false);
       return;
     }
-    tabSwitcherLastCaptureAt = Date.now();
-    withTabSwitcherHiddenForCapture(resolvedTab, () => new Promise((captureResolve) => {
-      try {
-        chrome.tabs.captureVisibleTab(windowId, {
-          format: 'jpeg',
-          quality: TAB_SWITCHER_CAPTURE_JPEG_QUALITY
-        }, (dataUrl) => {
-          if (chrome.runtime && chrome.runtime.lastError) {
-            captureResolve({
-              ok: false,
-              reason: chrome.runtime.lastError.message || 'capture-visible-tab-failed'
-            });
-            return;
-          }
-          captureResolve({
-            ok: true,
-            dataUrl
-          });
-        });
-      } catch (error) {
-        captureResolve({
-          ok: false,
-          reason: error && error.message ? error.message : 'capture-visible-tab-threw'
-        });
-      }
-    })).then((captureResult) => {
-      if (!captureResult || captureResult.ok !== true) {
-        logSwitcherThumbnailCaptureFailure(
-          resolvedTab,
-          captureResult && captureResult.reason ? captureResult.reason : 'capture-visible-tab-failed',
-          reason
-        );
+    shouldSkipSwitcherThumbnailCaptureForOpenSwitcher(resolvedTab, reason).then((shouldSkip) => {
+      if (shouldSkip) {
+        logSwitcherThumbnailCaptureFailure(resolvedTab, 'tab-switcher-open', reason);
         resolve(false);
         return;
       }
-      prepareSwitcherThumbnailDataUrl(captureResult.dataUrl).then((thumbnailDataUrl) => {
-        if (!thumbnailDataUrl || !recentTabTracker || typeof recentTabTracker.setThumbnail !== 'function') {
-          logSwitcherThumbnailCaptureFailure(resolvedTab, 'empty-thumbnail-data', reason);
+      tabSwitcherLastCaptureAt = Date.now();
+      withTabSwitcherHiddenForCapture(resolvedTab, () => new Promise((captureResolve) => {
+        try {
+          chrome.tabs.captureVisibleTab(windowId, {
+            format: 'jpeg',
+            quality: TAB_SWITCHER_CAPTURE_JPEG_QUALITY
+          }, (dataUrl) => {
+            if (chrome.runtime && chrome.runtime.lastError) {
+              captureResolve({
+                ok: false,
+                reason: chrome.runtime.lastError.message || 'capture-visible-tab-failed'
+              });
+              return;
+            }
+            captureResolve({
+              ok: true,
+              dataUrl
+            });
+          });
+        } catch (error) {
+          captureResolve({
+            ok: false,
+            reason: error && error.message ? error.message : 'capture-visible-tab-threw'
+          });
+        }
+      })).then((captureResult) => {
+        if (!captureResult || captureResult.ok !== true) {
+          logSwitcherThumbnailCaptureFailure(
+            resolvedTab,
+            captureResult && captureResult.reason ? captureResult.reason : 'capture-visible-tab-failed',
+            reason
+          );
           resolve(false);
           return;
         }
-        const didSet = recentTabTracker.setThumbnail(resolvedTab.id, thumbnailDataUrl, Date.now(), {
-          url: getResolvedTabUrl(resolvedTab)
+        prepareSwitcherThumbnailDataUrl(captureResult.dataUrl).then((thumbnailDataUrl) => {
+          if (!thumbnailDataUrl || !recentTabTracker || typeof recentTabTracker.setThumbnail !== 'function') {
+            logSwitcherThumbnailCaptureFailure(resolvedTab, 'empty-thumbnail-data', reason);
+            resolve(false);
+            return;
+          }
+          const didSet = recentTabTracker.setThumbnail(resolvedTab.id, thumbnailDataUrl, Date.now(), {
+            url: getResolvedTabUrl(resolvedTab)
+          });
+          if (didSet) {
+            schedulePersistTabSwitcherState();
+            logSwitcherThumbnailCaptureSuccess(resolvedTab, reason);
+          } else {
+            logSwitcherThumbnailCaptureFailure(resolvedTab, 'thumbnail-cache-rejected', reason);
+          }
+          resolve(Boolean(didSet));
+        }).catch(() => {
+          logSwitcherThumbnailCaptureFailure(resolvedTab, 'prepare-thumbnail-failed', reason);
+          resolve(false);
         });
-        if (didSet) {
-          schedulePersistTabSwitcherState();
-          logSwitcherThumbnailCaptureSuccess(resolvedTab, reason);
-        } else {
-          logSwitcherThumbnailCaptureFailure(resolvedTab, 'thumbnail-cache-rejected', reason);
-        }
-        resolve(Boolean(didSet));
       }).catch(() => {
-        logSwitcherThumbnailCaptureFailure(resolvedTab, 'prepare-thumbnail-failed', reason);
+        logSwitcherThumbnailCaptureFailure(resolvedTab, 'capture-visible-tab-failed', reason);
         resolve(false);
       });
     }).catch(() => {
-      logSwitcherThumbnailCaptureFailure(resolvedTab, 'capture-visible-tab-failed', reason);
+      logSwitcherThumbnailCaptureFailure(resolvedTab, 'tab-switcher-open-state-failed', reason);
       resolve(false);
     });
   });
@@ -3021,13 +3096,11 @@ function injectTabSwitcherOnTab(hostTab, items, context) {
     tabZoomFactor: tabZoomFactor,
     advanceOnExisting: true,
     suppressInitialShortcutAdvance: context && context.source === 'commands-tab-switcher',
-    runtimeVersion: TAB_SWITCHER_RUNTIME_VERSION,
     source: context && context.source ? context.source : ''
   });
   if (isOwnExtensionPageUrl(getResolvedTabUrl(hostTab))) {
     postTabSwitcherMessageToExtensionPage(hostTab, {
       action: 'openTabSwitcherFromCommand',
-      runtimeVersion: TAB_SWITCHER_RUNTIME_VERSION,
       context: buildSwitcherContext(1)
     }, (ok, reason) => {
       if (!ok) {
@@ -3111,35 +3184,6 @@ function injectTabSwitcherOnTab(hostTab, items, context) {
   };
   const runSwitcherScript = (tabZoomFactor) => {
     const switcherContext = buildSwitcherContext(tabZoomFactor);
-    if (chrome && chrome.tabs && typeof chrome.tabs.sendMessage === 'function') {
-      getTabSwitcherRuntimeVersionOnTab(hostTab, (version) => {
-        if (version === TAB_SWITCHER_RUNTIME_VERSION) {
-          chrome.tabs.sendMessage(hostTab.id, {
-            action: 'openTabSwitcherFromCommand',
-            runtimeVersion: TAB_SWITCHER_RUNTIME_VERSION,
-            context: switcherContext
-          }, (response) => {
-            const didOpen = !(chrome.runtime && chrome.runtime.lastError) &&
-              response &&
-              response.ok === true;
-            if (didOpen) {
-              logHotkeyDebug('tab-switcher-opened', {
-                tabId: hostTab.id,
-                itemCount: tabItems.length,
-                source: context && context.source ? context.source : '',
-                path: 'message'
-              });
-              finishOpen(true, 'message');
-              return;
-            }
-            runDynamicSwitcherScript(switcherContext);
-          });
-          return;
-        }
-        runDynamicSwitcherScript(switcherContext);
-      });
-      return;
-    }
     runDynamicSwitcherScript(switcherContext);
   };
   if (chrome.tabs && typeof chrome.tabs.getZoom === 'function') {
@@ -3171,17 +3215,17 @@ function advanceExistingTabSwitcherOnTab(tab, source, callback) {
   if (isOwnExtensionPageUrl(getResolvedTabUrl(tab))) {
     postTabSwitcherMessageToExtensionPage(tab, {
       action: 'advanceOpenTabSwitcherFromCommand',
-      runtimeVersion: TAB_SWITCHER_RUNTIME_VERSION,
       offset: 1
-    }, (ok) => {
-      if (ok) {
+    }, (ok, _reason, response) => {
+      const didAdvance = Boolean(ok && response && response.advanced === true);
+      if (didAdvance) {
         logHotkeyDebug('tab-switcher-advanced-fast', {
           tabId: tab.id,
           source: source || '',
           path: 'extension-page-port'
         });
       }
-      finish(ok);
+      finish(didAdvance);
     });
     return;
   }
@@ -3193,13 +3237,10 @@ function advanceExistingTabSwitcherOnTab(tab, source, callback) {
     }
     chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      func: (runtimeVersion) => {
+      func: () => {
         const host = document.getElementById('_x_extension_tab_switcher_host_2026_unique_');
         if (!host || typeof host._lumnoTabSwitcherAdvance !== 'function') {
           return { ok: false };
-        }
-        if (host._lumnoTabSwitcherRuntimeVersion !== runtimeVersion) {
-          return { ok: false, reason: 'tab_switcher_runtime_stale' };
         }
         const didAdvance = host._lumnoTabSwitcherAdvance(1);
         return {
@@ -3207,14 +3248,17 @@ function advanceExistingTabSwitcherOnTab(tab, source, callback) {
           advanced: didAdvance === true,
           suppressed: didAdvance === false
         };
-      },
-      args: [TAB_SWITCHER_RUNTIME_VERSION]
+      }
     }, (results) => {
-      const didAdvance = !(chrome.runtime && chrome.runtime.lastError) &&
-        Array.isArray(results) &&
+      const result = Array.isArray(results) &&
         results[0] &&
-        results[0].result &&
-        results[0].result.ok === true;
+        results[0].result
+        ? results[0].result
+        : null;
+      const didAdvance = !(chrome.runtime && chrome.runtime.lastError) &&
+        result &&
+        result.ok === true &&
+        result.advanced === true;
       if (didAdvance) {
         logHotkeyDebug('tab-switcher-advanced-fast', {
           tabId: tab.id,
@@ -3226,39 +3270,6 @@ function advanceExistingTabSwitcherOnTab(tab, source, callback) {
     });
   };
 
-  if (chrome && chrome.tabs && typeof chrome.tabs.sendMessage === 'function') {
-    getTabSwitcherRuntimeVersionOnTab(tab, (version) => {
-      if (version === TAB_SWITCHER_RUNTIME_VERSION) {
-        chrome.tabs.sendMessage(tab.id, {
-          action: 'advanceOpenTabSwitcherFromCommand',
-          runtimeVersion: TAB_SWITCHER_RUNTIME_VERSION,
-          offset: 1
-        }, (response) => {
-          const didAdvance = !(chrome.runtime && chrome.runtime.lastError) &&
-            response &&
-            response.ok === true;
-          if (didAdvance) {
-            logHotkeyDebug('tab-switcher-advanced-fast', {
-              tabId: tab.id,
-              source: source || '',
-              path: 'message'
-            });
-            finish(true);
-            return;
-          }
-          if (response && response.ok === false) {
-            finish(false);
-            return;
-          }
-          runExecuteScriptFallback();
-        });
-        return;
-      }
-      runExecuteScriptFallback();
-    });
-    return;
-  }
-
   runExecuteScriptFallback();
 }
 
@@ -3268,6 +3279,7 @@ function triggerTabSwitcherForTab(tab, source) {
     openNewtabFallback();
     return;
   }
+  clearScheduledSwitcherThumbnailCapture(tab.id);
   advanceExistingTabSwitcherOnTab(tab, source, (didAdvance) => {
     if (didAdvance) {
       return;
@@ -3289,13 +3301,12 @@ function triggerTabSwitcherForTab(tab, source) {
         }
         const tabList = Array.isArray(tabs) ? tabs : [];
         const activeTab = tabList.find((item) => item && item.id === tab.id) || tab;
+        clearScheduledSwitcherThumbnailCapture(activeTab.id);
         let activeThumbnailReady = Promise.resolve(false);
         if (shouldTrackSwitcherTab(activeTab)) {
           recordRecentSwitcherTab(activeTab);
           if (shouldCaptureOwnExtensionPageThumbnailBeforePayload(activeTab)) {
             activeThumbnailReady = captureSwitcherThumbnailForTab(activeTab, 'command-immediate');
-          } else {
-            scheduleSwitcherThumbnailCapture(activeTab, 'command');
           }
         }
         activeThumbnailReady.catch(() => false).finally(() => {

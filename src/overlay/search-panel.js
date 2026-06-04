@@ -766,12 +766,17 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     const sizePreset = getOverlaySizePreset(overlaySizeMode);
     const width = overlayElement.style.getPropertyValue('width') || `${sizePreset.width}px`;
     const maxWidth = overlayElement.style.getPropertyValue('max-width') || 'calc(100vw - 24px)';
+    const left = overlayElement.style.getPropertyValue('left') || '50%';
     const top = overlayElement.style.getPropertyValue('top') || '20vh';
-    const zoom = overlayElement.style.getPropertyValue('zoom') || '1';
+    const visibleScale = overlayElement.style.getPropertyValue('--x-ov-visible-scale') || '1';
     noticeElement.style.setProperty('width', width, 'important');
     noticeElement.style.setProperty('max-width', maxWidth, 'important');
+    noticeElement.style.setProperty('left', left, 'important');
     noticeElement.style.setProperty('top', top, 'important');
-    noticeElement.style.setProperty('zoom', zoom, 'important');
+    noticeElement.style.setProperty('--x-ov-visible-scale', visibleScale, 'important');
+    if (typeof noticeElement.style.removeProperty === 'function') {
+      noticeElement.style.removeProperty('zoom');
+    }
     noticeElement.setAttribute('data-theme', overlayElement.getAttribute('data-theme') || '');
   }
 
@@ -4944,6 +4949,14 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       });
     }
 
+    function syncSuggestionLastState() {
+      suggestionItems.forEach((item, index) => {
+        if (item && typeof item.setAttribute === 'function') {
+          item.setAttribute('data-last', index === suggestionItems.length - 1 ? 'true' : 'false');
+        }
+      });
+    }
+
     function scrollSelectedSuggestionIntoView(direction, didWrap) {
       if (!suggestionsContainer || selectedIndex < 0) {
         return;
@@ -5291,6 +5304,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         });
       });
 
+      syncSuggestionLastState();
       selectedIndex = -1;
       updateSelection();
     }
@@ -6419,6 +6433,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             });
           }
         });
+        syncSuggestionLastState();
         updateSelection();
         if (shouldAnimateGrowth) {
           animateSuggestionsGrowth(suggestionsContainer, previousHeight);
@@ -6469,7 +6484,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       if (reduceMotion) {
         overlay.style.setProperty('opacity', '1', 'important');
-        overlay.style.setProperty('transform', 'translateX(-50%) translateY(0) scale(1)', 'important');
+        overlay.style.setProperty('transform', 'translateX(-50%) translateY(0) scale(var(--x-ov-visible-scale, 1))', 'important');
         overlay.style.setProperty('filter', 'blur(0)', 'important');
         scheduleOverlayUpdateNoticeMount(0);
       } else {
@@ -6478,7 +6493,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         void overlay.offsetHeight;
         overlayFrameTracker.runEnterAnimation(overlay, () => {
           overlay.style.setProperty('opacity', '1', 'important');
-          overlay.style.setProperty('transform', 'translateX(-50%) translateY(0) scale(1)', 'important');
+          overlay.style.setProperty('transform', 'translateX(-50%) translateY(0) scale(var(--x-ov-visible-scale, 1))', 'important');
           overlay.style.setProperty('filter', 'blur(0)', 'important');
           scheduleOverlayUpdateNoticeMount(360);
         });

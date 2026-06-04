@@ -147,7 +147,7 @@
       });
     }
 
-    function removeTab(tabId) {
+    function removeStackEntry(tabId) {
       if (typeof tabId !== 'number') {
         return false;
       }
@@ -157,8 +157,16 @@
           recentStack.splice(index, 1);
         }
       }
-      thumbnailByTabId.delete(tabId);
       return recentStack.length !== before;
+    }
+
+    function removeTab(tabId) {
+      if (typeof tabId !== 'number') {
+        return false;
+      }
+      const didRemoveStackEntry = removeStackEntry(tabId);
+      const didRemoveThumbnail = thumbnailByTabId.delete(tabId);
+      return didRemoveStackEntry || didRemoveThumbnail;
     }
 
     function recordTab(tab, visitedAt) {
@@ -169,7 +177,7 @@
         }
         return null;
       }
-      removeTab(snapshot.id);
+      removeStackEntry(snapshot.id);
       recentStack.unshift(snapshot);
       trimStack();
       return snapshot;

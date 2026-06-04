@@ -336,6 +336,76 @@ async function testDirectUrlSuggestionUsesFaviconWhenAvailable() {
   );
 }
 
+async function testAppendRenderKeepsOnlyFinalSuggestionMarkedLast() {
+  const document = createFakeDocument();
+  const container = document.createElement('div');
+  container.setConnected(true);
+  const items = [];
+  const defaultTheme = faviconTheme.createDefaultTheme();
+
+  const view = suggestionsView.createSuggestionsView({
+    document,
+    container,
+    items,
+    t: (key, fallback) => fallback || key,
+    getRiSvg: () => '',
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl,
+    getThemeHostForSuggestion: (suggestion) => getHostFromUrl(suggestion && suggestion.url),
+    shouldBlockFaviconForHost: () => false,
+    getImmediateThemeForSuggestion: () => defaultTheme,
+    getThemeForSuggestion: () => Promise.resolve(defaultTheme),
+    getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    getHoverColors: (theme) => faviconTheme.getHoverColors(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
+    applyMarkVariables: () => {},
+    defaultTheme
+  });
+
+  const suggestions = Array.from({ length: 7 }, (_, index) => ({
+    type: 'history',
+    title: `Result ${index + 1}`,
+    url: `https://example.com/${index + 1}`,
+    favicon: ''
+  }));
+
+  view.render({
+    query: 'result',
+    primaryHighlightIndex: 0,
+    primaryHighlightReason: 'default',
+    suggestions: suggestions.slice(0, 6)
+  });
+
+  assert.strictEqual(view.getItems()[5].getAttribute('data-last'), 'true');
+
+  view.render({
+    query: 'result',
+    canAppend: true,
+    startIndex: 6,
+    primaryHighlightIndex: 0,
+    primaryHighlightReason: 'default',
+    suggestions
+  });
+
+  assert.strictEqual(view.getItems().length, 7, 'append render should create the seventh suggestion');
+  assert.strictEqual(
+    view.getItems()[5].getAttribute('data-last'),
+    'false',
+    'append render should clear data-last from the previous final suggestion'
+  );
+  assert.strictEqual(
+    view.getItems()[6].getAttribute('data-last'),
+    'true',
+    'append render should mark only the true final suggestion as last'
+  );
+}
+
 async function testBrowserNewtabSuggestionUsesFallbackIconWhenFaviconMissing() {
   const document = createFakeDocument();
   const container = document.createElement('div');
@@ -1112,6 +1182,7 @@ testSiteSearchProviderIconsUsePageFaviconCandidates();
 
 testLocalUrlSuggestionUsesFallbackTheme()
   .then(testDirectUrlSuggestionUsesFaviconWhenAvailable)
+  .then(testAppendRenderKeepsOnlyFinalSuggestionMarkedLast)
   .then(testBrowserNewtabSuggestionUsesFallbackIconWhenFaviconMissing)
   .then(testBrowserPageTabUsesChromeFavicon2PrimaryCandidate)
   .then(testBrowserPageSuggestionUsesChromeFavicon2WhenFaviconMissing)

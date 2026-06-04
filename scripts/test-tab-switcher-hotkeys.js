@@ -65,26 +65,20 @@ assert.ok(
   manifest.content_scripts &&
     manifest.content_scripts[0] &&
     Array.isArray(manifest.content_scripts[0].js) &&
-    manifest.content_scripts[0].js.includes('src/overlay/tab-switcher.js') &&
-    manifest.content_scripts[0].js.includes('src/overlay/tab-switcher-page-bridge.js') &&
-    manifest.content_scripts[0].js.indexOf('src/overlay/tab-switcher.js') <
-      manifest.content_scripts[0].js.indexOf('src/overlay/tab-switcher-page-bridge.js'),
-  'tab switcher runtime and its shared command bridge should be preloaded as content scripts'
+    manifest.content_scripts[0].js.includes('src/content/hotkey-listener.js') &&
+    !manifest.content_scripts[0].js.includes('src/overlay/tab-switcher.js') &&
+    !manifest.content_scripts[0].js.includes('src/overlay/tab-switcher-page-bridge.js'),
+  'normal pages should not preload the tab switcher runtime or bridge as content scripts'
 );
 assert.match(
   switcherBridgeSource,
   /openTabSwitcherFromCommand[\s\S]*_x_extension_toggleTabSwitcher_2026_unique_[\s\S]*toggle\(context\)/,
-  'shared tab switcher bridge should open the preloaded tab switcher runtime from a background message'
+  'shared tab switcher bridge should open the extension-page tab switcher runtime from a background message'
 );
-assert.match(
-  switcherSource,
-  /const TAB_SWITCHER_RUNTIME_VERSION = '[^']+';[\s\S]*window\._x_extension_tab_switcher_runtime_version_2026_unique_ = TAB_SWITCHER_RUNTIME_VERSION;/,
-  'tab switcher runtime should expose a version marker so existing tabs can detect stale injected styles after extension reload'
-);
-assert.match(
-  switcherSource,
-  /function handleExistingSwitcher\(context\)[\s\S]*_lumnoTabSwitcherRuntimeVersion !== TAB_SWITCHER_RUNTIME_VERSION[\s\S]*existingHost\.remove\(\)[\s\S]*return false;/,
-  'tab switcher should rebuild an existing stale host instead of advancing old styles after extension reload'
+assert.strictEqual(
+  /TAB_SWITCHER_RUNTIME_VERSION|_x_extension_tab_switcher_runtime_version_2026_unique_|_lumnoTabSwitcherRuntimeVersion/.test(switcherSource),
+  false,
+  'tab switcher should not keep reload-time runtime version markers'
 );
 const setButtonActiveBlock = getFunctionBlock(
   switcherSource,
@@ -101,20 +95,10 @@ assert.strictEqual(
   false,
   'tab switcher selection rendering should not force card focus because it can cause visible jumpiness'
 );
-assert.match(
-  switcherBridgeSource,
-  /function getTabSwitcherRuntimeVersion\(\)[\s\S]*_x_extension_tab_switcher_runtime_version_2026_unique_/,
-  'shared tab switcher bridge should report the page runtime version'
-);
-assert.match(
-  switcherBridgeSource,
-  /function isTabSwitcherRuntimeStale\(request\)[\s\S]*request\.runtimeVersion[\s\S]*getTabSwitcherRuntimeVersion\(\) !== request\.runtimeVersion/,
-  'shared tab switcher bridge should detect stale page runtimes before opening or advancing'
-);
-assert.match(
-  switcherBridgeSource,
-  /tab_switcher_runtime_stale/,
-  'shared tab switcher bridge should return an explicit stale-runtime reason'
+assert.strictEqual(
+  /getTabSwitcherRuntimeVersion|tab_switcher_runtime_stale|runtimeVersion/.test(switcherBridgeSource),
+  false,
+  'shared tab switcher bridge should not keep stale-runtime reload update logic'
 );
 assert.match(
   switcherBridgeSource,
@@ -128,8 +112,13 @@ assert.match(
 );
 assert.match(
   switcherBridgeSource,
-  /respondToExtensionPageRequest[\s\S]*advanced:[\s\S]*suppressed:/,
-  'shared tab switcher bridge should pass command advance status back to extension-page ports'
+  /function getOpenTabSwitcherState\(\)[\s\S]*TAB_SWITCHER_HOST_ID[\s\S]*open:\s*Boolean\(host\)/,
+  'shared tab switcher bridge should report whether an extension-page tab switcher is already open'
+);
+assert.match(
+  switcherBridgeSource,
+  /respondToExtensionPageRequest[\s\S]*advanced:[\s\S]*open:[\s\S]*suppressed:/,
+  'shared tab switcher bridge should pass command advance and open-state status back to extension-page ports'
 );
 assert.strictEqual(
   /openTabSwitcherFromCommand|advanceOpenTabSwitcherFromCommand|_x_extension_tab_switcher_advance_command_2026_unique_/.test(contentHotkeySource),
@@ -156,7 +145,7 @@ assert.match(
       html.includes('<script src="../overlay/tab-switcher-page-bridge.js"></script>') &&
       html.indexOf('<script src="../overlay/tab-switcher.js"></script>') <
         html.indexOf('<script src="../overlay/tab-switcher-page-bridge.js"></script>'),
-    `${pageName} should load the same tab switcher runtime and shared command bridge as normal pages`
+    `${pageName} should load the tab switcher runtime and shared command bridge for extension-page hosting`
   );
 });
 assert.match(
@@ -179,20 +168,20 @@ assert.match(
   /function postTabSwitcherMessageToExtensionPage[\s\S]*(?:record\.)?port\.postMessage\((?:message|payload)\)/,
   'background should send switcher open and advance messages to extension pages through the registered port'
 );
-assert.match(
-  backgroundSource,
-  /const TAB_SWITCHER_RUNTIME_VERSION = '[^']+';/,
-  'background should know the current tab switcher runtime version'
-);
-assert.match(
-  backgroundSource,
-  /function getTabSwitcherRuntimeVersionOnTab\(tab,\s*callback\)[\s\S]*action:\s*'getTabSwitcherRuntimeVersion'/,
-  'background should query page switcher runtime version before using message fast paths'
+assert.strictEqual(
+  /TAB_SWITCHER_RUNTIME_VERSION|getTabSwitcherRuntimeVersionOnTab|tab_switcher_runtime_stale|runtimeVersion/.test(backgroundSource),
+  false,
+  'background should not keep the reload-time tab switcher runtime update path'
 );
 assert.match(
   backgroundSource,
   /function setTabSwitcherCaptureVisibility\(tab,\s*hidden\)[\s\S]*action:\s*'setTabSwitcherCaptureVisibility'[\s\S]*chrome\.tabs\.sendMessage[\s\S]*chrome\.scripting\.executeScript/,
   'background should set tab switcher capture visibility through extension-page ports, content-script messages, and executeScript fallback'
+);
+assert.match(
+  backgroundSource,
+  /function getOpenTabSwitcherState\(tab\)[\s\S]*action:\s*'getOpenTabSwitcherState'[\s\S]*postTabSwitcherMessageToExtensionPage[\s\S]*chrome\.tabs\.sendMessage[\s\S]*chrome\.scripting\.executeScript/,
+  'background should read open tab switcher state through extension-page ports, content-script messages, and executeScript fallback'
 );
 assert.match(
   backgroundSource,
@@ -206,8 +195,13 @@ const captureSwitcherThumbnailBlock = getFunctionBlock(
 );
 assert.match(
   captureSwitcherThumbnailBlock,
+  /shouldSkipSwitcherThumbnailCaptureForOpenSwitcher\(resolvedTab,\s*reason\)[\s\S]*logSwitcherThumbnailCaptureFailure\(resolvedTab,\s*'tab-switcher-open'/,
+  'thumbnail capture should skip instead of hiding the page when the tab switcher is opening or already open'
+);
+assert.match(
+  captureSwitcherThumbnailBlock,
   /withTabSwitcherHiddenForCapture\(resolvedTab,[\s\S]*chrome\.tabs\.captureVisibleTab/,
-  'thumbnail capture should hide the visible switcher before calling captureVisibleTab'
+  'thumbnail capture should still hide and restore any late switcher host before calling captureVisibleTab'
 );
 assert.strictEqual(
   backgroundSource.includes('triggerTabSwitcherFromPageHotkey'),
@@ -236,13 +230,18 @@ assert.strictEqual(
 );
 assert.match(
   switcherSource,
-  /function advanceSelectionFromShortcut\(offset\)[\s\S]*if \(shouldSuppressInitialShortcutAdvance\(\)\)[\s\S]*return false;[\s\S]*selectByOffset\(offset\);[\s\S]*return true;/,
-  'tab switcher should suppress only immediate command re-entry advances during the initial Alt+Q noise window'
+  /function advanceSelectionFromShortcut\(offset\)[\s\S]*suppressInitialShortcutAdvanceUntilQKeyup = false;[\s\S]*selectByOffset\(offset\);[\s\S]*return true;/,
+  'tab switcher command re-entry should clear initial suppression and advance while Alt remains held'
 );
 assert.match(
   switcherSource,
-  /if \(keyText === 'q'\)[\s\S]*if \(shouldSuppressInitialShortcutAdvance\(\)\)[\s\S]*return;[\s\S]*selectByOffset\(1\)/,
+  /if \(keyText === 'q'\)[\s\S]*if \(shouldSuppressInitialShortcutAdvance\(\) && event\.altKey\)[\s\S]*return;[\s\S]*selectByOffset\(1\)/,
   'tab switcher should ignore immediate held Alt+Q duplicate keydowns without preventing later Q cycling'
+);
+assert.match(
+  switcherSource,
+  /if \(keyText === 'q'\)[\s\S]*if \(shouldSuppressInitialShortcutAdvance\(\) && event\.altKey\)[\s\S]*return;[\s\S]*suppressInitialShortcutAdvanceUntilQKeyup = false;[\s\S]*selectByOffset\(1\)/,
+  'tab switcher should clear initial suppression when Q is pressed after Alt has been released'
 );
 assert.match(
   switcherSource,
@@ -422,8 +421,18 @@ assert.match(
 );
 assert.match(
   switcherSource,
+  /function getSwitcherViewportComfortScale\(win\)[\s\S]*return 1\.08;[\s\S]*return 1\.045;[\s\S]*return 1;/,
+  'tab switcher should gently enlarge on roomy viewports while leaving compact windows at the base scale'
+);
+assert.match(
+  switcherSource,
   /function applySwitcherZoomCompensation\(panel,\s*tabZoomFactor,\s*visualViewportScale\)[\s\S]*zoomRaw \* visualScale/,
   'tab switcher should combine tab zoom and visual viewport scale before computing the visible scale'
+);
+assert.match(
+  applySwitcherZoomCompensationBlock,
+  /const viewportComfortScale = getSwitcherViewportComfortScale\(window\);[\s\S]*baseVisibleScale \* viewportComfortScale/,
+  'tab switcher zoom compensation should include the large-viewport comfort scale in the same stable transform token'
 );
 assert.match(
   switcherSource,
@@ -457,8 +466,13 @@ assert.match(
 );
 assert.match(
   panelBlock,
-  /box-shadow:\s*[\s\S]*inset 0 1px 0 rgba\(255,\s*255,\s*255,\s*0\.98\)[\s\S]*inset 0 -18px 44px rgba\(255,\s*255,\s*255,\s*0\.38\)[\s\S]*inset 0 0 0 1px rgba\(255,\s*255,\s*255,\s*0\.44\)/,
-  'tab switcher panel should add white inner highlights for a more tactile surface'
+  /radial-gradient\(120% 160% at 12% -24%,\s*rgba\(255,\s*255,\s*255,\s*0\.78\)[\s\S]*rgba\(255,\s*255,\s*255,\s*0\.44\)[\s\S]*rgba\(241,\s*245,\s*249,\s*0\.26\)[\s\S]*linear-gradient\(135deg,\s*rgba\(255,\s*255,\s*255,\s*0\.48\),\s*rgba\(226,\s*232,\s*240,\s*0\.28\)\)/,
+  'tab switcher light panel acrylic should lower the background alpha so more page color comes through'
+);
+assert.match(
+  panelBlock,
+  /box-shadow:\s*[\s\S]*inset 0 1px 0 rgba\(255,\s*255,\s*255,\s*0\.86\)[\s\S]*inset 0 -18px 44px rgba\(255,\s*255,\s*255,\s*0\.22\)[\s\S]*inset 0 0 0 1px rgba\(255,\s*255,\s*255,\s*0\.3\)/,
+  'tab switcher panel should keep subtler white inner highlights for a lighter acrylic surface'
 );
 assert.match(
   switcherSource,
@@ -487,7 +501,7 @@ assert.strictEqual(
 );
 assert.match(
   switcherSource,
-  /backdrop-filter:\s*blur\(42px\)\s*saturate\(185%\)/,
+  /backdrop-filter:\s*blur\(56px\)\s*saturate\(210%\)/,
   'tab switcher panel should use a stronger acrylic backdrop blur'
 );
 assert.match(
@@ -528,8 +542,8 @@ assert.strictEqual(
 );
 assert.match(
   switcherSource,
-  /\.x-tab-switcher-card\s*\{[\s\S]*transition:\s*border-color 70ms ease,\s*background 70ms ease,\s*box-shadow 70ms ease;/,
-  'tab switcher hover and selection transitions should be fast'
+  /\.x-tab-switcher-card\s*\{[\s\S]*transition:\s*border-color 140ms ease,\s*background 140ms ease,\s*box-shadow 180ms cubic-bezier\(0\.22,\s*1,\s*0\.36,\s*1\);/,
+  'tab switcher hover and selection transitions should ease the highlight shadow without animating unrelated properties'
 );
 assert.match(
   switcherSource,
@@ -542,13 +556,14 @@ assert.match(
   /background:\s*[\s\S]*color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*16%,/,
   'tab switcher selected cards should add a soft per-tab theme tint to the background'
 );
-assert.strictEqual(
-  /0 10px 26px/.test(activeCardBlock),
-  false,
-  'tab switcher selected cards should not add an outer highlight shadow'
+assert.match(
+  activeCardBlock,
+  /0 0 22px color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*18%,\s*transparent\)[\s\S]*0 8px 18px color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*10%,\s*transparent\)/,
+  'tab switcher selected cards should add a smaller theme-color glow instead of a dark drop shadow'
 );
 const missingThumbBlock = getCssBlockFromNeedle(switcherSource, '.x-tab-switcher-thumb[data-thumbnail-status="pending"],');
 const thumbBlock = getCssRuleBlock(switcherSource, '.x-tab-switcher-thumb');
+const thumbFaviconBlock = getCssRuleBlock(switcherSource, '.x-tab-switcher-thumb-favicon');
 assert.match(
   thumbBlock,
   /border-radius:\s*var\(--x-tab-switcher-radius-thumb\);/,
@@ -563,6 +578,16 @@ assert.match(
   missingThumbBlock,
   /background:\s*color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*14%,\s*rgba\(248,\s*250,\s*252,\s*0\.94\)\);/,
   'tab switcher empty and pending thumbnail surfaces should derive their fill from the per-card theme color'
+);
+assert.match(
+  thumbBlock,
+  /box-shadow:\s*[\s\S]*inset 0 0 0 1px rgba\(255,\s*255,\s*255,\s*0\.42\)[\s\S]*inset 0 1px 0 color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*10%,\s*rgba\(255,\s*255,\s*255,\s*0\.76\)\)/,
+  'tab switcher screenshot containers should add a faint internal stroke'
+);
+assert.match(
+  missingThumbBlock,
+  /box-shadow:\s*[\s\S]*inset 0 0 0 1px rgba\(255,\s*255,\s*255,\s*0\.42\)[\s\S]*inset 0 1px 0 color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*10%,\s*rgba\(255,\s*255,\s*255,\s*0\.76\)\)/,
+  'tab switcher empty and pending thumbnail surfaces should keep the same faint internal stroke'
 );
 assert.strictEqual(
   /border(?:-color)?\s*:/.test(missingThumbBlock),
@@ -580,8 +605,23 @@ assert.strictEqual(
   'tab switcher selected cards should not tint thumbnail backgrounds separately from inactive cards'
 );
 assert.match(
+  thumbFaviconBlock,
+  /position:\s*absolute;[\s\S]*left:\s*8px;[\s\S]*bottom:\s*8px;[\s\S]*width:\s*24px;[\s\S]*height:\s*24px;[\s\S]*object-fit:\s*cover;[\s\S]*opacity:\s*0;[\s\S]*transform:\s*translate3d\(-2px,\s*4px,\s*0\)\s*scale\(0\.92\);[\s\S]*transition:\s*opacity 150ms ease,\s*transform 180ms cubic-bezier\(0\.22,\s*1,\s*0\.36,\s*1\);[\s\S]*will-change:\s*opacity,\s*transform;/,
+  'tab switcher should stage the favicon as a plain thumbnail overlay with only opacity and transform motion'
+);
+assert.strictEqual(
+  /border-radius|box-shadow|background\s*:|filter\s*:/.test(thumbFaviconBlock),
+  false,
+  'tab switcher thumbnail favicon should not add rounded corners, stroke, background, shadow, or blur'
+);
+assert.match(
   switcherSource,
-  /@supports \(corner-shape:\s*superellipse\(1\.25\)\)\s*\{[\s\S]*#\$\{PANEL_ID\}[\s\S]*\.x-tab-switcher-card[\s\S]*\.x-tab-switcher-thumb[\s\S]*\.x-tab-switcher-favicon[\s\S]*corner-shape:\s*superellipse\(1\.25\);[\s\S]*\}/,
+  /\.x-tab-switcher-card\[data-active="true"\]\s+\.x-tab-switcher-thumb-favicon\s*\{[\s\S]*opacity:\s*1;[\s\S]*transform:\s*translate3d\(0,\s*0,\s*0\)\s*scale\(1\);[\s\S]*\}/,
+  'tab switcher should reveal the active favicon in the screenshot lower-left corner'
+);
+assert.match(
+  switcherSource,
+  /@supports \(corner-shape:\s*superellipse\(1\.25\)\)\s*\{[\s\S]*#\$\{PANEL_ID\}[\s\S]*\.x-tab-switcher-card[\s\S]*\.x-tab-switcher-thumb[\s\S]*\.x-tab-switcher-favicon[\s\S]*\.x-tab-switcher-thumb-favicon[\s\S]*corner-shape:\s*superellipse\(1\.25\);[\s\S]*\}/,
   'tab switcher should use the same superellipse corner curve as the overlay'
 );
 assert.match(
@@ -597,8 +637,13 @@ assert.match(
 );
 assert.match(
   darkPanelBlock,
-  /box-shadow:\s*[\s\S]*inset 0 1px 0 rgba\(255,\s*255,\s*255,\s*0\.2\)[\s\S]*inset 0 -18px 42px rgba\(255,\s*255,\s*255,\s*0\.06\)[\s\S]*inset 0 0 0 1px rgba\(255,\s*255,\s*255,\s*0\.06\)/,
-  'tab switcher dark panel should keep subtle white inner highlights'
+  /radial-gradient\(120% 150% at 12% -22%,\s*rgba\(71,\s*85,\s*105,\s*0\.4\)[\s\S]*rgba\(30,\s*41,\s*59,\s*0\.5\)[\s\S]*rgba\(8,\s*13,\s*24,\s*0\.44\)[\s\S]*linear-gradient\(135deg,\s*rgba\(30,\s*41,\s*59,\s*0\.54\),\s*rgba\(8,\s*13,\s*24,\s*0\.46\)\)/,
+  'tab switcher dark panel acrylic should be less opaque while preserving dark-mode depth'
+);
+assert.match(
+  darkPanelBlock,
+  /box-shadow:\s*[\s\S]*inset 0 1px 0 rgba\(255,\s*255,\s*255,\s*0\.16\)[\s\S]*inset 0 -18px 42px rgba\(255,\s*255,\s*255,\s*0\.04\)[\s\S]*inset 0 0 0 1px rgba\(255,\s*255,\s*255,\s*0\.05\)/,
+  'tab switcher dark panel should keep subtler white inner highlights'
 );
 const darkBaseCardBlock = getCssRuleBlock(switcherSource, '#${PANEL_ID}[data-theme="dark"] .x-tab-switcher-card');
 assert.match(
@@ -617,16 +662,21 @@ assert.match(
   /background:\s*[\s\S]*color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*18%,/,
   'tab switcher dark selected cards should add a subtle per-tab theme tint'
 );
-assert.strictEqual(
-  /0 10px 26px/.test(darkActiveCardBlock),
-  false,
-  'tab switcher dark selected cards should not add an outer highlight shadow'
+assert.match(
+  darkActiveCardBlock,
+  /0 0 24px color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*24%,\s*transparent\)[\s\S]*0 8px 18px color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*14%,\s*transparent\)/,
+  'tab switcher dark selected cards should use a theme-color glow instead of a black shadow'
 );
 const darkMissingThumbBlock = getCssBlockFromNeedle(switcherSource, '#${PANEL_ID}[data-theme="dark"] .x-tab-switcher-thumb[data-thumbnail-status="pending"],');
 assert.match(
   darkMissingThumbBlock,
   /background:\s*color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*18%,\s*rgba\(15,\s*23,\s*42,\s*0\.92\)\);/,
   'tab switcher dark empty and pending thumbnail surfaces should derive their fill from the per-card theme color'
+);
+assert.match(
+  darkMissingThumbBlock,
+  /box-shadow:\s*[\s\S]*inset 0 0 0 1px rgba\(255,\s*255,\s*255,\s*0\.1\)[\s\S]*inset 0 1px 0 color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*18%,\s*rgba\(255,\s*255,\s*255,\s*0\.08\)\)/,
+  'tab switcher dark empty and pending thumbnail surfaces should keep a faint internal stroke'
 );
 assert.strictEqual(
   /linear-gradient/.test(darkMissingThumbBlock),
@@ -643,6 +693,11 @@ assert.match(
   darkThumbBlock,
   /background:\s*color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*18%,\s*rgba\(15,\s*23,\s*42,\s*0\.92\)\);/,
   'tab switcher dark thumbnail background should always default to the card theme color even when a screenshot exists'
+);
+assert.match(
+  darkThumbBlock,
+  /box-shadow:\s*[\s\S]*inset 0 0 0 1px rgba\(255,\s*255,\s*255,\s*0\.1\)[\s\S]*inset 0 1px 0 color-mix\(in srgb,\s*var\(--x-tab-switcher-card-accent,\s*var\(--x-tab-switcher-accent\)\)\s*18%,\s*rgba\(255,\s*255,\s*255,\s*0\.08\)\)/,
+  'tab switcher dark thumbnail background should include a faint internal stroke'
 );
 assert.strictEqual(
   /border(?:-color)?\s*:/.test(darkThumbBlock),
@@ -662,8 +717,8 @@ assert.match(
 );
 assert.match(
   switcherSource,
-  /\.x-tab-switcher-favicon\[data-broken="true"\],[\s\S]*\.x-tab-switcher-title-favicon\[data-broken="true"\][\s\S]*visibility:\s*hidden;/,
-  'tab switcher broken favicons should hide while preserving title layout'
+  /\.x-tab-switcher-favicon\[data-broken="true"\],[\s\S]*\.x-tab-switcher-thumb-favicon\[data-broken="true"\][\s\S]*visibility:\s*hidden;/,
+  'tab switcher broken favicons should hide while preserving layout'
 );
 assert.match(
   switcherSource,
@@ -725,18 +780,18 @@ assert.strictEqual(
 );
 assert.match(
   switcherSource,
-  /\.x-tab-switcher-card\[data-thumbnail-status="pending"\][\s\S]*\.x-tab-switcher-card\[data-thumbnail-status="missing"\][\s\S]*transition:\s*none;/,
-  'tab switcher cards without a screenshot should not animate card hover or selection changes'
-);
-assert.match(
-  switcherSource,
-  /\.x-tab-switcher-title-favicon/,
-  'tab switcher should render the favicon before the title'
+  /\.x-tab-switcher-card\[data-thumbnail-status="pending"\][\s\S]*\.x-tab-switcher-card\[data-thumbnail-status="missing"\][\s\S]*transition:\s*border-color 140ms ease,\s*background 140ms ease,\s*box-shadow 180ms cubic-bezier\(0\.22,\s*1,\s*0\.36,\s*1\);/,
+  'tab switcher cards without a screenshot should still animate highlight changes'
 );
 assert.strictEqual(
-  /background\s*:/.test(getCssRuleBlock(switcherSource, '.x-tab-switcher-title-favicon')),
+  /createElement\(document,\s*'img',\s*'x-tab-switcher-title-favicon'\)|createElement\(document,\s*'span',\s*'x-tab-switcher-title-favicon'\)/.test(switcherSource),
   false,
-  'tab switcher title favicon should not draw its own background'
+  'tab switcher should not render a favicon before the title'
+);
+assert.strictEqual(
+  /x-tab-switcher-title-favicon/.test(switcherSource),
+  false,
+  'tab switcher should remove title favicon styling so text can use the full row'
 );
 assert.match(
   thumbBlock,
@@ -750,8 +805,8 @@ assert.strictEqual(
 );
 assert.match(
   switcherSource,
-  /\.x-tab-switcher-name-row\s*\{[\s\S]*grid-template-columns:\s*18px minmax\(0,\s*1fr\);/,
-  'tab switcher title row should reserve space for favicon before the title'
+  /\.x-tab-switcher-name-row\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/,
+  'tab switcher title row should let the title expand across the full card width'
 );
 const metaBlock = getCssRuleBlock(switcherSource, '.x-tab-switcher-meta');
 const nameRowBlock = getCssRuleBlock(switcherSource, '.x-tab-switcher-name-row');
@@ -764,8 +819,8 @@ assert.match(
 );
 assert.match(
   nameRowBlock,
-  /gap:\s*5px;/,
-  'tab switcher title row should tighten the favicon-to-title gap'
+  /gap:\s*0;/,
+  'tab switcher title row should not keep a gap for a removed favicon'
 );
 assert.match(
   nameBlock,
@@ -819,23 +874,28 @@ const advanceExistingBlock = getFunctionBlock(
 );
 assert.match(
   advanceExistingBlock,
-  /getTabSwitcherRuntimeVersionOnTab\(tab[\s\S]*version === TAB_SWITCHER_RUNTIME_VERSION[\s\S]*action:\s*'advanceOpenTabSwitcherFromCommand'/,
-  'Alt+Q command re-entry should verify the page runtime version before using the advance message fast path'
+  /postTabSwitcherMessageToExtensionPage\(tab,\s*\{\s*action:\s*'advanceOpenTabSwitcherFromCommand'[\s\S]*offset:\s*1/,
+  'Alt+Q command re-entry should still use the extension-page port bridge on own extension pages'
 );
 assert.match(
   advanceExistingBlock,
-  /_lumnoTabSwitcherRuntimeVersion !== runtimeVersion[\s\S]*return \{ ok: false, reason: 'tab_switcher_runtime_stale'/,
-  'Alt+Q command re-entry executeScript fallback should refuse to advance a stale switcher host'
+  /postTabSwitcherMessageToExtensionPage\(tab,[\s\S]*\(ok,\s*_?reason,\s*response\)\s*=>[\s\S]*response\.advanced === true[\s\S]*finish\(didAdvance\)/,
+  'Alt+Q command re-entry should not treat an initial suppressed shortcut as an advance on extension pages'
 );
 assert.match(
   advanceExistingBlock,
-  /chrome\.tabs\.sendMessage\(tab\.id,\s*\{\s*action:\s*'advanceOpenTabSwitcherFromCommand'/,
-  'Alt+Q command re-entry should try a content-script message before executeScript'
+  /chrome\.scripting\.executeScript\(\{[\s\S]*_lumnoTabSwitcherAdvance\(1\)/,
+  'Alt+Q command re-entry should advance normal pages through the in-page host executeScript path'
 );
 assert.match(
   advanceExistingBlock,
-  /chrome\.tabs\.sendMessage[\s\S]*if \(response && response\.ok === false\)[\s\S]*finish\(false\);[\s\S]*return;[\s\S]*runExecuteScriptFallback\(\);/,
-  'Alt+Q command re-entry should avoid executeScript unless the content-script fast path misses'
+  /const result = Array\.isArray\(results\)[\s\S]*results\[0\]\.result[\s\S]*const didAdvance =[\s\S]*result\.ok === true[\s\S]*result\.advanced === true/,
+  'Alt+Q command re-entry should not treat an initial suppressed shortcut as an advance on normal pages'
+);
+assert.strictEqual(
+  /getTabSwitcherRuntimeVersionOnTab|TAB_SWITCHER_RUNTIME_VERSION|tab_switcher_runtime_stale|chrome\.tabs\.sendMessage\(tab\.id/.test(advanceExistingBlock),
+  false,
+  'Alt+Q command re-entry should not keep the reload-time version/message fast path'
 );
 const injectSwitcherBlock = getFunctionBlock(
   backgroundSource,
@@ -844,23 +904,28 @@ const injectSwitcherBlock = getFunctionBlock(
 );
 assert.match(
   injectSwitcherBlock,
-  /chrome\.tabs\.sendMessage\(hostTab\.id,\s*\{\s*action:\s*'openTabSwitcherFromCommand'/,
-  'Alt+Q should try opening the preloaded tab switcher via content-script message before executeScript'
+  /postTabSwitcherMessageToExtensionPage\(hostTab,\s*\{\s*action:\s*'openTabSwitcherFromCommand'[\s\S]*context:\s*buildSwitcherContext\(1\)/,
+  'Alt+Q should still open the switcher through the extension-page port bridge on own extension pages'
 );
 assert.match(
   injectSwitcherBlock,
-  /getTabSwitcherRuntimeVersionOnTab\(hostTab[\s\S]*version === TAB_SWITCHER_RUNTIME_VERSION[\s\S]*action:\s*'openTabSwitcherFromCommand'[\s\S]*runDynamicSwitcherScript\(switcherContext\)/,
-  'Alt+Q should dynamically inject the latest tab switcher when an existing page has a stale runtime after extension reload'
+  /chrome\.scripting\.executeScript\(\{[\s\S]*files:\s*\['src\/overlay\/tab-switcher\.js'\][\s\S]*runDynamicSwitcherScript\(switcherContext\)/,
+  'Alt+Q should open normal pages through direct tab switcher injection'
 );
 const runSwitcherScriptStart = injectSwitcherBlock.indexOf('const runSwitcherScript = (tabZoomFactor) => {');
 assert.notStrictEqual(runSwitcherScriptStart, -1, 'Alt+Q switcher opener should define the runtime open path');
 const runSwitcherScriptEnd = injectSwitcherBlock.indexOf('if (chrome.tabs && typeof chrome.tabs.getZoom', runSwitcherScriptStart);
 assert.notStrictEqual(runSwitcherScriptEnd, -1, 'Alt+Q switcher opener should finish before the zoom lookup');
 const runSwitcherScriptBlock = injectSwitcherBlock.slice(runSwitcherScriptStart, runSwitcherScriptEnd);
-assert.ok(
-  runSwitcherScriptBlock.indexOf("action: 'openTabSwitcherFromCommand'") <
-    runSwitcherScriptBlock.indexOf('runDynamicSwitcherScript(switcherContext)'),
-  'Alt+Q message fast path should run before the dynamic tab-switcher.js injection fallback'
+assert.match(
+  runSwitcherScriptBlock,
+  /const switcherContext = buildSwitcherContext\(tabZoomFactor\);[\s\S]*runDynamicSwitcherScript\(switcherContext\);/,
+  'Alt+Q normal-page opener should directly inject instead of using the reload-time message fast path'
+);
+assert.strictEqual(
+  /chrome\.tabs\.sendMessage\(hostTab\.id|getTabSwitcherRuntimeVersionOnTab|TAB_SWITCHER_RUNTIME_VERSION/.test(runSwitcherScriptBlock),
+  false,
+  'Alt+Q normal-page opener should not keep the reload-time runtime version path'
 );
 assert.match(
   backgroundSource,
@@ -900,7 +965,7 @@ assert.match(
 assert.match(
   switcherSource,
   /host\._lumnoTabSwitcherAdvance = function\(offset\)[\s\S]*return advanceSelectionFromShortcut\(normalizeAdvanceOffset\(offset\)\);/,
-  'tab switcher command re-entry hook should respect initial shortcut suppression while Alt+Q is held'
+  'tab switcher command re-entry hook should use the advance path that clears stale initial shortcut suppression'
 );
 assert.match(
   switcherSource,
@@ -1129,13 +1194,28 @@ assert.match(
 );
 assert.match(
   triggerSwitcherBlock,
-  /shouldCaptureOwnExtensionPageThumbnailBeforePayload\(activeTab\)[\s\S]*captureSwitcherThumbnailForTab\(activeTab,\s*'command-immediate'\)[\s\S]*scheduleSwitcherThumbnailCapture\(activeTab,\s*'command'\)[\s\S]*activeThumbnailReady\.catch\(\(\) => false\)\.finally\(\(\) => \{[\s\S]*getRecentTabsForSwitcher\(tabList,\s*activeTab\.id\)/,
-  'Alt+Q should pre-capture missing own extension-page thumbnails before payload construction and keep normal pages on the scheduled async path'
+  /clearScheduledSwitcherThumbnailCapture\(tab\.id\)[\s\S]*advanceExistingTabSwitcherOnTab/,
+  'Alt+Q should cancel the active tab pending thumbnail timer before trying to open the visible switcher'
+);
+assert.match(
+  triggerSwitcherBlock,
+  /const activeTab = tabList\.find[\s\S]*clearScheduledSwitcherThumbnailCapture\(activeTab\.id\)[\s\S]*let activeThumbnailReady/,
+  'Alt+Q should cancel any resolved active-tab pending thumbnail timer before payload construction'
+);
+assert.match(
+  triggerSwitcherBlock,
+  /shouldCaptureOwnExtensionPageThumbnailBeforePayload\(activeTab\)[\s\S]*captureSwitcherThumbnailForTab\(activeTab,\s*'command-immediate'\)[\s\S]*activeThumbnailReady\.catch\(\(\) => false\)\.finally\(\(\) => \{[\s\S]*getRecentTabsForSwitcher\(tabList,\s*activeTab\.id\)/,
+  'Alt+Q should pre-capture missing own extension-page thumbnails before payload construction'
 );
 assert.match(
   triggerSwitcherBlock,
   /let activeThumbnailReady = Promise\.resolve\(false\);/,
   'Alt+Q normal command path should keep immediate rendering unless the own extension-page pre-capture guard opts in'
+);
+assert.strictEqual(
+  triggerSwitcherBlock.includes("scheduleSwitcherThumbnailCapture(activeTab, 'command')"),
+  false,
+  'Alt+Q should not schedule active-tab thumbnail capture while opening the visible switcher'
 );
 assert.strictEqual(
   triggerSwitcherBlock.includes("enqueueSwitcherThumbnailCapture(activeTab, 'command')"),

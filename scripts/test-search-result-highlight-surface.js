@@ -35,18 +35,6 @@ const newtabDarkActiveFaviconBlock = getCssRuleBlock(
 );
 
 assert.match(
-  overlayCss,
-  /\.x-ov-suggestion-item\[data-last="true"\],[\s\S]*?\.x-ov-suggestion-item:last-child\s*\{[\s\S]*?margin-bottom:\s*0;/,
-  'overlay suggestion rows should not rely only on data-last to remove the final bottom gap'
-);
-
-assert.match(
-  newtabHtml,
-  /\.x-nt-suggestion-item\[data-last="true"\],[\s\S]*?\.x-nt-suggestion-item:last-child\s*\{[\s\S]*?margin-bottom:\s*0;/,
-  'newtab suggestion rows should not rely only on data-last to remove the final bottom gap'
-);
-
-assert.match(
   newtabActiveSuggestionBlock,
   /background:\s*var\(--x-nt-suggestion-active-bg[\s\S]*?border-color:\s*var\(--x-nt-suggestion-active-border/,
   'newtab active suggestion rows should keep the existing background and border highlight'
@@ -92,6 +80,18 @@ assert.match(
   newtabDarkActiveFaviconBlock,
   /background-color:\s*#FFFFFF;/,
   'newtab dark active favicon slots should render on a white rounded rectangle'
+);
+
+assert.doesNotMatch(
+  overlayCss + newtabHtml,
+  /x-(?:ov|nt)-suggestion-item:last-child/,
+  'suggestion list spacing should come from synchronized data-last state, not a last-child fallback'
+);
+
+assert.match(
+  overlayJs,
+  /function syncSuggestionLastState\(\)[\s\S]*?data-last[\s\S]*?index === suggestionItems\.length - 1 \? 'true' : 'false'/,
+  'overlay append renders should resync which suggestion is the final row'
 );
 
 assert.match(
