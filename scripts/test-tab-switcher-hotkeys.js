@@ -164,6 +164,11 @@ assert.match(
   /function isOwnExtensionPageUrl\(url\)[\s\S]*chrome\.runtime\.id[\s\S]*parsed\.hostname === chrome\.runtime\.id/,
   'Alt+Q should only treat this extension own pages as extension-page switcher hosts'
 );
+assert.strictEqual(
+  /function isTabSwitcherExtensionPageBridgeTarget/.test(backgroundSource),
+  false,
+  'Alt+Q should not add a separate browser-newtab bridge target path when the extension page can already trigger commands'
+);
 assert.match(
   backgroundSource,
   /function canHostSwitcherSurface\(tab\)[\s\S]*isOwnExtensionPageUrl\(url\)[\s\S]*canOpenOverlayOnUrl\(url\)/,
@@ -171,8 +176,18 @@ assert.match(
 );
 assert.match(
   backgroundSource,
-  /function postTabSwitcherMessageToExtensionPage[\s\S]*(?:record\.)?port\.postMessage\((?:message|payload)\)/,
+  /function postTabSwitcherMessageToExtensionPage\(tab,\s*message,\s*callback\)[\s\S]*isOwnExtensionPageUrl\(getResolvedTabUrl\(tab\)\)[\s\S]*(?:record\.)?port\.postMessage\((?:message|payload)\)/,
   'background should send switcher open and advance messages to extension pages through the registered port'
+);
+const openOverlayBlock = getFunctionBlock(
+  backgroundSource,
+  'function openOverlayOnTab(activeTab, tabs, source)',
+  'function triggerShowSearchForTab(tab, source)'
+);
+assert.match(
+  openOverlayBlock,
+  /if \(restricted\)[\s\S]*isSearchCommandSource\(source\) && \(isLumnoNewtabUrl\(activeUrl\) \|\| isBrowserNewtabUrl\(activeUrl\)\)[\s\S]*requestFocusVisibleNewtabInput\(source,\s*activeTab\.id\)[\s\S]*return;/,
+  'show-search commands on restricted Lumno/browser newtab URLs should keep focusing the visible newtab input'
 );
 assert.strictEqual(
   /TAB_SWITCHER_RUNTIME_VERSION|getTabSwitcherRuntimeVersionOnTab|tab_switcher_runtime_stale|runtimeVersion/.test(backgroundSource),
@@ -1027,7 +1042,7 @@ const advanceExistingBlock = getFunctionBlock(
 );
 assert.match(
   advanceExistingBlock,
-  /postTabSwitcherMessageToExtensionPage\(tab,\s*\{\s*action:\s*'advanceOpenTabSwitcherFromCommand'[\s\S]*offset:\s*1/,
+  /isOwnExtensionPageUrl\(getResolvedTabUrl\(tab\)\)[\s\S]*postTabSwitcherMessageToExtensionPage\(tab,\s*\{\s*action:\s*'advanceOpenTabSwitcherFromCommand'[\s\S]*offset:\s*1/,
   'Alt+Q command re-entry should still use the extension-page port bridge on own extension pages'
 );
 assert.match(
@@ -1057,8 +1072,18 @@ const injectSwitcherBlock = getFunctionBlock(
 );
 assert.match(
   injectSwitcherBlock,
-  /postTabSwitcherMessageToExtensionPage\(hostTab,\s*\{\s*action:\s*'openTabSwitcherFromCommand'[\s\S]*context:\s*buildSwitcherContext\(1\)/,
+  /isOwnExtensionPageUrl\(getResolvedTabUrl\(hostTab\)\)[\s\S]*postTabSwitcherMessageToExtensionPage\(hostTab,\s*\{\s*action:\s*'openTabSwitcherFromCommand'[\s\S]*context:\s*buildSwitcherContext\(1\)/,
   'Alt+Q should still open the switcher through the extension-page port bridge on own extension pages'
+);
+assert.match(
+  backgroundSource,
+  /const TAB_SWITCHER_EXTENSION_PAGE_PORT_WAIT_MS = \d+;[\s\S]*const TAB_SWITCHER_EXTENSION_PAGE_PORT_RETRY_MS = \d+;/,
+  'Alt+Q should wait briefly for extension-page bridges such as a fresh Lumno newtab to register'
+);
+assert.match(
+  backgroundSource,
+  /function postTabSwitcherMessageToExtensionPage\(tab,\s*message,\s*callback\)[\s\S]*Date\.now\(\)[\s\S]*setTimeout\(attemptPost[\s\S]*TAB_SWITCHER_EXTENSION_PAGE_PORT_RETRY_MS/,
+  'Alt+Q extension-page command posting should retry before falling back when the page bridge is still connecting'
 );
 assert.match(
   injectSwitcherBlock,
@@ -1267,8 +1292,13 @@ assert.match(
 );
 assert.match(
   backgroundSource,
-  /const TAB_SWITCHER_CAPTURE_REASON_COMMAND_IMMEDIATE = 'command-immediate';[\s\S]*const TAB_SWITCHER_CAPTURE_REASON_COMMAND_REFRESH = 'command-refresh';[\s\S]*function isSwitcherCommandCaptureReason\(reason\)/,
-  'Alt+Q command thumbnail capture reasons should be named and checked through one helper'
+  /const TAB_SWITCHER_CAPTURE_REASON_COMMAND_IMMEDIATE = 'command-immediate';[\s\S]*function isSwitcherCommandCaptureReason\(reason\)[\s\S]*requestReason === TAB_SWITCHER_CAPTURE_REASON_COMMAND_IMMEDIATE/,
+  'Alt+Q should keep only the pre-open immediate thumbnail capture reason on the command path'
+);
+assert.strictEqual(
+  backgroundSource.includes('TAB_SWITCHER_CAPTURE_REASON_COMMAND_REFRESH'),
+  false,
+  'Alt+Q should not keep a post-open refresh capture reason because it hides the visible switcher host'
 );
 assert.match(
   backgroundSource,
@@ -1302,8 +1332,23 @@ assert.match(
 );
 assert.match(
   backgroundSource,
-  /function shouldCaptureOwnExtensionPageThumbnailBeforePayload\(tab\)[\s\S]*isOwnExtensionPageUrl\(getResolvedTabUrl\(tab\)\)[\s\S]*state\.status === 'ok'[\s\S]*state\.dataUrl\.startsWith\('data:image\/'\)/,
-  'Alt+Q should synchronously pre-capture an own extension page only when its cached thumbnail is missing'
+  /function isSwitcherThumbnailRefreshNeeded\(state\)[\s\S]*missing[\s\S]*stale[\s\S]*failed/,
+  'Alt+Q should treat missing, stale, and failed thumbnails as refresh candidates without retrying restricted tabs'
+);
+assert.match(
+  backgroundSource,
+  /function shouldPreCaptureActiveSwitcherThumbnailBeforePayload\(tab\)[\s\S]*tab\.active === true[\s\S]*getSwitcherThumbnailStateForPayload\(tab,[\s\S]*isSwitcherThumbnailRefreshNeeded\(state\)/,
+  'Alt+Q should pre-capture any active tab whose cached thumbnail is missing, stale, or failed'
+);
+assert.match(
+  backgroundSource,
+  /const TAB_SWITCHER_COMMAND_PRECAPTURE_BUDGET_MS = \d+;[\s\S]*function waitForSwitcherCommandPreCaptureBudget\(capturePromise\)[\s\S]*setTimeout/,
+  'Alt+Q active-tab pre-capture should be budgeted so opening the switcher stays immediate'
+);
+assert.match(
+  backgroundSource,
+  /const tabSwitcherThumbnailPriorityByTabId = new Map\(\);[\s\S]*function markSwitcherThumbnailPriorityForItems\(items,\s*tabList,\s*reason\)[\s\S]*isSwitcherThumbnailRefreshNeeded/,
+  'Alt+Q should remember missing recent-tab thumbnails as priority refresh candidates'
 );
 assert.match(
   backgroundSource,
@@ -1345,6 +1390,11 @@ assert.match(
   /markSwitcherThumbnailStatus\(tab,\s*'pending',\s*reason/,
   'Alt+Q thumbnail scheduling should mark thumbnails as pending before deferred capture'
 );
+assert.match(
+  scheduleThumbnailBlock,
+  /consumeSwitcherThumbnailPriority\(tab[\s\S]*TAB_SWITCHER_PRIORITY_CAPTURE_DELAY_MS[\s\S]*TAB_SWITCHER_CAPTURE_DELAY_MS/,
+  'Alt+Q thumbnail scheduling should use a shorter delay when a recent missing thumbnail becomes visible'
+);
 const triggerSwitcherBlock = getFunctionBlock(
   backgroundSource,
   'function triggerTabSwitcherForTab(tab, source)',
@@ -1367,23 +1417,33 @@ assert.match(
 );
 assert.match(
   triggerSwitcherBlock,
-  /shouldCaptureOwnExtensionPageThumbnailBeforePayload\(activeTab\)[\s\S]*captureSwitcherThumbnailForTab\([\s\S]*activeTab,[\s\S]*TAB_SWITCHER_CAPTURE_REASON_COMMAND_IMMEDIATE[\s\S]*activeThumbnailReady\.catch\(\(\) => false\)\.finally\(\(\) => \{[\s\S]*getRecentTabsForSwitcher\(tabList,\s*activeTab\.id\)/,
-  'Alt+Q should pre-capture missing own extension-page thumbnails before payload construction'
+  /shouldPreCaptureActiveSwitcherThumbnailBeforePayload\(activeTab\)[\s\S]*waitForSwitcherCommandPreCaptureBudget\([\s\S]*captureSwitcherThumbnailForTab\([\s\S]*activeTab,[\s\S]*TAB_SWITCHER_CAPTURE_REASON_COMMAND_IMMEDIATE[\s\S]*activeThumbnailReady\.catch\(\(\) => false\)\.finally\(\(\) => \{[\s\S]*getRecentTabsForSwitcher\(tabList,\s*activeTab\.id\)/,
+  'Alt+Q should give the active tab a budgeted pre-capture chance before payload construction'
 );
 assert.match(
   triggerSwitcherBlock,
   /let activeThumbnailReady = Promise\.resolve\(false\);/,
-  'Alt+Q normal command path should keep immediate rendering unless the own extension-page pre-capture guard opts in'
-);
-assert.match(
-  backgroundSource,
-  /function requestSwitcherThumbnailRefreshAfterOpen\(tab\)[\s\S]*enqueueSwitcherThumbnailCapture\([\s\S]*TAB_SWITCHER_CAPTURE_REASON_COMMAND_REFRESH/,
-  'Alt+Q should refresh the active tab screenshot after opening without blocking the cached first paint'
+  'Alt+Q normal command path should keep immediate rendering unless the active-tab pre-capture guard opts in'
 );
 assert.match(
   triggerSwitcherBlock,
-  /refreshThumbnailTab:\s*activeTab/,
-  'Alt+Q should pass the active tab through so the opener can refresh its cover after first paint'
+  /const items = getRecentTabsForSwitcher\(tabList,\s*activeTab\.id\);[\s\S]*markSwitcherThumbnailPriorityForItems\(items,\s*tabList,\s*'command-payload'\)/,
+  'Alt+Q should inspect the rendered recent five tabs and mark missing thumbnails for future priority capture'
+);
+assert.strictEqual(
+  backgroundSource.includes('function requestSwitcherThumbnailRefreshAfterOpen'),
+  false,
+  'Alt+Q should not schedule a thumbnail refresh after the switcher opens'
+);
+assert.strictEqual(
+  triggerSwitcherBlock.includes('refreshThumbnailTab'),
+  false,
+  'Alt+Q should not pass the active tab through for a post-open cover refresh'
+);
+assert.match(
+  backgroundSource,
+  /chrome\.windows\.onFocusChanged\.addListener[\s\S]*WINDOW_ID_NONE[\s\S]*scheduleSwitcherThumbnailCapture\(tab,\s*'window-focus'\)/,
+  'Alt+Q thumbnail cache should refresh the active tab when a browser window regains focus'
 );
 
 console.log('tab switcher hotkey tests passed');

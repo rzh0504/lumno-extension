@@ -89,12 +89,15 @@
       }
       body[data-theme="dark"] {
         --page-bg: #111111;
+        --panel-text: #e5e7eb;
         --tab-bg: #2f2f2f;
         --tab-active-bg: #475569;
         --tab-active-text: #f8fafc;
         --tab-inactive-text: #7f8898;
         --inline-tab-active-bg: #3f3f46;
-        --tab-border: rgba(93, 22, 22, 0.12);
+        --control-bg: #2f2f2f;
+        --control-hover-bg: #363636;
+        --tab-border: rgba(255, 255, 255, 0.12);
         --panel-subtext: #9ca3af;
       }
       body[data-theme="light"] {
@@ -332,17 +335,29 @@
       }
       ._x_extension_settings_version_badge_2024_unique_ {
         margin-left: auto;
+        cursor: pointer;
       }
       ._x_extension_settings_version_badge_2024_unique_ {
         margin-right: 20px;
+        appearance: none;
+        -webkit-appearance: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 22px;
+        padding: 3px 8px;
+        box-sizing: border-box;
         border-radius: 999px;
+        font-family: inherit;
         font-size: 11px;
+        line-height: 1;
         font-weight: 500;
         color: var(--panel-text);
         background: rgba(255, 255, 255, 0.12);
         border: none;
         backdrop-filter: blur(4px);
         -webkit-backdrop-filter: blur(4px);
+        cursor: pointer;
         white-space: nowrap;
       }
       body[data-theme="dark"] ._x_extension_settings_version_badge_2024_unique_ {
@@ -514,52 +529,54 @@
       }
       ._x_extension_onboarding_guide_button_2026_unique_ {
         margin-left: auto;
-        min-height: 30px;
-        padding: 6px 10px;
+        --settings-button-min-height: 30px;
+        --settings-button-padding: 6px 10px;
+        --settings-button-border-color: transparent;
+        --settings-button-bg: transparent;
+        --settings-button-color: rgba(107, 114, 128, 0.86);
+        --settings-button-shadow: none;
+        --settings-button-hover-bg: rgba(15, 23, 42, 0.045);
+        --settings-button-hover-color: var(--panel-text);
+        --settings-button-hover-shadow: none;
+        --settings-button-font-size: 12px;
         align-self: center;
-        border: 1px solid transparent;
-        background: transparent;
-        color: rgba(107, 114, 128, 0.86);
-        box-shadow: none;
-        font-size: 12px;
         line-height: 1;
         white-space: nowrap;
         flex-shrink: 0;
       }
-      ._x_extension_onboarding_guide_button_2026_unique_:hover {
-        background: rgba(15, 23, 42, 0.045);
-        color: var(--panel-text);
+      body[data-theme="dark"] ._x_extension_onboarding_guide_button_2026_unique_ {
+        --settings-button-bg: transparent;
+        --settings-button-color: var(--panel-subtext);
+        --settings-button-shadow: none;
       }
-      #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_onboarding_guide_button_2026_unique_ {
-        color: rgba(156, 163, 175, 0.88);
-      }
-      #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_onboarding_guide_button_2026_unique_:hover {
-        background: rgba(255, 255, 255, 0.075);
-        color: #f3f4f6;
+      body[data-theme="dark"] ._x_extension_onboarding_guide_button_2026_unique_:hover {
+        --settings-button-hover-bg: color-mix(in srgb, var(--control-hover-bg) 72%, transparent);
+        --settings-button-hover-color: var(--panel-text);
       }
       ._x_extension_shortcut_ghost_2026_unique_ {
-        min-height: 28px;
-        padding: 5px 9px;
+        --settings-button-min-height: 28px;
+        --settings-button-padding: 5px 9px;
+        --settings-button-border-color: transparent;
+        --settings-button-bg: transparent;
+        --settings-button-color: rgba(107, 114, 128, 0.86);
+        --settings-button-shadow: none;
+        --settings-button-hover-bg: rgba(15, 23, 42, 0.045);
+        --settings-button-hover-color: var(--panel-text);
+        --settings-button-hover-shadow: none;
+        --settings-button-font-size: 12px;
         align-self: center;
-        border: 1px solid transparent;
-        background: transparent;
-        color: rgba(107, 114, 128, 0.86);
-        box-shadow: none;
-        font-size: 12px;
         line-height: 1;
         white-space: nowrap;
         flex-shrink: 0;
       }
-      ._x_extension_shortcut_ghost_2026_unique_:hover {
-        background: rgba(15, 23, 42, 0.045);
-        color: var(--panel-text);
+      body[data-theme="dark"] ._x_extension_shortcut_ghost_2026_unique_ {
+        --settings-button-bg: transparent;
+        --settings-button-color: var(--panel-subtext);
+        --settings-button-shadow: none;
       }
-      #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_shortcut_ghost_2026_unique_ {
-        color: rgba(156, 163, 175, 0.88);
-      }
-      #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_shortcut_ghost_2026_unique_:hover {
-        background: rgba(255, 255, 255, 0.075);
-        color: #f3f4f6;
+      body[data-theme="dark"] ._x_extension_shortcut_ghost_2026_unique_:hover {
+        --settings-button-hover-bg: color-mix(in srgb, var(--control-hover-bg) 72%, transparent);
+        --settings-button-hover-color: var(--panel-text);
       }
       ._x_extension_site_search_template_header_2026_unique_ {
         display: flex;
@@ -1020,9 +1037,9 @@
         pointer-events: none;
       }
       ._x_extension_sync_button_2024_unique_ {
-        padding: 10px 16px;
-        font-size: 13px;
-        min-height: 36px;
+        --settings-button-padding: 10px 16px;
+        --settings-button-font-size: 13px;
+        --settings-button-min-height: 36px;
       }
       ._x_extension_switch_2024_unique_ {
         position: relative;
@@ -1638,10 +1655,13 @@
         justify-content: flex-end;
         gap: 10px;
       }
-      ._x_extension_confirm_actions_2024_unique_ ._x_extension_shortcut_edit_2024_unique_,
-      ._x_extension_confirm_actions_2024_unique_ ._x_extension_shortcut_secondary_2024_unique_ {
+      ._x_extension_confirm_actions_2024_unique_ ._x_extension_shortcut_edit_2024_unique_ {
         font-size: 12px;
         padding: 6px 12px;
+      }
+      ._x_extension_confirm_actions_2024_unique_ ._x_extension_shortcut_submit_2024_unique_ {
+        --settings-button-font-size: 12px;
+        --settings-button-padding: 6px 12px;
       }
       ._x_extension_shortcut_field_2024_unique_ {
         display: flex;
@@ -1713,19 +1733,43 @@
       ._x_extension_shortcut_submit_2024_unique_ {
         all: unset;
         box-sizing: border-box;
+        position: relative;
         cursor: pointer;
         align-self: flex-start;
-        padding: 8px 14px;
+        min-height: var(--settings-button-min-height, auto);
+        padding: var(--settings-button-padding, 8px 14px);
         border-radius: 999px;
-        border: none;
-        background: var(--tab-active-bg);
-        color: var(--tab-active-text);
-        font-size: 12px;
-        font-weight: 500;
+        border: 1px solid var(--settings-button-border-color, transparent);
+        background: var(--settings-button-bg, var(--tab-active-bg));
+        background-clip: padding-box;
+        color: var(--settings-button-color, var(--tab-active-text));
+        box-shadow: var(--settings-button-shadow, none);
+        font-size: var(--settings-button-font-size, 12px);
+        font-weight: var(--settings-button-font-weight, 500);
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        transition: transform 120ms ease, filter 120ms ease;
+        transition:
+          transform 120ms ease,
+          filter 120ms ease,
+          background 160ms ease,
+          border-color 160ms ease,
+          box-shadow 160ms ease,
+          color 160ms ease;
+      }
+      ._x_extension_shortcut_submit_2024_unique_::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        box-shadow: var(--settings-button-before-shadow, none);
+      }
+      ._x_extension_shortcut_submit_2024_unique_:hover {
+        background: var(--settings-button-hover-bg, var(--settings-button-bg, var(--tab-active-bg)));
+        border-color: var(--settings-button-hover-border-color, var(--settings-button-border-color, transparent));
+        color: var(--settings-button-hover-color, var(--settings-button-color, var(--tab-active-text)));
+        box-shadow: var(--settings-button-hover-shadow, var(--settings-button-shadow, none));
       }
       ._x_extension_shortcut_save_2024_unique_ {
         position: relative;
@@ -1752,25 +1796,18 @@
         align-self: center;
       }
       ._x_extension_shortcut_submit_2024_unique_:focus-visible {
-        outline: 2px solid rgba(59, 130, 246, 0.45);
-        outline-offset: 2px;
+        outline: var(--settings-button-focus-outline, 2px solid rgba(59, 130, 246, 0.45));
+        outline-offset: var(--settings-button-focus-outline-offset, 2px);
       }
       ._x_extension_shortcut_secondary_2024_unique_ {
-        border: 1px solid rgba(15, 23, 42, 0.06);
-        color: #1f2937;
-        background: #ffffff;
-        box-shadow:
+        --settings-button-border-color: rgba(15, 23, 42, 0.06);
+        --settings-button-color: #1f2937;
+        --settings-button-bg: #ffffff;
+        --settings-button-shadow:
           0 2px 2px rgba(15, 23, 42, 0.025),
           0 1px 1px rgba(15, 23, 42, 0.035),
           0 0 1px rgba(15, 23, 42, 0.06),
           inset 0 1px 0 rgba(255, 255, 255, 0.75);
-        transition:
-          background-color 160ms ease,
-          border-color 160ms ease,
-          box-shadow 160ms ease,
-          color 160ms ease,
-          transform 120ms ease,
-          filter 120ms ease;
       }
       ._x_extension_settings_tab_button_2024_unique_:active,
       ._x_extension_theme_option_2024_unique_:active,
@@ -1782,32 +1819,24 @@
         opacity: 0.5;
       }
       ._x_extension_shortcut_secondary_2024_unique_:hover {
-        background: #ffffff;
-        border-color: rgba(15, 23, 42, 0.08);
-        box-shadow:
+        --settings-button-hover-bg: #ffffff;
+        --settings-button-hover-border-color: rgba(15, 23, 42, 0.08);
+        --settings-button-hover-shadow:
           0 2px 3px rgba(15, 23, 42, 0.032),
           0 1px 1px rgba(15, 23, 42, 0.045),
           0 0 1px rgba(15, 23, 42, 0.07),
           inset 0 1px 0 rgba(255, 255, 255, 0.8);
       }
-      #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_shortcut_secondary_2024_unique_ {
-        background: #ffffff;
-        color: #1f2937;
-        border-color: rgba(15, 23, 42, 0.07);
-        box-shadow:
-          0 2px 2px rgba(0, 0, 0, 0.075),
-          0 1px 1px rgba(0, 0, 0, 0.095),
-          0 0 1px rgba(0, 0, 0, 0.14),
-          inset 0 1px 0 rgba(255, 255, 255, 0.78);
+      body[data-theme="dark"] ._x_extension_shortcut_secondary_2024_unique_ {
+        --settings-button-bg: color-mix(in srgb, var(--control-bg) 90%, #475569 10%);
+        --settings-button-color: var(--panel-text);
+        --settings-button-border-color: rgba(148, 163, 184, 0.18);
+        --settings-button-shadow: 0 1px 1px rgba(0, 0, 0, 0.18);
       }
-      #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_shortcut_secondary_2024_unique_:hover {
-        background: #ffffff;
-        border-color: rgba(15, 23, 42, 0.09);
-        box-shadow:
-          0 2px 3px rgba(0, 0, 0, 0.085),
-          0 1px 1px rgba(0, 0, 0, 0.105),
-          0 0 1px rgba(0, 0, 0, 0.15),
-          inset 0 1px 0 rgba(255, 255, 255, 0.82);
+      body[data-theme="dark"] ._x_extension_shortcut_secondary_2024_unique_:hover {
+        --settings-button-hover-bg: color-mix(in srgb, var(--control-hover-bg) 86%, #5b6b84 14%);
+        --settings-button-hover-border-color: rgba(164, 180, 207, 0.32);
+        --settings-button-hover-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
       }
       ._x_extension_shortcut_actions_row_2024_unique_ {
         display: inline-flex;
@@ -1817,69 +1846,41 @@
         width: 100%;
       }
       ._x_extension_shortcut_submit_primary_2024_unique_ {
-        position: relative;
-        border: none;
-        border-radius: 999px;
-        background: linear-gradient(180deg, #404859 0%, #273042 100%);
-        color: #ffffff;
-        box-shadow:
+        --settings-button-border-color: #040404;
+        --settings-button-bg: linear-gradient(180deg, #404859 0%, #273042 100%);
+        --settings-button-color: #ffffff;
+        --settings-button-font-weight: 600;
+        --settings-button-shadow:
           0 10px 3px rgba(0, 0, 0, 0),
           0 6px 2px rgba(0, 0, 0, 0.008),
           0 3px 2px rgba(0, 0, 0, 0.035),
           0 2px 2px rgba(0, 0, 0, 0.065),
           0 0 1px rgba(0, 0, 0, 0.075);
-        transition: transform 120ms ease, filter 120ms ease, background 160ms ease, box-shadow 160ms ease;
-      }
-      ._x_extension_shortcut_submit_primary_2024_unique_::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        pointer-events: none;
-        box-shadow:
-          inset 0 0 0 1px #040404,
-          inset 0 1px 1.6px rgba(255, 255, 255, 0.34);
-      }
-      #_x_extension_sync_now_2024_unique_._x_extension_shortcut_submit_primary_2024_unique_::before {
-        box-shadow:
-          inset 0 0 0 1px #040404,
-          inset 0 1px 0 rgba(255, 255, 255, 0.52),
-          inset 0 1px 2.4px rgba(255, 255, 255, 0.36);
+        --settings-button-before-shadow: inset 0 1px 1.6px rgba(255, 255, 255, 0.34);
+        --settings-button-focus-outline: none;
+        --settings-button-focus-outline-offset: 0;
       }
       ._x_extension_shortcut_submit_primary_2024_unique_:hover {
-        background: linear-gradient(180deg, #4a5467 0%, #2f3a4f 100%);
-        box-shadow:
+        --settings-button-hover-bg: linear-gradient(180deg, #4a5467 0%, #2f3a4f 100%);
+        --settings-button-hover-shadow:
           0 12px 4px rgba(0, 0, 0, 0),
           0 7px 3px rgba(0, 0, 0, 0.015),
           0 4px 3px rgba(0, 0, 0, 0.045),
           0 2px 2px rgba(0, 0, 0, 0.075),
           0 0 1px rgba(0, 0, 0, 0.09);
       }
-      #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_shortcut_submit_primary_2024_unique_ {
-        background: linear-gradient(180deg, #4a566c 0%, #334157 100%);
-        color: #f8fafc;
-        box-shadow:
-          0 10px 3px rgba(0, 0, 0, 0),
-          0 6px 2px rgba(0, 0, 0, 0.02),
-          0 3px 2px rgba(0, 0, 0, 0.08),
-          0 2px 2px rgba(0, 0, 0, 0.14),
-          0 0 1px rgba(0, 0, 0, 0.18);
-      }
-      #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_shortcut_submit_primary_2024_unique_::before {
-        box-shadow:
-          inset 0 0 0 1px rgba(3, 7, 18, 0.9),
-          inset 0 1px 1.8px rgba(255, 255, 255, 0.4);
-      }
-      #_x_extension_settings_panel_2024_unique_[data-theme="dark"] ._x_extension_shortcut_submit_primary_2024_unique_:hover {
-        background: linear-gradient(180deg, #56647c 0%, #3a4b66 100%);
+      body[data-theme="dark"] ._x_extension_shortcut_submit_primary_2024_unique_ {
+        --settings-button-bg: linear-gradient(180deg, #4a566c 0%, #334157 100%);
+        --settings-button-color: #f8fafc;
+        --settings-button-hover-bg: linear-gradient(180deg, #56647c 0%, #3a4b66 100%);
       }
       ._x_extension_shortcut_form_trigger_2024_unique_ ._x_extension_shortcut_submit_2024_unique_ {
-        background: transparent;
-        color: var(--panel-text);
-        box-shadow: none;
+        --settings-button-bg: transparent;
+        --settings-button-color: var(--panel-text);
+        --settings-button-shadow: none;
       }
       ._x_extension_shortcut_form_trigger_2024_unique_ ._x_extension_shortcut_submit_2024_unique_:hover {
-        background: var(--tab-bg);
+        --settings-button-hover-bg: var(--tab-bg);
       }
       ._x_extension_shortcut_error_2024_unique_ {
         font-size: 12px;
@@ -2222,7 +2223,7 @@
             <span data-i18n="settings_tab_labs">实验室功能</span>
           </button>
         </div>
-        <div id="_x_extension_settings_version_2024_unique_" class="_x_extension_settings_version_badge_2024_unique_" aria-label="version" data-i18n-aria-label="settings_version_label"></div>
+        <button id="_x_extension_settings_version_2024_unique_" class="_x_extension_settings_version_badge_2024_unique_" type="button" aria-label="version" data-i18n-aria-label="settings_version_label"></button>
         <span class="_x_extension_settings_sticky_line_2026_unique_" aria-hidden="true"></span>
       </div>
       <div id="_x_extension_settings_panel_2024_unique_" data-theme="light">
@@ -2279,6 +2280,18 @@
               </div>
               <input id="_x_extension_sync_import_input_2024_unique_" type="file" accept="application/json" style="display:none;" />
             </div>
+          </div>
+          <div class="_x_extension_setting_row_2024_unique_ _x_extension_setting_row_compact_2024_unique_">
+            <div>
+              <p class="_x_extension_setting_title_2024_unique_">
+                <span data-i18n="settings_update_notice_title">更新提示</span>
+              </p>
+              <p class="_x_extension_setting_desc_2024_unique_" data-i18n="settings_update_notice_desc">更新到新版本时显示新功能组件</p>
+            </div>
+            <label class="_x_extension_switch_2024_unique_" for="_x_extension_update_notice_toggle_2026_unique_">
+              <input id="_x_extension_update_notice_toggle_2026_unique_" type="checkbox" checked>
+              <span class="_x_extension_switch_slider_2024_unique_" aria-hidden="true"></span>
+            </label>
           </div>
           <div class="_x_extension_setting_row_2024_unique_ _x_extension_setting_row_compact_2024_unique_">
             <div>

@@ -84,6 +84,9 @@ function checkManifestPath(value) {
   if (/^(https?:|chrome:|__MSG_)/.test(value)) {
     return;
   }
+  if (value === '_favicon/*') {
+    return;
+  }
   if (!entrySet.has(value)) {
     if (fs.existsSync(value) &&
         fs.statSync(value).isDirectory() &&

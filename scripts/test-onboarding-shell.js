@@ -45,6 +45,13 @@ const newtabPreviewBrowserPageBeforeStyle = html.match(/\.newtab-preview-browser
 const visualCanvasStyle = html.match(/\.visual-canvas\s*\{[\s\S]*?\n\s*\}/);
 const browserWindowStyle = html.match(/\.browser-window\s*\{[\s\S]*?\n\s*\}/);
 
+function getCssRule(selector) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = html.match(new RegExp(`(?:^|\\n)\\s*${escapedSelector}\\s*\\{([\\s\\S]*?)\\}`));
+  assert.ok(match, `${selector} should exist in onboarding CSS`);
+  return match[1];
+}
+
 assert.match(html, /data-onboarding-shell/, 'page should expose a stable onboarding shell root');
 assert.match(html, /id="onboarding-copy-panel"/, 'left copy panel should have a stable mount point');
 assert.match(html, /id="onboarding-page-strip"/, 'left copy panel should expose an in-panel page strip from the second slide onward');
@@ -698,6 +705,25 @@ assert.match(
   /class="onboarding-action-button onboarding-action-button--primary"[^>]*data-action="next"[\s\S]*?<span>Get started<\/span>[\s\S]*?ri-arrow-right-line/,
   'initial primary lower-left action should have an English fallback before localized rendering'
 );
+assert.match(
+  getCssRule('.onboarding-action-button'),
+  /border:\s*1px solid var\(--onboarding-action-border-color,\s*transparent\);[\s\S]*?background:\s*var\(--onboarding-action-bg,\s*transparent\);[\s\S]*?background-clip:\s*padding-box;[\s\S]*?box-shadow:\s*var\(--onboarding-action-shadow,\s*none\);/,
+  'onboarding action button base should own the structural border, background, and shadow layers'
+);
+assert.match(
+  getCssRule('.onboarding-action-button:focus-visible'),
+  /outline:\s*var\(--onboarding-action-focus-outline,\s*2px solid rgba\(37,\s*99,\s*235,\s*0\.46\)\);[\s\S]*?outline-offset:\s*var\(--onboarding-action-focus-outline-offset,\s*3px\);/,
+  'onboarding action focus should be controlled through shared action button variables'
+);
+assert.match(
+  getCssRule('.onboarding-action-button--primary'),
+  /--onboarding-action-border-color:\s*#040404;[\s\S]*?--onboarding-action-before-shadow:\s*inset 0 1px 1\.6px rgba\(255,\s*255,\s*255,\s*0\.34\);[\s\S]*?--onboarding-action-focus-outline:\s*none;[\s\S]*?--onboarding-action-focus-outline-offset:\s*0;/,
+  'onboarding primary actions should use the shared border layer for the single black ring and disable the extra focus outline through variables'
+);
+assert.ok(
+  !/(?:^|\n)\s*\.onboarding-action-button--primary:focus-visible\s*\{/.test(html),
+  'onboarding primary actions should not need a separate focus-visible patch'
+);
 const secondaryActionHtml = html.match(/<button class="onboarding-action-button onboarding-action-button--secondary"[^>]*data-action="prev"[^>]*hidden[\s\S]*?<\/button>/);
 assert.ok(secondaryActionHtml, 'initial secondary lower-left action should stay hidden until content config reveals it');
 assert.match(
@@ -1238,9 +1264,9 @@ assert.match(
   'lower-left action row should span the copy panel so ghost actions can align right'
 );
 assert.match(
-  html,
-  /\.onboarding-action-button--ghost\s*\{[\s\S]*?margin-left:\s*auto;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;[\s\S]*?\}/,
-  'shortcut action should use a right-aligned ghost button treatment'
+  getCssRule('.onboarding-action-button--ghost'),
+  /margin-left:\s*auto;[\s\S]*?--onboarding-action-border-color:\s*transparent;[\s\S]*?--onboarding-action-bg:\s*transparent;[\s\S]*?--onboarding-action-shadow:\s*none;/,
+  'shortcut action should use the shared action button variables for its right-aligned ghost treatment'
 );
 assert.match(
   script,

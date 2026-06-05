@@ -6,6 +6,9 @@
   root.LumnoUpdateNotice = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function(root) {
   const UPDATE_NOTICE_STORAGE_KEY = '_x_lumno_update_notice_2026_unique_';
+  const SETTINGS = root && root.LumnoSettings ? root.LumnoSettings : {};
+  const UPDATE_NOTICE_ENABLED_STORAGE_KEY = SETTINGS.UPDATE_NOTICE_ENABLED_STORAGE_KEY ||
+    '_x_extension_update_notice_enabled_2026_unique_';
   const UPDATE_NOTICE_ID = 'update-notice';
   const RELEASE_DETAILS_URL = 'https://lumno.kubai.design/release/';
   const GITHUB_RELEASE_API_URL = 'https://api.github.com/repos/kubai087/lumno-extension/releases/tags/';
@@ -132,6 +135,12 @@
     );
   }
 
+  function normalizeUpdateNoticeEnabled(value) {
+    return typeof SETTINGS.normalizeUpdateNoticeEnabled === 'function'
+      ? SETTINGS.normalizeUpdateNoticeEnabled(value)
+      : value !== false;
+  }
+
   function getStorageRuntime(chromeApi) {
     const api = chromeApi || (root && root.chrome) || null;
     const storage = api && api.storage ? api.storage : null;
@@ -206,6 +215,27 @@
         });
       } catch (e) {
         resolve(null);
+      }
+    });
+  }
+
+  function getStoredUpdateNoticeEnabled(chromeApi) {
+    const storageRuntime = getStorageRuntime(chromeApi);
+    return new Promise((resolve) => {
+      if (!storageRuntime.area || typeof storageRuntime.area.get !== 'function') {
+        resolve(normalizeUpdateNoticeEnabled(undefined));
+        return;
+      }
+      try {
+        storageRuntime.area.get([UPDATE_NOTICE_ENABLED_STORAGE_KEY], (result) => {
+          const api = chromeApi || (root && root.chrome) || null;
+          const runtimeError = api && api.runtime ? api.runtime.lastError : null;
+          resolve(runtimeError
+            ? normalizeUpdateNoticeEnabled(undefined)
+            : normalizeUpdateNoticeEnabled(result && result[UPDATE_NOTICE_ENABLED_STORAGE_KEY]));
+        });
+      } catch (e) {
+        resolve(normalizeUpdateNoticeEnabled(undefined));
       }
     });
   }
@@ -339,6 +369,7 @@
     let notice = shouldShowUpdateNotice(config.initialNotice, currentVersion)
       ? normalizeUpdateNoticePayload(config.initialNotice)
       : null;
+    let updateNoticeEnabled = normalizeUpdateNoticeEnabled(config.updateNoticeEnabled);
     let destroyed = false;
     let titleRefreshPromise = null;
 
@@ -400,6 +431,14 @@
       return null;
     }
 
+    function syncNoticeVisibility() {
+      hintController.updateLanguage();
+      hintController.setVisible(Boolean(updateNoticeEnabled && notice));
+      if (updateNoticeEnabled) {
+        refreshMissingTitle();
+      }
+    }
+
     function applyNoticePayload(payload) {
       if (destroyed) {
         return;
@@ -407,9 +446,7 @@
       notice = shouldShowUpdateNotice(payload, currentVersion)
         ? normalizeUpdateNoticePayload(payload)
         : null;
-      hintController.updateLanguage();
-      hintController.setVisible(Boolean(notice));
-      refreshMissingTitle();
+      syncNoticeVisibility();
     }
 
     function refreshMissingTitle() {
@@ -438,11 +475,23 @@
         });
     }
 
-    getStoredUpdateNotice(chromeApi).then(applyNoticePayload);
+    Promise.all([
+      getStoredUpdateNotice(chromeApi),
+      getStoredUpdateNoticeEnabled(chromeApi)
+    ]).then(([payload, enabled]) => {
+      updateNoticeEnabled = enabled;
+      applyNoticePayload(payload);
+    });
 
     function handleStorageChanged(changes, areaName) {
       if (destroyed || (storageRuntime.name && areaName && areaName !== storageRuntime.name)) {
         return;
+      }
+      if (changes && changes[UPDATE_NOTICE_ENABLED_STORAGE_KEY]) {
+        updateNoticeEnabled = normalizeUpdateNoticeEnabled(
+          changes[UPDATE_NOTICE_ENABLED_STORAGE_KEY].newValue
+        );
+        syncNoticeVisibility();
       }
       if (changes && changes[UPDATE_NOTICE_STORAGE_KEY]) {
         applyNoticePayload(changes[UPDATE_NOTICE_STORAGE_KEY].newValue);
@@ -482,6 +531,7 @@
 
   return Object.freeze({
     UPDATE_NOTICE_STORAGE_KEY,
+    UPDATE_NOTICE_ENABLED_STORAGE_KEY,
     RELEASE_DETAILS_URL,
     GITHUB_RELEASE_API_URL,
     GITHUB_RELEASE_PAGE_URL,
@@ -493,9 +543,11 @@
     buildReleaseDetailsUrl,
     normalizeUpdateNoticePayload,
     shouldShowUpdateNotice,
+    normalizeUpdateNoticeEnabled,
     createUpdateNoticeDefinition,
     getUpdateNoticeDismissKey,
     getStoredUpdateNotice,
+    getStoredUpdateNoticeEnabled,
     setStoredUpdateNotice,
     fetchReleaseTitle,
     publishUpdateNotice,

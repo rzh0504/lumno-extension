@@ -834,6 +834,7 @@
 
   function copyStylesToPiP(pipWindow) {
     const pipDocument = pipWindow.document;
+    ensurePiPDocumentBase(pipDocument);
     const existingNodes = Array.from(pipDocument.head.querySelectorAll('link[data-lumno-pip-link="1"], style[data-lumno-pip-style="1"]'));
     existingNodes.forEach((node) => node.remove());
 
@@ -887,6 +888,19 @@
         }
       });
     }
+  }
+
+  function ensurePiPDocumentBase(pipDocument) {
+    if (!pipDocument || !pipDocument.head) {
+      return;
+    }
+    let base = pipDocument.getElementById('__lumno_pip_base_2026__');
+    if (!base) {
+      base = pipDocument.createElement('base');
+      base.id = '__lumno_pip_base_2026__';
+      pipDocument.head.insertBefore(base, pipDocument.head.firstChild || null);
+    }
+    base.href = document.baseURI || window.location.href;
   }
 
   function cloneContextNodeShallow(sourceNode, pipDocument) {
@@ -1133,6 +1147,125 @@
     return clone;
   }
 
+  function getElementTree(root) {
+    if (!root || root.nodeType !== Node.ELEMENT_NODE || typeof root.querySelectorAll !== 'function') {
+      return [];
+    }
+    return [root].concat(Array.from(root.querySelectorAll('*')));
+  }
+
+  function copyUrlAttribute(sourceNode, cloneNode, attrName, propertyName) {
+    if (!sourceNode || !cloneNode || !attrName || typeof sourceNode.getAttribute !== 'function' ||
+        typeof cloneNode.setAttribute !== 'function') {
+      return;
+    }
+    const raw = sourceNode.getAttribute(attrName);
+    if (!raw || /^\s*(#|data:|blob:|javascript:)/i.test(raw)) {
+      return;
+    }
+    const resolved = sourceNode[propertyName || attrName];
+    if (typeof resolved === 'string' && resolved) {
+      cloneNode.setAttribute(attrName, resolved);
+    }
+  }
+
+  function syncCloneRuntimeState(sourceRoot, cloneRoot) {
+    const sourceNodes = getElementTree(sourceRoot);
+    const cloneNodes = getElementTree(cloneRoot);
+    const count = Math.min(sourceNodes.length, cloneNodes.length);
+    for (let index = 0; index < count; index += 1) {
+      const sourceNode = sourceNodes[index];
+      const cloneNode = cloneNodes[index];
+      const tagName = String(sourceNode && sourceNode.tagName || '').toLowerCase();
+      if (!tagName) {
+        continue;
+      }
+      if (tagName === 'input') {
+        cloneNode.value = sourceNode.value;
+        cloneNode.checked = Boolean(sourceNode.checked);
+        cloneNode.indeterminate = Boolean(sourceNode.indeterminate);
+      } else if (tagName === 'textarea') {
+        cloneNode.value = sourceNode.value;
+        cloneNode.textContent = sourceNode.value;
+      } else if (tagName === 'select') {
+        cloneNode.selectedIndex = sourceNode.selectedIndex;
+        Array.from(sourceNode.options || []).forEach((sourceOption, optionIndex) => {
+          const cloneOption = cloneNode.options && cloneNode.options[optionIndex];
+          if (cloneOption) {
+            cloneOption.selected = Boolean(sourceOption.selected);
+          }
+        });
+      } else if (tagName === 'option') {
+        cloneNode.selected = Boolean(sourceNode.selected);
+      } else if (tagName === 'details') {
+        cloneNode.open = Boolean(sourceNode.open);
+      } else if (tagName === 'canvas' && typeof sourceNode.getContext === 'function' && typeof cloneNode.getContext === 'function') {
+        try {
+          const context = cloneNode.getContext('2d');
+          if (context) {
+            context.drawImage(sourceNode, 0, 0);
+          }
+        } catch (error) {
+          // Ignore canvas copies that are blocked by browser security.
+        }
+      }
+
+      if (tagName === 'img') {
+        copyUrlAttribute(sourceNode, cloneNode, 'src', sourceNode.currentSrc ? 'currentSrc' : 'src');
+      } else if (tagName === 'source' || tagName === 'track' || tagName === 'script') {
+        copyUrlAttribute(sourceNode, cloneNode, 'src', 'src');
+      } else if (tagName === 'a' || tagName === 'area') {
+        copyUrlAttribute(sourceNode, cloneNode, 'href', 'href');
+      }
+    }
+  }
+
+  function buildPiPElementClone(element, pipDocument) {
+    if (!element || !pipDocument) {
+      return null;
+    }
+    const clone = typeof pipDocument.importNode === 'function'
+      ? pipDocument.importNode(element, true)
+      : element.cloneNode(true);
+    if (clone && clone.nodeType === Node.ELEMENT_NODE) {
+      syncCloneRuntimeState(element, clone);
+    }
+    return clone;
+  }
+
+  function refreshPiPContent(session) {
+    if (!session || !session.element || !session.pipDocument || !session.pipContentMount ||
+        !session.pipWindow || session.pipWindow.closed) {
+      return;
+    }
+    const clone = buildPiPElementClone(session.element, session.pipDocument);
+    if (!clone) {
+      return;
+    }
+    const scrollHost = session.pipContent || null;
+    const scrollTop = scrollHost ? scrollHost.scrollTop : 0;
+    const scrollLeft = scrollHost ? scrollHost.scrollLeft : 0;
+    while (session.pipContentMount.firstChild) {
+      session.pipContentMount.removeChild(session.pipContentMount.firstChild);
+    }
+    session.pipContentMount.appendChild(clone);
+    session.pipElementClone = clone;
+    if (scrollHost) {
+      scrollHost.scrollTop = scrollTop;
+      scrollHost.scrollLeft = scrollLeft;
+    }
+  }
+
+  function schedulePiPContentRefresh(session) {
+    if (!session || !session.element || !session.pipContentMount || session.contentSyncTimer != null) {
+      return;
+    }
+    session.contentSyncTimer = window.setTimeout(() => {
+      session.contentSyncTimer = null;
+      refreshPiPContent(session);
+    }, 80);
+  }
+
   function syncPlaceholderMetrics(session) {
     if (!session || !session.element || !session.placeholder) {
       return;
@@ -1369,6 +1502,10 @@
       window.clearTimeout(session.previewSyncTimer);
       session.previewSyncTimer = null;
     }
+    if (session.contentSyncTimer != null) {
+      window.clearTimeout(session.contentSyncTimer);
+      session.contentSyncTimer = null;
+    }
     if (session.onMainPageHide) {
       window.removeEventListener('pagehide', session.onMainPageHide, true);
     }
@@ -1386,17 +1523,19 @@
     const originalParent = session.originalParent;
     const originalNextSibling = session.originalNextSibling;
     const canRestoreToParent = originalParent instanceof Node && originalParent.isConnected;
-    if (element && canRestoreToParent) {
-      if (placeholder && placeholder.parentNode === originalParent) {
-        originalParent.insertBefore(element, placeholder);
-        placeholder.remove();
-      } else if (originalNextSibling && originalNextSibling.parentNode === originalParent) {
-        originalParent.insertBefore(element, originalNextSibling);
-      } else {
-        originalParent.appendChild(element);
+    if (session.movedElement !== false) {
+      if (element && canRestoreToParent) {
+        if (placeholder && placeholder.parentNode === originalParent) {
+          originalParent.insertBefore(element, placeholder);
+          placeholder.remove();
+        } else if (originalNextSibling && originalNextSibling.parentNode === originalParent) {
+          originalParent.insertBefore(element, originalNextSibling);
+        } else {
+          originalParent.appendChild(element);
+        }
+      } else if (element && document.body) {
+        document.body.appendChild(element);
       }
-    } else if (element && document.body) {
-      document.body.appendChild(element);
     }
 
     if (placeholder && placeholder.isConnected) {
@@ -1477,14 +1616,8 @@
     let placeholderParts = null;
     const originalParent = element.parentNode;
     const originalNextSibling = element.nextSibling;
-    placeholderParts = createPlaceholder(element, visualTheme);
-    placeholder = placeholderParts.placeholder;
-    if (originalParent) {
-      originalParent.insertBefore(placeholder, originalNextSibling);
-    }
     const contextChain = buildPiPContextChain(element, pipDocument);
     content.appendChild(contextChain.root);
-    contextChain.mountPoint.appendChild(element);
 
     const syncObserver = new MutationObserver(() => {
       copyStylesToPiP(pipWindow);
@@ -1506,6 +1639,7 @@
 
     const previewObserver = new MutationObserver(() => {
       if (state.session) {
+        schedulePiPContentRefresh(state.session);
         schedulePlaceholderPreviewRefresh(state.session);
       }
     });
@@ -1520,6 +1654,7 @@
     if (typeof ResizeObserver === 'function') {
       resizeObserver = new ResizeObserver(() => {
         if (state.session) {
+          schedulePiPContentRefresh(state.session);
           syncPlaceholderMetrics(state.session);
         }
       });
@@ -1546,17 +1681,24 @@
     state.session = {
       element: element,
       pipWindow: pipWindow,
+      pipDocument: pipDocument,
+      pipContent: content,
+      pipContentMount: contextChain.mountPoint,
+      pipElementClone: null,
       placeholder: placeholder,
       preview: placeholderParts ? placeholderParts.preview : null,
       originalParent: originalParent,
       originalNextSibling: originalNextSibling,
+      movedElement: false,
       syncObserver: syncObserver,
       previewObserver: previewObserver,
       resizeObserver: resizeObserver,
+      contentSyncTimer: null,
       previewSyncTimer: null,
       dock: dock,
       onMainPageHide: onMainPageHide
     };
+    refreshPiPContent(state.session);
     window[STATE_FLAG] = true;
     return { ok: true };
   }

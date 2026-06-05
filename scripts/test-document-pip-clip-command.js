@@ -4,6 +4,7 @@ const path = require('path');
 
 const repoRoot = path.join(__dirname, '..');
 const backgroundJs = fs.readFileSync(path.join(repoRoot, 'src/background/background.js'), 'utf8');
+const contentJs = fs.readFileSync(path.join(repoRoot, 'src/content/document-pip-picker.js'), 'utf8');
 const overlayRuntimeJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/runtime.js'), 'utf8');
 const overlayJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/search-panel.js'), 'utf8');
 const actionModelJs = fs.readFileSync(path.join(repoRoot, 'src/shared/suggestion-action-model.js'), 'utf8');
@@ -29,6 +30,21 @@ assert.match(
   backgroundJs,
   /case 'openDocumentPipPicker':[\s\S]*?openDocumentPipPickerOnTab\(senderTab,\s*'search-command'\)/,
   'web clip command messages should open the Document PiP picker on the sender tab'
+);
+assert.match(
+  contentJs,
+  /function refreshPiPContent\(session\)/,
+  'web clip should keep a reusable PiP content refresh path'
+);
+assert.match(
+  contentJs,
+  /previewObserver\.observe\(element,[\s\S]*characterData:\s*true[\s\S]*attributes:\s*true/,
+  'web clip should observe source DOM changes so dynamic text can refresh in PiP'
+);
+assert.doesNotMatch(
+  contentJs,
+  /contextChain\.mountPoint\.appendChild\(element\)/,
+  'web clip should mirror the selected element instead of moving it out of the live page DOM'
 );
 
 assert.match(

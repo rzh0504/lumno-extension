@@ -44,13 +44,50 @@ assert.match(
 assert.match(templateHeaderRule, /width:\s*100%;/, 'site search template header should span the field width');
 
 const ghostRule = getRule(`.${ghostClass}`);
+const darkGhostRule = getRule(`body[data-theme="dark"] .${ghostClass}`);
+const darkGhostHoverRule = getRule(`body[data-theme="dark"] .${ghostClass}:hover`);
 [
-  /background:\s*transparent;/,
-  /box-shadow:\s*none;/,
+  /--settings-button-bg:\s*transparent;/,
+  /--settings-button-shadow:\s*none;/,
   /white-space:\s*nowrap;/
 ].forEach((pattern) => {
   assert.match(ghostRule, pattern, 'shortcut ghost buttons should stay visually quiet and compact');
 });
+assert.match(
+  ghostRule,
+  /--settings-button-hover-bg:\s*rgba\(15,\s*23,\s*42,\s*0\.045\);/,
+  'shortcut ghost buttons should only gain a background on hover'
+);
+assert.match(
+  darkGhostRule,
+  /--settings-button-color:\s*var\(--panel-subtext\);/,
+  'dark shortcut ghost buttons should use the dark-mode subtext token'
+);
+assert.match(
+  darkGhostRule,
+  /--settings-button-bg:\s*transparent;/,
+  'dark shortcut ghost buttons should stay backgroundless by default'
+);
+assert.match(
+  darkGhostRule,
+  /--settings-button-shadow:\s*none;/,
+  'dark shortcut ghost buttons should stay flat by default'
+);
+assert.doesNotMatch(
+  darkGhostRule,
+  /rgba\(156,\s*163,\s*175,\s*0\.88\)|#f3f4f6|rgba\(255,\s*255,\s*255,/,
+  'dark shortcut ghost buttons should not hard-code the old pale dark-mode colors'
+);
+assert.match(
+  darkGhostHoverRule,
+  /--settings-button-hover-bg:\s*color-mix\(in srgb,\s*var\(--control-hover-bg\)\s*72%,\s*transparent\);/,
+  'dark shortcut ghost button hover should use a quiet dark control hover surface'
+);
+assert.match(
+  darkGhostHoverRule,
+  /--settings-button-hover-color:\s*var\(--panel-text\);/,
+  'dark shortcut ghost button hover should lift text to the panel text token'
+);
 const buttonRule = getRule(`.${buttonClass}`);
 assert.match(buttonRule, /margin-left:\s*auto;/, 'query insert button should sit on the right side of the template header');
 assert.doesNotMatch(buttonRule, /text-align:\s*right;/, 'query insert button should move as a control without right-aligning its label');

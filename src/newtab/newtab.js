@@ -102,6 +102,8 @@
       typeof NEWTAB_PAGE_NOTICE.renderPageNotice !== 'function' ||
       typeof NEWTAB_TOAST.createToastController !== 'function' ||
       typeof NEWTAB_LAYOUT.createLayoutController !== 'function' ||
+      typeof NEWTAB_LAYOUT.getAdaptiveGridColumnCount !== 'function' ||
+      typeof NEWTAB_LAYOUT.getGridContentWidthForColumns !== 'function' ||
       typeof NEWTAB_RECENT_VIEW.createRecentSitesView !== 'function' ||
       typeof NEWTAB_BOOKMARKS_VIEW.createBookmarksView !== 'function' ||
       typeof NEWTAB_BOOKMARK_CASCADE_POSITION.placeRootCascadeMenu !== 'function' ||
@@ -271,6 +273,16 @@
     'margin-bottom 260ms cubic-bezier(0.22, 1, 0.36, 1), ' +
     'opacity 180ms ease, ' +
     'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)';
+  const BOOKMARK_CARD_TARGET_WIDTH_PX = 154;
+  const BOOKMARK_GRID_GAP_PX = 12;
+  const RECENT_CARD_TARGET_WIDTH_PX = 248;
+  const RECENT_GRID_GAP_PX = 12;
+  const RECENT_WIDE_MAX_COLUMNS = 6;
+  const RECENT_WIDE_CONTENT_MAX_WIDTH_PX = NEWTAB_LAYOUT.getGridContentWidthForColumns(
+    RECENT_WIDE_MAX_COLUMNS,
+    RECENT_CARD_TARGET_WIDTH_PX,
+    RECENT_GRID_GAP_PX
+  );
   const NEWTAB_WIDTH_MODE_CONFIGS = {
     standard: {
       searchMaxWidth: 720,
@@ -279,8 +291,8 @@
     },
     wide: {
       searchMaxWidth: 920,
-      contentMaxWidth: 1360,
-      recentMaxColumns: 6
+      contentMaxWidth: RECENT_WIDE_CONTENT_MAX_WIDTH_PX,
+      recentMaxColumns: RECENT_WIDE_MAX_COLUMNS
     }
   };
   const NEWTAB_SEARCH_WIDTH_CONFIG = {
@@ -290,10 +302,6 @@
     snapPoints: [640, 720, 920, 1040],
     snapThreshold: 14
   };
-  const BOOKMARK_CARD_TARGET_WIDTH_PX = 154;
-  const BOOKMARK_GRID_GAP_PX = 12;
-  const RECENT_CARD_TARGET_WIDTH_PX = 248;
-  const RECENT_GRID_GAP_PX = 12;
   let currentNewtabWidthMode = 'wide';
   let currentNewtabSearchWidth = null;
   let currentRecentGridColumns = 4;
@@ -571,15 +579,18 @@
   }
 
   function getBookmarkGridColumnCount() {
-    if (window.innerWidth <= 860) {
-      return 2;
-    }
     const config = getNewtabWidthModeConfig();
     const maxColumns = Math.max(2, normalizeBookmarkColumns(currentBookmarkColumns));
-    const contentMaxWidth = Number(config.contentMaxWidth || 1040);
-    const containerWidth = Math.max(0, Math.min(Math.floor(window.innerWidth * 0.96), contentMaxWidth));
-    const idealColumns = Math.floor((containerWidth + BOOKMARK_GRID_GAP_PX) / (BOOKMARK_CARD_TARGET_WIDTH_PX + BOOKMARK_GRID_GAP_PX));
-    return Math.max(2, Math.min(maxColumns, idealColumns || 2));
+    return NEWTAB_LAYOUT.getAdaptiveGridColumnCount({
+      viewportWidth: window.innerWidth,
+      compactBreakpointPx: 860,
+      compactColumns: 2,
+      contentMaxWidth: Number(config.contentMaxWidth || 1040),
+      targetColumnWidth: BOOKMARK_CARD_TARGET_WIDTH_PX,
+      gap: BOOKMARK_GRID_GAP_PX,
+      minColumns: 2,
+      maxColumns
+    });
   }
 
   function getNewtabWidthModeBaseConfig() {
@@ -598,18 +609,18 @@
   }
 
   function getRecentGridColumnCount() {
-    if (window.innerWidth <= 860) {
-      return 2;
-    }
     const config = getNewtabWidthModeConfig();
     const maxColumns = Math.max(4, Number(config.recentMaxColumns || 4));
-    if (maxColumns <= 4) {
-      return 4;
-    }
-    const contentMaxWidth = Number(config.contentMaxWidth || 1040);
-    const containerWidth = Math.max(0, Math.min(Math.floor(window.innerWidth * 0.96), contentMaxWidth));
-    const idealColumns = Math.floor((containerWidth + RECENT_GRID_GAP_PX) / (RECENT_CARD_TARGET_WIDTH_PX + RECENT_GRID_GAP_PX));
-    return Math.max(4, Math.min(maxColumns, idealColumns || 4));
+    return NEWTAB_LAYOUT.getAdaptiveGridColumnCount({
+      viewportWidth: window.innerWidth,
+      compactBreakpointPx: 860,
+      compactColumns: 2,
+      contentMaxWidth: Number(config.contentMaxWidth || 1040),
+      targetColumnWidth: RECENT_CARD_TARGET_WIDTH_PX,
+      gap: RECENT_GRID_GAP_PX,
+      minColumns: 4,
+      maxColumns
+    });
   }
 
   function clearPageNoticeQueryParam() {

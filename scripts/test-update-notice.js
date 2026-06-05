@@ -413,6 +413,11 @@ function flushMicrotasks() {
 
   const firstDismissKey = updateNotice.getUpdateNoticeDismissKey(featureHints, '0.9.10');
   const nextDismissKey = updateNotice.getUpdateNoticeDismissKey(featureHints, '0.9.11');
+  assert.strictEqual(
+    updateNotice.UPDATE_NOTICE_ENABLED_STORAGE_KEY,
+    '_x_extension_update_notice_enabled_2026_unique_',
+    'update notice module should expose the synced enablement preference key'
+  );
   assert(firstDismissKey.includes('update_notice'), 'dismiss key should be scoped to the update notice');
   assert.notStrictEqual(firstDismissKey, nextDismissKey, 'dismiss key should change per version');
 
@@ -485,6 +490,46 @@ function flushMicrotasks() {
     'dismissing one update notice should hide the other current-version instance'
   );
 
+  const disabledStore = {
+    [updateNotice.UPDATE_NOTICE_STORAGE_KEY]: normalized,
+    [updateNotice.UPDATE_NOTICE_ENABLED_STORAGE_KEY]: false
+  };
+  const disabledChromeApi = createStorageBackedChrome({}, disabledStore, '0.9.10');
+  const disabledController = updateNotice.createUpdateNotice({
+    documentObj: createFakeDocument(),
+    featureHints,
+    chromeApi: disabledChromeApi,
+    t(key, fallback) {
+      return fallback;
+    },
+    getRiSvg() {
+      return '';
+    }
+  });
+  assert(disabledController, 'disabled update notice controller should still be created');
+  await flushMicrotasks();
+  await flushMicrotasks();
+  assert.strictEqual(
+    disabledController.element.getAttribute('data-visible'),
+    'false',
+    'update notice should stay hidden when the global prompt switch is off'
+  );
+  disabledChromeApi.storage.sync.set({ [updateNotice.UPDATE_NOTICE_ENABLED_STORAGE_KEY]: true }, () => {});
+  await flushMicrotasks();
+  await flushMicrotasks();
+  assert.strictEqual(
+    disabledController.element.getAttribute('data-visible'),
+    'true',
+    'turning the global prompt switch back on should show the current update notice'
+  );
+  disabledChromeApi.storage.sync.set({ [updateNotice.UPDATE_NOTICE_ENABLED_STORAGE_KEY]: false }, () => {});
+  await flushMicrotasks();
+  assert.strictEqual(
+    disabledController.element.getAttribute('data-visible'),
+    'false',
+    'turning the global prompt switch off should hide a visible update notice'
+  );
+
   const oldChromeApi = createStorageBackedChrome({}, {
     [updateNotice.UPDATE_NOTICE_STORAGE_KEY]: normalized
   }, '0.9.9');
@@ -553,6 +598,7 @@ function flushMicrotasks() {
 
   firstController.destroy();
   secondController.destroy();
+  disabledController.destroy();
   oldController.destroy();
   hydratedController.destroy();
   assert.strictEqual(chromeApi.storage.onChanged.count, 0, 'destroy should detach storage listeners');

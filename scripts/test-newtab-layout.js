@@ -1,8 +1,11 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 
 require('../src/newtab/layout.js');
 
 const layoutRuntime = globalThis.LumnoNewtabLayout;
+const repoRoot = path.resolve(__dirname, '..');
 
 class FakeStyle {
   constructor() {
@@ -220,5 +223,55 @@ function testPreservesSearchTopDuringRestoreLayoutPass() {
 }
 
 testPreservesSearchTopDuringRestoreLayoutPass();
+
+function testWideRecentGridCanReachMaximumColumns() {
+  assert.strictEqual(
+    layoutRuntime.getGridContentWidthForColumns(6, 248, 12),
+    1548,
+    'six recent cards plus five gaps should define the wide content max width'
+  );
+
+  assert.strictEqual(
+    layoutRuntime.getAdaptiveGridColumnCount({
+      viewportWidth: 1920,
+      compactBreakpointPx: 860,
+      compactColumns: 2,
+      contentMaxWidth: 1548,
+      targetColumnWidth: 248,
+      gap: 12,
+      minColumns: 4,
+      maxColumns: 6
+    }),
+    6,
+    'wide desktop viewports should render the maximum recent-site columns'
+  );
+
+  assert.strictEqual(
+    layoutRuntime.getAdaptiveGridColumnCount({
+      viewportWidth: 1280,
+      compactBreakpointPx: 860,
+      compactColumns: 2,
+      contentMaxWidth: 1548,
+      targetColumnWidth: 248,
+      gap: 12,
+      minColumns: 4,
+      maxColumns: 6
+    }),
+    4,
+    'medium desktop viewports should keep recent-site rows compact'
+  );
+}
+
+function testNewtabWideModeUsesRecentGridMaximumWidth() {
+  const newtabJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/newtab.js'), 'utf8');
+  assert.match(
+    newtabJs,
+    /contentMaxWidth:\s*RECENT_WIDE_CONTENT_MAX_WIDTH_PX[\s\S]*?recentMaxColumns:\s*RECENT_WIDE_MAX_COLUMNS/,
+    'newtab wide mode should size content from the maximum recent grid width'
+  );
+}
+
+testWideRecentGridCanReachMaximumColumns();
+testNewtabWideModeUsesRecentGridMaximumWidth();
 
 console.log('newtab layout tests passed');

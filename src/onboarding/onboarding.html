@@ -784,8 +784,8 @@
       .interaction-slot:focus-visible,
       .interaction-accordion-trigger:focus-visible,
       .onboarding-action-button:focus-visible {
-        outline: 2px solid rgba(37, 99, 235, 0.46);
-        outline-offset: 3px;
+        outline: var(--onboarding-action-focus-outline, 2px solid rgba(37, 99, 235, 0.46));
+        outline-offset: var(--onboarding-action-focus-outline-offset, 3px);
       }
 
       .interaction-icon {
@@ -976,6 +976,11 @@
         min-height: 40px;
         padding: 0 16px;
         border-radius: 999px;
+        border: 1px solid var(--onboarding-action-border-color, transparent);
+        background: var(--onboarding-action-bg, transparent);
+        background-clip: padding-box;
+        color: var(--onboarding-action-color, var(--page-ink));
+        box-shadow: var(--onboarding-action-shadow, none);
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -1004,15 +1009,18 @@
 
       .onboarding-action-button--primary {
         position: relative;
-        border: none;
-        background: linear-gradient(180deg, #404859 0%, #273042 100%);
-        color: #ffffff;
-        box-shadow:
+        --onboarding-action-border-color: #040404;
+        --onboarding-action-bg: linear-gradient(180deg, #404859 0%, #273042 100%);
+        --onboarding-action-color: #ffffff;
+        --onboarding-action-shadow:
           0 10px 3px rgba(0, 0, 0, 0),
           0 6px 2px rgba(0, 0, 0, 0.008),
           0 3px 2px rgba(0, 0, 0, 0.035),
           0 2px 2px rgba(0, 0, 0, 0.065),
           0 0 1px rgba(0, 0, 0, 0.075);
+        --onboarding-action-before-shadow: inset 0 1px 1.6px rgba(255, 255, 255, 0.34);
+        --onboarding-action-focus-outline: none;
+        --onboarding-action-focus-outline-offset: 0;
       }
 
       .onboarding-action-button--primary::before {
@@ -1021,14 +1029,12 @@
         inset: 0;
         border-radius: inherit;
         pointer-events: none;
-        box-shadow:
-          inset 0 0 0 1px #040404,
-          inset 0 1px 1.6px rgba(255, 255, 255, 0.34);
+        box-shadow: var(--onboarding-action-before-shadow, none);
       }
 
       .onboarding-action-button--primary:hover {
-        background: linear-gradient(180deg, #4a5467 0%, #2f3a4f 100%);
-        box-shadow:
+        --onboarding-action-bg: linear-gradient(180deg, #4a5467 0%, #2f3a4f 100%);
+        --onboarding-action-shadow:
           0 12px 4px rgba(0, 0, 0, 0),
           0 7px 3px rgba(0, 0, 0, 0.015),
           0 4px 3px rgba(0, 0, 0, 0.045),
@@ -1037,10 +1043,10 @@
       }
 
       .onboarding-action-button--secondary {
-        border: 1px solid rgba(15, 23, 42, 0.06);
-        background: #ffffff;
-        color: #1f2937;
-        box-shadow:
+        --onboarding-action-border-color: rgba(15, 23, 42, 0.06);
+        --onboarding-action-bg: #ffffff;
+        --onboarding-action-color: #1f2937;
+        --onboarding-action-shadow:
           0 2px 2px rgba(15, 23, 42, 0.025),
           0 1px 1px rgba(15, 23, 42, 0.035),
           0 0 1px rgba(15, 23, 42, 0.06),
@@ -1048,8 +1054,8 @@
       }
 
       .onboarding-action-button--secondary:hover {
-        border-color: rgba(15, 23, 42, 0.08);
-        box-shadow:
+        --onboarding-action-border-color: rgba(15, 23, 42, 0.08);
+        --onboarding-action-shadow:
           0 2px 3px rgba(15, 23, 42, 0.032),
           0 1px 1px rgba(15, 23, 42, 0.045),
           0 0 1px rgba(15, 23, 42, 0.07),
@@ -1058,44 +1064,40 @@
 
       .onboarding-action-button--ghost {
         margin-left: auto;
-        border: 1px solid transparent;
-        background: transparent;
-        color: rgba(107, 114, 128, 0.86);
-        box-shadow: none;
+        --onboarding-action-border-color: transparent;
+        --onboarding-action-bg: transparent;
+        --onboarding-action-color: rgba(107, 114, 128, 0.86);
+        --onboarding-action-shadow: none;
       }
 
       .onboarding-action-button--ghost:hover {
-        background: rgba(15, 23, 42, 0.045);
-        color: var(--page-ink);
+        --onboarding-action-bg: rgba(15, 23, 42, 0.045);
+        --onboarding-action-color: var(--page-ink);
       }
 
       @media (prefers-color-scheme: dark) {
         .onboarding-action-button--primary {
-          background: linear-gradient(180deg, #4a566c 0%, #334157 100%);
-          color: #f8fafc;
-          box-shadow:
+          --onboarding-action-border-color: rgba(3, 7, 18, 0.9);
+          --onboarding-action-bg: linear-gradient(180deg, #4a566c 0%, #334157 100%);
+          --onboarding-action-color: #f8fafc;
+          --onboarding-action-shadow:
             0 10px 3px rgba(0, 0, 0, 0),
             0 6px 2px rgba(0, 0, 0, 0.02),
             0 3px 2px rgba(0, 0, 0, 0.08),
             0 2px 2px rgba(0, 0, 0, 0.14),
             0 0 1px rgba(0, 0, 0, 0.18);
-        }
-
-        .onboarding-action-button--primary::before {
-          box-shadow:
-            inset 0 0 0 1px rgba(3, 7, 18, 0.9),
-            inset 0 1px 1.8px rgba(255, 255, 255, 0.4);
+          --onboarding-action-before-shadow: inset 0 1px 1.8px rgba(255, 255, 255, 0.4);
         }
 
         .onboarding-action-button--primary:hover {
-          background: linear-gradient(180deg, #56647c 0%, #3a4b66 100%);
+          --onboarding-action-bg: linear-gradient(180deg, #56647c 0%, #3a4b66 100%);
         }
 
         .onboarding-action-button--secondary {
-          border-color: rgba(15, 23, 42, 0.07);
-          background: #ffffff;
-          color: #1f2937;
-          box-shadow:
+          --onboarding-action-border-color: rgba(15, 23, 42, 0.07);
+          --onboarding-action-bg: #ffffff;
+          --onboarding-action-color: #1f2937;
+          --onboarding-action-shadow:
             0 2px 2px rgba(0, 0, 0, 0.075),
             0 1px 1px rgba(0, 0, 0, 0.095),
             0 0 1px rgba(0, 0, 0, 0.14),
@@ -1103,8 +1105,8 @@
         }
 
         .onboarding-action-button--secondary:hover {
-          border-color: rgba(15, 23, 42, 0.09);
-          box-shadow:
+          --onboarding-action-border-color: rgba(15, 23, 42, 0.09);
+          --onboarding-action-shadow:
             0 2px 3px rgba(0, 0, 0, 0.085),
             0 1px 1px rgba(0, 0, 0, 0.105),
             0 0 1px rgba(0, 0, 0, 0.15),
@@ -1112,12 +1114,12 @@
         }
 
         .onboarding-action-button--ghost {
-          color: rgba(156, 163, 175, 0.88);
+          --onboarding-action-color: rgba(156, 163, 175, 0.88);
         }
 
         .onboarding-action-button--ghost:hover {
-          background: rgba(255, 255, 255, 0.075);
-          color: #f3f4f6;
+          --onboarding-action-bg: rgba(255, 255, 255, 0.075);
+          --onboarding-action-color: #f3f4f6;
         }
       }
 

@@ -52,6 +52,7 @@
   const syncExportButton = document.getElementById('_x_extension_sync_export_2024_unique_');
   const syncImportButton = document.getElementById('_x_extension_sync_import_2024_unique_');
   const syncImportInput = document.getElementById('_x_extension_sync_import_input_2024_unique_');
+  const updateNoticeToggle = document.getElementById('_x_extension_update_notice_toggle_2026_unique_');
   const fallbackShortcutInput = document.getElementById('_x_extension_shortcuts_input_2024_unique_');
   const fallbackShortcutTokens = document.getElementById('_x_extension_shortcuts_tokens_2024_unique_');
   const fallbackShortcutWrap = document.querySelector('._x_extension_shortcuts_hotkey_wrap_2024_unique_');
@@ -147,6 +148,7 @@
   const BOOKMARK_VIEW_MODE_STORAGE_KEY = '_x_extension_bookmark_view_mode_2026_unique_';
   const PINNED_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_pinned_recent_sites_2026_unique_';
   const HIDDEN_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_hidden_recent_sites_2026_unique_';
+  const UPDATE_NOTICE_ENABLED_STORAGE_KEY = '_x_extension_update_notice_enabled_2026_unique_';
   const AUTO_PIP_ENABLED_STORAGE_KEY = '_x_extension_auto_pip_enabled_2026_unique_';
   const TAB_SWITCHER_ENABLED_STORAGE_KEY = '_x_extension_tab_switcher_enabled_2026_unique_';
   const DOCUMENT_PIP_ENABLED_STORAGE_KEY = '_x_extension_document_pip_enabled_2026_unique_';
@@ -187,6 +189,7 @@
     BOOKMARK_VIEW_MODE_STORAGE_KEY,
     PINNED_RECENT_SITES_STORAGE_KEY,
     HIDDEN_RECENT_SITES_STORAGE_KEY,
+    UPDATE_NOTICE_ENABLED_STORAGE_KEY,
     AUTO_PIP_ENABLED_STORAGE_KEY,
     TAB_SWITCHER_ENABLED_STORAGE_KEY,
     DOCUMENT_PIP_ENABLED_STORAGE_KEY,
@@ -723,6 +726,12 @@
   function normalizeNewtabWordmarkVisible(value) {
     return typeof SETTINGS.normalizeNewtabWordmarkVisible === 'function'
       ? SETTINGS.normalizeNewtabWordmarkVisible(value)
+      : value !== false;
+  }
+
+  function normalizeUpdateNoticeEnabled(value) {
+    return typeof SETTINGS.normalizeUpdateNoticeEnabled === 'function'
+      ? SETTINGS.normalizeUpdateNoticeEnabled(value)
       : value !== false;
   }
 
@@ -2327,6 +2336,18 @@
     if (manifest?.version) {
       settingsVersion.textContent = `v${manifest.version}`;
     }
+    settingsVersion.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!chrome?.runtime?.sendMessage) {
+        return;
+      }
+      chrome.runtime.sendMessage({ action: 'openReleasePage', reason: 'options-version' }, () => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          return;
+        }
+      });
+    });
   }
 
   function applyResolvedTheme(resolvedTheme) {
@@ -2970,6 +2991,15 @@
       storageArea.set({ [NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY]: next });
     });
   }
+  if (updateNoticeToggle) {
+    updateNoticeToggle.addEventListener('change', () => {
+      const next = normalizeUpdateNoticeEnabled(updateNoticeToggle.checked);
+      if (!storageArea) {
+        return;
+      }
+      storageArea.set({ [UPDATE_NOTICE_ENABLED_STORAGE_KEY]: next });
+    });
+  }
   if (autoPipToggle) {
     autoPipToggle.addEventListener('change', () => {
       const next = Boolean(autoPipToggle.checked);
@@ -3471,6 +3501,17 @@
       }
       if (rawValue !== stored) {
         storageArea.set({ [NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY]: stored });
+      }
+      refreshCustomSelects();
+    });
+    storageArea.get([UPDATE_NOTICE_ENABLED_STORAGE_KEY], (result) => {
+      const rawValue = result[UPDATE_NOTICE_ENABLED_STORAGE_KEY];
+      const stored = normalizeUpdateNoticeEnabled(rawValue);
+      if (updateNoticeToggle) {
+        updateNoticeToggle.checked = stored;
+      }
+      if (rawValue !== stored) {
+        storageArea.set({ [UPDATE_NOTICE_ENABLED_STORAGE_KEY]: stored });
       }
       refreshCustomSelects();
     });
@@ -4763,6 +4804,15 @@
       newtabWordmarkToggle.checked = next;
       if (raw !== next && storageArea) {
         storageArea.set({ [NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY]: next });
+      }
+      refreshCustomSelects();
+    }
+    if (changes[UPDATE_NOTICE_ENABLED_STORAGE_KEY] && updateNoticeToggle) {
+      const raw = changes[UPDATE_NOTICE_ENABLED_STORAGE_KEY].newValue;
+      const next = normalizeUpdateNoticeEnabled(raw);
+      updateNoticeToggle.checked = next;
+      if (raw !== next && storageArea) {
+        storageArea.set({ [UPDATE_NOTICE_ENABLED_STORAGE_KEY]: next });
       }
       refreshCustomSelects();
     }

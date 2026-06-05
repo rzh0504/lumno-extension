@@ -140,6 +140,12 @@
   "document_pip_command_action": {
     "message": "開始剪裁"
   },
+  "settings_update_notice_title": {
+    "message": "更新提示"
+  },
+  "settings_update_notice_desc": {
+    "message": "更新到新版本時顯示新功能元件"
+  },
   "settings_auto_pip_title": {
     "message": "自動畫中畫"
   },

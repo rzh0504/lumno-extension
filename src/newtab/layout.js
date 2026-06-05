@@ -11,6 +11,45 @@
     return Number.isFinite(value) ? value : fallback;
   }
 
+  function getFiniteNumber(value, fallback) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  }
+
+  function getGridContentWidthForColumns(columnCount, columnWidth, gap) {
+    const columns = Math.max(1, Math.floor(getFiniteNumber(columnCount, 1)));
+    const trackWidth = Math.max(1, getFiniteNumber(columnWidth, 1));
+    const gapWidth = Math.max(0, getFiniteNumber(gap, 0));
+    return Math.ceil((columns * trackWidth) + (Math.max(0, columns - 1) * gapWidth));
+  }
+
+  function getResponsiveContentWidth(options) {
+    const config = options || {};
+    const viewportWidth = Math.max(0, getFiniteNumber(config.viewportWidth, 0));
+    const viewportRatio = Math.max(0, getFiniteNumber(config.viewportRatio, 0.96));
+    const contentMaxWidth = Math.max(
+      0,
+      getFiniteNumber(config.contentMaxWidth, viewportWidth * viewportRatio)
+    );
+    return Math.max(0, Math.min(Math.floor(viewportWidth * viewportRatio), contentMaxWidth));
+  }
+
+  function getAdaptiveGridColumnCount(options) {
+    const config = options || {};
+    const viewportWidth = Math.max(0, getFiniteNumber(config.viewportWidth, 0));
+    const compactBreakpointPx = Math.max(0, getFiniteNumber(config.compactBreakpointPx, 0));
+    if (compactBreakpointPx > 0 && viewportWidth <= compactBreakpointPx) {
+      return Math.max(1, Math.floor(getFiniteNumber(config.compactColumns, 1)));
+    }
+    const minColumns = Math.max(1, Math.floor(getFiniteNumber(config.minColumns, 1)));
+    const maxColumns = Math.max(minColumns, Math.floor(getFiniteNumber(config.maxColumns, minColumns)));
+    const targetColumnWidth = Math.max(1, getFiniteNumber(config.targetColumnWidth, 1));
+    const gap = Math.max(0, getFiniteNumber(config.gap, 0));
+    const containerWidth = getResponsiveContentWidth(config);
+    const idealColumns = Math.floor((containerWidth + gap) / (targetColumnWidth + gap));
+    return Math.max(minColumns, Math.min(maxColumns, idealColumns || minColumns));
+  }
+
   function createLayoutController(options) {
     options = options || {};
     const documentObj = options && options.documentObj ? options.documentObj : document;
@@ -406,6 +445,9 @@
   }
 
   globalThis.LumnoNewtabLayout = {
-    createLayoutController
+    createLayoutController,
+    getAdaptiveGridColumnCount,
+    getGridContentWidthForColumns,
+    getResponsiveContentWidth
   };
 })();

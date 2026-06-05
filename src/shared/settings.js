@@ -8,6 +8,7 @@
   const THEME_STORAGE_KEY = '_x_extension_theme_mode_2024_unique_';
   const NEWTAB_THEME_MODE_STORAGE_KEY = '_x_extension_newtab_theme_mode_2026_unique_';
   const NEWTAB_THEME_SCOPE_STORAGE_KEY = '_x_extension_newtab_theme_scope_2026_unique_';
+  const UPDATE_NOTICE_ENABLED_STORAGE_KEY = '_x_extension_update_notice_enabled_2026_unique_';
 
   function normalizeLocale(locale) {
     const raw = String(locale || '').trim();
@@ -59,6 +60,10 @@
   }
 
   function normalizeNewtabWordmarkVisible(value) {
+    return value !== false;
+  }
+
+  function normalizeUpdateNoticeEnabled(value) {
     return value !== false;
   }
 
@@ -152,11 +157,13 @@
     THEME_STORAGE_KEY,
     NEWTAB_THEME_MODE_STORAGE_KEY,
     NEWTAB_THEME_SCOPE_STORAGE_KEY,
+    UPDATE_NOTICE_ENABLED_STORAGE_KEY,
     normalizeLocale,
     localeToHtmlLang,
     normalizeNewtabWidthMode,
     normalizeNewtabSearchWidth,
     normalizeNewtabWordmarkVisible,
+    normalizeUpdateNoticeEnabled,
     normalizeOverlaySizeMode,
     normalizeOverlayTabPriorityMode,
     normalizeSearchResultPriority,
