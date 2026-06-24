@@ -374,12 +374,12 @@
     }),
     ja: Object.freeze({
       intro: Object.freeze({
-        title: '保存したページをすぐ検索',
-        titleLines: Object.freeze(['保存したページを', 'すぐ検索']),
+        title: 'ブックマークをすぐ検索',
+        titleLines: Object.freeze(['ブックマークを', 'すぐ検索']),
         titleCycle: Object.freeze({
           prefix: 'ブラウザの',
           items: Object.freeze([
-            Object.freeze({ id: 'bookmark', label: '保存ページ', tone: 'bookmark' }),
+            Object.freeze({ id: 'bookmark', label: 'ブックマーク', tone: 'bookmark' }),
             Object.freeze({ id: 'history', label: '履歴', tone: 'history' }),
             Object.freeze({ id: 'top-sites', label: 'よく使うサイト', tone: 'top-sites' }),
             Object.freeze({ id: 'settings', label: '設定', tone: 'settings' })
@@ -406,14 +406,14 @@
         diaLabel: 'Dia をお使いの方へ',
         diaText: 'Dia でキーが反応しない場合は、ブラウザのキー設定で「Open command bar」を「In Dia」から「Global」に変更してください。',
         shortcutsLink: 'キー設定',
-        localFileLabel: '手元の PDF/HTML で使う',
+        localFileLabel: 'ローカルの PDF/HTML で使う',
         localFileText: '拡張機能の詳細ページで Lumno の「ファイルの URL へのアクセスを許可する」をオンにし、タブを読み込み直してください。',
         detailsLink: '拡張機能の詳細',
         shortcutActionTooltip: 'ブラウザの制限により、Lumno のキー設定は拡張機能のキー設定ページで変更します。押すと開きます'
       }),
       search: Object.freeze({
         title: 'すっきり新しいタブ',
-        body: '見た目の調整と、保存ページや履歴の整理をまとめて。'
+        body: '見た目の調整と、ブックマークや履歴の整理をまとめて。'
       }),
       newtab: Object.freeze({
         title: 'AI / サイト内検索へ直行',
@@ -442,16 +442,16 @@
           settingsLabel: '設定',
           previousLabelTemplate: '{label} 前へ',
           nextLabelTemplate: '{label} 次へ',
-          debugBookmarkCascadeLabel: '保存ページ階層を調整',
-          feedbackLabel: '意見を送る',
+          debugBookmarkCascadeLabel: 'ブックマーク階層を調整',
+          feedbackLabel: 'フィードバックを送る',
           wallpaperLabel: '壁紙',
           siteSearchDemoAriaLabel: 'Lumno サイト内検索デモ',
           newtabSearchPreviewAriaLabel: 'Lumno 新しいタブ検索の表示例',
           newtabPreviewAriaLabel: 'Lumno 新しいタブの表示例',
           openItemAriaTemplate: '{title}を開く',
           sectionModeRecentLabel: '最近使ったサイトの表示モード',
-          sectionModeBookmarksLabel: '保存ページの表示方法',
-          bookmarkManagerLabel: '保存ページ管理を開く',
+          sectionModeBookmarksLabel: 'ブックマークの表示方法',
+          bookmarkManagerLabel: 'ブックマークマネージャーを開く',
           pageStripAriaTemplate: '案内ページ、{current} / {total}ページ',
           pageSegmentAriaTemplate: '{page}ページ目',
           featureCardAriaJoiner: '、',
@@ -462,7 +462,7 @@
           query: 'extension',
           results: Object.freeze([
             Object.freeze({ type: 'topSite', title: 'Chrome Web Store - Extensions', detail: 'https://chromewebstore.google.com/category/extensions', sourceTag: 'よく使う', favicon: 'https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=https%3A%2F%2Fchromewebstore.google.com%2F&size=32', actionTagLabel: '開く', actionTagKey: 'Enter', visitButtonLabel: '開く', active: true }),
-            Object.freeze({ type: 'bookmark', title: 'Chrome Extensions API Reference', detail: '保存ページ / 開発 / Browser extensions', sourceTag: '保存', sourceTagKind: 'bookmark', favicon: 'https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=https%3A%2F%2Fdeveloper.chrome.com%2F&size=32', visitButtonLabel: '開く' }),
+            Object.freeze({ type: 'bookmark', title: 'Chrome Extensions API Reference', detail: 'ブックマーク / 開発 / Browser extensions', sourceTag: 'ブックマーク', sourceTagKind: 'bookmark', favicon: 'https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=https%3A%2F%2Fdeveloper.chrome.com%2F&size=32', visitButtonLabel: '開く' }),
             Object.freeze({ type: 'history', title: 'Extensions - Chrome for Developers', detail: 'https://developer.chrome.com/docs/extensions', sourceTag: '履歴', favicon: 'https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=https%3A%2F%2Fdeveloper.chrome.com%2F&size=32', visitButtonLabel: '開く', historyDeletable: true }),
             Object.freeze({ type: 'newtab', title: '"extension" を検索', visitButtonLabel: '検索' }),
             Object.freeze({ type: 'browserPage', title: 'chrome://extensions/ を開く', visitButtonLabel: '開く' })
@@ -470,7 +470,7 @@
         }),
         newtabPreview: Object.freeze({
           query: '',
-          sections: Object.freeze({ bookmarks: '保存ページ', recent: '最近使ったサイト' }),
+          sections: Object.freeze({ bookmarks: 'ブックマーク', recent: '最近使ったサイト' }),
           bookmarks: Object.freeze([
             Object.freeze({ title: '作業場', type: 'folder', previewUrls: Object.freeze(['https://developer.chrome.com/docs/extensions/', 'https://chromewebstore.google.com/category/extensions', 'https://github.com/', 'https://figma.com/']) }),
             Object.freeze({ title: 'デザイン素材', type: 'folder', previewUrls: Object.freeze(['https://www.figma.com/', 'https://www.framer.com/', 'https://dribbble.com/', 'https://mobbin.com/']) }),
@@ -491,7 +491,7 @@
           ])
         }),
         featureCards: Object.freeze([
-          Object.freeze({ art: 'homepage-pip', tone: 'pip', title: '動画を自動で小窓表示', body: '動画タブを離れると自動で表示' }),
+          Object.freeze({ art: 'homepage-pip', tone: 'pip', title: '動画を自動でピクチャーインピクチャー表示', body: '動画タブを離れると自動で表示' }),
           Object.freeze({ art: 'newtab-filters', artSize: Object.freeze({ width: 298, height: 120 }), tone: 'newtab', title: '新しいタブを自分好みに', body: '壁紙と多彩な効果を選べます' })
         ]),
         featureAwards: Object.freeze([

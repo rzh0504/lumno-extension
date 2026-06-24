@@ -112,7 +112,7 @@ npm run test:onboarding-content
 
 ## クレジット
 
-- 作成・メンテナンス：[Kubai087](https://github.com/kubai087)
+- 日本語ローカライズ：[Humi](https://github.com/Hum1Tab) さんに日本語翻訳と校正へご協力いただきました。
 - 同梱アイコンセット：[Remix Icon](https://remixicon.com/)
 - 同梱書体：Open Sans
 

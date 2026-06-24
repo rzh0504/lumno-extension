@@ -287,6 +287,25 @@ function testOverlayRendererUsesExtensionFaviconProxyForBrowserPages() {
   );
 }
 
+function testOverlayRendererDefinesChromeMonogramHelper() {
+  const overlayJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/search-panel.js'), 'utf8');
+  assert.match(
+    overlayJs,
+    /function isChromeMonogramFaviconUrl\(url\)[\s\S]*?FAVICON_UTILS\.isChromeMonogramFaviconUrl/,
+    'overlay renderer should define a local chrome monogram favicon helper from shared favicon utils'
+  );
+  assert.match(
+    overlayJs,
+    /createOverlayFaviconViewRuntime\([\s\S]*?isChromeMonogramFaviconUrl,/,
+    'overlay favicon runtime should receive the same chrome monogram helper'
+  );
+  assert.match(
+    overlayJs,
+    /function createAttachedSuggestionFavicon\(suggestion, index, fallbackIconFactory\)[\s\S]*?!isChromeMonogramFaviconUrl\(iconUrl\)/,
+    'direct URL suggestion favicons should use the local chrome monogram helper instead of an undefined global'
+  );
+}
+
 async function testOverlayResolvesLocalFaviconThroughDataUrl() {
   const requestedUrls = [];
   const dataUrl = 'data:image/png;base64,bG9jYWw=';
@@ -434,6 +453,7 @@ testOverlayResolvesLocalFaviconThroughDataUrl()
   .then(testOverlayRendererReusesRuntimeFallbackIcon)
   .then(testOverlayRendererBuildsBrowserPageFavicon2WhenMissingExplicitIcon)
   .then(testOverlayRendererUsesExtensionFaviconProxyForBrowserPages)
+  .then(testOverlayRendererDefinesChromeMonogramHelper)
   .then(() => {
     console.log('overlay favicon view tests passed');
   })

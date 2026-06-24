@@ -1127,6 +1127,38 @@
         : getSafeFaviconCandidateUrl(getResolverChromeFaviconUrl(page));
     }
 
+    function getDistinctFallbackUrl(url, primaryUrl) {
+      const safeUrl = getSafeFaviconCandidateUrl(url);
+      return safeUrl && safeUrl !== primaryUrl ? safeUrl : '';
+    }
+
+    function getPageFaviconRenderCandidates(pageUrl, explicitUrl, candidateOptions) {
+      const candidateConfig = candidateOptions || {};
+      const page = getCanonicalFaviconPage(pageUrl);
+      const explicitFavicon = getSafeFaviconCandidateUrl(explicitUrl);
+      if (!page) {
+        return {
+          primaryUrl: explicitFavicon,
+          browserUrl: ''
+        };
+      }
+
+      const browserPageFavicon = getSafeFaviconCandidateUrl(getResolverBrowserPageFaviconUrl(page));
+      const chromeFavicon = getSafeFaviconCandidateUrl(getResolverChromeFaviconUrl(page));
+      const isInternalPage = isBrowserInternalPageUrl(page);
+      const primaryUrl = isInternalPage
+        ? (browserPageFavicon || explicitFavicon || chromeFavicon || '')
+        : (browserPageFavicon || explicitFavicon || '');
+      const shouldUseChromeFallback = isInternalPage ||
+        candidateConfig.includeChromeFallback === true ||
+        (!/^https?:\/\//i.test(page) && candidateConfig.includeChromeForNonHttp !== false);
+
+      return {
+        primaryUrl,
+        browserUrl: shouldUseChromeFallback ? getDistinctFallbackUrl(chromeFavicon, primaryUrl) : ''
+      };
+    }
+
     function buildFaviconCandidatePlan(state) {
       const input = state || {};
       const pageUrl = getCanonicalFaviconPage(input.pageUrl || input.url || '');
@@ -1182,6 +1214,7 @@
       getFaviconUrlHostCandidate,
       getGstaticFaviconUrl: getResolverGstaticFaviconUrl,
       getPageFaviconCandidateUrl,
+      getPageFaviconRenderCandidates,
       getSafeFaviconCandidateUrl,
       isBlockedFaviconPageUrl,
       isBlockedFaviconUrl,

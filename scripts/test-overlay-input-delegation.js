@@ -47,4 +47,28 @@ assert.doesNotMatch(
   'overlay should not use an undefined openTabQuickSwitchEnabled shorthand'
 );
 
+assert.doesNotMatch(
+  overlayJs,
+  /DIRECT_NAVIGATION_FALLBACK_SINGLE_COLON_PROTOCOLS|getDirectNavigationFallbackProtocol|isExplicitDirectNavigationFallbackUrl/,
+  'overlay should use the shared direct URL parser instead of keeping a local protocol fallback'
+);
+
+assert.match(
+  overlayJs,
+  /function getSearchUtilsRuntime\(\)[\s\S]*?window\.LumnoSearchUtils/,
+  'overlay should resolve shared search utils dynamically after script injection settles'
+);
+
+assert.match(
+  overlayJs,
+  /function getDirectNavigationUrl\(input\)[\s\S]*?getSearchUtilsRuntime\(\)[\s\S]*?getDirectNavigationUrl\(input\)/,
+  'overlay direct URL parsing should use the dynamic shared search utils reference'
+);
+
+assert.match(
+  overlayJs,
+  /function requestTabsAndRender\(filterQuery\)[\s\S]*?const requestQuery = typeof filterQuery === 'string'[\s\S]*?if \(requestQuery !== latestOverlayQuery\) \{[\s\S]*?return;[\s\S]*?\}[\s\S]*?renderTabSuggestions\(filteredTabs\);/,
+  'overlay tab suggestions should not overwrite search results after the user has typed a query'
+);
+
 console.log('overlay input delegation tests passed');

@@ -7,5 +7,7 @@ dist/
 tmp/
 output/
 AGENTS.md
-docs/
+docs/*
+!docs/
+!docs/telemetry-plan.md
 search-rule-changes-*.md

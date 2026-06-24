@@ -973,6 +973,7 @@
       .onboarding-action-button {
         all: unset;
         box-sizing: border-box;
+        position: relative;
         min-height: 40px;
         padding: 0 16px;
         border-radius: 999px;
@@ -995,7 +996,24 @@
           filter 120ms ease,
           background 160ms ease,
           border-color 160ms ease,
+          color 160ms ease,
           box-shadow 160ms ease;
+      }
+
+      .onboarding-action-button::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        box-shadow: var(--onboarding-action-before-shadow, none);
+      }
+
+      .onboarding-action-button:hover {
+        background: var(--onboarding-action-hover-bg, var(--onboarding-action-bg, transparent));
+        border-color: var(--onboarding-action-hover-border-color, var(--onboarding-action-border-color, transparent));
+        color: var(--onboarding-action-hover-color, var(--onboarding-action-color, var(--page-ink)));
+        box-shadow: var(--onboarding-action-hover-shadow, var(--onboarding-action-shadow, none));
       }
 
       .onboarding-action-button[hidden] {
@@ -1008,7 +1026,6 @@
       }
 
       .onboarding-action-button--primary {
-        position: relative;
         --onboarding-action-border-color: #040404;
         --onboarding-action-bg: linear-gradient(180deg, #404859 0%, #273042 100%);
         --onboarding-action-color: #ffffff;
@@ -1021,20 +1038,8 @@
         --onboarding-action-before-shadow: inset 0 1px 1.6px rgba(255, 255, 255, 0.34);
         --onboarding-action-focus-outline: none;
         --onboarding-action-focus-outline-offset: 0;
-      }
-
-      .onboarding-action-button--primary::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        pointer-events: none;
-        box-shadow: var(--onboarding-action-before-shadow, none);
-      }
-
-      .onboarding-action-button--primary:hover {
-        --onboarding-action-bg: linear-gradient(180deg, #4a5467 0%, #2f3a4f 100%);
-        --onboarding-action-shadow:
+        --onboarding-action-hover-bg: linear-gradient(180deg, #4a5467 0%, #2f3a4f 100%);
+        --onboarding-action-hover-shadow:
           0 12px 4px rgba(0, 0, 0, 0),
           0 7px 3px rgba(0, 0, 0, 0.015),
           0 4px 3px rgba(0, 0, 0, 0.045),
@@ -1051,11 +1056,8 @@
           0 1px 1px rgba(15, 23, 42, 0.035),
           0 0 1px rgba(15, 23, 42, 0.06),
           inset 0 1px 0 rgba(255, 255, 255, 0.75);
-      }
-
-      .onboarding-action-button--secondary:hover {
-        --onboarding-action-border-color: rgba(15, 23, 42, 0.08);
-        --onboarding-action-shadow:
+        --onboarding-action-hover-border-color: rgba(15, 23, 42, 0.08);
+        --onboarding-action-hover-shadow:
           0 2px 3px rgba(15, 23, 42, 0.032),
           0 1px 1px rgba(15, 23, 42, 0.045),
           0 0 1px rgba(15, 23, 42, 0.07),
@@ -1068,58 +1070,31 @@
         --onboarding-action-bg: transparent;
         --onboarding-action-color: rgba(107, 114, 128, 0.86);
         --onboarding-action-shadow: none;
-      }
-
-      .onboarding-action-button--ghost:hover {
-        --onboarding-action-bg: rgba(15, 23, 42, 0.045);
-        --onboarding-action-color: var(--page-ink);
+        --onboarding-action-hover-bg: rgba(15, 23, 42, 0.045);
+        --onboarding-action-hover-color: var(--page-ink);
       }
 
       @media (prefers-color-scheme: dark) {
         .onboarding-action-button--primary {
-          --onboarding-action-border-color: rgba(3, 7, 18, 0.9);
           --onboarding-action-bg: linear-gradient(180deg, #4a566c 0%, #334157 100%);
           --onboarding-action-color: #f8fafc;
-          --onboarding-action-shadow:
-            0 10px 3px rgba(0, 0, 0, 0),
-            0 6px 2px rgba(0, 0, 0, 0.02),
-            0 3px 2px rgba(0, 0, 0, 0.08),
-            0 2px 2px rgba(0, 0, 0, 0.14),
-            0 0 1px rgba(0, 0, 0, 0.18);
-          --onboarding-action-before-shadow: inset 0 1px 1.8px rgba(255, 255, 255, 0.4);
-        }
-
-        .onboarding-action-button--primary:hover {
-          --onboarding-action-bg: linear-gradient(180deg, #56647c 0%, #3a4b66 100%);
+          --onboarding-action-hover-bg: linear-gradient(180deg, #56647c 0%, #3a4b66 100%);
         }
 
         .onboarding-action-button--secondary {
-          --onboarding-action-border-color: rgba(15, 23, 42, 0.07);
-          --onboarding-action-bg: #ffffff;
-          --onboarding-action-color: #1f2937;
-          --onboarding-action-shadow:
-            0 2px 2px rgba(0, 0, 0, 0.075),
-            0 1px 1px rgba(0, 0, 0, 0.095),
-            0 0 1px rgba(0, 0, 0, 0.14),
-            inset 0 1px 0 rgba(255, 255, 255, 0.78);
-        }
-
-        .onboarding-action-button--secondary:hover {
-          --onboarding-action-border-color: rgba(15, 23, 42, 0.09);
-          --onboarding-action-shadow:
-            0 2px 3px rgba(0, 0, 0, 0.085),
-            0 1px 1px rgba(0, 0, 0, 0.105),
-            0 0 1px rgba(0, 0, 0, 0.15),
-            inset 0 1px 0 rgba(255, 255, 255, 0.82);
+          --onboarding-action-border-color: rgba(148, 163, 184, 0.18);
+          --onboarding-action-bg: color-mix(in srgb, var(--surface-soft) 86%, #475569 14%);
+          --onboarding-action-color: var(--page-ink);
+          --onboarding-action-shadow: 0 1px 1px rgba(0, 0, 0, 0.18);
+          --onboarding-action-hover-bg: color-mix(in srgb, var(--surface-soft) 78%, #5b6b84 22%);
+          --onboarding-action-hover-border-color: rgba(164, 180, 207, 0.32);
+          --onboarding-action-hover-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
         }
 
         .onboarding-action-button--ghost {
           --onboarding-action-color: rgba(156, 163, 175, 0.88);
-        }
-
-        .onboarding-action-button--ghost:hover {
-          --onboarding-action-bg: rgba(255, 255, 255, 0.075);
-          --onboarding-action-color: #f3f4f6;
+          --onboarding-action-hover-bg: rgba(255, 255, 255, 0.075);
+          --onboarding-action-hover-color: #f3f4f6;
         }
       }
 
@@ -1171,10 +1146,6 @@
 
       .onboarding-browser-tooltip {
         padding: 8px 10px;
-      }
-
-      .onboarding-info-tooltip ._x_extension_tooltip_line_2026_unique_ + ._x_extension_tooltip_line_2026_unique_ {
-        margin-top: 6px;
       }
 
       .onboarding-browser-tooltip .browser-avatar-group {
@@ -4714,6 +4685,7 @@
     <script src="../overlay/shell.js"></script>
     <script src="../overlay/lifecycle.js"></script>
     <script src="../overlay/site-fixes.js"></script>
+    <script src="../overlay/page-theme.js"></script>
     <script src="../overlay/search-panel.js"></script>
     <script src="../overlay/tab-switcher.js"></script>
     <script src="../overlay/tab-switcher-page-bridge.js"></script>

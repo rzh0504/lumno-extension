@@ -45,6 +45,16 @@ assert.match(
 );
 assert.match(
   generalContent,
+  /_x_extension_shortcuts_section_title_row_2026_unique_[\s\S]*_x_extension_shortcuts_section_copy_2026_unique_[\s\S]*data-i18n="settings_shortcuts_section_title"[\s\S]*_x_extension_shortcuts_section_desc_2026_unique_[\s\S]*id="_x_extension_open_shortcuts_page_2026_unique_/,
+  'shortcut settings header should center the button against the title and hint copy stack'
+);
+assert.match(
+  optionsHtml,
+  /\._x_extension_shortcut_submit_2024_unique_\._x_extension_shortcuts_link_2026_unique_\s*\{[^}]*align-self:\s*center;/,
+  'shortcut settings header button should keep center alignment after the base submit rule'
+);
+assert.match(
+  generalContent,
   /data-i18n="settings_shortcuts_title"[\s\S]*data-i18n="settings_shortcuts_dia_tag"/,
   'Dia usage badge should sit beside the Open command bar shortcut title'
 );

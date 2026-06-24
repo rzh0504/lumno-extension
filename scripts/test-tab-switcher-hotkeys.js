@@ -164,20 +164,20 @@ assert.match(
   /function isOwnExtensionPageUrl\(url\)[\s\S]*chrome\.runtime\.id[\s\S]*parsed\.hostname === chrome\.runtime\.id/,
   'Alt+Q should only treat this extension own pages as extension-page switcher hosts'
 );
-assert.strictEqual(
-  /function isTabSwitcherExtensionPageBridgeTarget/.test(backgroundSource),
-  false,
-  'Alt+Q should not add a separate browser-newtab bridge target path when the extension page can already trigger commands'
+assert.match(
+  backgroundSource,
+  /function hasTabSwitcherExtensionPagePort\(tab\)[\s\S]*tabSwitcherExtensionPagePortsByTabId\.get\(tab\.id\)[\s\S]*typeof record\.port\.postMessage === 'function'/,
+  'Alt+Q should be able to recognize chrome://newtab tabs that have already registered the Lumno extension-page bridge'
 );
 assert.match(
   backgroundSource,
-  /function canHostSwitcherSurface\(tab\)[\s\S]*isOwnExtensionPageUrl\(url\)[\s\S]*canOpenOverlayOnUrl\(url\)/,
-  'Alt+Q should allow this extension pages to host the same switcher surface'
+  /function canHostSwitcherSurface\(tab\)[\s\S]*isOwnExtensionPageUrl\(url\)[\s\S]*isBrowserNewtabUrl\(url\) && hasTabSwitcherExtensionPagePort\(tab\)[\s\S]*canOpenOverlayOnUrl\(url\)/,
+  'Alt+Q should allow browser newtab URLs to host only when the Lumno extension-page bridge is registered'
 );
 assert.match(
   backgroundSource,
-  /function postTabSwitcherMessageToExtensionPage\(tab,\s*message,\s*callback\)[\s\S]*isOwnExtensionPageUrl\(getResolvedTabUrl\(tab\)\)[\s\S]*(?:record\.)?port\.postMessage\((?:message|payload)\)/,
-  'background should send switcher open and advance messages to extension pages through the registered port'
+  /function postTabSwitcherMessageToExtensionPage\(tab,\s*message,\s*callback\)[\s\S]*isTabSwitcherExtensionPageMessageTarget\(tab\)[\s\S]*(?:record\.)?port\.postMessage\((?:message|payload)\)/,
+  'background should send switcher open and advance messages to extension-page message targets through the registered port'
 );
 const openOverlayBlock = getFunctionBlock(
   backgroundSource,
@@ -1042,8 +1042,8 @@ const advanceExistingBlock = getFunctionBlock(
 );
 assert.match(
   advanceExistingBlock,
-  /isOwnExtensionPageUrl\(getResolvedTabUrl\(tab\)\)[\s\S]*postTabSwitcherMessageToExtensionPage\(tab,\s*\{\s*action:\s*'advanceOpenTabSwitcherFromCommand'[\s\S]*offset:\s*1/,
-  'Alt+Q command re-entry should still use the extension-page port bridge on own extension pages'
+  /isTabSwitcherExtensionPageMessageTarget\(tab\)[\s\S]*postTabSwitcherMessageToExtensionPage\(tab,\s*\{\s*action:\s*'advanceOpenTabSwitcherFromCommand'[\s\S]*offset:\s*1/,
+  'Alt+Q command re-entry should still use the extension-page port bridge on extension-page message targets'
 );
 assert.match(
   advanceExistingBlock,
@@ -1072,8 +1072,8 @@ const injectSwitcherBlock = getFunctionBlock(
 );
 assert.match(
   injectSwitcherBlock,
-  /isOwnExtensionPageUrl\(getResolvedTabUrl\(hostTab\)\)[\s\S]*postTabSwitcherMessageToExtensionPage\(hostTab,\s*\{\s*action:\s*'openTabSwitcherFromCommand'[\s\S]*context:\s*buildSwitcherContext\(1\)/,
-  'Alt+Q should still open the switcher through the extension-page port bridge on own extension pages'
+  /isTabSwitcherExtensionPageMessageTarget\(hostTab\)[\s\S]*postTabSwitcherMessageToExtensionPage\(hostTab,\s*\{\s*action:\s*'openTabSwitcherFromCommand'[\s\S]*context:\s*buildSwitcherContext\(1\)/,
+  'Alt+Q should still open the switcher through the extension-page port bridge on extension-page message targets'
 );
 assert.match(
   backgroundSource,

@@ -243,7 +243,7 @@
     "message": "在 Dia 中使用"
   },
   "settings_shortcuts_dia_tooltip": {
-    "message": "在 Dia 环境下，受浏览器限制，Lumno 的新标签页功能暂不可用，但聚焦搜索功能仍可正常运行。\n\n若快捷键在 Dia 中不可用，请点击下方右侧按钮进入浏览器的快捷键设置页面，将「Open command bar」从 In Dia 改成 Global。"
+    "message": "在 Dia 环境下，受浏览器限制，Lumno 的新标签页功能暂不可用，但聚焦搜索功能仍可正常运行。\n\n若快捷键在 Dia 中不可用，请点击下方右侧按钮进入浏览器的快捷键设置页面，将「Open command bar」从 In Dia 改成 Global"
   },
   "settings_shortcuts_section_title": {
     "message": "快捷键设置"
@@ -285,7 +285,7 @@
     "message": "在受限页行为"
   },
   "settings_restricted_tooltip": {
-    "message": "受限页（如 chrome://、扩展商店、部分 file:// 页面）无法开启聚焦搜索；按下快捷键将按此处规则处理。"
+    "message": "受限页（如 chrome://、扩展商店、部分 file:// 页面）无法开启聚焦搜索；按下快捷键将按此处规则处理"
   },
   "restricted_action_default": {
     "message": "前往新标签页"
@@ -822,7 +822,7 @@
     "message": "AI"
   },
   "shortcuts_group_ai_desc": {
-    "message": "输入关键词，按下 Tab 并键入内容（Prompt）后，可跳转至以下 AI 网站并自动填入（需先登录对应网站）。"
+    "message": "输入关键词，按下 Tab 并键入内容（Prompt）后，可跳转至以下 AI 网站并自动填入（需先登录对应网站）"
   },
   "shortcuts_badge_custom": {
     "message": "自定义"
@@ -894,7 +894,7 @@
     "message": "操作失败，请重试"
   },
   "toast_error_template": {
-    "message": "搜索模板必须包含 {query}。"
+    "message": "搜索模板必须包含 {query}"
   },
   "toast_reset": {
     "message": "已重置"
@@ -930,10 +930,10 @@
     "message": "确认移除该项？"
   },
   "shortcuts_error_key": {
-    "message": "请填写触发词。"
+    "message": "请填写触发词"
   },
   "shortcuts_error_key_space": {
-    "message": "触发词不能包含空格。"
+    "message": "触发词不能包含空格"
   },
   "search_placeholder": {
     "message": "搜索或输入网址..."
@@ -1015,6 +1015,9 @@
   },
   "open_url": {
     "message": "打开 {url}"
+  },
+  "open_browser_url": {
+    "message": "打开 {browser}：{url}"
   },
   "mode_badge": {
     "message": "模式：{mode}"

@@ -45,7 +45,6 @@ assert.match(templateHeaderRule, /width:\s*100%;/, 'site search template header 
 
 const ghostRule = getRule(`.${ghostClass}`);
 const darkGhostRule = getRule(`body[data-theme="dark"] .${ghostClass}`);
-const darkGhostHoverRule = getRule(`body[data-theme="dark"] .${ghostClass}:hover`);
 [
   /--settings-button-bg:\s*transparent;/,
   /--settings-button-shadow:\s*none;/,
@@ -79,14 +78,18 @@ assert.doesNotMatch(
   'dark shortcut ghost buttons should not hard-code the old pale dark-mode colors'
 );
 assert.match(
-  darkGhostHoverRule,
+  darkGhostRule,
   /--settings-button-hover-bg:\s*color-mix\(in srgb,\s*var\(--control-hover-bg\)\s*72%,\s*transparent\);/,
-  'dark shortcut ghost button hover should use a quiet dark control hover surface'
+  'dark shortcut ghost buttons should expose their quiet hover surface as a variant token'
 );
 assert.match(
-  darkGhostHoverRule,
+  darkGhostRule,
   /--settings-button-hover-color:\s*var\(--panel-text\);/,
-  'dark shortcut ghost button hover should lift text to the panel text token'
+  'dark shortcut ghost buttons should expose their hover text lift as a variant token'
+);
+assert.ok(
+  !new RegExp(`(?:^|\\n)\\s*body\\[data-theme="dark"\\]\\s+\\.${ghostClass}:hover\\s*\\{`).test(optionsHtml),
+  'dark shortcut ghost buttons should not need a separate hover selector'
 );
 const buttonRule = getRule(`.${buttonClass}`);
 assert.match(buttonRule, /margin-left:\s*auto;/, 'query insert button should sit on the right side of the template header');

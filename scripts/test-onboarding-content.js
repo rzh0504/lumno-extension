@@ -501,10 +501,17 @@ assert.strictEqual(zhTw.slides[4].actions.secondary.label, '為我們評分');
 const ja = onboarding.getOnboardingBlueprint('ja-JP');
 assert.strictEqual(ja.locale, 'ja');
 assert.strictEqual(ja.htmlLang, 'ja');
-assert.strictEqual(ja.slides[0].copy.title, '保存したページをすぐ検索');
+assert.strictEqual(ja.slides[0].copy.title, 'ブックマークをすぐ検索');
 assert.strictEqual(ja.slides[1].copy.title, 'どこでも呼び出せる');
 assert.strictEqual(ja.slides[3].copy.body, '検索語入力後に Tab。サイト内検索をすぐ開けます。');
 assert.strictEqual(ja.slides[4].actions.secondary.label, '評価する');
+assert.strictEqual(ja.slides[0].copy.titleCycle.items[0].label, 'ブックマーク');
+assert.strictEqual(ja.slides[1].left.interactionSlots[1].label, 'ローカルの PDF/HTML で使う');
+assert.strictEqual(ja.slides[2].copy.body, '見た目の調整と、ブックマークや履歴の整理をまとめて。');
+assert.strictEqual(ja.runtimeCopy.misc.feedbackLabel, 'フィードバックを送る');
+assert.strictEqual(ja.runtimeCopy.misc.bookmarkManagerLabel, 'ブックマークマネージャーを開く');
+assert.strictEqual(ja.runtimeCopy.newtabPreview.sections.bookmarks, 'ブックマーク');
+assert.strictEqual(ja.runtimeCopy.featureCards[0].title, '動画を自動でピクチャーインピクチャー表示');
 assert.deepStrictEqual(
   ja.runtimeCopy.featureAwards.map((award) => award.lines),
   [
@@ -532,7 +539,6 @@ function collectStringValues(value, bucket) {
 
 const jaOnboardingStrings = collectStringValues(ja, []);
 [
-  'ブックマーク',
   'ネイティブ',
   'コマンドバー',
   'ショートカット',
@@ -541,11 +547,8 @@ const jaOnboardingStrings = collectStringValues(ja, []);
   'プライバシー',
   'リポジトリ',
   'カスタマイズ',
-  'フィードバック',
   'オンボーディング',
   'ナビゲーション',
-  'ブックマークマネージャー',
-  'ピクチャーインピクチャー',
   'ワークスペース',
   'ドキュメント',
   'プレビュー'

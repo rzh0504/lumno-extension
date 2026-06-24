@@ -134,6 +134,24 @@
       : function() {
         return '';
       };
+    const getPageFaviconRenderCandidates = typeof config.getPageFaviconRenderCandidates === 'function'
+      ? config.getPageFaviconRenderCandidates
+      : function(url, explicitUrl, optionsArg) {
+        const pageUrl = String(url || '');
+        const explicitFavicon = String(explicitUrl || '').trim();
+        const browserPageFavicon = getBrowserPageFaviconUrl(pageUrl);
+        const chromeFavicon = getChromeFaviconUrl(pageUrl);
+        const isInternalPage = isBrowserInternalUrl(pageUrl);
+        const primaryUrl = isInternalPage
+          ? (browserPageFavicon || explicitFavicon || chromeFavicon || '')
+          : (browserPageFavicon || explicitFavicon || '');
+        const shouldUseChromeFallback = isInternalPage ||
+          Boolean(optionsArg && optionsArg.includeChromeFallback);
+        return {
+          primaryUrl,
+          browserUrl: shouldUseChromeFallback && chromeFavicon !== primaryUrl ? chromeFavicon : ''
+        };
+      };
     const reportMissingIcon = typeof config.reportMissingIcon === 'function'
       ? config.reportMissingIcon
       : noop;
@@ -323,22 +341,24 @@
       return iconSlot;
     }
 
-    function getBrowserFaviconCandidateForSuggestion(suggestion, host) {
-      const url = suggestion && suggestion.url ? String(suggestion.url) : '';
+    function shouldUseChromeFaviconFallback(url, host) {
       if (!url) {
-        return '';
+        return false;
       }
       if (!/^https?:\/\//i.test(url)) {
-        return getChromeFaviconUrl(url);
+        return true;
       }
-      return host && isLocalNetworkHost(host) ? getChromeFaviconUrl(url) : '';
+      return Boolean(host && isLocalNetworkHost(host));
     }
 
-    function getPrimaryFaviconCandidate(url, explicitUrl) {
-      if (isBrowserInternalUrl(url)) {
-        return getChromeFaviconUrl(url) || getBrowserPageFaviconUrl(url) || explicitUrl || '';
-      }
-      return getBrowserPageFaviconUrl(url) || explicitUrl || '';
+    function getFaviconAttachOptions(url, explicitUrl, host) {
+      const candidates = getPageFaviconRenderCandidates(url, explicitUrl, {
+        includeChromeFallback: shouldUseChromeFaviconFallback(url, host)
+      }) || {};
+      return {
+        primaryUrl: candidates.primaryUrl || '',
+        browserUrl: candidates.browserUrl || ''
+      };
     }
 
     function hasTabFavicon(tab) {
@@ -746,12 +766,12 @@
           const favicon = createFaviconImage(index, {
             fallbackIconName: getBrowserPageFallbackIconName(tab && tab.url)
           });
-          attachFaviconWithFallbacks(favicon, tab.url || '', hostForTab, {
-            primaryUrl: getPrimaryFaviconCandidate(tab.url || '', tab.favIconUrl || ''),
-            browserUrl: !/^https?:\/\//i.test(String(tab.url || '')) || (hostForTab && isLocalNetworkHost(hostForTab))
-              ? getChromeFaviconUrl(tab.url || '')
-              : ''
-          });
+          attachFaviconWithFallbacks(
+            favicon,
+            tab.url || '',
+            hostForTab,
+            getFaviconAttachOptions(tab.url || '', tab.favIconUrl || '', hostForTab)
+          );
           iconNode = favicon;
         }
         const iconSlot = createIconSlot(iconNode, !useFallback);
@@ -929,10 +949,12 @@
                 ? getBrowserPageFallbackIconName(suggestion.url)
                 : ''
             });
-            attachFaviconWithFallbacks(favicon, suggestion.url || suggestion.favicon || '', suggestionHost, {
-              primaryUrl: getPrimaryFaviconCandidate(suggestion.url || '', suggestion.favicon || ''),
-              browserUrl: getBrowserFaviconCandidateForSuggestion(suggestion, suggestionHost)
-            });
+            attachFaviconWithFallbacks(
+              favicon,
+              suggestion.url || suggestion.favicon || '',
+              suggestionHost,
+              getFaviconAttachOptions(suggestion.url || '', suggestion.favicon || '', suggestionHost)
+            );
             iconNode = favicon;
           } else {
             iconNode = suggestion.type === 'browserPage'
@@ -965,10 +987,12 @@
         ) {
           const suggestionHost = suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : '';
           const favicon = createFaviconImage(index, { objectFitContain: true });
-          attachFaviconWithFallbacks(favicon, suggestion.url || suggestion.favicon || '', suggestionHost, {
-            primaryUrl: getPrimaryFaviconCandidate(suggestion.url || '', suggestion.favicon || ''),
-            browserUrl: getBrowserFaviconCandidateForSuggestion(suggestion, suggestionHost)
-          });
+          attachFaviconWithFallbacks(
+            favicon,
+            suggestion.url || suggestion.favicon || '',
+            suggestionHost,
+            getFaviconAttachOptions(suggestion.url || '', suggestion.favicon || '', suggestionHost)
+          );
           iconNode = favicon;
         } else if (suggestion.favicon) {
           const suggestionHost = suggestion && suggestion.url ? getHostFromUrl(suggestion.url) : '';
@@ -978,9 +1002,12 @@
           } else {
             const favicon = createFaviconImage(index, { objectFitContain: true });
             const faviconPageUrl = suggestion && suggestion.url ? suggestion.url : (suggestion.favicon || '');
-            attachFaviconWithFallbacks(favicon, faviconPageUrl, suggestionHost, {
-              primaryUrl: getPrimaryFaviconCandidate(faviconPageUrl, suggestion.favicon || '')
-            });
+            attachFaviconWithFallbacks(
+              favicon,
+              faviconPageUrl,
+              suggestionHost,
+              getFaviconAttachOptions(faviconPageUrl, suggestion.favicon || '', suggestionHost)
+            );
             iconNode = favicon;
           }
         } else {

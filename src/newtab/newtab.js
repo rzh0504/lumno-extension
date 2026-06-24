@@ -33,6 +33,7 @@
   const NEWTAB_THEME_MODE_STORAGE_KEY = '_x_extension_newtab_theme_mode_2026_unique_';
   const NEWTAB_THEME_SCOPE_STORAGE_KEY = '_x_extension_newtab_theme_scope_2026_unique_';
   const NEWTAB_WALLPAPER_STORAGE_KEY = '_x_extension_newtab_wallpaper_2026_unique_';
+  const NEWTAB_LOCAL_WALLPAPER_STORAGE_KEY = '_x_extension_newtab_local_wallpaper_2026_unique_';
   const NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY = '_x_extension_newtab_wallpaper_overlay_2026_unique_';
   const NEWTAB_WALLPAPER_EFFECT_STORAGE_KEY = '_x_extension_newtab_wallpaper_effect_2026_unique_';
   const LUMNO_CHROME_WEB_STORE_URL = 'https://chromewebstore.google.com/detail/lumno-%E8%81%9A%E7%84%A6%E6%90%9C%E7%B4%A2%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/nggfkkbmogmadfoikakkfegkoilfcfao?utm_source=item-share-cb';
@@ -1527,8 +1528,10 @@
     chromeObj: chrome,
     extensionRoutes: EXTENSION_ROUTES,
     storageArea,
+    localWallpaperStorageArea: localStorageArea,
     storageKeys: {
       wallpaper: NEWTAB_WALLPAPER_STORAGE_KEY,
+      localWallpaper: NEWTAB_LOCAL_WALLPAPER_STORAGE_KEY,
       overlay: NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY,
       effect: NEWTAB_WALLPAPER_EFFECT_STORAGE_KEY,
       wordmark: NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY
@@ -2845,6 +2848,11 @@
         hiddenRecentSites = normalizeHiddenRecentSites(changes[HIDDEN_RECENT_SITES_STORAGE_KEY].newValue);
         recentRenderSignature = '';
         renderRecentSites(recentSourceItems);
+      }
+      if (areaName === 'local' &&
+          changes[NEWTAB_LOCAL_WALLPAPER_STORAGE_KEY] &&
+          wallpaperRuntime) {
+        wallpaperRuntime.handleStorageChange(changes);
       }
       return;
     }
@@ -6205,6 +6213,13 @@
     return resolver ? resolver.getPageFaviconCandidateUrl(pageUrl) : '';
   }
 
+  function getPageFaviconRenderCandidates(pageUrl, explicitUrl, options) {
+    const resolver = getPageFaviconUrlResolver();
+    return resolver && typeof resolver.getPageFaviconRenderCandidates === 'function'
+      ? resolver.getPageFaviconRenderCandidates(pageUrl, explicitUrl, options)
+      : { primaryUrl: String(explicitUrl || '').trim(), browserUrl: '' };
+  }
+
   function getHostFaviconUrl(hostname) {
     const normalized = normalizeFaviconHost(hostname);
     if (!normalized) {
@@ -7341,6 +7356,76 @@
     return 'chrome://';
   }
 
+  function normalizeBrandName(brand) {
+    return String(brand || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function isGreaseBrandName(brand) {
+    const compact = normalizeBrandName(brand).toLowerCase().replace(/[^a-z]/g, '');
+    return compact.includes('not') && compact.includes('brand');
+  }
+
+  function isChromiumEngineBrandName(brand) {
+    return normalizeBrandName(brand).toLowerCase() === 'chromium';
+  }
+
+  function getClientHintBrowserName(userAgentData) {
+    const brands = userAgentData && Array.isArray(userAgentData.brands)
+      ? userAgentData.brands
+      : [];
+    const names = brands
+      .map((item) => normalizeBrandName(item && item.brand))
+      .filter((name) => name && !isGreaseBrandName(name));
+    const productName = names.find((name) => {
+      const lower = name.toLowerCase();
+      return !isChromiumEngineBrandName(name) &&
+        lower !== 'google chrome' &&
+        lower !== 'chrome';
+    });
+    if (productName) {
+      return productName;
+    }
+    return names.find((name) => !isChromiumEngineBrandName(name)) ||
+      names.find((name) => isChromiumEngineBrandName(name)) ||
+      '';
+  }
+
+  function getFallbackBrowserName(scheme) {
+    if (scheme === 'edge://') {
+      return 'Microsoft Edge';
+    }
+    if (scheme === 'brave://') {
+      return 'Brave';
+    }
+    if (scheme === 'vivaldi://') {
+      return 'Vivaldi';
+    }
+    if (scheme === 'opera://') {
+      return 'Opera';
+    }
+    return 'Chrome';
+  }
+
+  function getBrowserInternalProfile() {
+    const scheme = getBrowserInternalScheme();
+    return {
+      scheme,
+      name: getClientHintBrowserName(navigator.userAgentData) ||
+        getFallbackBrowserName(scheme)
+    };
+  }
+
+  function getBrowserPageSuggestionTitle(browserProfile, targetUrl) {
+    const browserName = browserProfile && browserProfile.name ? browserProfile.name : '';
+    if (browserName) {
+      return formatMessage('open_browser_url', '打开 {browser}：{url}', {
+        browser: browserName,
+        url: targetUrl
+      });
+    }
+    return formatMessage('open_url', '打开 {url}', { url: targetUrl });
+  }
+
   function getShortcutRules() {
     if (window._x_extension_shortcut_rules_2024_unique_) {
       return Promise.resolve(window._x_extension_shortcut_rules_2024_unique_);
@@ -7369,7 +7454,8 @@
 
   function buildKeywordSuggestions(input, rules) {
     const queryLower = input.toLowerCase();
-    const scheme = getBrowserInternalScheme();
+    const browserProfile = getBrowserInternalProfile();
+    const scheme = browserProfile.scheme;
     const matches = [];
     rules.forEach((rule) => {
       if (!rule || !Array.isArray(rule.keys)) {
@@ -7383,7 +7469,7 @@
         const targetUrl = `${scheme}${rule.path}`;
         matches.push({
           type: 'browserPage',
-          title: formatMessage('open_url', '打开 {url}', { url: targetUrl }),
+          title: getBrowserPageSuggestionTitle(browserProfile, targetUrl),
           url: targetUrl,
           favicon: getPageFaviconCandidateUrl(targetUrl) ||
             'https://img.icons8.com/?size=100&id=1LqgD1Q7n2fy&format=png&color=000000'
@@ -7414,92 +7500,11 @@
     };
   }
 
-  function isNumericHostLike(hostname) {
-    if (!hostname) {
-      return false;
-    }
-    if (!/^(\d{1,3})(\.\d{1,3}){0,3}$/.test(hostname)) {
-      return false;
-    }
-    const parts = hostname.split('.');
-    if (parts.length < 1 || parts.length > 4) {
-      return false;
-    }
-    if (parts.length === 1) {
-      return parts[0] === '127';
-    }
-    return parts.every((part) => {
-      const value = Number(part);
-      return Number.isInteger(value) && value >= 0 && value <= 255;
-    });
-  }
-
-  function extractHostFromInput(rawInput) {
-    const withoutScheme = String(rawInput || '').replace(/^https?:\/\//i, '');
-    const authority = withoutScheme.split(/[/?#]/)[0] || '';
-    if (!authority) {
-      return '';
-    }
-    if (authority.startsWith('[')) {
-      const endBracket = authority.indexOf(']');
-      if (endBracket > 1) {
-        return authority.slice(1, endBracket).toLowerCase();
-      }
-      return '';
-    }
-    if (authority.includes('::') && !authority.includes('.')) {
-      return authority.toLowerCase();
-    }
-    return (authority.split(':')[0] || '').toLowerCase();
-  }
-
-  function isDevHostLike(hostname) {
-    if (!hostname) {
-      return false;
-    }
-    if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
-      return true;
-    }
-    if (hostname === 'host.docker.internal') {
-      return true;
-    }
-    if (
-      hostname.endsWith('.local') ||
-      hostname.endsWith('.test') ||
-      hostname.endsWith('.localdev') ||
-      hostname.endsWith('.internal')
-    ) {
-      return true;
-    }
-    return hostname === '::1' || hostname === '0:0:0:0:0:0:0:1';
-  }
-
   function getDirectNavigationUrl(input) {
-    const raw = String(input || '').trim();
-    if (!raw) {
-      return '';
+    if (SEARCH_UTILS && typeof SEARCH_UTILS.getDirectNavigationUrl === 'function') {
+      return SEARCH_UTILS.getDirectNavigationUrl(input);
     }
-    const queryLower = raw.toLowerCase();
-    const isInternal = ['chrome://', 'edge://', 'brave://', 'vivaldi://', 'opera://'].some((prefix) =>
-      queryLower.startsWith(prefix)
-    );
-    let normalizedInput = raw.match(/^(\d{1,3})([.\s]\d{1,3}){0,3}(?::\d{1,5})?(?:[/?#].*)?$/)
-      ? raw.replace(/\s+/g, '.').replace(/\.{2,}/g, '.')
-      : raw;
-    const hostOnly = extractHostFromInput(normalizedInput);
-    const isDevHost = isDevHostLike(hostOnly);
-    const isNumericLike = isNumericHostLike(hostOnly);
-    const looksLikeUrl = (normalizedInput.includes('.') && !normalizedInput.includes(' ')) || isInternal || isDevHost || isNumericLike;
-    if (!looksLikeUrl) {
-      return '';
-    }
-    if (hostOnly.includes(':') && !/^https?:\/\//i.test(normalizedInput) && !normalizedInput.startsWith('[')) {
-      normalizedInput = `[${normalizedInput}]`;
-    }
-    if (!isInternal && !normalizedInput.startsWith('http://') && !normalizedInput.startsWith('https://')) {
-      return `https://${normalizedInput}`;
-    }
-    return normalizedInput;
+    return '';
   }
 
   function resolveQuickNavigation(query) {
@@ -7554,6 +7559,7 @@
     preloadIcon,
     getChromeFaviconUrl,
     getBrowserPageFaviconUrl,
+    getPageFaviconRenderCandidates,
     setSuggestionsVisible,
     onSetSelectedIndex: (nextIndex) => {
       selectedIndex = nextIndex;
@@ -7944,7 +7950,7 @@
               isAuto: inlineAutoHighlight
             }
           : null;
-        const resolvedProvider = mergedProvider || siteSearchTrigger;
+        const resolvedProvider = siteSearchTrigger;
         siteSearchTriggerState = resolvedProvider
           ? { provider: resolvedProvider, rawInput: rawTagInput }
           : null;

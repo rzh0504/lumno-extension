@@ -58,6 +58,11 @@ assert.ok(
   tooltipCss.includes('._x_extension_tooltip_divider_2026_unique_'),
   'shared tooltip CSS should own multiline divider styling'
 );
+assert.match(
+  tooltipCss,
+  /\._x_extension_tooltip_line_2026_unique_\s*\+\s*\._x_extension_tooltip_line_2026_unique_\s*\{[\s\S]*?margin-top:\s*6px;[\s\S]*?\}/,
+  'shared tooltip CSS should add default spacing between multiline text paragraphs'
+);
 
 function createFakeElement(tagName) {
   const children = [];

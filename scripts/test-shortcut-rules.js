@@ -1,6 +1,7 @@
 const assert = require('assert');
 
 const shortcutRules = require('../src/background/shortcut-rules.js');
+const bundledShortcutRules = require('../assets/data/shortcut-rules.json');
 
 function createResponse(data) {
   return {
@@ -49,6 +50,42 @@ function testBrowserScheme() {
   assert.strictEqual(shortcutRules.getBrowserInternalScheme('Chrome'), 'chrome://');
 }
 
+function testBrowserProfileUsesClientHintBrand() {
+  assert.deepStrictEqual(
+    shortcutRules.getBrowserInternalProfile({
+      userAgent: 'Mozilla/5.0 Chrome/149 Safari/537.36',
+      userAgentData: {
+        brands: [
+          { brand: 'Not.A/Brand', version: '99' },
+          { brand: 'Chromium', version: '149' },
+          { brand: 'Dia', version: '1' }
+        ]
+      }
+    }),
+    { scheme: 'chrome://', name: 'Dia' }
+  );
+
+  assert.deepStrictEqual(
+    shortcutRules.getBrowserInternalProfile({
+      userAgent: 'Mozilla/5.0 Chrome/149 Safari/537.36',
+      userAgentData: {
+        brands: [
+          { brand: 'Comet', version: '1' },
+          { brand: 'Chromium', version: '149' }
+        ]
+      }
+    }),
+    { scheme: 'chrome://', name: 'Comet' }
+  );
+
+  assert.deepStrictEqual(
+    shortcutRules.getBrowserInternalProfile({
+      userAgent: 'Mozilla/5.0 Chrome Edg/149 Safari/537.36'
+    }),
+    { scheme: 'edge://', name: 'Microsoft Edge' }
+  );
+}
+
 function testShortcutUrlMatching() {
   const rules = [
     { type: 'browserPage', keys: ['ext ', 'extensions '], path: 'extensions' },
@@ -79,12 +116,54 @@ async function testInstanceShortcutUrl() {
   assert.strictEqual(api.getShortcutUrl('history today', rules), 'edge://history');
 }
 
+function testBundledChromePageRules() {
+  const rules = bundledShortcutRules.items;
+  const cases = [
+    ['扩展程序', 'chrome://extensions/'],
+    ['フラグ', 'chrome://flags/'],
+    ['设置', 'chrome://settings/'],
+    ['ショートカット', 'chrome://extensions/shortcuts'],
+    ['web store', 'https://chromewebstore.google.com/'],
+    ['history today', 'chrome://history'],
+    ['下载记录', 'chrome://downloads'],
+    ['書籤', 'chrome://bookmarks'],
+    ['密码', 'chrome://password-manager/passwords'],
+    ['新規タブ', 'chrome://newtab'],
+    ['版本', 'chrome://version'],
+    ['内部页面', 'chrome://about'],
+    ['chrome urls', 'chrome://chrome-urls'],
+    ['gpu status', 'chrome://gpu'],
+    ['network log', 'chrome://net-export'],
+    ['dns cache', 'chrome://dns'],
+    ['クラッシュ', 'chrome://crashes'],
+    ['inspect devices', 'chrome://inspect'],
+    ['service worker', 'chrome://serviceworker-internals'],
+    ['存储配额', 'chrome://quota-internals'],
+    ['站点参与度', 'chrome://site-engagement'],
+    ['タブ破棄', 'chrome://discards'],
+    ['webrtc debug', 'chrome://webrtc-internals'],
+    ['tracing trace', 'chrome://tracing'],
+    ['policy list', 'chrome://policy'],
+    ['管理ページ', 'chrome://management']
+  ];
+
+  cases.forEach(([query, expectedUrl]) => {
+    assert.strictEqual(
+      shortcutRules.getShortcutUrlForScheme(query, rules, 'chrome://'),
+      expectedUrl,
+      `expected "${query}" to open ${expectedUrl}`
+    );
+  });
+}
+
 (async () => {
   await testLoadShortcutRules();
   await testLoadShortcutRulesFallback();
   testBrowserScheme();
+  testBrowserProfileUsesClientHintBrand();
   testShortcutUrlMatching();
   await testInstanceShortcutUrl();
+  testBundledChromePageRules();
   console.log('shortcut rules tests passed');
 })().catch((error) => {
   console.error(error);

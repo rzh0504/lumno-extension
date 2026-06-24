@@ -112,7 +112,7 @@ npm run test:onboarding-content
 
 ## Credits
 
-- Created and maintained by [Kubai087](https://github.com/kubai087)
+- Japanese localization: thanks to [Humi](https://github.com/Hum1Tab) for Japanese translation and review.
 - Bundled icon set: [Remix Icon](https://remixicon.com/)
 - Bundled typeface: Open Sans
 

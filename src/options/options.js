@@ -124,7 +124,6 @@
   const storageAreaName = storageArea
     ? (storageArea === (chrome && chrome.storage ? chrome.storage.sync : null) ? 'sync' : 'local')
     : null;
-
   function getRiSvg(id, sizeClass) {
     const size = sizeClass || 'ri-size-12';
     return `<i class="ri-icon ${size} ${id}" aria-hidden="true"></i>`;
@@ -3872,17 +3871,17 @@
         const nextKeyRaw = String(keyInput.value || '').trim();
         const isBuiltinAiProvider = !item._xIsCustom && isAiSiteSearchProvider(item);
         if (!nextKeyRaw) {
-          showToast(getMessage('shortcuts_error_key', '请填写触发词。'), true);
+          showToast(getMessage('shortcuts_error_key', '请填写触发词'), true);
           return;
         }
         if (/\s/.test(nextKeyRaw)) {
-          showToast(getMessage('shortcuts_error_key_space', '触发词不能包含空格。'), true);
+          showToast(getMessage('shortcuts_error_key_space', '触发词不能包含空格'), true);
           return;
         }
         const templateRaw = String(templateInput.value || '').trim();
         const template = normalizeSiteSearchTemplate(templateRaw);
         if (!template || (!isBuiltinAiProvider && !template.includes('{query}'))) {
-          showToast(getMessage('toast_error_template', '搜索模板必须包含 {query}。'), true);
+          showToast(getMessage('toast_error_template', '搜索模板必须包含 {query}'), true);
           return;
         }
         const aliases = normalizeAliases(aliasInput.value || '');
@@ -4578,16 +4577,16 @@
       const templateRaw = String(siteSearchTemplateInput ? siteSearchTemplateInput.value : '').trim();
       const aliases = normalizeAliases(siteSearchAliasInput ? siteSearchAliasInput.value : '');
       if (!key) {
-        setSiteSearchError(getMessage('shortcuts_error_key', '请填写触发词。'));
+        setSiteSearchError(getMessage('shortcuts_error_key', '请填写触发词'));
         return;
       }
       if (/\s/.test(key)) {
-        setSiteSearchError(getMessage('shortcuts_error_key_space', '触发词不能包含空格。'));
+        setSiteSearchError(getMessage('shortcuts_error_key_space', '触发词不能包含空格'));
         return;
       }
       const template = normalizeSiteSearchTemplate(templateRaw);
       if (!template || !template.includes('{query}')) {
-        setSiteSearchError(getMessage('toast_error_template', '搜索模板必须包含 {query}。'));
+        setSiteSearchError(getMessage('toast_error_template', '搜索模板必须包含 {query}'));
         return;
       }
       const normalizedKey = key.toLowerCase();

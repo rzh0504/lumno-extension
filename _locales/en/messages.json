@@ -1016,6 +1016,9 @@
   "open_url": {
     "message": "Open {url}"
   },
+  "open_browser_url": {
+    "message": "Open {browser}: {url}"
+  },
   "mode_badge": {
     "message": "Mode: {mode}"
   },

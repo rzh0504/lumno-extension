@@ -199,6 +199,27 @@ function testSiteSearchProviderIconsUsePageFaviconCandidates() {
   );
 }
 
+function testSiteSearchTabHintRequiresExplicitTrigger() {
+  const newtabJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/newtab.js'), 'utf8');
+  const overlayJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/search-panel.js'), 'utf8');
+  assert.ok(
+    /const resolvedProvider = siteSearchTrigger;/.test(newtabJs),
+    'newtab Tab site-search hint should be driven only by explicit provider triggers'
+  );
+  assert.ok(
+    /const resolvedProvider = siteSearchTrigger;/.test(overlayJs),
+    'overlay Tab site-search hint should be driven only by explicit provider triggers'
+  );
+  assert.ok(
+    !/const resolvedProvider = mergedProvider \|\| siteSearchTrigger;/.test(newtabJs),
+    'newtab should not infer the Tab site-search hint from the highlighted result provider'
+  );
+  assert.ok(
+    !/const resolvedProvider = mergedProvider \|\| siteSearchTrigger;/.test(overlayJs),
+    'overlay should not infer the Tab site-search hint from the highlighted result provider'
+  );
+}
+
 async function testLocalUrlSuggestionUsesFallbackTheme() {
   const document = createFakeDocument();
   const container = document.createElement('div');
@@ -466,7 +487,7 @@ async function testBrowserNewtabSuggestionUsesFallbackIconWhenFaviconMissing() {
   assert.strictEqual(item._xIconWrap.childNodes[0].innerHTML, 'ri-link');
 }
 
-async function testBrowserPageTabUsesChromeFavicon2PrimaryCandidate() {
+async function testBrowserPageTabUsesBrowserPageFaviconPrimaryCandidate() {
   const document = createFakeDocument();
   const container = document.createElement('div');
   container.setConnected(true);
@@ -523,13 +544,17 @@ async function testBrowserPageTabUsesChromeFavicon2PrimaryCandidate() {
   assert.strictEqual(attached.length, 1, 'browser page tab favicon should be attached through the fallback chain');
   assert.strictEqual(
     attached[0].primaryUrl,
-    'chrome://favicon2/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128',
-    'browser page tabs should use chrome://favicon2 as the primary favicon candidate'
+    browserPageIcon,
+    'browser page tabs should keep the extension _favicon URL as the primary favicon candidate'
   );
-  assert.notStrictEqual(attached[0].primaryUrl, browserPageIcon);
+  assert.strictEqual(
+    attached[0].browserUrl,
+    'chrome://favicon2/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128',
+    'browser page tabs should keep chrome://favicon2 as a fallback candidate'
+  );
 }
 
-async function testBrowserPageSuggestionUsesChromeFavicon2WhenFaviconMissing() {
+async function testBrowserPageSuggestionUsesBrowserPageFaviconWhenFaviconMissing() {
   const document = createFakeDocument();
   const container = document.createElement('div');
   container.setConnected(true);
@@ -560,6 +585,7 @@ async function testBrowserPageSuggestionUsesChromeFavicon2WhenFaviconMissing() {
     applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
     applyMarkVariables: () => {},
     getChromeFaviconUrl: (url) => `chrome://favicon2/?pageUrl=${encodeURIComponent(url)}&size=128`,
+    getBrowserPageFaviconUrl: (url) => `chrome-extension://abc/_favicon/?pageUrl=${encodeURIComponent(url)}&size=128`,
     attachFaviconWithFallbacks: (img, url, host, options) => {
       attached.push({
         img,
@@ -590,8 +616,13 @@ async function testBrowserPageSuggestionUsesChromeFavicon2WhenFaviconMissing() {
   assert.strictEqual(attached.length, 1, 'browser page suggestions should attach a favicon even without suggestion.favicon');
   assert.strictEqual(
     attached[0].primaryUrl,
+    'chrome-extension://abc/_favicon/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128',
+    'browser page suggestions should use the extension _favicon URL when no favicon was supplied'
+  );
+  assert.strictEqual(
+    attached[0].browserUrl,
     'chrome://favicon2/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128',
-    'browser page suggestions should use chrome://favicon2 when no favicon was supplied'
+    'browser page suggestions should keep chrome://favicon2 as a fallback candidate'
   );
 }
 
@@ -1179,13 +1210,14 @@ async function testOpenNewTabVisitButtonReflectsCurrentTabModifier() {
 }
 
 testSiteSearchProviderIconsUsePageFaviconCandidates();
+testSiteSearchTabHintRequiresExplicitTrigger();
 
 testLocalUrlSuggestionUsesFallbackTheme()
   .then(testDirectUrlSuggestionUsesFaviconWhenAvailable)
   .then(testAppendRenderKeepsOnlyFinalSuggestionMarkedLast)
   .then(testBrowserNewtabSuggestionUsesFallbackIconWhenFaviconMissing)
-  .then(testBrowserPageTabUsesChromeFavicon2PrimaryCandidate)
-  .then(testBrowserPageSuggestionUsesChromeFavicon2WhenFaviconMissing)
+  .then(testBrowserPageTabUsesBrowserPageFaviconPrimaryCandidate)
+  .then(testBrowserPageSuggestionUsesBrowserPageFaviconWhenFaviconMissing)
   .then(testHighlightedSiteSearchUsesFaviconFallbackChain)
   .then(testAiSiteSearchUsesFaviconFallbackChain)
   .then(testModeSwitchImageFallbackUsesLinkIcon)

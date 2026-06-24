@@ -3,7 +3,7 @@
     "message": "Lumno | 検索バー＆新しいタブ"
   },
   "ext_description": {
-    "message": "どのページからでもLumnoを呼び出し、検索、URL移動、タブ切替をすばやく実行。新しいタブも使いやすくします。"
+    "message": "どのページからでもLumnoを呼び出し、検索、URL移動、タブ切り替えをすばやく実行できます。新しいタブも使いやすくします。"
   },
   "settings_tab_general": {
     "message": "一般"
@@ -78,7 +78,7 @@
     "message": "表示言語を選択"
   },
   "settings_version_label": {
-    "message": "版"
+    "message": "バージョン"
   },
   "language_zh_cn": {
     "message": "简体中文"
@@ -105,7 +105,7 @@
     "message": "検索結果設定"
   },
   "settings_search_result_priority_title": {
-    "message": "検索結果の先頭優先度"
+    "message": "検索結果の先頭表示優先度"
   },
   "settings_search_result_sources_title": {
     "message": "表示する結果タイプ"
@@ -120,22 +120,22 @@
     "message": "最近/よくアクセスするサイトを表示"
   },
   "settings_recent_sites_title": {
-    "message": "サイト表示"
+    "message": "最近使ったサイトの表示"
   },
   "settings_newtab_width_title": {
     "message": "新しいタブの内容幅"
   },
   "settings_bookmarks_title": {
-    "message": "保存ページ"
+    "message": "ブックマーク"
   },
   "settings_document_pip_title": {
-    "message": "ページ小窓"
+    "message": "Webクリップ"
   },
   "settings_document_pip_desc": {
-    "message": "ページ内の一部を切り出して浮かせて表示。参照や比較に使えます"
+    "message": "ページ内の一部を切り出して、別ウィンドウで浮かせて表示します。参照や比較に使えます。"
   },
   "document_pip_command_title": {
-    "message": "ページ小窓を開始"
+    "message": "Webクリップを開始"
   },
   "document_pip_command_action": {
     "message": "開始"
@@ -147,10 +147,10 @@
     "message": "新しいバージョンへの更新後に新機能のお知らせを表示します"
   },
   "settings_auto_pip_title": {
-    "message": "動画を自動で小窓表示"
+    "message": "動画を自動でピクチャーインピクチャー表示"
   },
   "settings_auto_pip_desc": {
-    "message": "動画再生中に別タブへ移動すると、再生中の動画を小窓で表示します"
+    "message": "動画の再生中に別タブへ移動すると、再生中の動画をピクチャーインピクチャーで表示します。"
   },
   "settings_pinned_tab_recovery_title": {
     "message": "再起動後に固定タブを復元"
@@ -159,46 +159,46 @@
     "message": "復元可能な固定タブを記録し、ブラウザ再起動後に自動で戻します。"
   },
   "document_pip_picker_hint": {
-    "message": "マウスを動かして要素を選択、押すと小窓表示。ホイールで親要素へ切替、Escで中止。"
+    "message": "マウスを動かして要素を選択し、クリックするとWebクリップで表示します。ホイールで親要素へ切り替え、Escでキャンセルできます。"
   },
   "document_pip_picker_idle": {
     "message": "ページの表示領域にマウスを移動して選択を開始します。"
   },
   "document_pip_picker_started": {
-    "message": "浮かせたい内容を押します。ホイールで範囲切替、Escで中止"
+    "message": "浮かせたい内容をクリックしてください。ホイールで範囲を切り替え、Escでキャンセルできます。"
   },
   "document_pip_picker_cancelled": {
-    "message": "内容選択を終了しました"
+    "message": "内容の選択をキャンセルしました。"
   },
   "document_pip_picker_closed": {
-    "message": "内容の小窓を閉じました"
+    "message": "Webクリップを閉じました。"
   },
   "document_pip_picker_guidance_default": {
-    "message": "この範囲は小窓表示に適しています。"
+    "message": "この範囲はWebクリップ表示に適しています。"
   },
   "document_pip_picker_guidance_leaf": {
-    "message": "この範囲は小さな要素です。安定させるにはホイールで親要素へ切り替えてください。"
+    "message": "この範囲は小さな要素です。安定させるには、ホイールで親要素へ切り替えてください。"
   },
   "document_pip_picker_guidance_interactive": {
-    "message": "この範囲はボタン群のようです。小窓内で押せない場合は、背景のある大きめの範囲へ切り替えてください。"
+    "message": "この範囲はボタン群のようです。Webクリップ内で押せない場合は、背景を含む大きめの範囲へ切り替えてください。"
   },
   "document_pip_picker_guidance_toolbar": {
-    "message": "この範囲はメニューや操作バーのようです。小窓では複雑なメニューがうまく動かない場合があります。必要に応じて外側の範囲へ切り替えてください。"
+    "message": "この範囲はメニューや操作バーのようです。Webクリップでは複雑なメニューがうまく動かない場合があります。必要に応じて外側の範囲へ切り替えてください。"
   },
   "document_pip_picker_unsupported": {
-    "message": "このページでは小窓表示を利用できません"
+    "message": "このページではWebクリップを利用できません。"
   },
   "document_pip_picker_conflict_video_pip": {
-    "message": "動画の小窓表示が開いています。先に閉じてからページ小窓を使ってください"
+    "message": "動画のピクチャーインピクチャーが開いています。先に閉じてからWebクリップを使用してください。"
   },
   "document_pip_picker_invalid": {
-    "message": "この範囲は小窓表示できません。より大きな内容範囲を選んでください"
+    "message": "この範囲はWebクリップで表示できません。より大きな範囲を選んでください。"
   },
   "document_pip_picker_open_failed": {
-    "message": "内容の小窓を開けませんでした。別の範囲でお試しください"
+    "message": "Webクリップを開けませんでした。別の範囲でお試しください。"
   },
   "document_pip_picker_badge": {
-    "message": "小窓で開きました"
+    "message": "Webクリップで開きました。"
   },
   "document_pip_picker_button_reselect": {
     "message": "選び直す"
@@ -213,16 +213,16 @@
     "message": "新しいタブ"
   },
   "settings_overlay_tab_priority_title": {
-    "message": "開いているタブへすばやく切替"
+    "message": "開いているタブへすばやく切り替える"
   },
   "settings_overlay_tab_priority_desc": {
-    "message": "入力が開いているタブに一致したときの、先頭候補のEnter動作"
+    "message": "入力内容が開いているタブに一致したとき、先頭候補でEnterを押して実行する操作"
   },
   "overlay_tab_priority_switch_first": {
-    "message": "Enterで開いているタブへ切替"
+    "message": "Enterで開いているタブに切り替える"
   },
   "overlay_tab_priority_newtab_first": {
-    "message": "Enterで新しいタブに開く"
+    "message": "Enterで新しいタブで開く"
   },
   "settings_shortcuts_title": {
     "message": "Lumnoを開く"
@@ -294,7 +294,7 @@
     "message": "何もしない"
   },
   "newtab_file_access_notice_title": {
-    "message": "手元のPDF/HTMLでLumnoを使うには、「ファイルのURLへのアクセスを許可する」をオンにしてください"
+    "message": "ローカルのPDF/HTMLでLumnoを使うには、「ファイルのURLへのアクセスを許可する」をオンにしてください"
   },
   "newtab_file_access_notice_body": {
     "message": "現在、ファイルURLへのアクセス権がありません。拡張機能の詳細ページで「ファイルのURLへのアクセスを許可する」をオンにし、元のページでキーをもう一度押してください。"
@@ -333,7 +333,7 @@
     "message": "8行表示"
   },
   "settings_bookmark_columns_title": {
-    "message": "1行の保存ページ数"
+    "message": "1行あたりのブックマーク数"
   },
   "bookmark_columns_4": {
     "message": "1行に4個"
@@ -393,7 +393,7 @@
     "message": "新しいタブの壁紙"
   },
   "settings_wallpaper_desc": {
-    "message": "手元の画像を新しいタブの背景に使う"
+    "message": "この端末の画像を新しいタブの背景に使用します。"
   },
   "settings_wallpaper_upload": {
     "message": "画像を追加"
@@ -450,7 +450,7 @@
     "message": "内蔵"
   },
   "newtab_wallpaper_local_section": {
-    "message": "手元"
+    "message": "この端末"
   },
   "newtab_wallpaper_toggle_label": {
     "message": "壁紙のオン/オフ"
@@ -459,7 +459,7 @@
     "message": "{name} を選択"
   },
   "newtab_wallpaper_add_local": {
-    "message": "手元の壁紙を追加"
+    "message": "この端末から壁紙を追加"
   },
   "newtab_wallpaper_feature_hint_badge": {
     "message": "新機能"
@@ -480,7 +480,7 @@
     "message": "対応リスト"
   },
   "newtab_ai_quick_jump_feature_hint_close": {
-    "message": "AI移動ヒントを閉じる"
+    "message": "AIクイックジャンプのヒントを閉じる"
   },
   "newtab_tab_switcher_feature_hint_badge": {
     "message": "新機能"
@@ -504,16 +504,16 @@
     "message": "更新通知を閉じる"
   },
   "newtab_bookmark_cascade_debug_enable": {
-    "message": "保存ページの安全範囲を表示"
+    "message": "ブックマークの安全範囲を表示"
   },
   "newtab_bookmark_cascade_debug_disable": {
-    "message": "保存ページの安全範囲を非表示"
+    "message": "ブックマークの安全範囲を非表示"
   },
   "newtab_bookmark_cascade_debug_open_label": {
     "message": "開く"
   },
   "newtab_bookmark_cascade_debug_switch_label": {
-    "message": "切替"
+    "message": "切り替え"
   },
   "newtab_bookmark_cascade_debug_safe_label": {
     "message": "保護"
@@ -522,7 +522,7 @@
     "message": "閉じる"
   },
   "newtab_feedback_button_aria": {
-    "message": "意見を送る"
+    "message": "フィードバックを送る"
   },
   "newtab_feedback_menu_aria": {
     "message": "送信先"
@@ -561,7 +561,7 @@
     "message": "不具合・要望"
   },
   "newtab_feedback_wechat_collapse_aria": {
-    "message": "意見欄を折りたたむ"
+    "message": "フィードバック欄を折りたたむ"
   },
   "newtab_feedback_discord_label": {
     "message": "Discord"
@@ -576,13 +576,13 @@
     "message": "Lumno WeChatグループQRコード"
   },
   "newtab_feedback_mail_subject": {
-    "message": "Lumnoへの意見"
+    "message": "Lumnoへのフィードバック"
   },
   "newtab_feedback_mail_source_label": {
     "message": "送信元"
   },
   "newtab_feedback_mail_version_label": {
-    "message": "Lumno版"
+    "message": "Lumnoのバージョン"
   },
   "newtab_feedback_mail_language_label": {
     "message": "言語"
@@ -597,10 +597,10 @@
     "message": "追加した壁紙を削除"
   },
   "newtab_wallpaper_custom_name": {
-    "message": "手元の壁紙"
+    "message": "追加した壁紙"
   },
   "newtab_wallpaper_overlay_opacity": {
-    "message": "マスク効果"
+    "message": "オーバーレイの濃さ"
   },
   "newtab_wallpaper_overlay_transparent_tick": {
     "message": "透明"
@@ -684,13 +684,13 @@
     "message": "スーラの河岸"
   },
   "newtab_wallpaper_name_white_3d_architecture": {
-    "message": "白昼の建築"
+    "message": "明るい建築"
   },
   "newtab_wallpaper_name_white_linocut_topographic": {
-    "message": "白昼の等高線"
+    "message": "明るい等高線"
   },
   "newtab_wallpaper_name_white_risograph_collage": {
-    "message": "白昼の貼り絵"
+    "message": "明るい貼り絵"
   },
   "newtab_wallpaper_name_white_shanshui": {
     "message": "晴れの山水"
@@ -717,7 +717,7 @@
     "message": "追加済み"
   },
   "blacklist_section_title": {
-    "message": "検索結果と最近表示の非表示リスト"
+    "message": "検索結果と最近使ったサイトの非表示リスト"
   },
   "blacklist_section_desc": {
     "message": "以下のURLはLumnoの検索結果、および新しいタブの「最近のアクセス」「よくアクセス」に表示されません"
@@ -774,7 +774,7 @@
     "message": "www. 付きにも自動対応します。例：baidu.com は www.baidu.com にも一致します"
   },
   "blacklist_placeholder_url": {
-    "message": "現在のページは完全なURL、サイト全体はドメインを入力"
+    "message": "現在のページを指定する場合は完全なURL、サイト全体を指定する場合はドメインを入力"
   },
   "blacklist_placeholder_domain": {
     "message": "baidu.com"
@@ -867,7 +867,7 @@
     "message": "変更を保存"
   },
   "shortcuts_cancel": {
-    "message": "中止"
+    "message": "キャンセル"
   },
   "shortcuts_edit": {
     "message": "編集"
@@ -924,7 +924,7 @@
     "message": "確定"
   },
   "confirm_cancel": {
-    "message": "中止"
+    "message": "キャンセル"
   },
   "confirm_remove_item": {
     "message": "この項目を削除しますか？"
@@ -957,7 +957,7 @@
     "message": "よくアクセス"
   },
   "bookmarks_heading": {
-    "message": "保存ページ"
+    "message": "ブックマーク"
   },
   "display_mode_title": {
     "message": "表示モード"
@@ -978,7 +978,7 @@
     "message": "次のページ"
   },
   "bookmarks_open_manager": {
-    "message": "保存ページ管理を開く"
+    "message": "ブックマークマネージャーを開く"
   },
   "search_tag_history": {
     "message": "履歴"
@@ -996,7 +996,7 @@
     "message": "よく使う"
   },
   "search_tag_bookmark": {
-    "message": "保存"
+    "message": "ブックマーク"
   },
   "search_tag_open_tab": {
     "message": "開いている"
@@ -1015,6 +1015,9 @@
   },
   "open_url": {
     "message": "{url} を開く"
+  },
+  "open_browser_url": {
+    "message": "{browser}：{url} を開く"
   },
   "mode_badge": {
     "message": "モード：{mode}"
@@ -1044,7 +1047,7 @@
     "message": "Lumnoを開く"
   },
   "command_show_search_prefill": {
-    "message": "ページURLを入れて開く"
+    "message": "現在のページURLを入力して開く"
   },
   "command_show_search_prefill_v": {
     "message": "現在のページURLをコピー"
@@ -1053,7 +1056,7 @@
     "message": "{name}：テーマを{mode}に切り替え"
   },
   "switch_to_tab": {
-    "message": "切替"
+    "message": "切り替え"
   },
   "untitled": {
     "message": "無題"
@@ -1152,7 +1155,7 @@
     "message": "Googleで検索"
   },
   "action_switch": {
-    "message": "切替"
+    "message": "切り替え"
   },
   "action_open": {
     "message": "開く"
@@ -1227,22 +1230,22 @@
     "message": "設定ファイルが無効です"
   },
   "document_pip_picker_unsupported_policy": {
-    "message": "このサイトでは、小窓表示が無効になっています。"
+    "message": "このサイトでは、Webクリップが無効になっています。"
   },
   "document_pip_picker_unsupported_iframe": {
-    "message": "小窓表示は最上位ページでのみ使用できます。"
+    "message": "Webクリップは最上位ページでのみ使用できます。"
   },
   "document_pip_picker_unsupported_insecure": {
-    "message": "小窓表示はHTTPSページでのみ使用できます。"
+    "message": "WebクリップはHTTPSページでのみ使用できます。"
   },
   "document_pip_picker_open_failed_not_allowed": {
-    "message": "サイトまたはブラウザにより、小窓表示の起動がブロックされました。"
+    "message": "サイトまたはブラウザにより、Webクリップの起動がブロックされました。"
   },
   "document_pip_picker_open_failed_not_supported": {
-    "message": "現在選択した内容は、このページでは小窓で開けません。"
+    "message": "現在選択した内容は、このページではWebクリップで開けません。"
   },
   "document_pip_picker_open_failed_invalid_state": {
-    "message": "すでに小窓が開いているか、ページ状態が変わりました。再試行してください。"
+    "message": "すでにWebクリップが開いているか、ページ状態が変わりました。再試行してください。"
   },
   "document_pip_picker_open_failed_security": {
     "message": "ブラウザの安全設定により、この操作はブロックされました。"
@@ -1329,7 +1332,7 @@
     "message": "現在のページでLumnoを開きます"
   },
   "shortcut_reference_show_search_prefill_title": {
-    "message": "ページURLを入れて開く"
+    "message": "現在のページURLを入力して開く"
   },
   "shortcut_reference_show_search_prefill_desc": {
     "message": "Lumnoを開き、現在のページURLを入力します"

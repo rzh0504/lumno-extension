@@ -22,9 +22,7 @@ const buttonBaseBeforeRule = getRule(`.${buttonBaseClass}::before`);
 const buttonBaseFocusRule = getRule(`.${buttonBaseClass}:focus-visible`);
 const secondaryRule = getRule('._x_extension_shortcut_secondary_2024_unique_');
 const primaryRule = getRule('._x_extension_shortcut_submit_primary_2024_unique_');
-const hoverRule = getRule('._x_extension_shortcut_secondary_2024_unique_:hover');
 const darkSecondaryRule = getRule('body[data-theme="dark"] ._x_extension_shortcut_secondary_2024_unique_');
-const darkHoverRule = getRule('body[data-theme="dark"] ._x_extension_shortcut_secondary_2024_unique_:hover');
 const darkPrimaryRule = getRule('body[data-theme="dark"] ._x_extension_shortcut_submit_primary_2024_unique_');
 const confirmActionButtonRule = getRule('._x_extension_confirm_actions_2024_unique_ ._x_extension_shortcut_submit_2024_unique_');
 const secondaryClassPattern = /(?:class(?:Name)?\s*=\s*|class=")(['"]?)([^'"\n]*_x_extension_shortcut_secondary_2024_unique_[^'"\n]*)\1/g;
@@ -235,9 +233,9 @@ assert.doesNotMatch(
   'secondary buttons should avoid the previous heavy layered shadow'
 );
 assert.match(
-  hoverRule,
+  secondaryRule,
   /--settings-button-hover-shadow:\s*0 2px 3px rgba\(15,\s*23,\s*42,\s*0\.032\),\s*0 1px 1px rgba\(15,\s*23,\s*42,\s*0\.045\),\s*0 0 1px rgba\(15,\s*23,\s*42,\s*0\.07\),\s*inset 0 1px 0 rgba\(255,\s*255,\s*255,\s*0\.8\);/,
-  'secondary buttons should only slightly increase the restrained shadow on hover'
+  'secondary buttons should expose their restrained hover shadow as a variant token'
 );
 assert.match(
   darkSecondaryRule,
@@ -265,12 +263,12 @@ assert.match(
   'dark secondary buttons should use a flat shadow without an internal top highlight'
 );
 assert.match(
-  darkHoverRule,
+  darkSecondaryRule,
   /--settings-button-hover-bg:\s*color-mix\(in srgb,\s*var\(--control-hover-bg\)\s*86%,\s*#5b6b84\s*14%\);/,
   'dark secondary button hover should shift to a clearer dark hover surface'
 );
 assert.match(
-  darkHoverRule,
+  darkSecondaryRule,
   /--settings-button-hover-border-color:\s*rgba\(164,\s*180,\s*207,\s*0\.32\);/,
   'dark secondary button hover should visibly change the ring color'
 );
@@ -291,6 +289,18 @@ assert.ok(
 assert.ok(
   !/(?:^|\n)\s*body\[data-theme="dark"\]\s+\._x_extension_shortcut_submit_primary_2024_unique_:hover\s*\{/.test(optionsHtml),
   'dark primary hover should be controlled by color variables on the dark primary rule'
+);
+assert.ok(
+  !/(?:^|\n)\s*\._x_extension_shortcut_secondary_2024_unique_:hover\s*\{/.test(optionsHtml),
+  'secondary hover should be controlled by variant tokens consumed by the shared button hover rule'
+);
+assert.ok(
+  !/(?:^|\n)\s*body\[data-theme="dark"\]\s+\._x_extension_shortcut_secondary_2024_unique_:hover\s*\{/.test(optionsHtml),
+  'dark secondary hover should not need a separate selector'
+);
+assert.ok(
+  !/(?:^|\n)\s*\._x_extension_shortcut_submit_primary_2024_unique_:hover\s*\{/.test(optionsHtml),
+  'primary hover should be controlled by variant tokens consumed by the shared button hover rule'
 );
 assert.ok(
   !/(?:^|\n)\s*\._x_extension_shortcut_submit_primary_2024_unique_::before\s*\{/.test(optionsHtml),

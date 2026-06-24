@@ -296,6 +296,25 @@ function getResolvedTabUrl(tab) {
   return pendingUrl;
 }
 
+function hasTabSwitcherExtensionPagePort(tab) {
+  if (!tab || typeof tab.id !== 'number') {
+    return false;
+  }
+  const record = tabSwitcherExtensionPagePortsByTabId.get(tab.id);
+  return Boolean(record && record.port && typeof record.port.postMessage === 'function');
+}
+
+function isTabSwitcherExtensionPageMessageTarget(tab) {
+  if (!tab || typeof tab.id !== 'number') {
+    return false;
+  }
+  const url = getResolvedTabUrl(tab);
+  if (isOwnExtensionPageUrl(url)) {
+    return true;
+  }
+  return isBrowserNewtabUrl(url) && hasTabSwitcherExtensionPagePort(tab);
+}
+
 function shouldTrackSwitcherTab(tab) {
   if (!tab || typeof tab.id !== 'number' || typeof tab.windowId !== 'number' || tab.incognito === true) {
     return false;
@@ -321,7 +340,9 @@ function canHostSwitcherSurface(tab) {
     return false;
   }
   const url = getResolvedTabUrl(tab);
-  return isOwnExtensionPageUrl(url) || canOpenOverlayOnUrl(url);
+  return isOwnExtensionPageUrl(url) ||
+    (isBrowserNewtabUrl(url) && hasTabSwitcherExtensionPagePort(tab)) ||
+    canOpenOverlayOnUrl(url);
 }
 
 function isTabSwitcherEligibleTab(tab) {
@@ -448,7 +469,7 @@ function registerTabSwitcherExtensionPagePortConnection(port) {
 }
 
 function postTabSwitcherMessageToExtensionPage(tab, message, callback) {
-  if (!tab || typeof tab.id !== 'number' || !isOwnExtensionPageUrl(getResolvedTabUrl(tab))) {
+  if (!tab || typeof tab.id !== 'number' || !isTabSwitcherExtensionPageMessageTarget(tab)) {
     if (typeof callback === 'function') {
       callback(false, 'not-extension-page');
     }
@@ -646,7 +667,7 @@ function sendTabSwitcherHostMessage(tab, payload, optionsArg) {
     options.normalizeScriptResults,
     fallbackValue
   );
-  if (isOwnExtensionPageUrl(getResolvedTabUrl(tab))) {
+  if (isTabSwitcherExtensionPageMessageTarget(tab)) {
     return new Promise((resolve) => {
       postTabSwitcherMessageToExtensionPage(tab, payload, (ok, _reason, response) => {
         if (ok) {
@@ -3183,6 +3204,7 @@ function openOverlayOnTab(activeTab, tabs, source) {
     'src/overlay/shell.js',
     'src/overlay/lifecycle.js',
     'src/overlay/site-fixes.js',
+    'src/overlay/page-theme.js',
     'src/overlay/search-panel.js'
   ];
   logHotkeyDebug('inject-start', { tabId: activeTab.id, file: overlayInjectionFiles.join(','), source: source || '' });
@@ -3316,7 +3338,7 @@ function injectTabSwitcherOnTab(hostTab, items, context) {
     suppressInitialShortcutAdvance: context && context.source === 'commands-tab-switcher',
     source: context && context.source ? context.source : ''
   });
-  if (isOwnExtensionPageUrl(getResolvedTabUrl(hostTab))) {
+  if (isTabSwitcherExtensionPageMessageTarget(hostTab)) {
     postTabSwitcherMessageToExtensionPage(hostTab, {
       action: 'openTabSwitcherFromCommand',
       context: buildSwitcherContext(1)
@@ -3430,7 +3452,7 @@ function advanceExistingTabSwitcherOnTab(tab, source, callback) {
     }
   };
 
-  if (isOwnExtensionPageUrl(getResolvedTabUrl(tab))) {
+  if (isTabSwitcherExtensionPageMessageTarget(tab)) {
     postTabSwitcherMessageToExtensionPage(tab, {
       action: 'advanceOpenTabSwitcherFromCommand',
       offset: 1
@@ -5261,27 +5283,7 @@ function buildDefaultSearchUrl(query) {
   return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
 }
 
-function isNumericHostLike(hostname) {
-  if (!hostname) {
-    return false;
-  }
-  if (!/^(\d{1,3})(\.\d{1,3}){0,3}$/.test(hostname)) {
-    return false;
-  }
-  const parts = hostname.split('.');
-  if (parts.length < 1 || parts.length > 4) {
-    return false;
-  }
-  if (parts.length === 1) {
-    return parts[0] === '127';
-  }
-  return parts.every((part) => {
-    const value = Number(part);
-    return Number.isInteger(value) && value >= 0 && value <= 255;
-  });
-}
-
-function extractHostFromInput(rawInput) {
+function getFaviconFallbackHost(rawInput) {
   const withoutScheme = String(rawInput || '').replace(/^https?:\/\//i, '');
   const authority = withoutScheme.split(/[/?#]/)[0] || '';
   if (!authority) {
@@ -5300,53 +5302,11 @@ function extractHostFromInput(rawInput) {
   return (authority.split(':')[0] || '').toLowerCase();
 }
 
-function isDevHostLike(hostname) {
-  if (!hostname) {
-    return false;
-  }
-  if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
-    return true;
-  }
-  if (hostname === 'host.docker.internal') {
-    return true;
-  }
-  if (
-    hostname.endsWith('.local') ||
-    hostname.endsWith('.test') ||
-    hostname.endsWith('.localdev') ||
-    hostname.endsWith('.internal')
-  ) {
-    return true;
-  }
-  return hostname === '::1' || hostname === '0:0:0:0:0:0:0:1';
-}
-
 function getDirectNavigationUrl(input) {
-  const raw = String(input || '').trim();
-  if (!raw) {
-    return '';
+  if (SEARCH_UTILS && typeof SEARCH_UTILS.getDirectNavigationUrl === 'function') {
+    return SEARCH_UTILS.getDirectNavigationUrl(input);
   }
-  const lower = raw.toLowerCase();
-  const isInternal = ['chrome://', 'edge://', 'brave://', 'vivaldi://', 'opera://'].some((prefix) =>
-    lower.startsWith(prefix)
-  );
-  let normalizedInput = raw.match(/^(\d{1,3})([.\s]\d{1,3}){0,3}(?::\d{1,5})?(?:[/?#].*)?$/)
-    ? raw.replace(/\s+/g, '.').replace(/\.{2,}/g, '.')
-    : raw;
-  const hostOnly = extractHostFromInput(normalizedInput);
-  const isDevHost = isDevHostLike(hostOnly);
-  const isNumericLike = isNumericHostLike(hostOnly);
-  const looksLikeUrl = (normalizedInput.includes('.') && !normalizedInput.includes(' ')) || isInternal || isDevHost || isNumericLike;
-  if (!looksLikeUrl) {
-    return '';
-  }
-  if (hostOnly.includes(':') && !/^https?:\/\//i.test(normalizedInput) && !normalizedInput.startsWith('[')) {
-    normalizedInput = `[${normalizedInput}]`;
-  }
-  if (!isInternal && !normalizedInput.startsWith('http://') && !normalizedInput.startsWith('https://')) {
-    return `https://${normalizedInput}`;
-  }
-  return normalizedInput;
+  return '';
 }
 
 function getDefaultSearchEngineThemeUrl() {
@@ -6979,7 +6939,7 @@ async function getSearchSuggestions(query) {
           ? ''
           : getPageFaviconCandidateUrl(urlObj.href);
       } catch (e) {
-        const fallbackHost = extractHostFromInput(url);
+        const fallbackHost = getFaviconFallbackHost(url);
         return shouldBlockFaviconForHost(fallbackHost) ? '' : getHostFaviconUrl(fallbackHost);
       }
     }

@@ -4,6 +4,7 @@
   const WALLPAPER_LOCAL_STORE = globalThis.LumnoNewtabWallpaperLocalStore || {};
   const DEFAULT_STORAGE_KEYS = {
     wallpaper: '_x_extension_newtab_wallpaper_2026_unique_',
+    localWallpaper: '_x_extension_newtab_local_wallpaper_2026_unique_',
     overlay: '_x_extension_newtab_wallpaper_overlay_2026_unique_',
     effect: '_x_extension_newtab_wallpaper_effect_2026_unique_',
     wordmark: '_x_extension_newtab_wordmark_visible_2026_unique_'
@@ -19,8 +20,10 @@
     const chrome = options.chromeObj || globalThis.chrome || {};
     const extensionRoutes = options.extensionRoutes || globalThis.LumnoExtensionRoutes || {};
     const storageArea = options.storageArea || null;
+    const localWallpaperStorageArea = options.localWallpaperStorageArea || null;
     const storageKeys = Object.assign({}, DEFAULT_STORAGE_KEYS, options.storageKeys || {});
     const NEWTAB_WALLPAPER_STORAGE_KEY = storageKeys.wallpaper;
+    const NEWTAB_LOCAL_WALLPAPER_STORAGE_KEY = storageKeys.localWallpaper;
     const NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY = storageKeys.overlay;
     const NEWTAB_WALLPAPER_EFFECT_STORAGE_KEY = storageKeys.effect;
     const NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY = storageKeys.wordmark;
@@ -100,6 +103,7 @@
     const NEWTAB_WALLPAPER_DEFAULT_ID = 'monet-coastal-white';
     const NEWTAB_CUSTOM_WALLPAPER_ID = WALLPAPER_LOCAL_STORE.CUSTOM_WALLPAPER_ID || 'custom-upload';
     const NEWTAB_CUSTOM_WALLPAPER_ID_PREFIX = WALLPAPER_LOCAL_STORE.CUSTOM_WALLPAPER_ID_PREFIX || 'custom-wallpaper-';
+    const NEWTAB_LOCAL_WALLPAPER_DISABLED_VALUE = '__lumno_local_wallpaper_disabled__';
     const NEWTAB_WALLPAPER_OPTIONS = [
       {
         id: 'dark-linocut-topographic',
@@ -687,6 +691,7 @@
     let wallpaperPanelRendered = false;
     let currentWallpaperId = '';
     let lastActiveWallpaperId = '';
+    let localWallpaperOverrideActive = false;
     let currentWordmarkVisible = normalizeNewtabWordmarkVisible(getWordmarkVisible());
 
     function isCustomWallpaperId(id) {
@@ -1052,6 +1057,92 @@
     function shouldWaitForCustomWallpapers(value) {
       const id = String(getRawWallpaperId(value) || '').trim();
       return id === NEWTAB_CUSTOM_WALLPAPER_ID || isCustomWallpaperId(id);
+    }
+
+    function hasStorageValue(result, key) {
+      return Boolean(result && Object.prototype.hasOwnProperty.call(result, key));
+    }
+
+    function readStorageValue(area, key) {
+      return new Promise((resolve) => {
+        if (!area || !key || typeof area.get !== 'function') {
+          resolve({ hasValue: false, value: undefined });
+          return;
+        }
+        area.get([key], (result) => {
+          resolve({
+            hasValue: hasStorageValue(result, key),
+            value: result ? result[key] : undefined
+          });
+        });
+      });
+    }
+
+    function writeStorageValue(area, key, value, onError) {
+      if (!area || !key || typeof area.set !== 'function') {
+        return;
+      }
+      area.set({ [key]: value }, () => {
+        if (chrome.runtime && chrome.runtime.lastError && typeof onError === 'function') {
+          onError();
+        }
+      });
+    }
+
+    function writeSyncedWallpaperValue(value, options) {
+      writeStorageValue(storageArea, NEWTAB_WALLPAPER_STORAGE_KEY, value, () => {
+        if (options && options.showError) {
+          showToast(t('newtab_wallpaper_save_error', 'Failed to save wallpaper'), true);
+        }
+      });
+    }
+
+    function writeLocalWallpaperValue(value, options) {
+      writeStorageValue(localWallpaperStorageArea, NEWTAB_LOCAL_WALLPAPER_STORAGE_KEY, value, () => {
+        if (options && options.showError) {
+          showToast(t('newtab_wallpaper_save_error', 'Failed to save wallpaper'), true);
+        }
+      });
+    }
+
+    function resolveLocalWallpaperOverride(value, hasValue) {
+      if (!hasValue) {
+        return { hasOverride: false, id: '', shouldClear: false };
+      }
+      const rawId = String(getRawWallpaperId(value) || '').trim();
+      if (rawId === NEWTAB_LOCAL_WALLPAPER_DISABLED_VALUE) {
+        return { hasOverride: true, id: '', shouldClear: false };
+      }
+      const nextId = normalizeNewtabWallpaperId(value);
+      if (nextId && isCustomWallpaperId(nextId)) {
+        return { hasOverride: true, id: nextId, shouldClear: false };
+      }
+      return { hasOverride: false, id: '', shouldClear: Boolean(rawId) };
+    }
+
+    function resolveSyncedWallpaperValue(value, hasValue) {
+      const raw = hasValue ? value : NEWTAB_WALLPAPER_DEFAULT_ID;
+      if (shouldWaitForCustomWallpapers(raw)) {
+        const nextCustomId = normalizeNewtabWallpaperId(raw);
+        if (nextCustomId && isCustomWallpaperId(nextCustomId)) {
+          return {
+            id: nextCustomId,
+            sanitizedId: NEWTAB_WALLPAPER_DEFAULT_ID,
+            migrateCustomToLocal: true
+          };
+        }
+        return {
+          id: NEWTAB_WALLPAPER_DEFAULT_ID,
+          sanitizedId: NEWTAB_WALLPAPER_DEFAULT_ID,
+          migrateCustomToLocal: false
+        };
+      }
+      const nextId = normalizeNewtabWallpaperId(raw);
+      return {
+        id: nextId,
+        sanitizedId: !hasValue || (raw && raw !== nextId) ? nextId : null,
+        migrateCustomToLocal: false
+      };
     }
 
     function writeWallpaperPreloadCache(wallpaper) {
@@ -1951,7 +2042,7 @@
         });
       }
       updateSearchWidthSliderElement(getSearchWidth());
-      setSearchWidthControlVisible(getThemeScope() === 'home');
+      setSearchWidthControlVisible(true);
     }
 
     function persistSearchWidthFromSlider(value, options) {
@@ -2074,45 +2165,54 @@
       }
       hasWallpaperBootstrapStarted = true;
       const customWallpapersPromise = loadCustomWallpapers();
-      if (!storageArea) {
-        customWallpapersPromise.then(() => {
-          applyNewtabWallpaper(NEWTAB_WALLPAPER_DEFAULT_ID);
-        });
-        return initialWallpaperReadyPromise;
-      }
-      storageArea.get([NEWTAB_WALLPAPER_STORAGE_KEY], (result) => {
-        const hasStoredWallpaper = Boolean(result &&
-          Object.prototype.hasOwnProperty.call(result, NEWTAB_WALLPAPER_STORAGE_KEY));
-        const raw = hasStoredWallpaper
-          ? result[NEWTAB_WALLPAPER_STORAGE_KEY]
-          : NEWTAB_WALLPAPER_DEFAULT_ID;
-        const applyStoredWallpaper = () => {
-          const nextId = normalizeNewtabWallpaperId(raw);
-          applyNewtabWallpaper(nextId);
-          if (!hasStoredWallpaper || (raw && raw !== nextId)) {
-            storageArea.set({ [NEWTAB_WALLPAPER_STORAGE_KEY]: nextId });
-          }
-        };
-        if (shouldWaitForCustomWallpapers(raw)) {
-          customWallpapersPromise.then(applyStoredWallpaper);
+      Promise.all([
+        customWallpapersPromise,
+        readStorageValue(storageArea, NEWTAB_WALLPAPER_STORAGE_KEY),
+        readStorageValue(localWallpaperStorageArea, NEWTAB_LOCAL_WALLPAPER_STORAGE_KEY)
+      ]).then((results) => {
+        const syncedValue = results[1];
+        const localValue = results[2];
+        const localResolution = resolveLocalWallpaperOverride(localValue.value, localValue.hasValue);
+        if (localResolution.shouldClear) {
+          writeLocalWallpaperValue('');
+        }
+        if (localResolution.hasOverride) {
+          localWallpaperOverrideActive = true;
+          applyNewtabWallpaper(localResolution.id);
           return;
         }
-        applyStoredWallpaper();
+        const syncedResolution = resolveSyncedWallpaperValue(syncedValue.value, syncedValue.hasValue);
+        if (syncedResolution.migrateCustomToLocal) {
+          localWallpaperOverrideActive = true;
+          writeLocalWallpaperValue(syncedResolution.id);
+        } else {
+          localWallpaperOverrideActive = false;
+        }
+        applyNewtabWallpaper(syncedResolution.id);
+        if (syncedResolution.sanitizedId !== null) {
+          writeSyncedWallpaperValue(syncedResolution.sanitizedId);
+        }
       });
       return initialWallpaperReadyPromise;
     }
 
     function persistNewtabWallpaper(id) {
+      const wasUsingLocalWallpaper = localWallpaperOverrideActive || isCustomWallpaperId(currentWallpaperId);
       const nextId = normalizeNewtabWallpaperId(id);
       applyNewtabWallpaper(nextId);
-      if (!storageArea) {
+      if (nextId && isCustomWallpaperId(nextId)) {
+        localWallpaperOverrideActive = true;
+        writeLocalWallpaperValue(nextId, { showError: true });
         return;
       }
-      storageArea.set({ [NEWTAB_WALLPAPER_STORAGE_KEY]: nextId }, () => {
-        if (chrome.runtime && chrome.runtime.lastError) {
-          showToast(t('newtab_wallpaper_save_error', 'Failed to save wallpaper'), true);
-        }
-      });
+      if (!nextId && wasUsingLocalWallpaper) {
+        localWallpaperOverrideActive = true;
+        writeLocalWallpaperValue(NEWTAB_LOCAL_WALLPAPER_DISABLED_VALUE, { showError: true });
+        return;
+      }
+      localWallpaperOverrideActive = false;
+      writeSyncedWallpaperValue(nextId, { showError: true });
+      writeLocalWallpaperValue('');
     }
 
     function canShowCustomWallpaperTooltip(target) {
@@ -3263,20 +3363,68 @@
         applyWallpaperOverlayOpacity(changes[NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY].newValue);
         handled = true;
       }
+      if (NEWTAB_LOCAL_WALLPAPER_STORAGE_KEY && changes[NEWTAB_LOCAL_WALLPAPER_STORAGE_KEY]) {
+        const raw = changes[NEWTAB_LOCAL_WALLPAPER_STORAGE_KEY].newValue;
+        const hasValue = typeof raw !== 'undefined';
+        const rawWallpaperId = String(getRawWallpaperId(raw) || '').trim();
+        const shouldRefreshCustomWallpapers = shouldWaitForCustomWallpapers(raw) &&
+          !getWallpaperById(rawWallpaperId);
+        const applyLocalWallpaper = () => {
+          const localResolution = resolveLocalWallpaperOverride(raw, hasValue);
+          if (localResolution.shouldClear) {
+            writeLocalWallpaperValue('');
+          }
+          if (localResolution.hasOverride) {
+            localWallpaperOverrideActive = true;
+            applyNewtabWallpaper(localResolution.id);
+            return;
+          }
+          localWallpaperOverrideActive = false;
+          readStorageValue(storageArea, NEWTAB_WALLPAPER_STORAGE_KEY).then((syncedValue) => {
+            const syncedResolution = resolveSyncedWallpaperValue(syncedValue.value, syncedValue.hasValue);
+            if (syncedResolution.migrateCustomToLocal) {
+              localWallpaperOverrideActive = true;
+              writeLocalWallpaperValue(syncedResolution.id);
+            }
+            applyNewtabWallpaper(syncedResolution.id);
+            if (syncedResolution.sanitizedId !== null) {
+              writeSyncedWallpaperValue(syncedResolution.sanitizedId);
+            }
+          });
+        };
+        wallpaperStorageChangeSeq += 1;
+        if (shouldRefreshCustomWallpapers) {
+          const changeSeq = wallpaperStorageChangeSeq;
+          loadCustomWallpapers().then(() => {
+            if (changeSeq === wallpaperStorageChangeSeq) {
+              applyLocalWallpaper();
+            }
+          });
+        } else {
+          applyLocalWallpaper();
+        }
+        handled = true;
+      }
       if (changes[NEWTAB_WALLPAPER_STORAGE_KEY]) {
         const raw = changes[NEWTAB_WALLPAPER_STORAGE_KEY].newValue;
         const rawWallpaperId = String(getRawWallpaperId(raw) || '').trim();
         const shouldRefreshCustomWallpapers = shouldWaitForCustomWallpapers(raw) &&
           !getWallpaperById(rawWallpaperId);
         const applyStoredWallpaper = () => {
-          const nextWallpaperId = normalizeNewtabWallpaperId(raw);
-          if (storageArea &&
-              raw &&
-              raw !== nextWallpaperId &&
-              (!shouldWaitForCustomWallpapers(raw) || nextWallpaperId)) {
-            storageArea.set({ [NEWTAB_WALLPAPER_STORAGE_KEY]: nextWallpaperId });
+          const syncedResolution = resolveSyncedWallpaperValue(raw, true);
+          if (syncedResolution.sanitizedId !== null) {
+            writeSyncedWallpaperValue(syncedResolution.sanitizedId);
           }
-          applyNewtabWallpaper(nextWallpaperId);
+          if (localWallpaperOverrideActive) {
+            return;
+          }
+          if (syncedResolution.migrateCustomToLocal) {
+            localWallpaperOverrideActive = true;
+            writeLocalWallpaperValue(syncedResolution.id);
+          } else {
+            localWallpaperOverrideActive = false;
+          }
+          applyNewtabWallpaper(syncedResolution.id);
         };
         wallpaperStorageChangeSeq += 1;
         if (shouldRefreshCustomWallpapers) {

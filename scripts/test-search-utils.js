@@ -1,5 +1,26 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const search = require('../src/shared/search-utils.js');
+
+const repoRoot = path.resolve(__dirname, '..');
+
+function readSource(relativePath) {
+  return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
+}
+
+function assertDirectNavigationDelegatesToShared(relativePath) {
+  const source = readSource(relativePath);
+  assert.ok(
+    /function getDirectNavigationUrl\(input\)\s*\{[\s\S]*?typeof (?:SEARCH_UTILS|searchUtils)\.getDirectNavigationUrl === 'function'[\s\S]*?(?:SEARCH_UTILS|searchUtils)\.getDirectNavigationUrl\(input\)/.test(source),
+    `${relativePath} should delegate direct URL parsing to shared search utils`
+  );
+  assert.doesNotMatch(
+    source,
+    /function isNumericHostLike\(hostname\)|function isDevHostLike\(hostname\)|DIRECT_NAVIGATION_FALLBACK_SINGLE_COLON_PROTOCOLS|getDirectNavigationFallbackProtocol|isExplicitDirectNavigationFallbackUrl/,
+    `${relativePath} should not keep a second direct URL parser`
+  );
+}
 
 function score(item, query, sourceType = 'history') {
   const context = search.buildSearchQueryContext(query);
@@ -135,6 +156,52 @@ const navList = [
 const promoted = search.promoteStrongNavigationMatch(navList, 'example');
 assert.strictEqual(promoted.title, 'Example Home', 'strong navigation promotion should choose representative pages');
 assert.strictEqual(navList[0].title, 'Example Home', 'strong navigation promotion should mutate the list consistently');
+
+const blobUrl = 'blob:https://example.com/6b44b52f-04bb-4dc9-8df3-5d979bd66d5f';
+assert.strictEqual(
+  search.getDirectNavigationUrl(blobUrl),
+  blobUrl,
+  'blob protocol URLs should be preserved as direct navigation targets'
+);
+[
+  'file:///Users/kevinxu/Downloads/report.pdf',
+  'data:text/plain,hello',
+  'view-source:https://example.com/',
+  'mailto:hello@example.com',
+  'magnet:?xt=urn:btih:0123456789abcdef',
+  'vscode://file/Users/kevinxu/github/Lumno',
+  'about:blank',
+  'javascript:alert(1)'
+].forEach((directUrl) => {
+  assert.strictEqual(
+    search.getDirectNavigationUrl(directUrl),
+    directUrl,
+    `${directUrl} should be preserved as a direct navigation target`
+  );
+});
+assert.strictEqual(
+  search.getDirectNavigationUrl('example.com/docs'),
+  'https://example.com/docs',
+  'shared direct navigation should keep existing host-like input behavior'
+);
+assert.strictEqual(
+  search.getDirectNavigationUrl('localhost:3000'),
+  'https://localhost:3000',
+  'host:port development inputs should keep direct navigation behavior'
+);
+assert.strictEqual(
+  search.getDirectNavigationUrl('example.com:8080/docs'),
+  'https://example.com:8080/docs',
+  'host:port web inputs should keep direct navigation behavior'
+);
+assert.strictEqual(
+  search.getDirectNavigationUrl('site:example.com'),
+  '',
+  'search operators should not be treated as direct custom protocol navigation'
+);
+assertDirectNavigationDelegatesToShared('src/newtab/newtab.js');
+assertDirectNavigationDelegatesToShared('src/overlay/search-panel.js');
+assertDirectNavigationDelegatesToShared('src/background/background.js');
 
 function testDirectNavigationUrl(input) {
   const raw = String(input || '').trim();
@@ -306,6 +373,18 @@ assert.strictEqual(
   'WeChat Official Accounts',
   'default wechat provider name should describe WeChat Official Accounts search'
 );
+assert.strictEqual(
+  search.findProviderForSiteSearchSuggestion(
+    {
+      type: 'history',
+      title: '下载',
+      url: 'https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html'
+    },
+    [wechatProvider]
+  ),
+  null,
+  'site-search provider inference should not treat arbitrary Weixin developer URLs as WeChat Official Accounts search'
+);
 
 assert.strictEqual(
   search.buildSearchUrlFromTemplate('https://example.com/search?q={searchTerms}', 'hello world'),
@@ -358,6 +437,31 @@ assert.strictEqual(
   ),
   null,
   'short provider triggers should not hijack a mismatched top-site prefix'
+);
+
+const titledProvider = {
+  key: 'apps',
+  aliases: [],
+  name: 'Apps Library',
+  template: 'https://downloads.example.com/search?q={query}'
+};
+assert.strictEqual(
+  search.getSiteSearchTriggerCandidate(
+    'macked',
+    [titledProvider],
+    { type: 'topSite', title: 'MacKed - Mac Apps Library', url: 'https://downloads.example.com/' }
+  ),
+  titledProvider,
+  'site-search triggers should allow the matched provider host to use the site title as a keyword'
+);
+assert.strictEqual(
+  search.getSiteSearchTriggerCandidate(
+    'macked',
+    [titledProvider],
+    { type: 'topSite', title: 'MacKed - Search Results', url: 'https://downloads.example.com/search?q=macked' }
+  ),
+  null,
+  'site-search title matching should ignore provider search-result URLs to avoid query-title overlap'
 );
 
 console.log('search utils tests passed');

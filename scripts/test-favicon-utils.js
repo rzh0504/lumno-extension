@@ -76,6 +76,17 @@ assert.strictEqual(
   'chrome-extension://abc/_favicon/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128',
   'browser-internal pages should use the browser-page _favicon candidate'
 );
+const browserPageRenderCandidates = resolver.getPageFaviconRenderCandidates('chrome://extensions/', '');
+assert.strictEqual(
+  browserPageRenderCandidates.primaryUrl,
+  'chrome-extension://abc/_favicon/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128',
+  'browser-internal render candidates should prefer _favicon'
+);
+assert.strictEqual(
+  browserPageRenderCandidates.browserUrl,
+  'chrome://favicon2/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128',
+  'browser-internal render candidates should keep chrome://favicon2 as fallback'
+);
 assert.strictEqual(
   resolver.getPageFaviconCandidateUrl('chrome-extension://abc/src/options/options.html'),
   'chrome-extension://abc/assets/images/lumno.png',

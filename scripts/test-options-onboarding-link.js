@@ -34,7 +34,6 @@ assert.match(
 
 const rule = getRule(`.${buttonClass}`);
 const darkRule = getRule(`body[data-theme="dark"] .${buttonClass}`);
-const darkHoverRule = getRule(`body[data-theme="dark"] .${buttonClass}:hover`);
 [
   /margin-left:\s*auto;/,
   /--settings-button-min-height:\s*30px;/,
@@ -71,14 +70,18 @@ assert.doesNotMatch(
   'dark tutorial ghost action should not hard-code the old pale dark-mode colors'
 );
 assert.match(
-  darkHoverRule,
+  darkRule,
   /--settings-button-hover-bg:\s*color-mix\(in srgb,\s*var\(--control-hover-bg\)\s*72%,\s*transparent\);/,
-  'dark tutorial ghost action hover should use a quiet dark control hover surface'
+  'dark tutorial ghost action should expose its quiet dark hover surface as a variant token'
 );
 assert.match(
-  darkHoverRule,
+  darkRule,
   /--settings-button-hover-color:\s*var\(--panel-text\);/,
-  'dark tutorial ghost action hover should lift text to the panel text token'
+  'dark tutorial ghost action should expose its hover text lift as a variant token'
+);
+assert.ok(
+  !new RegExp(`(?:^|\\n)\\s*body\\[data-theme="dark"\\]\\s+\\.${buttonClass}:hover\\s*\\{`).test(optionsHtml),
+  'dark tutorial ghost action should not need a separate hover selector'
 );
 
 assert.match(

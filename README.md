@@ -112,7 +112,7 @@ npm run test:onboarding-content
 
 ## 鸣谢
 
-- 作者与维护者：[Kubai087](https://github.com/kubai087)
+- 日文本地化：感谢 [Humi](https://github.com/Hum1Tab) 参与日文翻译与校对。
 - 内置图标集：[Remix Icon](https://remixicon.com/)
 - 内置字体：Open Sans
 

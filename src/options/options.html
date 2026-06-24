@@ -150,6 +150,7 @@
         --switch-on-bg: #111827;
         --switch-knob: #ffffff;
         --tooltip-font-size: 13px;
+        --settings-option-desc-font-size: 13px;
         --panel-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
         --sync-button-bg: rgba(148, 163, 184, 0.16);
         --sync-button-hover-bg: rgba(148, 163, 184, 0.28);
@@ -466,15 +467,11 @@
         gap: 10px;
       }
       ._x_extension_setting_desc_2024_unique_ {
-        font-size: 14px;
+        font-size: var(--settings-option-desc-font-size);
         margin: 4px 0 0;
         color: var(--panel-subtext);
       }
-      ._x_extension_settings_content_2024_unique_[data-content="labs"] ._x_extension_setting_desc_2024_unique_ {
-        font-size: 13px;
-      }
       ._x_extension_setting_desc_compact_2026_unique_ {
-        font-size: 13px;
         margin: -2px 0 0;
       }
       ._x_extension_shortcut_input_affix_2026_unique_ {
@@ -548,8 +545,6 @@
         --settings-button-bg: transparent;
         --settings-button-color: var(--panel-subtext);
         --settings-button-shadow: none;
-      }
-      body[data-theme="dark"] ._x_extension_onboarding_guide_button_2026_unique_:hover {
         --settings-button-hover-bg: color-mix(in srgb, var(--control-hover-bg) 72%, transparent);
         --settings-button-hover-color: var(--panel-text);
       }
@@ -573,8 +568,6 @@
         --settings-button-bg: transparent;
         --settings-button-color: var(--panel-subtext);
         --settings-button-shadow: none;
-      }
-      body[data-theme="dark"] ._x_extension_shortcut_ghost_2026_unique_:hover {
         --settings-button-hover-bg: color-mix(in srgb, var(--control-hover-bg) 72%, transparent);
         --settings-button-hover-color: var(--panel-text);
       }
@@ -601,7 +594,7 @@
         align-items: center;
       }
       ._x_extension_shortcuts_section_desc_2026_unique_ {
-        font-size: 13px;
+        font-size: var(--settings-option-desc-font-size);
         margin: 6px 0 0;
         color: var(--panel-subtext);
       }
@@ -632,6 +625,9 @@
         padding: 0 14px;
         border-radius: 10px;
       }
+      ._x_extension_shortcut_submit_2024_unique_._x_extension_shortcuts_link_2026_unique_ {
+        align-self: center;
+      }
       ._x_extension_shortcuts_browser_hint_2026_unique_ {
         color: var(--panel-subtext);
         display: inline-flex;
@@ -647,6 +643,9 @@
         justify-content: space-between;
         gap: 12px;
         width: 100%;
+      }
+      ._x_extension_shortcuts_section_copy_2026_unique_ {
+        min-width: 0;
       }
       ._x_extension_shortcut_reference_2026_unique_ {
         display: flex;
@@ -1169,7 +1168,7 @@
         margin: 0;
       }
       ._x_extension_shortcuts_desc_2024_unique_ {
-        font-size: 12px;
+        font-size: var(--settings-option-desc-font-size);
         color: var(--panel-subtext);
         margin: 0;
       }
@@ -1693,6 +1692,11 @@
       ._x_extension_shortcut_hint_2024_unique_:hover {
         background: var(--tab-bg);
       }
+      ._x_extension_shortcut_hint_2024_unique_:focus-visible {
+        outline: 2px solid var(--input-focus-color);
+        outline-offset: 2px;
+        background: var(--tab-bg);
+      }
       ._x_extension_shortcut_hint_2024_unique_ svg {
         width: 14px;
         height: 14px;
@@ -1808,6 +1812,13 @@
           0 1px 1px rgba(15, 23, 42, 0.035),
           0 0 1px rgba(15, 23, 42, 0.06),
           inset 0 1px 0 rgba(255, 255, 255, 0.75);
+        --settings-button-hover-bg: #ffffff;
+        --settings-button-hover-border-color: rgba(15, 23, 42, 0.08);
+        --settings-button-hover-shadow:
+          0 2px 3px rgba(15, 23, 42, 0.032),
+          0 1px 1px rgba(15, 23, 42, 0.045),
+          0 0 1px rgba(15, 23, 42, 0.07),
+          inset 0 1px 0 rgba(255, 255, 255, 0.8);
       }
       ._x_extension_settings_tab_button_2024_unique_:active,
       ._x_extension_theme_option_2024_unique_:active,
@@ -1818,22 +1829,11 @@
       ._x_extension_sync_icon_faded_2024_unique_ .ri-icon {
         opacity: 0.5;
       }
-      ._x_extension_shortcut_secondary_2024_unique_:hover {
-        --settings-button-hover-bg: #ffffff;
-        --settings-button-hover-border-color: rgba(15, 23, 42, 0.08);
-        --settings-button-hover-shadow:
-          0 2px 3px rgba(15, 23, 42, 0.032),
-          0 1px 1px rgba(15, 23, 42, 0.045),
-          0 0 1px rgba(15, 23, 42, 0.07),
-          inset 0 1px 0 rgba(255, 255, 255, 0.8);
-      }
       body[data-theme="dark"] ._x_extension_shortcut_secondary_2024_unique_ {
         --settings-button-bg: color-mix(in srgb, var(--control-bg) 90%, #475569 10%);
         --settings-button-color: var(--panel-text);
         --settings-button-border-color: rgba(148, 163, 184, 0.18);
         --settings-button-shadow: 0 1px 1px rgba(0, 0, 0, 0.18);
-      }
-      body[data-theme="dark"] ._x_extension_shortcut_secondary_2024_unique_:hover {
         --settings-button-hover-bg: color-mix(in srgb, var(--control-hover-bg) 86%, #5b6b84 14%);
         --settings-button-hover-border-color: rgba(164, 180, 207, 0.32);
         --settings-button-hover-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
@@ -1859,8 +1859,6 @@
         --settings-button-before-shadow: inset 0 1px 1.6px rgba(255, 255, 255, 0.34);
         --settings-button-focus-outline: none;
         --settings-button-focus-outline-offset: 0;
-      }
-      ._x_extension_shortcut_submit_primary_2024_unique_:hover {
         --settings-button-hover-bg: linear-gradient(180deg, #4a5467 0%, #2f3a4f 100%);
         --settings-button-hover-shadow:
           0 12px 4px rgba(0, 0, 0, 0),
@@ -1878,8 +1876,6 @@
         --settings-button-bg: transparent;
         --settings-button-color: var(--panel-text);
         --settings-button-shadow: none;
-      }
-      ._x_extension_shortcut_form_trigger_2024_unique_ ._x_extension_shortcut_submit_2024_unique_:hover {
         --settings-button-hover-bg: var(--tab-bg);
       }
       ._x_extension_shortcut_error_2024_unique_ {
@@ -2360,19 +2356,21 @@
           <div class="_x_extension_setting_row_2024_unique_">
             <div class="_x_extension_shortcuts_section_block_2026_unique_">
               <div class="_x_extension_shortcuts_section_title_row_2026_unique_">
-                <p class="_x_extension_section_title_2024_unique_" data-i18n="settings_shortcuts_section_title">快捷键设置</p>
+                <div class="_x_extension_shortcuts_section_copy_2026_unique_">
+                  <p class="_x_extension_section_title_2024_unique_" data-i18n="settings_shortcuts_section_title">快捷键设置</p>
+                  <p class="_x_extension_shortcuts_section_desc_2026_unique_">
+                    <span data-i18n="settings_shortcuts_browser_desc_prefix">需在 </span>
+                    <span class="_x_extension_shortcuts_section_desc_path_2026_unique_" data-i18n="settings_shortcuts_browser_desc_path_extensions">「扩展程序」</span>
+                    <span class="_x_extension_shortcuts_section_desc_path_2026_unique_"> -> </span>
+                    <span class="_x_extension_shortcuts_section_desc_path_2026_unique_" data-i18n="settings_shortcuts_browser_desc_path_shortcuts">「键盘快捷键」</span>
+                    <span data-i18n="settings_shortcuts_browser_desc_suffix"> 修改快捷键</span>
+                  </p>
+                </div>
                 <button id="_x_extension_open_shortcuts_page_2026_unique_" class="_x_extension_sync_button_2024_unique_ _x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_submit_primary_2024_unique_ _x_extension_shortcuts_link_2026_unique_" type="button">
                   <span data-i18n="settings_shortcuts_action">前往快捷键设置</span>
                   <i class="ri-icon ri-size-14 ri-external-link-line" aria-hidden="true"></i>
                 </button>
               </div>
-              <p class="_x_extension_shortcuts_section_desc_2026_unique_">
-                <span data-i18n="settings_shortcuts_browser_desc_prefix">需在 </span>
-                <span class="_x_extension_shortcuts_section_desc_path_2026_unique_" data-i18n="settings_shortcuts_browser_desc_path_extensions">「扩展程序」</span>
-                <span class="_x_extension_shortcuts_section_desc_path_2026_unique_"> -> </span>
-                <span class="_x_extension_shortcuts_section_desc_path_2026_unique_" data-i18n="settings_shortcuts_browser_desc_path_shortcuts">「键盘快捷键」</span>
-                <span data-i18n="settings_shortcuts_browser_desc_suffix"> 修改快捷键</span>
-              </p>
             </div>
           </div>
           <div class="_x_extension_setting_row_2024_unique_">
@@ -2382,8 +2380,8 @@
                 <span
                   class="_x_extension_shortcut_badge_2024_unique_ _x_extension_shortcuts_dia_badge_2026_unique_ _x_extension_tooltip_host_2024_unique_"
                   data-i18n-tooltip="settings_shortcuts_dia_tooltip"
-                  data-tooltip="在 Dia 环境下，受浏览器限制，Lumno 的新标签页功能暂不可用，但聚焦搜索功能仍可正常运行。&#10;&#10;若快捷键在 Dia 中不可用，请点击上方按钮进入浏览器的快捷键设置页面，将「Open command bar」从 In Dia 改成 Global。"
-                  aria-label="在 Dia 环境下，受浏览器限制，Lumno 的新标签页功能暂不可用，但聚焦搜索功能仍可正常运行。若快捷键在 Dia 中不可用，请点击上方按钮进入浏览器的快捷键设置页面，将「Open command bar」从 In Dia 改成 Global。"
+                  data-tooltip="在 Dia 环境下，受浏览器限制，Lumno 的新标签页功能暂不可用，但聚焦搜索功能仍可正常运行。&#10;&#10;若快捷键在 Dia 中不可用，请点击上方按钮进入浏览器的快捷键设置页面，将「Open command bar」从 In Dia 改成 Global"
+                  aria-label="在 Dia 环境下，受浏览器限制，Lumno 的新标签页功能暂不可用，但聚焦搜索功能仍可正常运行。若快捷键在 Dia 中不可用，请点击上方按钮进入浏览器的快捷键设置页面，将「Open command bar」从 In Dia 改成 Global"
                   role="img">
                   <span data-i18n="settings_shortcuts_dia_tag">在 Dia 中使用</span>
                   <i class="ri-icon ri-size-12 ri-question-line" aria-hidden="true"></i>
@@ -2401,8 +2399,8 @@
                 <span
                   class="_x_extension_shortcut_hint_2024_unique_ _x_extension_shortcut_group_action_2024_unique_"
                   data-i18n-tooltip="settings_restricted_tooltip"
-                  data-tooltip="受限页（如 chrome://、扩展商店、部分 file:// 页面）无法开启聚焦搜索；按下快捷键将按此处规则处理。"
-                  aria-label="受限页（如 chrome://、扩展商店、部分 file:// 页面）无法开启聚焦搜索；按下快捷键将按此处规则处理。"
+                  data-tooltip="受限页（如 chrome://、扩展商店、部分 file:// 页面）无法开启聚焦搜索；按下快捷键将按此处规则处理"
+                  aria-label="受限页（如 chrome://、扩展商店、部分 file:// 页面）无法开启聚焦搜索；按下快捷键将按此处规则处理"
                   role="img">
                   <i class="ri-icon ri-size-14 ri-question-line" aria-hidden="true"></i>
                 </span>
@@ -2676,7 +2674,7 @@
               <div class="_x_extension_shortcut_group_header_2024_unique_">
                 <div class="_x_extension_shortcut_group_title_2024_unique_ _x_extension_section_title_2024_unique_" data-i18n="shortcuts_group_ai">AI</div>
               </div>
-              <p class="_x_extension_setting_desc_2024_unique_ _x_extension_setting_desc_compact_2026_unique_" data-i18n="shortcuts_group_ai_desc">输入关键词，按下 Tab 并键入内容（Prompt）后，可跳转至以下 AI 网站并自动填入（需先登录对应网站）。</p>
+              <p class="_x_extension_setting_desc_2024_unique_ _x_extension_setting_desc_compact_2026_unique_" data-i18n="shortcuts_group_ai_desc">输入关键词，按下 Tab 并键入内容（Prompt）后，可跳转至以下 AI 网站并自动填入（需先登录对应网站）</p>
               <div id="_x_extension_site_search_ai_builtin_list_2026_unique_" class="_x_extension_shortcut_list_2024_unique_"></div>
             </div>
           </div>

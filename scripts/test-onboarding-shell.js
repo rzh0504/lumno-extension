@@ -680,10 +680,10 @@ assert.match(
   /className:\s*'onboarding-info-tooltip'/,
   'onboarding info tooltips should declare a component class for local styling'
 );
-assert.match(
+assert.doesNotMatch(
   html,
   /\.onboarding-info-tooltip\s+\._x_extension_tooltip_line_2026_unique_\s*\+\s*\._x_extension_tooltip_line_2026_unique_\s*\{[\s\S]*?margin-top:\s*6px;[\s\S]*?\}/,
-  'onboarding info tooltip multiline content should add component-level spacing between lines'
+  'onboarding should rely on the shared tooltip component for multiline text spacing'
 );
 assert.match(
   script,
@@ -711,6 +711,16 @@ assert.match(
   'onboarding action button base should own the structural border, background, and shadow layers'
 );
 assert.match(
+  getCssRule('.onboarding-action-button::before'),
+  /box-shadow:\s*var\(--onboarding-action-before-shadow,\s*none\);/,
+  'onboarding action button base should own the shared pseudo highlight layer'
+);
+assert.match(
+  getCssRule('.onboarding-action-button:hover'),
+  /background:\s*var\(--onboarding-action-hover-bg,\s*var\(--onboarding-action-bg,\s*transparent\)\);[\s\S]*?border-color:\s*var\(--onboarding-action-hover-border-color,\s*var\(--onboarding-action-border-color,\s*transparent\)\);[\s\S]*?color:\s*var\(--onboarding-action-hover-color,\s*var\(--onboarding-action-color,\s*var\(--page-ink\)\)\);[\s\S]*?box-shadow:\s*var\(--onboarding-action-hover-shadow,\s*var\(--onboarding-action-shadow,\s*none\)\);/,
+  'onboarding action button base should consume shared hover variables for every variant'
+);
+assert.match(
   getCssRule('.onboarding-action-button:focus-visible'),
   /outline:\s*var\(--onboarding-action-focus-outline,\s*2px solid rgba\(37,\s*99,\s*235,\s*0\.46\)\);[\s\S]*?outline-offset:\s*var\(--onboarding-action-focus-outline-offset,\s*3px\);/,
   'onboarding action focus should be controlled through shared action button variables'
@@ -723,6 +733,35 @@ assert.match(
 assert.ok(
   !/(?:^|\n)\s*\.onboarding-action-button--primary:focus-visible\s*\{/.test(html),
   'onboarding primary actions should not need a separate focus-visible patch'
+);
+assert.ok(
+  !/(?:^|\n)\s*\.onboarding-action-button--primary::before\s*\{/.test(html),
+  'onboarding primary actions should use the shared button pseudo-element instead of a variant pseudo-element'
+);
+['primary', 'secondary', 'ghost'].forEach((variant) => {
+  assert.ok(
+    !new RegExp(`(?:^|\\n)\\s*\\.onboarding-action-button--${variant}:hover\\s*\\{`).test(html),
+    `onboarding ${variant} hover should be controlled by variant tokens consumed by the shared button hover rule`
+  );
+});
+const darkPrimaryActionRule = html.match(/@media \(prefers-color-scheme: dark\)\s*\{\s*\.onboarding-action-button--primary\s*\{([\s\S]*?)\}\s*\.onboarding-action-button--secondary\s*\{/);
+assert.ok(darkPrimaryActionRule, 'dark onboarding primary action rule should exist');
+assert.match(
+  darkPrimaryActionRule[1],
+  /--onboarding-action-bg:\s*linear-gradient\(180deg,\s*#4a566c 0%,\s*#334157 100%\);[\s\S]*?--onboarding-action-color:\s*#f8fafc;[\s\S]*?--onboarding-action-hover-bg:\s*linear-gradient\(180deg,\s*#56647c 0%,\s*#3a4b66 100%\);/,
+  'dark onboarding primary actions should only swap primary color tokens'
+);
+assert.doesNotMatch(
+  darkPrimaryActionRule[1],
+  /--onboarding-action-border-color|--onboarding-action-shadow|--onboarding-action-before-shadow|box-shadow:/,
+  'dark onboarding primary actions should not redefine structure, rings, shadows, or highlights'
+);
+const darkSecondaryActionRule = html.match(/@media \(prefers-color-scheme: dark\)\s*\{\s*\.onboarding-action-button--primary\s*\{[\s\S]*?\}\s*\.onboarding-action-button--secondary\s*\{([\s\S]*?)\}\s*\.onboarding-action-button--ghost\s*\{/);
+assert.ok(darkSecondaryActionRule, 'dark onboarding secondary action rule should exist');
+assert.doesNotMatch(
+  darkSecondaryActionRule[1],
+  /#ffffff|#1f2937|inset 0 1px/,
+  'dark onboarding secondary actions should not reuse the light surface or keep an inner top highlight'
 );
 const secondaryActionHtml = html.match(/<button class="onboarding-action-button onboarding-action-button--secondary"[^>]*data-action="prev"[^>]*hidden[\s\S]*?<\/button>/);
 assert.ok(secondaryActionHtml, 'initial secondary lower-left action should stay hidden until content config reveals it');

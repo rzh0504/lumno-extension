@@ -156,7 +156,7 @@
     "message": "重啟後恢復置頂分頁"
   },
   "settings_pinned_tab_recovery_desc": {
-    "message": "記錄可恢復的置頂網頁分頁，瀏覽器重啟後自動補回。"
+    "message": "記錄可恢復的置頂網頁分頁，瀏覽器重啟後自動補回"
   },
   "document_pip_picker_hint": {
     "message": "移動滑鼠選擇元素，點擊開啟懸浮窗，滾輪切換父層，Esc 取消。"
@@ -243,7 +243,7 @@
     "message": "在 Dia 中使用"
   },
   "settings_shortcuts_dia_tooltip": {
-    "message": "在 Dia 環境下，受瀏覽器限制，Lumno 的新分頁功能暫不可用，但聚焦搜尋功能仍可正常運行。\n\n若快捷鍵在 Dia 中不可用，請點擊下方右側按鈕進入瀏覽器的快捷鍵設定頁面，將「Open command bar」從 In Dia 改成 Global。"
+    "message": "在 Dia 環境下，受瀏覽器限制，Lumno 的新分頁功能暫不可用，但聚焦搜尋功能仍可正常運行。\n\n若快捷鍵在 Dia 中不可用，請點擊下方右側按鈕進入瀏覽器的快捷鍵設定頁面，將「Open command bar」從 In Dia 改成 Global"
   },
   "settings_shortcuts_section_title": {
     "message": "快捷鍵設定"
@@ -285,7 +285,7 @@
     "message": "在受限頁行為"
   },
   "settings_restricted_tooltip": {
-    "message": "受限頁（如 chrome://、擴充功能商店、部分 file:// 頁面）無法開啟聚焦搜尋；按下快捷鍵將依此處規則處理。"
+    "message": "受限頁（如 chrome://、擴充功能商店、部分 file:// 頁面）無法開啟聚焦搜尋；按下快捷鍵將依此處規則處理"
   },
   "restricted_action_default": {
     "message": "前往新分頁"
@@ -813,7 +813,7 @@
     "message": "AI"
   },
   "shortcuts_group_ai_desc": {
-    "message": "輸入關鍵詞，按下 Tab 並輸入內容（Prompt）後，可跳轉至以下 AI 網站並自動填入（需先登入對應網站）。"
+    "message": "輸入關鍵詞，按下 Tab 並輸入內容（Prompt）後，可跳轉至以下 AI 網站並自動填入（需先登入對應網站）"
   },
   "shortcuts_badge_custom": {
     "message": "自訂"
@@ -894,7 +894,7 @@
     "message": "操作失敗，請重試"
   },
   "toast_error_template": {
-    "message": "搜尋範本必須包含 {query}。"
+    "message": "搜尋範本必須包含 {query}"
   },
   "toast_reset": {
     "message": "已重設"
@@ -930,10 +930,10 @@
     "message": "確認移除此項？"
   },
   "shortcuts_error_key": {
-    "message": "請填寫觸發詞。"
+    "message": "請填寫觸發詞"
   },
   "shortcuts_error_key_space": {
-    "message": "觸發詞不能包含空白。"
+    "message": "觸發詞不能包含空白"
   },
   "search_placeholder": {
     "message": "搜尋或輸入網址..."
@@ -1015,6 +1015,9 @@
   },
   "open_url": {
     "message": "開啟 {url}"
+  },
+  "open_browser_url": {
+    "message": "開啟 {browser}：{url}"
   },
   "mode_badge": {
     "message": "模式：{mode}"
@@ -1410,6 +1413,6 @@
     "message": "AltQ 分頁切換器"
   },
   "settings_tab_switcher_desc": {
-    "message": "按 Alt/⌥+Q 快速切換最近分頁。"
+    "message": "按 Alt/⌥+Q 快速切換最近分頁"
   }
 }
