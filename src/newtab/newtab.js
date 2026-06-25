@@ -65,6 +65,7 @@
   const SEARCH_RESULT_PRIORITY_STORAGE_KEY = '_x_extension_search_result_priority_2026_unique_';
   const SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY = '_x_extension_search_result_source_types_2026_unique_';
   const SEARCH_BLACKLIST_STORAGE_KEY = '_x_extension_search_blacklist_2026_unique_';
+  const FAVICON_REQUEST_BLACKLIST_STORAGE_KEY = '_x_extension_favicon_request_blacklist_2026_unique_';
   const BLACKLIST_UTILS = globalThis.LumnoBlacklistUtils || {};
   const SETTINGS = globalThis.LumnoSettings || {};
   const EXTENSION_ROUTES = globalThis.LumnoExtensionRoutes || {};
@@ -3411,6 +3412,7 @@
   let suggestionRequestWatchdogTimer = null;
   let searchResultPriorityMode = 'autocomplete';
   let searchInputRef = null;
+  let faviconRequestBlacklistItems = [];
   loadDefaultSearchEngineState();
   if (chrome && chrome.storage && chrome.storage.onChanged) {
     chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -3431,11 +3433,21 @@
         markRecentDataDirty();
         scheduleRecentReloadIfVisible();
       }
+      if (changes[FAVICON_REQUEST_BLACKLIST_STORAGE_KEY]) {
+        faviconRequestBlacklistItems = normalizeFaviconRequestBlacklistItems(changes[FAVICON_REQUEST_BLACKLIST_STORAGE_KEY].newValue);
+        markRecentDataDirty();
+        scheduleRecentReloadIfVisible();
+        scheduleBookmarkReloadIfVisible();
+        if (typeof refreshThemeAwareFavicons === 'function') {
+          refreshThemeAwareFavicons();
+        }
+      }
       if (latestQuery && latestQuery.trim() && (
         changes[DEFAULT_SEARCH_ENGINE_STORAGE_KEY] ||
         changes[SEARCH_RESULT_PRIORITY_STORAGE_KEY] ||
         changes[SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY] ||
-        changes[SEARCH_BLACKLIST_STORAGE_KEY]
+        changes[SEARCH_BLACKLIST_STORAGE_KEY] ||
+        changes[FAVICON_REQUEST_BLACKLIST_STORAGE_KEY]
       )) {
         requestSuggestions(latestQuery, { immediate: true });
       }
@@ -3468,6 +3480,7 @@
     SITE_SEARCH_STORAGE_KEY,
     SITE_SEARCH_DISABLED_STORAGE_KEY,
     SEARCH_BLACKLIST_STORAGE_KEY,
+    FAVICON_REQUEST_BLACKLIST_STORAGE_KEY,
     PINNED_RECENT_SITES_STORAGE_KEY,
     HIDDEN_RECENT_SITES_STORAGE_KEY
   ]);
@@ -4475,9 +4488,10 @@
   const scheduleThemeAwareFaviconRescue = faviconViewRuntime.scheduleThemeAwareFaviconRescue;
 
   function isBlockedLocalFaviconUrl(url) {
-    return typeof FAVICON_UTILS.isBlockedLocalFaviconUrl === 'function'
+    const blockedByLocalRules = typeof FAVICON_UTILS.isBlockedLocalFaviconUrl === 'function'
       ? FAVICON_UTILS.isBlockedLocalFaviconUrl(url)
       : false;
+    return blockedByLocalRules || isUrlBlockedByFaviconRequestBlacklist(url);
   }
 
   function isChromeMonogramFaviconUrl(url) {
@@ -4534,6 +4548,9 @@
   }
 
   function getThemeSourceForSuggestion(suggestion) {
+    if (suggestion && suggestion.url && isUrlBlockedByFaviconRequestBlacklist(suggestion.url)) {
+      return '';
+    }
     if (suggestion && suggestion.provider) {
       const hostKey = getProviderThemeHost(suggestion.provider);
       if (hostKey && shouldBlockFaviconForHost(hostKey)) {
@@ -6265,6 +6282,13 @@
     return [];
   }
 
+  function normalizeFaviconRequestBlacklistItems(items) {
+    if (BLACKLIST_UTILS.normalizeItems) {
+      return BLACKLIST_UTILS.normalizeItems(items, 'prefix');
+    }
+    return [];
+  }
+
   function loadSearchBlacklistItems() {
     return new Promise((resolve) => {
       if (!storageArea) {
@@ -6274,6 +6298,39 @@
       storageArea.get([SEARCH_BLACKLIST_STORAGE_KEY], (result) => {
         const items = normalizeSearchBlacklistItems(result && result[SEARCH_BLACKLIST_STORAGE_KEY]);
         searchBlacklistItems = items;
+        resolve(items);
+      });
+    });
+  }
+
+  function getFaviconRequestMatchUrl(url) {
+    const raw = String(url || '').trim();
+    if (!raw) {
+      return '';
+    }
+    return typeof FAVICON_UTILS.getCanonicalPageUrlForFavicon === 'function'
+      ? String(FAVICON_UTILS.getCanonicalPageUrlForFavicon(raw) || raw).trim()
+      : raw;
+  }
+
+  function isUrlBlockedByFaviconRequestBlacklist(url) {
+    const target = getFaviconRequestMatchUrl(url);
+    return Boolean(
+      target &&
+      BLACKLIST_UTILS.isUrlBlocked &&
+      BLACKLIST_UTILS.isUrlBlocked(target, faviconRequestBlacklistItems)
+    );
+  }
+
+  function loadFaviconRequestBlacklistItems() {
+    return new Promise((resolve) => {
+      if (!storageArea) {
+        resolve([]);
+        return;
+      }
+      storageArea.get([FAVICON_REQUEST_BLACKLIST_STORAGE_KEY], (result) => {
+        const items = normalizeFaviconRequestBlacklistItems(result && result[FAVICON_REQUEST_BLACKLIST_STORAGE_KEY]);
+        faviconRequestBlacklistItems = items;
         resolve(items);
       });
     });
@@ -9173,7 +9230,8 @@
     bootstrapInitialWallpaper(),
     bootstrapInitialWallpaperOverlay(),
     bootstrapInitialWallpaperEffect(),
-    loadSearchBlacklistItems()
+    loadSearchBlacklistItems(),
+    loadFaviconRequestBlacklistItems()
   ]).then(() => {
     hydrateSectionsFromCache();
     loadRecentSites();

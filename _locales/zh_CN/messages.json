@@ -720,10 +720,10 @@
     "message": "搜索与最近访问黑名单"
   },
   "blacklist_section_desc": {
-    "message": "以下 URL 不会出现在 Lumno 的搜索结果，以及新标签页的“最近访问”和“最常访问”中"
+    "message": "想让某些网址不再出现在搜索结果、最近访问或最常访问里，就加在这里。"
   },
   "blacklist_group_custom": {
-    "message": "URL 列表"
+    "message": "隐藏这些 URL"
   },
   "blacklist_label_url": {
     "message": "URL 规则"
@@ -789,7 +789,7 @@
     "message": "baidu.com"
   },
   "blacklist_add": {
-    "message": "添加到黑名单"
+    "message": "添加隐藏规则"
   },
   "blacklist_empty": {
     "message": "暂未添加黑名单 URL"
@@ -814,6 +814,18 @@
   },
   "blacklist_removed_toast": {
     "message": "已从黑名单移除"
+  },
+  "favicon_blacklist_section_title": {
+    "message": "只关掉图标抓取"
+  },
+  "favicon_blacklist_section_desc": {
+    "message": "要是某个局域网或 VPN 站点总弹本地网络权限提示，就加在这里。它还会正常显示、搜索和打开，只是不再抓图标和主题色。"
+  },
+  "favicon_blacklist_add": {
+    "message": "添加排除规则"
+  },
+  "favicon_blacklist_removed_toast": {
+    "message": "已从图标抓取排除中移除"
   },
   "shortcuts_group_builtin": {
     "message": "内置"
@@ -906,7 +918,10 @@
     "message": "清空自定义"
   },
   "blacklist_clear": {
-    "message": "清空黑名单"
+    "message": "清空隐藏规则"
+  },
+  "favicon_blacklist_clear": {
+    "message": "清空排除规则"
   },
   "toast_cleared": {
     "message": "已清空"
@@ -915,7 +930,10 @@
     "message": "确认清空自定义搜索？"
   },
   "confirm_clear_blacklist": {
-    "message": "确认清空黑名单？"
+    "message": "确认清空隐藏规则？"
+  },
+  "confirm_clear_favicon_blacklist": {
+    "message": "确认清空排除规则？"
   },
   "confirm_reset_builtin": {
     "message": "确认重置内置列表？"

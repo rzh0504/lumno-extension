@@ -105,6 +105,22 @@
   const blacklistAddButton = document.getElementById('_x_extension_blacklist_add_2026_unique_');
   const blacklistCancelButton = document.getElementById('_x_extension_blacklist_cancel_2026_unique_');
   const blacklistError = document.getElementById('_x_extension_blacklist_error_2026_unique_');
+  const faviconBlacklistList = document.getElementById('_x_extension_favicon_blacklist_list_2026_unique_');
+  const faviconBlacklistForm = document.getElementById('_x_extension_favicon_blacklist_form_2026_unique_');
+  const faviconBlacklistFormTrigger = document.getElementById('_x_extension_favicon_blacklist_expand_2026_unique_');
+  const faviconBlacklistClearButton = document.getElementById('_x_extension_favicon_blacklist_clear_2026_unique_');
+  const faviconBlacklistUrlLabel = document.getElementById('_x_extension_favicon_blacklist_url_label_2026_unique_');
+  const faviconBlacklistUrlPrefix = document.getElementById('_x_extension_favicon_blacklist_url_prefix_2026_unique_');
+  const faviconBlacklistUrlInput = document.getElementById('_x_extension_favicon_blacklist_url_2026_unique_');
+  const faviconBlacklistMatchExactInput = document.getElementById('_x_extension_favicon_blacklist_match_exact_2026_unique_');
+  const faviconBlacklistMatchPrefixInput = document.getElementById('_x_extension_favicon_blacklist_match_prefix_2026_unique_');
+  const faviconBlacklistMatchSuffixInput = document.getElementById('_x_extension_favicon_blacklist_match_suffix_2026_unique_');
+  const faviconBlacklistMatchExactWrap = document.getElementById('_x_extension_favicon_blacklist_match_exact_wrap_2026_unique_');
+  const faviconBlacklistMatchPrefixWrap = document.getElementById('_x_extension_favicon_blacklist_match_prefix_wrap_2026_unique_');
+  const faviconBlacklistMatchSuffixWrap = document.getElementById('_x_extension_favicon_blacklist_match_suffix_wrap_2026_unique_');
+  const faviconBlacklistAddButton = document.getElementById('_x_extension_favicon_blacklist_add_2026_unique_');
+  const faviconBlacklistCancelButton = document.getElementById('_x_extension_favicon_blacklist_cancel_2026_unique_');
+  const faviconBlacklistError = document.getElementById('_x_extension_favicon_blacklist_error_2026_unique_');
   const toastElement = document.getElementById('_x_extension_toast_2024_unique_');
   const confirmMask = document.getElementById('_x_extension_confirm_mask_2024_unique_');
   const confirmMessage = document.getElementById('_x_extension_confirm_message_2024_unique_');
@@ -161,6 +177,7 @@
   const SITE_SEARCH_STORAGE_KEY = '_x_extension_site_search_custom_2024_unique_';
   const SITE_SEARCH_DISABLED_STORAGE_KEY = '_x_extension_site_search_disabled_2024_unique_';
   const SEARCH_BLACKLIST_STORAGE_KEY = '_x_extension_search_blacklist_2026_unique_';
+  const FAVICON_REQUEST_BLACKLIST_STORAGE_KEY = '_x_extension_favicon_request_blacklist_2026_unique_';
   const BLACKLIST_UTILS = globalThis.LumnoBlacklistUtils || {};
   const SETTINGS = globalThis.LumnoSettings || {};
   const CHECKBOX = globalThis.LumnoCheckbox || {};
@@ -202,6 +219,7 @@
     SITE_SEARCH_STORAGE_KEY,
     SITE_SEARCH_DISABLED_STORAGE_KEY,
     SEARCH_BLACKLIST_STORAGE_KEY,
+    FAVICON_REQUEST_BLACKLIST_STORAGE_KEY,
     DEFAULT_SEARCH_ENGINE_STORAGE_KEY
   ];
   const DEBUG_DUPLICATE_CUSTOM_KEY = 'dup';
@@ -234,6 +252,8 @@
   let isFallbackWidthReady = false;
   let searchBlacklistItems = [];
   let blacklistFormExpanded = false;
+  let faviconRequestBlacklistItems = [];
+  let faviconBlacklistFormExpanded = false;
   let searchResultSourceTypeGroup = null;
   const customSelectController = globalThis.LumnoCustomSelect &&
       typeof globalThis.LumnoCustomSelect.createController === 'function'
@@ -375,6 +395,15 @@
     blacklistError.style.display = text ? 'block' : 'none';
   }
 
+  function setFaviconBlacklistError(message) {
+    if (!faviconBlacklistError) {
+      return;
+    }
+    const text = String(message || '').trim();
+    faviconBlacklistError.textContent = text;
+    faviconBlacklistError.style.display = text ? 'block' : 'none';
+  }
+
   function getBlacklistPatternInputValue(item) {
     if (BLACKLIST_UTILS.getPatternInputValue) {
       return BLACKLIST_UTILS.getPatternInputValue(item);
@@ -402,6 +431,26 @@
     }
   }
 
+  function setFaviconBlacklistFormExpanded(expanded) {
+    faviconBlacklistFormExpanded = Boolean(expanded);
+    if (faviconBlacklistForm) {
+      faviconBlacklistForm.setAttribute('data-expanded', faviconBlacklistFormExpanded ? 'true' : 'false');
+    }
+    if (faviconBlacklistFormTrigger) {
+      faviconBlacklistFormTrigger.setAttribute('aria-expanded', faviconBlacklistFormExpanded ? 'true' : 'false');
+    }
+    if (faviconBlacklistCancelButton) {
+      faviconBlacklistCancelButton.style.display = faviconBlacklistFormExpanded ? 'inline-flex' : 'none';
+      if (faviconBlacklistCancelButton.textContent) {
+        faviconBlacklistCancelButton.textContent = getMessage('shortcuts_cancel', faviconBlacklistCancelButton.textContent);
+      }
+    }
+    if (faviconBlacklistFormExpanded && faviconBlacklistUrlInput) {
+      updateFaviconBlacklistInputPresentation();
+      faviconBlacklistUrlInput.focus();
+    }
+  }
+
   function resetBlacklistForm() {
     if (blacklistUrlInput) {
       blacklistUrlInput.value = '';
@@ -425,11 +474,42 @@
     setBlacklistFormExpanded(false);
   }
 
+  function resetFaviconBlacklistForm() {
+    if (faviconBlacklistUrlInput) {
+      faviconBlacklistUrlInput.value = '';
+    }
+    if (faviconBlacklistAddButton) {
+      faviconBlacklistAddButton.textContent = getMessage('favicon_blacklist_add', '添加排除规则');
+      faviconBlacklistAddButton.classList.add('_x_extension_shortcut_save_2024_unique_');
+    }
+    setFaviconBlacklistError('');
+    if (faviconBlacklistMatchExactInput) {
+      faviconBlacklistMatchExactInput.checked = false;
+    }
+    if (faviconBlacklistMatchPrefixInput) {
+      faviconBlacklistMatchPrefixInput.checked = false;
+    }
+    if (faviconBlacklistMatchSuffixInput) {
+      faviconBlacklistMatchSuffixInput.checked = true;
+    }
+    syncFaviconBlacklistMatchModeAvailability();
+    updateFaviconBlacklistInputPresentation();
+    setFaviconBlacklistFormExpanded(false);
+  }
+
   function getBlacklistMatchModesFromForm() {
     return normalizeBlacklistMatchModes([
       blacklistMatchExactInput && blacklistMatchExactInput.checked ? 'exact' : '',
       blacklistMatchPrefixInput && blacklistMatchPrefixInput.checked ? 'prefix' : '',
       blacklistMatchSuffixInput && blacklistMatchSuffixInput.checked ? 'suffix' : ''
+    ], null);
+  }
+
+  function getFaviconBlacklistMatchModesFromForm() {
+    return normalizeBlacklistMatchModes([
+      faviconBlacklistMatchExactInput && faviconBlacklistMatchExactInput.checked ? 'exact' : '',
+      faviconBlacklistMatchPrefixInput && faviconBlacklistMatchPrefixInput.checked ? 'prefix' : '',
+      faviconBlacklistMatchSuffixInput && faviconBlacklistMatchSuffixInput.checked ? 'suffix' : ''
     ], null);
   }
 
@@ -450,6 +530,28 @@
         blacklistUrlLabel,
         blacklistUrlPrefix,
         blacklistUrlInput,
+        modes
+      )
+    );
+  }
+
+  function syncFaviconBlacklistMatchModeAvailability(changedMode) {
+    syncBlacklistModeSelection(
+      {
+        exact: faviconBlacklistMatchExactInput,
+        prefix: faviconBlacklistMatchPrefixInput,
+        suffix: faviconBlacklistMatchSuffixInput
+      },
+      changedMode,
+      {
+        exact: faviconBlacklistMatchExactWrap,
+        prefix: faviconBlacklistMatchPrefixWrap,
+        suffix: faviconBlacklistMatchSuffixWrap
+      },
+      (modes) => applyBlacklistInputPresentationToElements(
+        faviconBlacklistUrlLabel,
+        faviconBlacklistUrlPrefix,
+        faviconBlacklistUrlInput,
         modes
       )
     );
@@ -545,6 +647,23 @@
     }
     if (blacklistUrlInput) {
       blacklistUrlInput.setAttribute('data-i18n-placeholder', config.placeholderKey);
+    }
+  }
+
+  function updateFaviconBlacklistInputPresentation() {
+    const modes = getFaviconBlacklistMatchModesFromForm();
+    applyBlacklistInputPresentationToElements(
+      faviconBlacklistUrlLabel,
+      faviconBlacklistUrlPrefix,
+      faviconBlacklistUrlInput,
+      modes
+    );
+    const config = getBlacklistInputConfig(modes);
+    if (faviconBlacklistUrlLabel) {
+      faviconBlacklistUrlLabel.setAttribute('data-i18n', config.labelKey);
+    }
+    if (faviconBlacklistUrlInput) {
+      faviconBlacklistUrlInput.setAttribute('data-i18n-placeholder', config.placeholderKey);
     }
   }
 
@@ -671,6 +790,16 @@
     );
   }
 
+  function upsertFaviconBlacklistItems(nextItem, replacedRuleKey) {
+    const nextKey = buildBlacklistItemKey(nextItem);
+    return [{ pattern: nextItem.pattern, matchModes: nextItem.matchModes }].concat(
+      faviconRequestBlacklistItems.filter((entry) => {
+        const entryKey = buildBlacklistItemKey(entry);
+        return entryKey !== replacedRuleKey && entryKey !== nextKey;
+      })
+    );
+  }
+
   function persistBlacklistItems(nextItems, successMessage) {
     return saveSearchBlacklistItems(nextItems).then((savedItems) => {
       searchBlacklistItems = savedItems;
@@ -681,6 +810,13 @@
       }
       return savedItems;
     });
+  }
+
+  function normalizeFaviconRequestBlacklistItems(items) {
+    if (BLACKLIST_UTILS.normalizeItems) {
+      return BLACKLIST_UTILS.normalizeItems(items, 'prefix');
+    }
+    return [];
   }
 
   function normalizeBookmarkColumns(value) {
@@ -1194,6 +1330,16 @@
     blacklistClearButton.setAttribute('data-tooltip', text);
   }
 
+  function updateFaviconBlacklistClearTooltip() {
+    if (!faviconBlacklistClearButton) {
+      return;
+    }
+    const text = getMessage('favicon_blacklist_clear', '清空排除规则');
+    faviconBlacklistClearButton.removeAttribute('title');
+    faviconBlacklistClearButton.setAttribute('aria-label', text);
+    faviconBlacklistClearButton.setAttribute('data-tooltip', text);
+  }
+
   function showToast(message, isError) {
     if (!toastElement) {
       return;
@@ -1632,6 +1778,7 @@
       updateBuiltinResetTooltip();
       updateCustomClearTooltip();
       updateBlacklistClearTooltip();
+      updateFaviconBlacklistClearTooltip();
       refreshSyncStatus();
       refreshShortcutsStatus();
       renderShortcutReferenceList();
@@ -1639,8 +1786,11 @@
       if (confirmOk) confirmOk.textContent = getMessage('confirm_ok', '确认');
       renderSiteSearchList();
       renderSearchBlacklistList();
+      renderFaviconRequestBlacklistList();
       updateBlacklistInputPresentation();
+      updateFaviconBlacklistInputPresentation();
       setBlacklistFormExpanded(blacklistFormExpanded);
+      setFaviconBlacklistFormExpanded(faviconBlacklistFormExpanded);
       if (shouldPersist) {
         if (!storageArea) {
           return;
@@ -2578,6 +2728,7 @@
     SITE_SEARCH_DISABLED_STORAGE_KEY,
     SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY,
     SEARCH_BLACKLIST_STORAGE_KEY,
+    FAVICON_REQUEST_BLACKLIST_STORAGE_KEY,
     DEFAULT_SEARCH_ENGINE_STORAGE_KEY
   ]);
   refreshSyncStatus();
@@ -2920,6 +3071,36 @@
       setBlacklistFormExpanded(true);
     });
   }
+  if (faviconBlacklistAddButton) {
+    faviconBlacklistAddButton.addEventListener('click', () => {
+      if (!faviconBlacklistFormExpanded) {
+        setFaviconBlacklistFormExpanded(true);
+        return;
+      }
+      const matchModes = getFaviconBlacklistMatchModesFromForm();
+      const draft = buildBlacklistRuleDraft(faviconBlacklistUrlInput && faviconBlacklistUrlInput.value, matchModes);
+      if (!draft.item) {
+        setFaviconBlacklistError(draft.error || '');
+        return;
+      }
+      setFaviconBlacklistError('');
+      saveFaviconRequestBlacklistItems(
+        upsertFaviconBlacklistItems(draft.item, '')
+      ).then((savedItems) => {
+        faviconRequestBlacklistItems = savedItems;
+        renderFaviconRequestBlacklistList();
+        showToast(getMessage('toast_saved', '已保存'), false);
+        resetFaviconBlacklistForm();
+      }).catch(() => {
+        showToast(getMessage('toast_error', '操作失败，请重试'), true);
+      });
+    });
+  }
+  if (faviconBlacklistFormTrigger) {
+    faviconBlacklistFormTrigger.addEventListener('click', () => {
+      setFaviconBlacklistFormExpanded(true);
+    });
+  }
   [
     [blacklistMatchExactInput, 'exact'],
     [blacklistMatchPrefixInput, 'prefix'],
@@ -2932,9 +3113,26 @@
       syncBlacklistMatchModeAvailability(mode);
     });
   });
+  [
+    [faviconBlacklistMatchExactInput, 'exact'],
+    [faviconBlacklistMatchPrefixInput, 'prefix'],
+    [faviconBlacklistMatchSuffixInput, 'suffix']
+  ].forEach(([input, mode]) => {
+    if (!input) {
+      return;
+    }
+    input.addEventListener('change', () => {
+      syncFaviconBlacklistMatchModeAvailability(mode);
+    });
+  });
   if (blacklistCancelButton) {
     blacklistCancelButton.addEventListener('click', () => {
       resetBlacklistForm();
+    });
+  }
+  if (faviconBlacklistCancelButton) {
+    faviconBlacklistCancelButton.addEventListener('click', () => {
+      resetFaviconBlacklistForm();
     });
   }
   if (blacklistUrlInput) {
@@ -2947,6 +3145,20 @@
         event.preventDefault();
         if (blacklistAddButton) {
           blacklistAddButton.click();
+        }
+      }
+    });
+  }
+  if (faviconBlacklistUrlInput) {
+    faviconBlacklistUrlInput.addEventListener('input', () => {
+      setFaviconBlacklistError('');
+      updateFaviconBlacklistInputPresentation();
+    });
+    faviconBlacklistUrlInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        if (faviconBlacklistAddButton) {
+          faviconBlacklistAddButton.click();
         }
       }
     });
@@ -4134,6 +4346,29 @@
     });
   }
 
+  function loadFaviconRequestBlacklistItems() {
+    return new Promise((resolve) => {
+      if (!storageArea) {
+        resolve([]);
+        return;
+      }
+      storageArea.get([FAVICON_REQUEST_BLACKLIST_STORAGE_KEY], (result) => {
+        resolve(normalizeFaviconRequestBlacklistItems(result && result[FAVICON_REQUEST_BLACKLIST_STORAGE_KEY]));
+      });
+    });
+  }
+
+  function saveFaviconRequestBlacklistItems(items) {
+    return new Promise((resolve) => {
+      if (!storageArea) {
+        resolve([]);
+        return;
+      }
+      const normalized = normalizeFaviconRequestBlacklistItems(items);
+      storageArea.set({ [FAVICON_REQUEST_BLACKLIST_STORAGE_KEY]: normalized }, () => resolve(normalized));
+    });
+  }
+
   function renderSearchBlacklistList() {
     if (!blacklistList) {
       return;
@@ -4437,6 +4672,303 @@
     initTooltips();
   }
 
+  function renderFaviconRequestBlacklistList() {
+    if (!faviconBlacklistList) {
+      return;
+    }
+    faviconBlacklistList.innerHTML = '';
+    if (!Array.isArray(faviconRequestBlacklistItems) || faviconRequestBlacklistItems.length === 0) {
+      return;
+    }
+    faviconRequestBlacklistItems.forEach((item) => {
+      const itemKey = buildBlacklistItemKey(item);
+      const row = document.createElement('div');
+      row.className = '_x_extension_shortcut_item_2024_unique_';
+      row.setAttribute('data-expanded', 'false');
+      const header = document.createElement('div');
+      header.className = '_x_extension_shortcut_item_header_2024_unique_';
+      const info = document.createElement('div');
+      info.className = '_x_extension_shortcut_item_info_2024_unique_';
+      const title = document.createElement('div');
+      title.className = '_x_extension_shortcut_item_title_2024_unique_';
+      const badge = document.createElement('div');
+      badge.className = '_x_extension_shortcut_badge_2024_unique_';
+      const badgeConfig = getBlacklistMatchBadgeConfig(item.matchModes);
+      badge.setAttribute('data-tone', badgeConfig.tone);
+      badge.textContent = badgeConfig.text;
+      const titleText = document.createElement('span');
+      titleText.textContent = formatBlacklistPatternForDisplay(item);
+      title.appendChild(badge);
+      title.appendChild(titleText);
+      info.appendChild(title);
+      const actions = document.createElement('div');
+      actions.className = '_x_extension_shortcut_item_actions_2024_unique_';
+      const editButton = document.createElement('button');
+      editButton.className = '_x_extension_shortcut_edit_2024_unique_';
+      editButton.innerHTML = getRiSvg('ri-edit-line', 'ri-size-14');
+      editButton.setAttribute('aria-label', getMessage('shortcuts_edit', '编辑'));
+      const removeButton = document.createElement('button');
+      removeButton.className = '_x_extension_shortcut_remove_2024_unique_';
+      removeButton.innerHTML = getRiSvg('ri-delete-bin-4-line', 'ri-size-14');
+      removeButton.setAttribute('aria-label', getMessage('shortcuts_remove', '移除'));
+      const popconfirm = document.createElement('div');
+      popconfirm.className = '_x_extension_popconfirm_2024_unique_';
+      popconfirm.setAttribute('data-open', 'false');
+      const popText = document.createElement('div');
+      popText.className = '_x_extension_popconfirm_text_2024_unique_';
+      popText.textContent = getMessage('confirm_remove_item', '确认移除该项？');
+      const popActions = document.createElement('div');
+      popActions.className = '_x_extension_popconfirm_actions_2024_unique_';
+      const popCancel = document.createElement('button');
+      popCancel.className = SECONDARY_BUTTON_CLASS_NAME;
+      popCancel.textContent = getMessage('confirm_cancel', '取消');
+      const popOk = document.createElement('button');
+      popOk.className = '_x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_submit_primary_2024_unique_ _x_extension_shortcut_save_2024_unique_';
+      popOk.textContent = getMessage('confirm_ok', '确认');
+      popActions.appendChild(popCancel);
+      popActions.appendChild(popOk);
+      popconfirm.appendChild(popText);
+      popconfirm.appendChild(popActions);
+      const popWrap = document.createElement('div');
+      popWrap.className = '_x_extension_popconfirm_wrap_2024_unique_';
+      popWrap.appendChild(removeButton);
+      popWrap.appendChild(popconfirm);
+      actions.appendChild(editButton);
+      actions.appendChild(popWrap);
+      header.appendChild(info);
+      header.appendChild(actions);
+      row.appendChild(header);
+
+      const editor = document.createElement('div');
+      editor.className = '_x_extension_shortcut_editor_2024_unique_';
+
+      const urlField = document.createElement('div');
+      urlField.className = '_x_extension_shortcut_field_2024_unique_';
+      const urlLabel = document.createElement('div');
+      urlLabel.className = '_x_extension_shortcut_label_2024_unique_';
+      const urlLabelText = document.createElement('span');
+      const urlRequired = document.createElement('span');
+      urlRequired.className = '_x_extension_shortcut_required_2024_unique_';
+      urlRequired.textContent = '*';
+      urlLabel.appendChild(urlLabelText);
+      urlLabel.appendChild(urlRequired);
+      const urlAffix = document.createElement('div');
+      urlAffix.className = '_x_extension_shortcut_input_affix_2026_unique_';
+      const urlPrefix = document.createElement('span');
+      urlPrefix.className = '_x_extension_shortcut_input_prefix_2026_unique_';
+      const urlInput = document.createElement('input');
+      urlInput.className = '_x_extension_shortcut_input_2024_unique_';
+      urlInput.value = getBlacklistPatternInputValue(item);
+      urlAffix.appendChild(urlPrefix);
+      urlAffix.appendChild(urlInput);
+      urlField.appendChild(urlLabel);
+      urlField.appendChild(urlAffix);
+
+      const matchField = document.createElement('div');
+      matchField.className = '_x_extension_shortcut_field_2024_unique_';
+      const matchLabel = document.createElement('div');
+      matchLabel.className = '_x_extension_shortcut_label_2024_unique_';
+      matchLabel.textContent = getMessage('blacklist_match_label', '匹配方式');
+      const matchModes = document.createElement('div');
+      matchModes.className = CHECKBOX_GROUP_CLASS_NAME;
+      matchModes.setAttribute('data-align', 'start');
+      matchModes.setAttribute('data-gap', 'wide');
+
+      function createModeOption(textKey, fallback, tooltipKey, tooltipFallback) {
+        const wrap = document.createElement('label');
+        wrap.className = CHECKBOX_CLASS_NAME;
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        const text = document.createElement('span');
+        text.textContent = getMessage(textKey, fallback);
+        const hint = document.createElement('span');
+        hint.className = '_x_extension_shortcut_hint_2024_unique_ _x_extension_tooltip_host_2024_unique_';
+        hint.setAttribute('data-tooltip', getMessage(tooltipKey, tooltipFallback));
+        hint.innerHTML = getRiSvg('ri-question-line', 'ri-size-14');
+        wrap.appendChild(input);
+        wrap.appendChild(text);
+        wrap.appendChild(hint);
+        return { wrap, input };
+      }
+
+      const exactOption = createModeOption(
+        'blacklist_match_exact',
+        '当前页面',
+        'blacklist_match_exact_tooltip',
+        '只屏蔽这一页\n────────\n例如，填 x.com/home 后，只有这一页不会出现，其他页面不受影响'
+      );
+      const prefixOption = createModeOption(
+        'blacklist_match_prefix',
+        '当前站点路径',
+        'blacklist_match_prefix_tooltip',
+        '只屏蔽这个站点下这一路径的页面\n────────\n例如，填 baidu.com/search 后，baidu.com/search 和 baidu.com/search/1 不会出现，但 baidu.com/news 不受影响'
+      );
+      const suffixOption = createModeOption(
+        'blacklist_match_suffix',
+        '整个网站',
+        'blacklist_match_suffix_tooltip',
+        '屏蔽这个网站的所有页面，也包括它的子网站\n────────\n例如，填 baidu.com 后，baidu.com/search 和 tieba.baidu.com 都不会出现'
+      );
+      matchModes.appendChild(suffixOption.wrap);
+      matchModes.appendChild(exactOption.wrap);
+      matchModes.appendChild(prefixOption.wrap);
+      matchField.appendChild(matchLabel);
+      matchField.appendChild(matchModes);
+
+      const editorError = document.createElement('div');
+      editorError.className = '_x_extension_shortcut_error_2024_unique_';
+      editorError.style.display = 'none';
+      function setEditorError(message) {
+        const text = String(message || '').trim();
+        editorError.textContent = text;
+        editorError.style.display = text ? 'block' : 'none';
+      }
+
+      function getEditorMatchModes() {
+        return normalizeBlacklistMatchModes([
+          exactOption.input.checked ? 'exact' : '',
+          prefixOption.input.checked ? 'prefix' : '',
+          suffixOption.input.checked ? 'suffix' : ''
+        ], null);
+      }
+
+      function syncEditorMatchModeAvailability(changedMode) {
+        syncBlacklistModeSelection(
+          {
+            exact: exactOption.input,
+            prefix: prefixOption.input,
+            suffix: suffixOption.input
+          },
+          changedMode,
+          {
+            exact: exactOption.wrap,
+            prefix: prefixOption.wrap,
+            suffix: suffixOption.wrap
+          },
+          (modes) => applyBlacklistInputPresentationToElements(
+            urlLabelText,
+            urlPrefix,
+            urlInput,
+            modes
+          )
+        );
+      }
+
+      exactOption.input.addEventListener('change', () => syncEditorMatchModeAvailability('exact'));
+      prefixOption.input.addEventListener('change', () => syncEditorMatchModeAvailability('prefix'));
+      suffixOption.input.addEventListener('change', () => syncEditorMatchModeAvailability('suffix'));
+      urlInput.addEventListener('input', () => {
+        setEditorError('');
+      });
+
+      const initialModes = normalizeBlacklistMatchModes(item.matchModes);
+      exactOption.input.checked = initialModes.includes('exact');
+      prefixOption.input.checked = initialModes.includes('prefix');
+      suffixOption.input.checked = initialModes.includes('suffix');
+      syncEditorMatchModeAvailability();
+
+      const editorActions = document.createElement('div');
+      editorActions.className = '_x_extension_shortcut_editor_actions_2024_unique_';
+      const cancelButton = document.createElement('button');
+      cancelButton.className = SECONDARY_BUTTON_CLASS_NAME;
+      cancelButton.textContent = getMessage('shortcuts_cancel', '取消');
+      const saveButton = document.createElement('button');
+      saveButton.className = '_x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_submit_primary_2024_unique_ _x_extension_shortcut_save_2024_unique_';
+      saveButton.textContent = getMessage('shortcuts_save', '保存修改');
+      attachSaveButtonAnimation(saveButton);
+      cancelButton.addEventListener('click', () => {
+        row.setAttribute('data-expanded', 'false');
+      });
+      saveButton.addEventListener('click', () => {
+        const nextModes = getEditorMatchModes();
+        if (nextModes.length === 0) {
+          setEditorError(getMessage('blacklist_error_match_mode', '请选择至少一种匹配方式'));
+          return;
+        }
+        const nextPattern = normalizeBlacklistPattern(urlInput.value, nextModes);
+        if (!nextPattern) {
+          const message = nextModes.includes('suffix')
+            ? getMessage('blacklist_error_domain', '请输入网站域名')
+            : getMessage('blacklist_error_url', '请输入站点域名或完整 URL');
+          setEditorError(message);
+          return;
+        }
+        setEditorError('');
+        const nextItems = [{ pattern: nextPattern, matchModes: nextModes }].concat(
+          faviconRequestBlacklistItems.filter((entry) => buildBlacklistItemKey(entry) !== itemKey && entry.pattern !== nextPattern)
+        );
+        saveFaviconRequestBlacklistItems(nextItems).then((savedItems) => {
+          faviconRequestBlacklistItems = savedItems;
+          renderFaviconRequestBlacklistList();
+          const finalize = () => {
+            showToast(getMessage('toast_saved', '已保存'), false);
+          };
+          if (saveButton.classList.contains('_x_extension_shortcut_save_2024_unique_')) {
+            setTimeout(finalize, 220);
+          } else {
+            finalize();
+          }
+        }).catch(() => {
+          showToast(getMessage('toast_error', '操作失败，请重试'), true);
+        });
+      });
+      editorActions.appendChild(cancelButton);
+      editorActions.appendChild(saveButton);
+
+      editor.appendChild(urlField);
+      editor.appendChild(matchField);
+      editor.appendChild(editorActions);
+      editor.appendChild(editorError);
+      row.appendChild(editor);
+
+      editButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        row.setAttribute('data-expanded', row.getAttribute('data-expanded') === 'true' ? 'false' : 'true');
+      });
+      removeButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (activePopconfirm && activePopconfirm !== popconfirm) {
+          closeActivePopconfirm();
+        }
+        const isOpen = popconfirm.getAttribute('data-open') === 'true';
+        if (isOpen) {
+          popconfirm.setAttribute('data-open', 'false');
+          activePopconfirm = null;
+        } else {
+          popconfirm.setAttribute('data-open', 'true');
+          activePopconfirm = popconfirm;
+        }
+      });
+      popCancel.addEventListener('click', (event) => {
+        event.stopPropagation();
+        popconfirm.setAttribute('data-open', 'false');
+        if (activePopconfirm === popconfirm) {
+          activePopconfirm = null;
+        }
+      });
+      popOk.addEventListener('click', (event) => {
+        event.stopPropagation();
+        popconfirm.setAttribute('data-open', 'false');
+        if (activePopconfirm === popconfirm) {
+          activePopconfirm = null;
+        }
+        const nextItems = faviconRequestBlacklistItems.filter((entry) => buildBlacklistItemKey(entry) !== itemKey);
+        saveFaviconRequestBlacklistItems(nextItems).then((savedItems) => {
+          faviconRequestBlacklistItems = savedItems;
+          renderFaviconRequestBlacklistList();
+          showToast(getMessage('favicon_blacklist_removed_toast', '已从图标抓取排除中移除'), false);
+          if (faviconBlacklistUrlInput) {
+            faviconBlacklistUrlInput.focus();
+          }
+        }).catch(() => {
+          showToast(getMessage('toast_error', '操作失败，请重试'), true);
+        });
+      });
+      faviconBlacklistList.appendChild(row);
+    });
+    initTooltips();
+  }
+
   function refreshSiteSearchProviders() {
     if (!siteSearchCustomList || !siteSearchBuiltinList) {
       return;
@@ -4493,6 +5025,13 @@
       searchBlacklistItems = items;
       syncBlacklistMatchModeAvailability();
       renderSearchBlacklistList();
+    });
+  }
+  if (faviconBlacklistList) {
+    loadFaviconRequestBlacklistItems().then((items) => {
+      faviconRequestBlacklistItems = items;
+      syncFaviconBlacklistMatchModeAvailability();
+      renderFaviconRequestBlacklistList();
     });
   }
 
@@ -4689,6 +5228,23 @@
       }
     );
   }
+  if (faviconBlacklistClearButton) {
+    attachPopconfirm(
+      faviconBlacklistClearButton,
+      'confirm_clear_favicon_blacklist',
+      '确认清空排除规则？',
+      () => {
+        saveFaviconRequestBlacklistItems([]).then((savedItems) => {
+          faviconRequestBlacklistItems = savedItems;
+          renderFaviconRequestBlacklistList();
+          resetFaviconBlacklistForm();
+          showToast(getMessage('toast_cleared', '已清空'), false);
+        }).catch(() => {
+          showToast(getMessage('toast_error', '操作失败，请重试'), true);
+        });
+      }
+    );
+  }
 
   /*
   if (confirmOk) {
@@ -4732,6 +5288,7 @@
         changes[SITE_SEARCH_STORAGE_KEY] ||
         changes[SITE_SEARCH_DISABLED_STORAGE_KEY] ||
         changes[SEARCH_BLACKLIST_STORAGE_KEY] ||
+        changes[FAVICON_REQUEST_BLACKLIST_STORAGE_KEY] ||
         changes[DEFAULT_SEARCH_ENGINE_STORAGE_KEY]) {
       refreshSyncStatus();
     }
@@ -4867,6 +5424,10 @@
     if (changes[SEARCH_BLACKLIST_STORAGE_KEY]) {
       searchBlacklistItems = normalizeSearchBlacklistItems(changes[SEARCH_BLACKLIST_STORAGE_KEY].newValue);
       renderSearchBlacklistList();
+    }
+    if (changes[FAVICON_REQUEST_BLACKLIST_STORAGE_KEY]) {
+      faviconRequestBlacklistItems = normalizeFaviconRequestBlacklistItems(changes[FAVICON_REQUEST_BLACKLIST_STORAGE_KEY].newValue);
+      renderFaviconRequestBlacklistList();
     }
     if (!changes[SITE_SEARCH_STORAGE_KEY] && !changes[SITE_SEARCH_DISABLED_STORAGE_KEY]) {
       return;

@@ -711,10 +711,10 @@
     "message": "搜尋與最近訪問黑名單"
   },
   "blacklist_section_desc": {
-    "message": "以下 URL 不會出現在 Lumno 的搜尋結果，以及新分頁的「最近訪問」和「最常訪問」中"
+    "message": "想讓某些網址不再出現在搜尋結果、最近訪問或最常訪問裡，就加在這裡。"
   },
   "blacklist_group_custom": {
-    "message": "URL 清單"
+    "message": "隱藏這些 URL"
   },
   "blacklist_label_url": {
     "message": "URL 規則"
@@ -780,7 +780,7 @@
     "message": "baidu.com"
   },
   "blacklist_add": {
-    "message": "加入黑名單"
+    "message": "加入隱藏規則"
   },
   "blacklist_empty": {
     "message": "尚未加入黑名單 URL"
@@ -805,6 +805,18 @@
   },
   "blacklist_removed_toast": {
     "message": "已從黑名單移除"
+  },
+  "favicon_blacklist_section_title": {
+    "message": "只關掉圖標抓取"
+  },
+  "favicon_blacklist_section_desc": {
+    "message": "如果某個區域網路或 VPN 站點一直跳出本地網路權限提示，就加在這裡。它還是能正常顯示、搜尋和開啟，只是不再抓圖標和主題色。"
+  },
+  "favicon_blacklist_add": {
+    "message": "加入排除規則"
+  },
+  "favicon_blacklist_removed_toast": {
+    "message": "已從圖標抓取排除中移除"
   },
   "shortcuts_group_builtin": {
     "message": "內建"
@@ -906,7 +918,10 @@
     "message": "清空自訂"
   },
   "blacklist_clear": {
-    "message": "清空黑名單"
+    "message": "清空隱藏規則"
+  },
+  "favicon_blacklist_clear": {
+    "message": "清空排除規則"
   },
   "toast_cleared": {
     "message": "已清空"
@@ -915,7 +930,10 @@
     "message": "確認清空自訂搜尋？"
   },
   "confirm_clear_blacklist": {
-    "message": "確認清空黑名單？"
+    "message": "確認清空隱藏規則？"
+  },
+  "confirm_clear_favicon_blacklist": {
+    "message": "確認清空排除規則？"
   },
   "confirm_reset_builtin": {
     "message": "確認重設內建清單？"

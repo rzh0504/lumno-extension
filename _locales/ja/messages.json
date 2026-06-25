@@ -720,10 +720,10 @@
     "message": "検索結果と最近使ったサイトの非表示リスト"
   },
   "blacklist_section_desc": {
-    "message": "以下のURLはLumnoの検索結果、および新しいタブの「最近のアクセス」「よくアクセス」に表示されません"
+    "message": "検索結果や「最近のアクセス」「よくアクセス」に出したくないURLがあれば、ここに追加してください。"
   },
   "blacklist_group_custom": {
-    "message": "URLリスト"
+    "message": "隠すURL"
   },
   "blacklist_label_url": {
     "message": "URLルール"
@@ -789,7 +789,7 @@
     "message": "baidu.com"
   },
   "blacklist_add": {
-    "message": "非表示リストに追加"
+    "message": "隠すルールを追加"
   },
   "blacklist_empty": {
     "message": "非表示URLはまだありません"
@@ -814,6 +814,18 @@
   },
   "blacklist_removed_toast": {
     "message": "非表示リストから削除しました"
+  },
+  "favicon_blacklist_section_title": {
+    "message": "アイコン取得だけ止める"
+  },
+  "favicon_blacklist_section_desc": {
+    "message": "LAN や VPN 内のサイトでローカルネットワーク権限の確認が出る場合は、ここに URL を追加してください。表示・検索・起動には影響しません。"
+  },
+  "favicon_blacklist_add": {
+    "message": "除外ルールを追加"
+  },
+  "favicon_blacklist_removed_toast": {
+    "message": "アイコン取得の除外から削除しました"
   },
   "shortcuts_group_builtin": {
     "message": "内蔵"
@@ -906,7 +918,10 @@
     "message": "追加分をすべて削除"
   },
   "blacklist_clear": {
-    "message": "非表示リストを空にする"
+    "message": "隠すルールを空にする"
+  },
+  "favicon_blacklist_clear": {
+    "message": "除外ルールを空にする"
   },
   "toast_cleared": {
     "message": "空にしました"
@@ -915,7 +930,10 @@
     "message": "追加した検索をすべて削除しますか？"
   },
   "confirm_clear_blacklist": {
-    "message": "非表示リストを空にしますか？"
+    "message": "隠すルールを空にしますか？"
+  },
+  "confirm_clear_favicon_blacklist": {
+    "message": "除外ルールを空にしますか？"
   },
   "confirm_reset_builtin": {
     "message": "内蔵リストをリセットしますか？"

@@ -720,10 +720,10 @@
     "message": "Search and Recent Blacklist"
   },
   "blacklist_section_desc": {
-    "message": "The URLs below won't appear in Lumno search results or in the New Tab page's Recent and Most Visited sections"
+    "message": "If you don't want certain URLs to appear in search results, Recent, or Most Visited, add them here."
   },
   "blacklist_group_custom": {
-    "message": "Blocked URLs"
+    "message": "Hide These URLs"
   },
   "blacklist_label_url": {
     "message": "URL rule"
@@ -789,7 +789,7 @@
     "message": "e.g. baidu.com"
   },
   "blacklist_add": {
-    "message": "Add to blacklist"
+    "message": "Add hide rule"
   },
   "blacklist_empty": {
     "message": "No blacklisted URLs yet"
@@ -814,6 +814,18 @@
   },
   "blacklist_removed_toast": {
     "message": "Removed from blacklist"
+  },
+  "favicon_blacklist_section_title": {
+    "message": "Only Stop Favicon Fetching"
+  },
+  "favicon_blacklist_section_desc": {
+    "message": "If a LAN or VPN site triggers local network permission prompts, add its URL here. This won't affect showing, searching, or opening the page."
+  },
+  "favicon_blacklist_add": {
+    "message": "Add exclusion rule"
+  },
+  "favicon_blacklist_removed_toast": {
+    "message": "Removed from favicon exclusions"
   },
   "shortcuts_group_builtin": {
     "message": "Built-in"
@@ -906,7 +918,10 @@
     "message": "Clear custom"
   },
   "blacklist_clear": {
-    "message": "Clear blacklist"
+    "message": "Clear hide rules"
+  },
+  "favicon_blacklist_clear": {
+    "message": "Clear exclusion rules"
   },
   "toast_cleared": {
     "message": "Cleared"
@@ -915,7 +930,10 @@
     "message": "Clear all custom searches?"
   },
   "confirm_clear_blacklist": {
-    "message": "Clear the blacklist?"
+    "message": "Clear the hide rules?"
+  },
+  "confirm_clear_favicon_blacklist": {
+    "message": "Clear exclusion rules?"
   },
   "confirm_reset_builtin": {
     "message": "Reset built-in list?"
