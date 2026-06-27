@@ -10,6 +10,7 @@
   在任意网页快速搜索、直达网址、切换标签页，并增强新标签页体验。
 </p>
 
+
 <p align="center">
   <img src="https://img.shields.io/badge/Manifest-MV3-111827?style=flat-square" alt="Manifest V3" />
   <img src="https://img.shields.io/badge/Browser-Chromium-2563eb?style=flat-square" alt="Chromium" />
@@ -23,15 +24,13 @@
   <a href="README.ja.md">日本語</a>
 </p>
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/2f32b28c-2655-4ffe-9f07-678793367f10" alt="Lumno preview 1" width="100%" />
-  <br />
-  <img src="https://github.com/user-attachments/assets/0c00c851-27c2-430a-a2a6-4e98c026514e" alt="Lumno preview 2" width="100%" />
-</p>
+
 
 Lumno 是一个面向 Chromium 浏览器的 Manifest V3 扩展，把「聚焦搜索命令栏」和「极简新标签页」放在一起：你可以从任意网页快速搜索书签、历史、常用网站、已打开标签页、站内搜索和 AI 助手，也可以把新标签页整理成更好用的工作入口。
 
 当前版本：`0.9.14`
+
+<img width="1400" height="560" alt="banner_m" src="https://github.com/user-attachments/assets/cc8a4e34-bf7d-4448-9280-f5734f8b84bf" />
 
 ## 功能亮点
 
@@ -44,6 +43,13 @@ Lumno 是一个面向 Chromium 浏览器的 Manifest V3 扩展，把「聚焦搜
 - 视频自动画中画：在 YouTube、Bilibili、Youku、腾讯视频、抖音、TikTok、Netflix、Vimeo、Prime Video、Disney+、Twitch 等站点切换标签页时，尝试自动进入视频 PiP。
 - 标签页与浏览器增强：支持重启后恢复置顶网页标签页、受限页面回退到新标签页、复制当前页面链接、打开扩展快捷键页和扩展详情页。
 - 多语言：扩展 UI 支持简体中文、繁体中文、英文、日文和跟随浏览器语言；本 README 支持简体中文、英文、日文切换。
+
+## 实机截图
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/2f32b28c-2655-4ffe-9f07-678793367f10" alt="Lumno preview 1" width="100%" />
+  <br />
+  <img src="https://github.com/user-attachments/assets/0c00c851-27c2-430a-a2a6-4e98c026514e" alt="Lumno preview 2" width="100%" />
+</p>
 
 ## 快捷键
 
