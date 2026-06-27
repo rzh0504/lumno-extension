@@ -23,15 +23,11 @@
   <a href="README.ja.md">日本語</a>
 </p>
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/2f32b28c-2655-4ffe-9f07-678793367f10" alt="Lumno preview 1" width="100%" />
-  <br />
-  <img src="https://github.com/user-attachments/assets/0c00c851-27c2-430a-a2a6-4e98c026514e" alt="Lumno preview 2" width="100%" />
-</p>
-
 Lumno は Chromium ブラウザ向けの Manifest V3 拡張機能です。集中して使えるブラウザコマンドバーとミニマルな新しいタブを組み合わせ、ブックマーク、履歴、よく使うサイト、開いているタブ、サイト内検索、AI アシスタントをひとつの入口から探せます。
 
 現在のバージョン：`0.9.14`
+
+<img width="1400" height="560" alt="banner_m" src="https://github.com/user-attachments/assets/cc8a4e34-bf7d-4448-9280-f5734f8b84bf" />
 
 ## 主な機能
 
@@ -44,6 +40,13 @@ Lumno は Chromium ブラウザ向けの Manifest V3 拡張機能です。集中
 - 動画の自動画中画：動画再生中に別タブへ移動したとき、YouTube、Bilibili、Youku、Tencent Video、Douyin、TikTok、Netflix、Vimeo、Prime Video、Disney+、Twitch などで自動的に動画 PiP へ入ることを試みます。
 - ブラウザ補助：再起動後の固定タブ復元、制限ページから新しいタブへのフォールバック、現在ページ URL のコピー、拡張機能ショートカット/詳細ページのオープンに対応します。
 - 多言語：拡張 UI は簡体字中国語、繁体字中国語、英語、日本語、ブラウザ言語への追従に対応します。この README は簡体字中国語、英語、日本語で切り替えできます。
+
+## スクリーンショット
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/2f32b28c-2655-4ffe-9f07-678793367f10" alt="Lumno preview 1" width="100%" />
+  <br />
+  <img src="https://github.com/user-attachments/assets/0c00c851-27c2-430a-a2a6-4e98c026514e" alt="Lumno preview 2" width="100%" />
+</p>
 
 ## ショートカット
 

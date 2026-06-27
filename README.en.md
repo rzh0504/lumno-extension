@@ -23,15 +23,11 @@
   <a href="README.ja.md">日本語</a>
 </p>
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/2f32b28c-2655-4ffe-9f07-678793367f10" alt="Lumno preview 1" width="100%" />
-  <br />
-  <img src="https://github.com/user-attachments/assets/0c00c851-27c2-430a-a2a6-4e98c026514e" alt="Lumno preview 2" width="100%" />
-</p>
-
 Lumno is a Manifest V3 extension for Chromium browsers. It combines a focused browser command bar with a minimal new tab page, so you can search bookmarks, history, top sites, open tabs, site-search shortcuts, and AI assistants from one place.
 
 Current version: `0.9.14`
+
+<img width="1400" height="560" alt="banner_m" src="https://github.com/user-attachments/assets/cc8a4e34-bf7d-4448-9280-f5734f8b84bf" />
 
 ## Highlights
 
@@ -44,6 +40,13 @@ Current version: `0.9.14`
 - Auto video Picture-in-Picture: when you switch tabs while video is playing, Lumno attempts automatic video PiP on sites such as YouTube, Bilibili, Youku, Tencent Video, Douyin, TikTok, Netflix, Vimeo, Prime Video, Disney+, and Twitch.
 - Browser enhancements: restore pinned web tabs after restart, fall back from restricted pages to the new tab page, copy the current page URL, and open extension shortcut/details pages.
 - Localization: the extension UI supports Simplified Chinese, Traditional Chinese, English, Japanese, and browser-language mode. This README supports Simplified Chinese, English, and Japanese switching.
+
+## Screenshots
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/2f32b28c-2655-4ffe-9f07-678793367f10" alt="Lumno preview 1" width="100%" />
+  <br />
+  <img src="https://github.com/user-attachments/assets/0c00c851-27c2-430a-a2a6-4e98c026514e" alt="Lumno preview 2" width="100%" />
+</p>
 
 ## Shortcuts
 

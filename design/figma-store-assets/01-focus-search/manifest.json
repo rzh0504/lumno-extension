@@ -1,0 +1,8 @@
+{
+  "name": "Lumno Store Image 01 - Focus Search",
+  "id": "lumno-store-image-01-focus-search",
+  "api": "1.0.0",
+  "documentAccess": "dynamic-page",
+  "main": "code.js",
+  "editorType": ["figma"]
+}

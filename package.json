@@ -25,6 +25,7 @@
     "test:extension-routes": "node scripts/test-extension-routes.js",
     "test:extension-pages": "node scripts/test-extension-pages.js",
     "test:options-onboarding-link": "node scripts/test-options-onboarding-link.js",
+    "test:options-language-labels": "node scripts/test-options-language-labels.js",
     "test:no-usage-stats-code": "node scripts/test-no-usage-stats-code.js",
     "test:options-auto-pip-placement": "node scripts/test-options-auto-pip-placement.js",
     "test:options-shortcut-reference": "node scripts/test-options-shortcut-reference.js",
