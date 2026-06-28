@@ -27,7 +27,7 @@ Lumno is a Manifest V3 extension for Chromium browsers. It combines a focused br
 
 Current version: `0.9.14`
 
-<img width="1400" height="560" alt="banner_m" src="https://github.com/user-attachments/assets/cc8a4e34-bf7d-4448-9280-f5734f8b84bf" />
+<img width="1200" height="480" alt="Lumno command bar preview" src="./assets/images/readme/banner.webp" decoding="async" />
 
 ## Highlights
 
@@ -43,9 +43,9 @@ Current version: `0.9.14`
 
 ## Screenshots
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/2f32b28c-2655-4ffe-9f07-678793367f10" alt="Lumno preview 1" width="100%" />
+  <img src="./assets/images/readme/preview-newtab.webp" alt="Lumno new tab preview" width="100%" loading="lazy" decoding="async" />
   <br />
-  <img src="https://github.com/user-attachments/assets/0c00c851-27c2-430a-a2a6-4e98c026514e" alt="Lumno preview 2" width="100%" />
+  <img src="./assets/images/readme/preview-command-bar.webp" alt="Lumno command bar preview" width="100%" loading="lazy" decoding="async" />
 </p>
 
 ## Shortcuts
