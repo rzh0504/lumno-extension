@@ -7,6 +7,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function() {
   const ROUTE_PATHS = Object.freeze({
     newtab: 'src/newtab/newtab.html',
+    lumnoNewtab: 'src/newtab/lumno-newtab.html',
     onboarding: 'src/onboarding/onboarding.html',
     options: 'src/options/options.html',
     optionsAppearance: 'src/options/options.html#appearance'
@@ -45,14 +46,22 @@
     url.searchParams.set(key, String(value));
   }
 
-  function buildNewtabUrl(chromeApi, params) {
-    const baseUrl = buildExtensionUrl(chromeApi, ROUTE_PATHS.newtab);
+  function buildRouteUrl(chromeApi, routePath, params) {
+    const baseUrl = buildExtensionUrl(chromeApi, routePath);
     const url = new URL(baseUrl, 'chrome-extension://lumno/');
     const nextParams = params && typeof params === 'object' ? params : {};
     Object.keys(nextParams).sort().forEach((key) => {
       setUrlParam(url, key, nextParams[key]);
     });
     return url.toString();
+  }
+
+  function buildNewtabUrl(chromeApi, params) {
+    return buildRouteUrl(chromeApi, ROUTE_PATHS.newtab, params);
+  }
+
+  function buildLumnoNewtabUrl(chromeApi, params) {
+    return buildRouteUrl(chromeApi, ROUTE_PATHS.lumnoNewtab, params);
   }
 
   function buildOptionsUrl(chromeApi, hash) {
@@ -86,7 +95,9 @@
   }
 
   function isNewtabUrl(url) {
-    return pathMatchesRoute(getPathname(url), ROUTE_PATHS.newtab);
+    const pathname = getPathname(url);
+    return pathMatchesRoute(pathname, ROUTE_PATHS.newtab) ||
+      pathMatchesRoute(pathname, ROUTE_PATHS.lumnoNewtab);
   }
 
   function isOptionsUrl(url) {
@@ -114,6 +125,7 @@
     ROUTE_PATHS,
     buildExtensionUrl,
     buildNewtabUrl,
+    buildLumnoNewtabUrl,
     buildOptionsUrl,
     isNewtabUrl,
     isOptionsUrl,

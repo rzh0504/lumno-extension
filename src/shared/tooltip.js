@@ -193,7 +193,7 @@
     const config = options || {};
     const windowObj = getWindow(config);
     const positionMode = config.positionMode === 'absolute' ? 'absolute' : 'fixed';
-    const placement = config.placement === 'left' || config.placement === 'left-above'
+    const placement = config.placement === 'left' || config.placement === 'left-above' || config.placement === 'bottom'
       ? config.placement
       : 'top';
     const margin = getNumber(config.margin, 8);
@@ -230,6 +230,12 @@
       }
       if (left < margin) {
         left = targetRight + spacing;
+      }
+    } else if (placement === 'bottom') {
+      top = targetBottom + spacing;
+      left = targetLeft + ((targetRect.width - tooltipRect.width) / 2);
+      if (top + tooltipRect.height + margin > (boundaryRect.height || viewportHeight)) {
+        top = targetTop - tooltipRect.height - spacing;
       }
     } else {
       top = targetTop - tooltipRect.height - spacing;
@@ -360,8 +366,10 @@
       };
       target.addEventListener('mouseenter', showBoundTooltip);
       target.addEventListener('mouseleave', hide);
-      target.addEventListener('focus', showBoundTooltip);
-      target.addEventListener('blur', hide);
+      if (settings.showOnFocus !== false) {
+        target.addEventListener('focus', showBoundTooltip);
+        target.addEventListener('blur', hide);
+      }
       return target;
     }
 

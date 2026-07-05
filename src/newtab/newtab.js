@@ -36,6 +36,7 @@
   const NEWTAB_LOCAL_WALLPAPER_STORAGE_KEY = '_x_extension_newtab_local_wallpaper_2026_unique_';
   const NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY = '_x_extension_newtab_wallpaper_overlay_2026_unique_';
   const NEWTAB_WALLPAPER_EFFECT_STORAGE_KEY = '_x_extension_newtab_wallpaper_effect_2026_unique_';
+  const NEWTAB_FAVICON_STORAGE_KEY = '_x_extension_newtab_favicon_2026_unique_';
   const LUMNO_CHROME_WEB_STORE_URL = 'https://chromewebstore.google.com/detail/lumno-%E8%81%9A%E7%84%A6%E6%90%9C%E7%B4%A2%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/nggfkkbmogmadfoikakkfegkoilfcfao?utm_source=item-share-cb';
   const LUMNO_CHROME_WEB_STORE_REVIEW_URL = 'https://chromewebstore.google.com/detail/lumno-%E8%81%9A%E7%84%A6%E6%90%9C%E7%B4%A2%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/nggfkkbmogmadfoikakkfegkoilfcfao/reviews?utm_source=item-share-cb';
   const LUMNO_WEB_ORIGIN = 'https://lumno.kubai.design';
@@ -63,6 +64,7 @@
   const BOOKMARK_CASCADE_DEBUG_UI_ENABLED = false;
   const DEFAULT_SEARCH_ENGINE_STORAGE_KEY = '_x_extension_default_search_engine_2024_unique_';
   const SEARCH_RESULT_PRIORITY_STORAGE_KEY = '_x_extension_search_result_priority_2026_unique_';
+  const OVERLAY_TAB_PRIORITY_STORAGE_KEY = '_x_extension_overlay_tab_priority_2024_unique_';
   const SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY = '_x_extension_search_result_source_types_2026_unique_';
   const SEARCH_BLACKLIST_STORAGE_KEY = '_x_extension_search_blacklist_2026_unique_';
   const FAVICON_REQUEST_BLACKLIST_STORAGE_KEY = '_x_extension_favicon_request_blacklist_2026_unique_';
@@ -85,11 +87,13 @@
   const NEWTAB_PAGE_NOTICE = globalThis.LumnoNewtabPageNotice || {};
   const NEWTAB_TOAST = globalThis.LumnoNewtabToast || {};
   const NEWTAB_LAYOUT = globalThis.LumnoNewtabLayout || {};
+  const NEWTAB_DOCK = globalThis.LumnoNewtabDock || {};
   const NEWTAB_RECENT_VIEW = globalThis.LumnoNewtabRecentSitesView || {};
   const NEWTAB_BOOKMARKS_VIEW = globalThis.LumnoNewtabBookmarksView || {};
   const NEWTAB_BOOKMARK_CASCADE_POSITION = globalThis.LumnoNewtabBookmarkCascadePosition || {};
   const NEWTAB_BOOKMARK_CASCADE_MENU = globalThis.LumnoNewtabBookmarkCascadeMenu || {};
   const NEWTAB_SUGGESTIONS_VIEW = globalThis.LumnoNewtabSuggestionsView || {};
+  const NEWTAB_SHORTCUTS_STORE = globalThis.LumnoNewtabShortcutsStore || {};
   const NEWTAB_WALLPAPER_LOCAL_STORE = globalThis.LumnoNewtabWallpaperLocalStore || {};
   const NEWTAB_WALLPAPER_ADAPTIVE_TONE = globalThis.LumnoNewtabWallpaperAdaptiveTone || {};
   const NEWTAB_WALLPAPER_EFFECTS = globalThis.LumnoNewtabWallpaperEffects || {};
@@ -106,12 +110,18 @@
       typeof NEWTAB_LAYOUT.createLayoutController !== 'function' ||
       typeof NEWTAB_LAYOUT.getAdaptiveGridColumnCount !== 'function' ||
       typeof NEWTAB_LAYOUT.getGridContentWidthForColumns !== 'function' ||
+      typeof NEWTAB_DOCK.createBottomDockRuntime !== 'function' ||
       typeof NEWTAB_RECENT_VIEW.createRecentSitesView !== 'function' ||
       typeof NEWTAB_BOOKMARKS_VIEW.createBookmarksView !== 'function' ||
       typeof NEWTAB_BOOKMARK_CASCADE_POSITION.placeRootCascadeMenu !== 'function' ||
       typeof NEWTAB_BOOKMARK_CASCADE_POSITION.placeCascadeSubmenu !== 'function' ||
       typeof NEWTAB_BOOKMARK_CASCADE_MENU.createBookmarkCascadeMenuRuntime !== 'function' ||
       typeof NEWTAB_SUGGESTIONS_VIEW.createSuggestionsView !== 'function' ||
+      typeof NEWTAB_SHORTCUTS_STORE.normalizeShortcuts !== 'function' ||
+      typeof NEWTAB_SHORTCUTS_STORE.loadShortcuts !== 'function' ||
+      typeof NEWTAB_SHORTCUTS_STORE.saveShortcuts !== 'function' ||
+      typeof NEWTAB_SHORTCUTS_STORE.saveShortcut !== 'function' ||
+      typeof NEWTAB_SHORTCUTS_STORE.createShortcutRecord !== 'function' ||
       typeof NEWTAB_WALLPAPER_LOCAL_STORE.createWallpaperLocalStore !== 'function' ||
       typeof NEWTAB_WALLPAPER_ADAPTIVE_TONE.createWallpaperAdaptiveTone !== 'function' ||
       typeof NEWTAB_WALLPAPER_EFFECTS.createWallpaperEffects !== 'function' ||
@@ -131,8 +141,19 @@
   const NEWTAB_BOOKMARK_CACHE_STORAGE_KEY = '_x_extension_newtab_bookmark_cache_2024_unique_';
   const PINNED_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_pinned_recent_sites_2026_unique_';
   const HIDDEN_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_hidden_recent_sites_2026_unique_';
+  const NEWTAB_SHORTCUTS_STORAGE_KEY = '_x_extension_newtab_shortcuts_2026_unique_';
+  const NEWTAB_SHORTCUTS_VISIBLE_STORAGE_KEY = '_x_extension_newtab_shortcuts_visible_2026_unique_';
   const MAX_PINNED_RECENT_SITES = 3;
   const MAX_HIDDEN_RECENT_SITES = 60;
+  const MAX_NEWTAB_SHORTCUTS = 10;
+  const SHORTCUT_DRAG_START_THRESHOLD_PX = 10;
+  const SHORTCUT_REORDER_ANIMATION_MS = 180;
+  const SHORTCUT_DROP_ANIMATION_MS = 210;
+  const SHORTCUT_REORDER_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
+  const BOOKMARK_DRAG_START_THRESHOLD_PX = 10;
+  const BOOKMARK_REORDER_ANIMATION_MS = 180;
+  const BOOKMARK_DROP_ANIMATION_MS = 210;
+  const BOOKMARK_REORDER_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
   const NEWTAB_SECTION_CACHE_TTL_MS = 1000 * 60 * 5;
   const pageSearchParams = new URLSearchParams(window.location.search || '');
   const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -156,9 +177,18 @@
   let modeBadge = null;
   let siteSearchTabHint = null;
   let inputModeController = null;
+  let inputParts = null;
   const recentCards = [];
   const bookmarkCards = [];
   const bookmarkCardElementCache = new Map();
+  const suggestionItems = [];
+  let selectedIndex = -1;
+  let currentSuggestions = [];
+  let lastSuggestionResponse = [];
+  let siteSearchTriggerState = null;
+  let lastRenderedQuery = '';
+  let lastRenderedActionContextKey = '';
+  let suggestionsView = null;
   let recentSourceItems = [];
   let pinnedRecentSites = [];
   let hiddenRecentSites = [];
@@ -229,17 +259,58 @@
   let bookmarkPagerNextButton = null;
   let bookmarkOpenManagerButton = null;
   let bookmarkPageAnimating = false;
+  let bookmarkDragState = null;
   let bookmarkWheelLastAt = 0;
   let recentMouseInsideSection = false;
   let recentMouseLeftAt = 0;
   let recentSitesView = null;
   let bookmarksView = null;
+  let shortcutSection = null;
+  let shortcutGrid = null;
+  let addShortcutButton = null;
+  let shortcutDialogBackdrop = null;
+  let shortcutDialog = null;
+  let shortcutForm = null;
+  let shortcutDialogTitle = null;
+  let shortcutNameInput = null;
+  let shortcutUrlInput = null;
+  let shortcutNameLabel = null;
+  let shortcutUrlLabel = null;
+  let shortcutCancelButton = null;
+  let shortcutDoneButton = null;
+  let shortcutError = null;
+  let shortcutDialogPreviousFocus = null;
+  let shortcutDialogOpenFrame = 0;
+  let shortcutDialogCloseTimer = 0;
+  let shortcutDialogMode = 'add';
+  let shortcutDialogEditingId = '';
+  let shortcutContextMenu = null;
+  let shortcutContextMenuTargetId = '';
+  let newtabShortcuts = [];
+  let newtabShortcutsVisible = true;
+  let shortcutDragState = null;
+  const shortcutTiles = [];
+  const SHORTCUT_DIALOG_MODE_ADD = 'add';
+  const SHORTCUT_DIALOG_MODE_EDIT = 'edit';
+  const SHORTCUT_CONTEXT_MENU_EDIT_VALUE = 'edit';
+  const SHORTCUT_CONTEXT_MENU_REMOVE_VALUE = 'remove';
   const sectionModeSelectController = globalThis.LumnoCustomSelect &&
       typeof globalThis.LumnoCustomSelect.createController === 'function'
     ? globalThis.LumnoCustomSelect.createController({
       documentObj: document,
       windowObj: window,
       onBeforeOpen: hideTopActionTooltip
+    })
+    : null;
+  const shortcutContextMenuSelectController = globalThis.LumnoCustomSelect &&
+      typeof globalThis.LumnoCustomSelect.createController === 'function'
+    ? globalThis.LumnoCustomSelect.createController({
+      documentObj: document,
+      windowObj: window,
+      onBeforeOpen: () => {
+        hideShortcutTooltip();
+        hideTopActionTooltip();
+      }
     })
     : null;
   const BOOKMARK_WHEEL_SWITCH_COOLDOWN_MS = 220;
@@ -249,6 +320,10 @@
   const SECTION_MODE_MENU_MAX_WIDTH_PX = 240;
   const SECTION_MODE_MENU_PORTAL_Z_INDEX = 10020;
   const SECTION_MODE_MENU_PORTAL_OFFSET_PX = 8;
+  const SHORTCUT_CONTEXT_MENU_MIN_WIDTH_PX = 124;
+  const SHORTCUT_CONTEXT_MENU_MAX_WIDTH_PX = 180;
+  const SHORTCUT_CONTEXT_MENU_PORTAL_Z_INDEX = 10040;
+  const SHORTCUT_CONTEXT_MENU_PORTAL_OFFSET_PX = -6;
   const SEARCH_LAYOUT_MIN_TOP_PX = 28;
   const SEARCH_LAYOUT_MIN_BOTTOM_PX = 20;
   const SEARCH_LAYOUT_UPSHIFT_RATIO = 0.06;
@@ -261,10 +336,6 @@
   const SEARCH_LAYOUT_NARROW_TOP_INSET_PX = 16;
   const SEARCH_LAYOUT_SHORT_VIEWPORT_MAX_HEIGHT_PX = 680;
   const SEARCH_LAYOUT_SHORT_MIN_TOP_PX = 44;
-  const BOTTOM_DOCK_TOP_RESERVE_PX = 240;
-  const BOTTOM_DOCK_COMPACT_VIEWPORT_MAX_HEIGHT_PX = 800;
-  const BOTTOM_DOCK_COMPACT_SEARCH_GAP_PX = 30;
-  const BOTTOM_DOCK_COMPACT_MIN_TOP_RESERVE_PX = 168;
   const WORDMARK_ENTRY_ANIMATION_NAME = '_x_nt_wordmark_enter_2026_unique_';
   const WORDMARK_ENTRY_ANIMATION_TOTAL_MS = 660;
   const WORDMARK_WALLPAPER_COVER_DARK_OPACITY = '0.32';
@@ -349,10 +420,22 @@
       : value !== false;
   }
 
+  function normalizeNewtabShortcutsVisible(value) {
+    return typeof SETTINGS.normalizeNewtabShortcutsVisible === 'function'
+      ? SETTINGS.normalizeNewtabShortcutsVisible(value)
+      : value !== false;
+  }
+
   function normalizeSearchResultPriority(value) {
     return typeof SETTINGS.normalizeSearchResultPriority === 'function'
       ? SETTINGS.normalizeSearchResultPriority(value)
       : (value === 'search' ? 'search' : 'autocomplete');
+  }
+
+  function normalizeOverlayTabPriorityMode(value) {
+    return typeof SETTINGS.normalizeOverlayTabPriorityMode === 'function'
+      ? SETTINGS.normalizeOverlayTabPriorityMode(value)
+      : (value !== 'newtabFirst' && value !== false);
   }
 
   function normalizeBookmarkCount(value) {
@@ -1466,6 +1549,24 @@
     const bookmarkPager = bookmarkPagerPrevButton && bookmarkPagerPrevButton.parentElement
       ? bookmarkPagerPrevButton.parentElement
       : null;
+    const shortcutToneTargets = shortcutTiles.map((tile) => ({
+      element: tile,
+      sampleElement: getShortcutDockIcon(tile) || tile,
+      minWidth: 42,
+      minHeight: 42,
+      iconButton: true,
+      forcedIconBackground: 'default-theme'
+    }));
+    if (addShortcutButton) {
+      shortcutToneTargets.push({
+        element: addShortcutButton,
+        sampleElement: getShortcutDockIcon(addShortcutButton) || addShortcutButton,
+        minWidth: 42,
+        minHeight: 42,
+        iconButton: true,
+        forcedIconBackground: 'shortcut-add'
+      });
+    }
     return [
       {
         element: wordmarkContainer,
@@ -1520,7 +1621,7 @@
         minHeight: 42,
         iconButton: true
       }
-    ];
+    ].concat(shortcutToneTargets);
   }
 
   wallpaperRuntime = NEWTAB_WALLPAPER.createWallpaperRuntime({
@@ -1535,7 +1636,8 @@
       localWallpaper: NEWTAB_LOCAL_WALLPAPER_STORAGE_KEY,
       overlay: NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY,
       effect: NEWTAB_WALLPAPER_EFFECT_STORAGE_KEY,
-      wordmark: NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY
+      wordmark: NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY,
+      favicon: NEWTAB_FAVICON_STORAGE_KEY
     },
     searchWidthConfig: NEWTAB_SEARCH_WIDTH_CONFIG,
     t,
@@ -1583,6 +1685,12 @@
 
   function bootstrapInitialWallpaperEffect() {
     return wallpaperRuntime ? wallpaperRuntime.bootstrapInitialWallpaperEffect() : Promise.resolve();
+  }
+
+  function bootstrapInitialNewtabFavicon() {
+    return wallpaperRuntime && typeof wallpaperRuntime.bootstrapInitialNewtabFavicon === 'function'
+      ? wallpaperRuntime.bootstrapInitialNewtabFavicon()
+      : Promise.resolve();
   }
 
   function createWallpaperControls() {
@@ -2577,6 +2685,7 @@
     updateWallpaperLanguageStrings();
     updateWallpaperAppearanceSelectionUi();
     updateFeedbackLanguageStrings();
+    updateShortcutLanguageStrings();
     if (updateNoticeController &&
         typeof updateNoticeController.updateLanguage === 'function') {
       updateNoticeController.updateLanguage();
@@ -2656,6 +2765,15 @@
     });
   }
 
+  function refreshShortcutTileThemes() {
+    shortcutTiles.forEach((tile) => {
+      if (!tile) {
+        return;
+      }
+      applyShortcutTileTheme(tile, tile._xTheme, tile._xHost || '');
+    });
+  }
+
   function applyThemeMode(mode, options) {
     currentThemeMode = normalizeThemeMode(mode);
     const mediaMatchesOverride = options && typeof options.mediaMatches === 'boolean'
@@ -2684,6 +2802,7 @@
       // 文件夹卡片通常没有 host/theme，也需要在主题切换时重算阴影与变量。
       applyBookmarkCardTheme(card, card._xTheme, card._xHost || '');
     });
+    refreshShortcutTileThemes();
     applyLanguageStrings();
     updateSelection();
     updateModeBadge(inputParts && inputParts.input ? inputParts.input.value : '');
@@ -2832,6 +2951,7 @@
   bootstrapInitialWallpaper();
   bootstrapInitialWallpaperOverlay();
   bootstrapInitialWallpaperEffect();
+  bootstrapInitialNewtabFavicon();
 
   chrome.storage.onChanged.addListener((changes, areaName) => {
     const isPrimaryArea = Boolean(storageAreaName) && areaName === storageAreaName;
@@ -2929,6 +3049,15 @@
       }
       applyNewtabWordmarkVisibility();
     }
+    if (changes[NEWTAB_SHORTCUTS_VISIBLE_STORAGE_KEY]) {
+      const raw = changes[NEWTAB_SHORTCUTS_VISIBLE_STORAGE_KEY].newValue;
+      const nextValue = normalizeNewtabShortcutsVisible(raw);
+      newtabShortcutsVisible = nextValue;
+      if (storageArea && raw !== nextValue) {
+        storageArea.set({ [NEWTAB_SHORTCUTS_VISIBLE_STORAGE_KEY]: nextValue });
+      }
+      applyNewtabShortcutsVisibility();
+    }
     if (changes[RECENT_MODE_STORAGE_KEY]) {
       const nextMode = normalizeRecentMode(changes[RECENT_MODE_STORAGE_KEY].newValue, 'latest');
       if (currentRecentMode === nextMode) {
@@ -3013,6 +3142,13 @@
       hiddenRecentSites = normalizeHiddenRecentSites(changes[HIDDEN_RECENT_SITES_STORAGE_KEY].newValue);
       recentRenderSignature = '';
       renderRecentSites(recentSourceItems);
+    }
+    if (changes[NEWTAB_SHORTCUTS_STORAGE_KEY]) {
+      newtabShortcuts = NEWTAB_SHORTCUTS_STORE.normalizeShortcuts(
+        changes[NEWTAB_SHORTCUTS_STORAGE_KEY].newValue,
+        getShortcutStoreOptions()
+      );
+      renderShortcuts();
     }
   });
 
@@ -3103,6 +3239,15 @@
       if (wallpaperRuntime && typeof wallpaperRuntime.updateWordmarkVisibilityUi === 'function') {
         wallpaperRuntime.updateWordmarkVisibilityUi();
       }
+    });
+    storageArea.get([NEWTAB_SHORTCUTS_VISIBLE_STORAGE_KEY], (result) => {
+      const raw = result[NEWTAB_SHORTCUTS_VISIBLE_STORAGE_KEY];
+      const nextValue = normalizeNewtabShortcutsVisible(raw);
+      newtabShortcutsVisible = nextValue;
+      if (raw !== nextValue) {
+        storageArea.set({ [NEWTAB_SHORTCUTS_VISIBLE_STORAGE_KEY]: nextValue });
+      }
+      applyNewtabShortcutsVisibility();
     });
     storageArea.get([RECENT_MODE_STORAGE_KEY], (result) => {
       const stored = result[RECENT_MODE_STORAGE_KEY];
@@ -3406,11 +3551,13 @@
   let siteSearchState = null;
   let debounceTimer = null;
   let tabs = [];
+  let currentNewtabTabId = null;
   let siteSearchProvidersCache = null;
   let pendingProviderReload = false;
   let suggestionRequestSeq = 0;
   let suggestionRequestWatchdogTimer = null;
   let searchResultPriorityMode = 'autocomplete';
+  let openTabQuickSwitchEnabled = true;
   let searchInputRef = null;
   let faviconRequestBlacklistItems = [];
   loadDefaultSearchEngineState();
@@ -3427,6 +3574,12 @@
       }
       if (changes[SEARCH_RESULT_PRIORITY_STORAGE_KEY]) {
         searchResultPriorityMode = normalizeSearchResultPriority(changes[SEARCH_RESULT_PRIORITY_STORAGE_KEY].newValue);
+      }
+      if (changes[OVERLAY_TAB_PRIORITY_STORAGE_KEY]) {
+        openTabQuickSwitchEnabled = normalizeOverlayTabPriorityMode(changes[OVERLAY_TAB_PRIORITY_STORAGE_KEY].newValue);
+        if (latestQuery) {
+          requestSuggestions(latestQuery, { immediate: true });
+        }
       }
       if (changes[SEARCH_BLACKLIST_STORAGE_KEY]) {
         searchBlacklistItems = normalizeSearchBlacklistItems(changes[SEARCH_BLACKLIST_STORAGE_KEY].newValue);
@@ -3482,7 +3635,9 @@
     SEARCH_BLACKLIST_STORAGE_KEY,
     FAVICON_REQUEST_BLACKLIST_STORAGE_KEY,
     PINNED_RECENT_SITES_STORAGE_KEY,
-    HIDDEN_RECENT_SITES_STORAGE_KEY
+    HIDDEN_RECENT_SITES_STORAGE_KEY,
+    NEWTAB_SHORTCUTS_STORAGE_KEY,
+    NEWTAB_SHORTCUTS_VISIBLE_STORAGE_KEY
   ]);
   let handleTabKey = null;
   const defaultSiteSearchProviders = typeof SEARCH_UTILS.getDefaultSiteSearchProviders === 'function'
@@ -3495,6 +3650,9 @@
   const rgbToCssAlpha = NEWTAB_FAVICON_THEME.rgbToCssAlpha;
   const rgbToCssParts = NEWTAB_FAVICON_THEME.rgbToCssParts;
   const parseCssColor = NEWTAB_FAVICON_THEME.parseCssColor;
+  const getReadableTextColor = typeof NEWTAB_FAVICON_THEME.getReadableTextColor === 'function'
+    ? NEWTAB_FAVICON_THEME.getReadableTextColor
+    : (() => '#111827');
   const buildTheme = NEWTAB_FAVICON_THEME.buildTheme;
   const getBrandAccentForHost = NEWTAB_FAVICON_THEME.getBrandAccentForHost;
   const getBrandAccentForUrl = NEWTAB_FAVICON_THEME.getBrandAccentForUrl;
@@ -3749,6 +3907,12 @@
       if (card && normalizeHost(card._xHost || '') === normalizedHost) {
         card._xTheme = theme;
         applyBookmarkCardTheme(card, theme, normalizedHost);
+      }
+    });
+    shortcutTiles.forEach((tile) => {
+      if (tile && normalizeHost(tile._xHost || '') === normalizedHost) {
+        tile._xTheme = theme;
+        applyShortcutTileTheme(tile, theme, normalizedHost);
       }
     });
     suggestionItems.forEach((item) => {
@@ -4462,6 +4626,7 @@
     isOwnExtensionUrl,
     isBlockedLocalFaviconUrl,
     shouldBlockFaviconForHost,
+    shouldAvoidDirectFaviconForHost,
     getHostFromUrl,
     isFaviconProxyUrl,
     isChromeMonogramFaviconUrl,
@@ -4487,11 +4652,19 @@
   const rescueThemeAwareFallbackFavicons = faviconViewRuntime.rescueThemeAwareFallbackFavicons;
   const scheduleThemeAwareFaviconRescue = faviconViewRuntime.scheduleThemeAwareFaviconRescue;
 
+  function isAllowedFaviconProxyRequestUrl(url) {
+    return typeof FAVICON_UTILS.isAllowedFaviconProxyRequestUrl === 'function'
+      ? FAVICON_UTILS.isAllowedFaviconProxyRequestUrl(url)
+      : /^chrome-extension:\/\/[^/]+\/_favicon\//i.test(String(url || '').trim()) ||
+        /^chrome:\/\/favicon2\//i.test(String(url || '').trim());
+  }
+
   function isBlockedLocalFaviconUrl(url) {
     const blockedByLocalRules = typeof FAVICON_UTILS.isBlockedLocalFaviconUrl === 'function'
       ? FAVICON_UTILS.isBlockedLocalFaviconUrl(url)
       : false;
-    return blockedByLocalRules || isUrlBlockedByFaviconRequestBlacklist(url);
+    return blockedByLocalRules ||
+      (!isAllowedFaviconProxyRequestUrl(url) && isUrlBlockedByFaviconRequestBlacklist(url));
   }
 
   function isChromeMonogramFaviconUrl(url) {
@@ -4541,22 +4714,26 @@
       pageFaviconUrlResolver = FAVICON_UTILS.createFaviconUrlResolver({
         chromeApi: chrome,
         size: FAVICON_PROXY_SIZE,
-        shouldBlockFaviconForHost
+        shouldBlockFaviconForHost,
+        shouldAvoidDirectFaviconForHost
       });
     }
     return pageFaviconUrlResolver;
   }
 
   function getThemeSourceForSuggestion(suggestion) {
-    if (suggestion && suggestion.url && isUrlBlockedByFaviconRequestBlacklist(suggestion.url)) {
-      return '';
-    }
     if (suggestion && suggestion.provider) {
       const hostKey = getProviderThemeHost(suggestion.provider);
       if (hostKey && shouldBlockFaviconForHost(hostKey)) {
         return '';
       }
       return getProviderIcon(suggestion.provider) || (hostKey ? getHostFaviconUrl(hostKey) : '');
+    }
+    if (suggestion && suggestion.url && isUrlBlockedByFaviconRequestBlacklist(suggestion.url)) {
+      if (suggestion.favicon && isAllowedFaviconProxyRequestUrl(suggestion.favicon)) {
+        return suggestion.favicon;
+      }
+      return getPageFaviconCandidateUrl(getCanonicalPageUrlForFavicon(suggestion.url) || suggestion.url);
     }
     if (suggestion && suggestion.url) {
       try {
@@ -4598,6 +4775,23 @@
     } else {
       window.location.href = url;
     }
+  }
+
+  function openUrlFromNewtabCard(url, options) {
+    if (!url) {
+      return;
+    }
+    const config = options && typeof options === 'object' ? options : {};
+    if (config.openInBackgroundTab &&
+        chrome && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+      chrome.runtime.sendMessage({
+        action: 'createTab',
+        url: url,
+        disposition: 'backgroundTab'
+      });
+      return;
+    }
+    navigateToUrl(url);
   }
 
   function recordSearchSuggestionSelection(suggestion, rawQuery) {
@@ -4699,12 +4893,24 @@
       maxWidth: 420
     })
     : null;
+  const shortcutTooltipController = globalThis.LumnoTooltip &&
+      typeof globalThis.LumnoTooltip.createController === 'function'
+    ? globalThis.LumnoTooltip.createController({
+      documentObj: document,
+      windowObj: window,
+      id: '_x_extension_newtab_shortcut_tooltip_2026_unique_',
+      className: 'x-nt-shortcut-tooltip',
+      appendTo: document.body,
+      maxWidth: 360
+    })
+    : null;
   const bookmarkCursorTooltipController = globalThis.LumnoCursorTooltip &&
       typeof globalThis.LumnoCursorTooltip.createController === 'function'
     ? globalThis.LumnoCursorTooltip.createController({
       documentObj: document,
       windowObj: window,
       id: '_x_extension_newtab_bookmark_cursor_tooltip_2026_unique_',
+      className: 'x-nt-bookmark-cursor-tooltip',
       appendTo: document.body,
       maxWidth: 460,
       offsetX: 14,
@@ -4733,14 +4939,64 @@
     topActionTooltipController.hide();
   }
 
+  function bindShortcutTooltip(target, getText, options) {
+    if (!shortcutTooltipController || !target) {
+      return null;
+    }
+    const tooltipOptions = options && typeof options === 'object' ? options : {};
+    const resolveText = typeof getText === 'function'
+      ? getText
+      : () => (typeof target.getAttribute === 'function' ? target.getAttribute('data-tooltip') : '');
+    return shortcutTooltipController.bind(target, (tooltipTarget) => {
+      if (isShortcutTooltipSuppressed()) {
+        return '';
+      }
+      return resolveText(tooltipTarget);
+    }, Object.assign({
+      placement: 'bottom',
+      maxWidth: 360,
+      spacing: -6,
+      showOnFocus: false
+    }, tooltipOptions));
+  }
+
+  function isShortcutTooltipSuppressed() {
+    return Boolean(
+      (shortcutDragState && shortcutDragState.isDragging) ||
+      (shortcutGrid && shortcutGrid.getAttribute('data-shortcut-dragging') === 'true') ||
+      isShortcutContextMenuOpen()
+    );
+  }
+
+  function hideShortcutTooltip() {
+    if (!shortcutTooltipController) {
+      return;
+    }
+    shortcutTooltipController.hide();
+  }
+
   function bindCursorTooltip(target, getText, options) {
     if (!bookmarkCursorTooltipController || !target) {
       return null;
     }
     const tooltipOptions = options && typeof options === 'object' ? options : {};
+    const originalShouldShow = typeof tooltipOptions.shouldShow === 'function'
+      ? tooltipOptions.shouldShow
+      : null;
     return bookmarkCursorTooltipController.bind(target, getText, Object.assign({
       maxWidth: 460
-    }, tooltipOptions));
+    }, tooltipOptions, {
+      shouldShow: (tooltipTarget, inputEvent) => {
+        if (isBookmarkCursorTooltipSuppressed(tooltipTarget)) {
+          return false;
+        }
+        return originalShouldShow ? originalShouldShow(tooltipTarget, inputEvent) !== false : true;
+      }
+    }));
+  }
+
+  function isBookmarkCursorTooltipSuppressed(target) {
+    return shouldSuppressBookmarkHover(target);
   }
 
   function hideCursorTooltip() {
@@ -4840,6 +5096,1470 @@
     return Boolean(section && section.getAttribute('data-visible') === 'true');
   }
 
+  function applyNewtabShortcutsVisibility() {
+    if (!shortcutSection) {
+      return;
+    }
+    setContentSectionVisible(shortcutSection, Boolean(newtabShortcutsVisible));
+    if (!newtabShortcutsVisible) {
+      resetShortcutDockHover();
+      closeShortcutContextMenu();
+      closeShortcutDialog();
+    }
+  }
+
+  function getShortcutStoreOptions(extraOptions) {
+    return {
+      key: NEWTAB_SHORTCUTS_STORAGE_KEY,
+      maxShortcuts: MAX_NEWTAB_SHORTCUTS,
+      normalizeHost,
+      sanitizeDisplayText,
+      ...(extraOptions || {})
+    };
+  }
+
+  function getShortcutTitle(shortcut) {
+    return sanitizeDisplayText(shortcut && shortcut.title ? shortcut.title : '') ||
+      sanitizeDisplayText(shortcut && shortcut.host ? shortcut.host : '') ||
+      sanitizeDisplayText(shortcut && shortcut.url ? shortcut.url : '') ||
+      t('newtab_shortcuts_add', 'Add shortcut');
+  }
+
+  function setShortcutError(message) {
+    if (!shortcutError) {
+      return;
+    }
+    const text = String(message || '').trim();
+    shortcutError.textContent = text;
+    shortcutError.setAttribute('data-visible', text ? 'true' : 'false');
+  }
+
+  function updateShortcutDialogLanguageStrings() {
+    const isEditMode = shortcutDialogMode === SHORTCUT_DIALOG_MODE_EDIT;
+    if (shortcutDialogTitle) {
+      shortcutDialogTitle.textContent = isEditMode
+        ? t('newtab_shortcuts_edit_dialog_title', 'Edit shortcut')
+        : t('newtab_shortcuts_dialog_title', 'Add shortcut');
+    }
+    if (shortcutNameLabel) {
+      shortcutNameLabel.textContent = t('newtab_shortcuts_name_label', 'Name');
+    }
+    if (shortcutUrlLabel) {
+      shortcutUrlLabel.textContent = t('newtab_shortcuts_url_label', 'URL');
+    }
+    if (shortcutNameInput) {
+      shortcutNameInput.placeholder = t('newtab_shortcuts_name_placeholder', 'Lumno');
+    }
+    if (shortcutUrlInput) {
+      shortcutUrlInput.placeholder = t('newtab_shortcuts_url_placeholder', 'https://example.com');
+    }
+    if (shortcutCancelButton) {
+      shortcutCancelButton.textContent = t('newtab_shortcuts_cancel', 'Cancel');
+    }
+    if (shortcutDoneButton) {
+      shortcutDoneButton.textContent = isEditMode
+        ? t('newtab_shortcuts_save', 'Save')
+        : t('newtab_shortcuts_done', 'Done');
+    }
+  }
+
+  function getShortcutContextMenuOptions() {
+    return [
+      {
+        value: SHORTCUT_CONTEXT_MENU_EDIT_VALUE,
+        label: t('shortcuts_edit', 'Edit')
+      },
+      {
+        value: SHORTCUT_CONTEXT_MENU_REMOVE_VALUE,
+        label: t('shortcuts_remove', 'Remove')
+      }
+    ];
+  }
+
+  function updateShortcutContextMenuLanguageStrings() {
+    if (!shortcutContextMenu || !shortcutContextMenuSelectController) {
+      return;
+    }
+    const label = t('newtab_shortcuts_context_menu_label', 'Shortcut actions');
+    if (shortcutContextMenu.trigger) {
+      shortcutContextMenu.trigger.setAttribute('aria-label', label);
+    }
+    if (typeof shortcutContextMenuSelectController.setOptions === 'function') {
+      shortcutContextMenuSelectController.setOptions(
+        shortcutContextMenu.control,
+        getShortcutContextMenuOptions(),
+        SHORTCUT_CONTEXT_MENU_EDIT_VALUE
+      );
+    }
+  }
+
+  function updateShortcutLanguageStrings() {
+    if (shortcutSection) {
+      shortcutSection.setAttribute('aria-label', t('newtab_shortcuts_section_label', 'Shortcuts'));
+    }
+    if (addShortcutButton) {
+      const addLabel = t('newtab_shortcuts_add', 'Add shortcut');
+      addShortcutButton.setAttribute('aria-label', addLabel);
+      addShortcutButton.setAttribute('data-tooltip', addLabel);
+    }
+    updateShortcutDialogLanguageStrings();
+    if (shortcutGrid) {
+      Array.from(shortcutGrid.querySelectorAll('.x-nt-shortcut-tile[data-shortcut-url]')).forEach((tile) => {
+        const title = tile.getAttribute('data-shortcut-title') || '';
+        tile.setAttribute('aria-label', formatMessage('open_prefix', '打开 {title}', { title }));
+      });
+    }
+    updateShortcutContextMenuLanguageStrings();
+  }
+
+  function closeShortcutDialog(options) {
+    if (!shortcutDialogBackdrop) {
+      return;
+    }
+    if (shortcutDialogOpenFrame) {
+      cancelAnimationFrame(shortcutDialogOpenFrame);
+      shortcutDialogOpenFrame = 0;
+    }
+    shortcutDialogBackdrop.removeAttribute('data-preparing');
+    if (shortcutDialogCloseTimer) {
+      clearTimeout(shortcutDialogCloseTimer);
+      shortcutDialogCloseTimer = 0;
+    }
+    shortcutDialogBackdrop.setAttribute('data-open', 'false');
+    if (shortcutDialogBackdrop.hidden) {
+      shortcutDialogBackdrop.hidden = true;
+    } else {
+      shortcutDialogCloseTimer = window.setTimeout(() => {
+        shortcutDialogCloseTimer = 0;
+        if (shortcutDialogBackdrop &&
+            shortcutDialogBackdrop.getAttribute('data-open') !== 'true') {
+          shortcutDialogBackdrop.hidden = true;
+        }
+      }, 180);
+    }
+    setShortcutError('');
+    if (options && options.restoreFocus && shortcutDialogPreviousFocus &&
+        typeof shortcutDialogPreviousFocus.focus === 'function') {
+      try {
+        shortcutDialogPreviousFocus.focus({ preventScroll: true });
+      } catch (error) {
+        shortcutDialogPreviousFocus.focus();
+      }
+    }
+    shortcutDialogPreviousFocus = null;
+  }
+
+  function clampShortcutDialogEnterOffset(value, limit) {
+    const raw = Number(value);
+    const max = Number.isFinite(Number(limit)) ? Math.max(0, Number(limit)) : 28;
+    if (!Number.isFinite(raw)) {
+      return 0;
+    }
+    return Math.max(-max, Math.min(max, raw));
+  }
+
+  function getShortcutDialogEnterOffset(sourceCenter, targetCenter) {
+    const delta = Number(sourceCenter) - Number(targetCenter);
+    if (!Number.isFinite(delta) || Math.abs(delta) < 4) {
+      return 0;
+    }
+    const offset = clampShortcutDialogEnterOffset(delta * 0.12, 28);
+    if (Math.abs(offset) < 6) {
+      return delta < 0 ? -6 : 6;
+    }
+    return offset;
+  }
+
+  function setShortcutDialogEnterDirection(sourceElement) {
+    if (!shortcutDialog) {
+      return;
+    }
+    let enterX = 0;
+    let enterY = 12;
+    let originX = 'center';
+    let originY = 'bottom';
+    if (sourceElement && typeof sourceElement.getBoundingClientRect === 'function') {
+      const sourceRect = sourceElement.getBoundingClientRect();
+      const dialogRect = shortcutDialog.getBoundingClientRect();
+      const viewportWidth = Math.max(0, window.innerWidth || document.documentElement.clientWidth || 0);
+      const viewportHeight = Math.max(0, window.innerHeight || document.documentElement.clientHeight || 0);
+      const targetX = dialogRect.width ? dialogRect.left + dialogRect.width / 2 : viewportWidth / 2;
+      const targetY = dialogRect.height ? dialogRect.top + dialogRect.height / 2 : viewportHeight / 2;
+      const sourceX = sourceRect.left + sourceRect.width / 2;
+      const sourceY = sourceRect.top + sourceRect.height / 2;
+      enterX = getShortcutDialogEnterOffset(sourceX, targetX);
+      enterY = getShortcutDialogEnterOffset(sourceY, targetY);
+      if (Math.abs(enterX) < 2) {
+        enterX = 0;
+      }
+      if (Math.abs(enterY) < 2) {
+        enterY = 0;
+      }
+      originX = enterX < -2 ? 'left' : enterX > 2 ? 'right' : 'center';
+      originY = enterY < -2 ? 'top' : enterY > 2 ? 'bottom' : 'center';
+    }
+    shortcutDialog.style.setProperty('--x-nt-shortcut-dialog-enter-x', `${Math.round(enterX)}px`);
+    shortcutDialog.style.setProperty('--x-nt-shortcut-dialog-enter-y', `${Math.round(enterY)}px`);
+    shortcutDialog.style.transformOrigin = `${originX} ${originY}`;
+  }
+
+  function setShortcutDialogMode(mode, shortcut) {
+    const isEditMode = mode === SHORTCUT_DIALOG_MODE_EDIT && shortcut;
+    shortcutDialogMode = isEditMode ? SHORTCUT_DIALOG_MODE_EDIT : SHORTCUT_DIALOG_MODE_ADD;
+    shortcutDialogEditingId = isEditMode ? String(shortcut.id || '') : '';
+    updateShortcutDialogLanguageStrings();
+    if (!isEditMode) {
+      return;
+    }
+    if (shortcutNameInput) {
+      shortcutNameInput.value = shortcut.title || '';
+    }
+    if (shortcutUrlInput) {
+      shortcutUrlInput.value = shortcut.url || '';
+    }
+  }
+
+  function openShortcutDialog() {
+    if (!shortcutDialogBackdrop || !shortcutForm) {
+      return;
+    }
+    const options = arguments.length > 0 ? arguments[0] : null;
+    const dialogMode = options && options.mode === SHORTCUT_DIALOG_MODE_EDIT
+      ? SHORTCUT_DIALOG_MODE_EDIT
+      : SHORTCUT_DIALOG_MODE_ADD;
+    shortcutDialogPreviousFocus = (options && options.sourceElement) || document.activeElement;
+    shortcutForm.reset();
+    setShortcutError('');
+    setShortcutDialogMode(dialogMode, options && options.shortcut);
+    if (shortcutDialogCloseTimer) {
+      clearTimeout(shortcutDialogCloseTimer);
+      shortcutDialogCloseTimer = 0;
+    }
+    if (shortcutDialogOpenFrame) {
+      cancelAnimationFrame(shortcutDialogOpenFrame);
+      shortcutDialogOpenFrame = 0;
+    }
+    shortcutDialogBackdrop.setAttribute('data-open', 'false');
+    shortcutDialogBackdrop.hidden = false;
+    shortcutDialogBackdrop.setAttribute('data-preparing', 'true');
+    setShortcutDialogEnterDirection(options && options.sourceElement);
+    if (shortcutDialog) {
+      void shortcutDialog.offsetWidth;
+    }
+    shortcutDialogOpenFrame = requestAnimationFrame(() => {
+      shortcutDialogOpenFrame = 0;
+      if (!shortcutDialogBackdrop || shortcutDialogBackdrop.hidden) {
+        return;
+      }
+      shortcutDialogBackdrop.removeAttribute('data-preparing');
+      if (shortcutDialog) {
+        void shortcutDialog.offsetWidth;
+      }
+      shortcutDialogBackdrop.setAttribute('data-open', 'true');
+      if (!shortcutNameInput) {
+        return;
+      }
+      try {
+        shortcutNameInput.focus({ preventScroll: true });
+      } catch (error) {
+        shortcutNameInput.focus();
+      }
+    });
+  }
+
+  function getShortcutTileFromNode(node) {
+    if (!shortcutGrid || !node) {
+      return null;
+    }
+    const tile = typeof node.closest === 'function'
+      ? node.closest('.x-nt-shortcut-tile')
+      : null;
+    return tile && shortcutGrid.contains(tile) ? tile : null;
+  }
+
+  function getShortcutDockPointerX(event) {
+    const value = Number(event && event.clientX);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  function getShortcutDockIcon(tile) {
+    return tile && typeof tile.querySelector === 'function'
+      ? tile.querySelector('.x-nt-shortcut-icon')
+      : null;
+  }
+
+  function resetShortcutDockTile(tile) {
+    if (!tile) {
+      return;
+    }
+    tile.removeAttribute('data-dock-distance');
+    tile.removeAttribute('data-dock-side');
+    const icon = getShortcutDockIcon(tile);
+    if (!icon || !icon.style || typeof icon.style.removeProperty !== 'function') {
+      return;
+    }
+    icon.style.removeProperty('--x-nt-shortcut-dock-scale');
+    icon.style.removeProperty('--x-nt-shortcut-dock-shift-x');
+    icon.style.removeProperty('--x-nt-shortcut-dock-rise');
+  }
+
+  function getShortcutDockInfluence(pointerX, icon) {
+    if (!icon || typeof icon.getBoundingClientRect !== 'function' || !Number.isFinite(pointerX)) {
+      return null;
+    }
+    const rect = icon.getBoundingClientRect();
+    const iconWidth = Math.max(1, rect.width || rect.height || 48);
+    const centerX = rect.left + ((rect.width || iconWidth) / 2);
+    const distancePx = Math.abs(pointerX - centerX);
+    const influenceRadius = Math.max(144, iconWidth * 4);
+    const raw = Math.max(0, 1 - (distancePx / influenceRadius));
+    const eased = raw * raw * (3 - (2 * raw));
+    return {
+      eased,
+      side: centerX < pointerX ? 'before' : centerX > pointerX ? 'after' : 'active'
+    };
+  }
+
+  function applyShortcutDockPointerStyles(tile, pointerX, offset) {
+    const icon = getShortcutDockIcon(tile);
+    const influence = getShortcutDockInfluence(pointerX, icon);
+    if (!icon || !influence || !icon.style || typeof icon.style.setProperty !== 'function') {
+      return;
+    }
+    const eased = Math.max(0, Math.min(1, influence.eased));
+    if (eased <= 0.015) {
+      icon.style.removeProperty('--x-nt-shortcut-dock-scale');
+      icon.style.removeProperty('--x-nt-shortcut-dock-shift-x');
+      icon.style.removeProperty('--x-nt-shortcut-dock-rise');
+      return;
+    }
+    const numericOffset = Number(offset);
+    const sideMultiplier = numericOffset < 0 ? -1 : numericOffset > 0 ? 1 : 0;
+    const distanceFalloff = sideMultiplier === 0
+      ? 0
+      : 1 / Math.max(1, Math.abs(numericOffset));
+    const landingTaper = Math.max(0, 1 - eased);
+    const shiftPx = sideMultiplier * 16 * eased * landingTaper * distanceFalloff;
+    icon.style.setProperty('--x-nt-shortcut-dock-scale', (1 + (0.28 * eased)).toFixed(3));
+    icon.style.setProperty('--x-nt-shortcut-dock-shift-x', `${Math.round(shiftPx)}px`);
+    icon.style.setProperty('--x-nt-shortcut-dock-rise', `${Math.round(-6 * eased)}px`);
+  }
+
+  function resetShortcutDockHover() {
+    if (!shortcutGrid) {
+      return;
+    }
+    if (isShortcutContextMenuOpen() && shortcutContextMenuTargetId) {
+      const activeTile = getShortcutTileById(shortcutContextMenuTargetId);
+      if (activeTile) {
+        applyShortcutContextMenuDockHover(activeTile);
+        return;
+      }
+    }
+    shortcutGrid.removeAttribute('data-dock-active');
+    Array.from(shortcutGrid.querySelectorAll('.x-nt-shortcut-tile')).forEach((tile) => {
+      resetShortcutDockTile(tile);
+    });
+    clearShortcutContextMenuTileActive();
+  }
+
+  function setShortcutDockHover(activeTile, pointerX) {
+    if (!shortcutGrid || !activeTile) {
+      return;
+    }
+    const tiles = Array.from(shortcutGrid.querySelectorAll('.x-nt-shortcut-tile'));
+    const activeIndex = tiles.indexOf(activeTile);
+    if (activeIndex < 0) {
+      resetShortcutDockHover();
+      return;
+    }
+    shortcutGrid.setAttribute('data-dock-active', 'true');
+    tiles.forEach((tile, index) => {
+      const offset = index - activeIndex;
+      const distance = Math.abs(offset);
+      if (distance > 2) {
+        resetShortcutDockTile(tile);
+        return;
+      }
+      tile.setAttribute('data-dock-distance', String(distance));
+      tile.setAttribute('data-dock-side', offset < 0 ? 'before' : offset > 0 ? 'after' : 'active');
+      if (Number.isFinite(pointerX)) {
+        applyShortcutDockPointerStyles(tile, pointerX, offset);
+      }
+    });
+  }
+
+  function handleShortcutDockPointerOver(event) {
+    if (shortcutDragState && shortcutDragState.isDragging) {
+      return;
+    }
+    const tile = getShortcutTileFromNode(event.target);
+    if (tile) {
+      setShortcutDockHover(tile, getShortcutDockPointerX(event));
+    }
+  }
+
+  function handleShortcutDockPointerMove(event) {
+    if (shortcutDragState && shortcutDragState.isDragging) {
+      return;
+    }
+    const tile = getShortcutTileFromNode(event.target);
+    if (tile) {
+      setShortcutDockHover(tile, getShortcutDockPointerX(event));
+    }
+  }
+
+  function getShortcutTileId(tile) {
+    return tile && typeof tile.getAttribute === 'function'
+      ? tile.getAttribute('data-shortcut-id') || ''
+      : '';
+  }
+
+  function refreshShortcutTileCacheFromDom() {
+    if (!shortcutGrid) {
+      return;
+    }
+    shortcutTiles.length = 0;
+    Array.from(shortcutGrid.querySelectorAll('.x-nt-shortcut-tile[data-shortcut-id]')).forEach((tile) => {
+      shortcutTiles.push(tile);
+    });
+  }
+
+  function getShortcutReorderTiles() {
+    return shortcutGrid
+      ? Array.from(shortcutGrid.querySelectorAll('.x-nt-shortcut-tile[data-shortcut-id]'))
+      : [];
+  }
+
+  function getShortcutById(shortcutId) {
+    const id = String(shortcutId || '');
+    if (!id) {
+      return null;
+    }
+    return newtabShortcuts.find((item) => item && item.id === id) || null;
+  }
+
+  function getShortcutTileById(shortcutId) {
+    const id = String(shortcutId || '');
+    if (!id) {
+      return null;
+    }
+    return getShortcutReorderTiles().find((tile) => getShortcutTileId(tile) === id) || null;
+  }
+
+  function isShortcutContextMenuOpen() {
+    return Boolean(
+      shortcutContextMenu &&
+      shortcutContextMenuSelectController &&
+      shortcutContextMenuSelectController.isOpen(shortcutContextMenu.control)
+    );
+  }
+
+  function isShortcutContextMenuNode(node) {
+    if (!node || !shortcutContextMenu) {
+      return false;
+    }
+    const { control, menu } = shortcutContextMenu;
+    return Boolean(
+      (control && (node === control || (typeof control.contains === 'function' && control.contains(node)))) ||
+      (menu && (node === menu || (typeof menu.contains === 'function' && menu.contains(node))))
+    );
+  }
+
+  function clearShortcutContextMenuTileActive() {
+    getShortcutReorderTiles().forEach((tile) => {
+      tile.removeAttribute('data-shortcut-context-menu-open');
+    });
+  }
+
+  function setShortcutContextMenuTileActive(shortcutId) {
+    clearShortcutContextMenuTileActive();
+    const tile = getShortcutTileById(shortcutId);
+    if (tile) {
+      tile.setAttribute('data-shortcut-context-menu-open', 'true');
+    }
+  }
+
+  function getShortcutContextMenuAnchorElement(tile) {
+    return getShortcutDockIcon(tile) || tile;
+  }
+
+  function getShortcutContextMenuAnchorX(tile) {
+    const anchor = getShortcutContextMenuAnchorElement(tile);
+    if (!anchor || typeof anchor.getBoundingClientRect !== 'function') {
+      return null;
+    }
+    const rect = anchor.getBoundingClientRect();
+    const centerX = rect.left + (rect.width / 2);
+    return Number.isFinite(centerX) ? centerX : null;
+  }
+
+  function applyShortcutContextMenuDockHover(tile) {
+    if (!tile) {
+      return;
+    }
+    setShortcutDockHover(tile, getShortcutContextMenuAnchorX(tile));
+    tile.setAttribute('data-shortcut-context-menu-open', 'true');
+  }
+
+  function syncShortcutDockHoverFromPoint(clientX, clientY) {
+    const pointerX = Number(clientX);
+    const pointerY = Number(clientY);
+    if (!Number.isFinite(pointerX) || !Number.isFinite(pointerY) ||
+        typeof document.elementFromPoint !== 'function') {
+      resetShortcutDockHover();
+      return;
+    }
+    const tile = getShortcutTileFromNode(document.elementFromPoint(pointerX, pointerY));
+    if (tile) {
+      setShortcutDockHover(tile, pointerX);
+      return;
+    }
+    resetShortcutDockHover();
+  }
+
+  function closeShortcutContextMenu(options) {
+    const closeOptions = options && typeof options === 'object' ? options : {};
+    if (!shortcutContextMenu || !shortcutContextMenuSelectController) {
+      shortcutContextMenuTargetId = '';
+      clearShortcutContextMenuTileActive();
+      return;
+    }
+    const wasOpen = isShortcutContextMenuOpen() || Boolean(shortcutContextMenuTargetId);
+    shortcutContextMenuSelectController.setOpen(shortcutContextMenu.control, false);
+    shortcutContextMenuTargetId = '';
+    clearShortcutContextMenuTileActive();
+    if (!wasOpen) {
+      return;
+    }
+    if (closeOptions.syncHoverFromPointer) {
+      syncShortcutDockHoverFromPoint(closeOptions.clientX, closeOptions.clientY);
+      return;
+    }
+    resetShortcutDockHover();
+  }
+
+  function getShortcutContextMenuPoint(tile) {
+    const anchor = getShortcutContextMenuAnchorElement(tile);
+    if (anchor && typeof anchor.getBoundingClientRect === 'function') {
+      const rect = anchor.getBoundingClientRect();
+      return {
+        x: Math.round(rect.left + rect.width / 2),
+        y: Math.round(rect.bottom)
+      };
+    }
+    return { x: 0, y: 0 };
+  }
+
+  function setShortcutContextMenuPosition(tile) {
+    if (!shortcutContextMenu || !shortcutContextMenu.control) {
+      return;
+    }
+    const point = getShortcutContextMenuPoint(tile);
+    shortcutContextMenu.control.style.left = `${Math.round(point.x)}px`;
+    shortcutContextMenu.control.style.top = `${Math.round(point.y)}px`;
+  }
+
+  function handleShortcutContextMenuAction(actionValue) {
+    const action = String(actionValue || '');
+    const targetId = shortcutContextMenuTargetId;
+    const shortcut = getShortcutById(targetId);
+    const sourceElement = getShortcutTileById(targetId);
+    closeShortcutContextMenu();
+    if (!shortcut || !action) {
+      return;
+    }
+    if (action === SHORTCUT_CONTEXT_MENU_EDIT_VALUE) {
+      openShortcutEditor(shortcut, sourceElement);
+      return;
+    }
+    if (action === SHORTCUT_CONTEXT_MENU_REMOVE_VALUE) {
+      removeShortcutById(targetId);
+    }
+  }
+
+  function handleShortcutContextMenuActionClick(event) {
+    const target = event && event.target;
+    const option = target && typeof target.closest === 'function'
+      ? target.closest('._x_extension_select_option_2024_unique_')
+      : null;
+    if (!option || !shortcutContextMenu || !shortcutContextMenu.menu ||
+        !shortcutContextMenu.menu.contains(option)) {
+      return;
+    }
+    event.stopPropagation();
+    handleShortcutContextMenuAction(option.getAttribute('data-value'));
+  }
+
+  function handleShortcutContextMenuDocumentPointerDown(event) {
+    if (!isShortcutContextMenuOpen() || isShortcutContextMenuNode(event.target)) {
+      return;
+    }
+    closeShortcutContextMenu({
+      syncHoverFromPointer: true,
+      clientX: event.clientX,
+      clientY: event.clientY
+    });
+  }
+
+  function createShortcutContextMenu() {
+    if (!shortcutContextMenuSelectController ||
+        typeof shortcutContextMenuSelectController.createSelect !== 'function') {
+      return null;
+    }
+    const created = shortcutContextMenuSelectController.createSelect({
+      id: '_x_extension_newtab_shortcut_context_menu_2026_unique_',
+      selectId: '_x_extension_newtab_shortcut_context_menu_select_2026_unique_',
+      className: 'x-nt-shortcut-context-menu',
+      iconOnly: true,
+      triggerIconClass: 'ri-more-line',
+      menuClassName: 'x-nt-shortcut-context-menu-portal',
+      menuAlign: 'middle',
+      menuWidth: 'content',
+      menuMinWidth: SHORTCUT_CONTEXT_MENU_MIN_WIDTH_PX,
+      menuMaxWidth: SHORTCUT_CONTEXT_MENU_MAX_WIDTH_PX,
+      menuPortal: true,
+      menuPortalZIndex: SHORTCUT_CONTEXT_MENU_PORTAL_Z_INDEX,
+      menuPortalOffset: SHORTCUT_CONTEXT_MENU_PORTAL_OFFSET_PX,
+      value: SHORTCUT_CONTEXT_MENU_EDIT_VALUE,
+      ariaLabel: t('newtab_shortcuts_context_menu_label', 'Shortcut actions'),
+      options: getShortcutContextMenuOptions()
+    });
+    const control = created.wrapper;
+    const select = created.select;
+    const trigger = created.trigger;
+    const menu = created.menu;
+    if (!control || !select || !trigger || !menu) {
+      return null;
+    }
+    trigger.tabIndex = -1;
+    const stopContextMenuEvent = (event) => {
+      event.stopPropagation();
+    };
+    [control, trigger, menu].forEach((element) => {
+      element.addEventListener('pointerdown', stopContextMenuEvent);
+      element.addEventListener('click', stopContextMenuEvent);
+      element.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
+    });
+    menu.addEventListener('click', handleShortcutContextMenuActionClick);
+    document.addEventListener('pointerdown', handleShortcutContextMenuDocumentPointerDown, true);
+    (document.body || shortcutSection || document.documentElement).appendChild(control);
+    return {
+      control,
+      select,
+      trigger,
+      menu
+    };
+  }
+
+  function openShortcutContextMenu(tile) {
+    const shortcutId = getShortcutTileId(tile);
+    if (!shortcutId) {
+      return;
+    }
+    if (!shortcutContextMenu) {
+      shortcutContextMenu = createShortcutContextMenu();
+    }
+    if (!shortcutContextMenu || !shortcutContextMenuSelectController) {
+      return;
+    }
+    hideShortcutTooltip();
+    resetShortcutDockHover();
+    shortcutContextMenuTargetId = shortcutId;
+    setShortcutContextMenuTileActive(shortcutId);
+    applyShortcutContextMenuDockHover(tile);
+    setShortcutContextMenuPosition(tile);
+    if (typeof shortcutContextMenuSelectController.setOptions === 'function') {
+      shortcutContextMenuSelectController.setOptions(
+        shortcutContextMenu.control,
+        getShortcutContextMenuOptions(),
+        SHORTCUT_CONTEXT_MENU_EDIT_VALUE
+      );
+    }
+    shortcutContextMenu.select.value = SHORTCUT_CONTEXT_MENU_EDIT_VALUE;
+    shortcutContextMenuSelectController.sync(shortcutContextMenu.control);
+    shortcutContextMenuSelectController.setOpen(shortcutContextMenu.control, true);
+  }
+
+  function handleShortcutContextMenu(event) {
+    const tile = getShortcutTileFromNode(event.currentTarget || event.target);
+    if (!tile || !getShortcutTileId(tile)) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    openShortcutContextMenu(tile);
+  }
+
+  function handleShortcutNativeDragStart(event) {
+    if (event && typeof event.preventDefault === 'function') {
+      event.preventDefault();
+    }
+  }
+
+  function openShortcutEditor(shortcut, sourceElement) {
+    if (!shortcut) {
+      return;
+    }
+    openShortcutDialog({
+      mode: SHORTCUT_DIALOG_MODE_EDIT,
+      shortcut,
+      sourceElement
+    });
+  }
+
+  function getShortcutTileRectMap() {
+    const rects = new Map();
+    getShortcutReorderTiles().forEach((tile) => {
+      if (tile && typeof tile.getBoundingClientRect === 'function') {
+        rects.set(tile, tile.getBoundingClientRect());
+      }
+    });
+    return rects;
+  }
+
+  function getShortcutTileLayoutRect(tile) {
+    if (!tile || !shortcutGrid || typeof tile.offsetLeft !== 'number' ||
+        typeof tile.offsetTop !== 'number') {
+      return null;
+    }
+    const offsetParent = tile.offsetParent && typeof tile.offsetParent.getBoundingClientRect === 'function'
+      ? tile.offsetParent
+      : shortcutGrid;
+    const parentRect = typeof offsetParent.getBoundingClientRect === 'function'
+      ? offsetParent.getBoundingClientRect()
+      : { left: 0, top: 0 };
+    const width = Number(tile.offsetWidth) || 0;
+    const height = Number(tile.offsetHeight) || 0;
+    const left = parentRect.left + tile.offsetLeft;
+    const top = parentRect.top + tile.offsetTop;
+    return {
+      left,
+      top,
+      right: left + width,
+      bottom: top + height,
+      width,
+      height,
+      centerX: left + (width / 2),
+      centerY: top + (height / 2)
+    };
+  }
+
+  function clearShortcutTileLayoutAnimation(tile) {
+    if (!tile || !tile.style) {
+      return;
+    }
+    if (tile._xShortcutLayoutAnimationTimer) {
+      window.clearTimeout(tile._xShortcutLayoutAnimationTimer);
+      tile._xShortcutLayoutAnimationTimer = 0;
+    }
+    tile.style.removeProperty('transition');
+    if (tile.getAttribute && tile.getAttribute('data-shortcut-dragging') !== 'true' &&
+        tile.getAttribute('data-shortcut-dropping') !== 'true') {
+      tile.style.removeProperty('transform');
+    }
+  }
+
+  function animateShortcutLayoutShift(beforeRects, draggedTile) {
+    if (!beforeRects || !shortcutGrid) {
+      return;
+    }
+    getShortcutReorderTiles().forEach((tile) => {
+      if (!tile || tile === draggedTile || !tile.style || typeof tile.getBoundingClientRect !== 'function') {
+        return;
+      }
+      const before = beforeRects.get(tile);
+      if (!before) {
+        return;
+      }
+      clearShortcutTileLayoutAnimation(tile);
+      const after = tile.getBoundingClientRect();
+      const dx = before.left - after.left;
+      const dy = before.top - after.top;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+        return;
+      }
+      tile.style.transition = 'none';
+      tile.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+      void tile.offsetWidth;
+      window.requestAnimationFrame(() => {
+        if (!tile.isConnected) {
+          return;
+        }
+        tile.style.transition = `transform ${SHORTCUT_REORDER_ANIMATION_MS}ms ${SHORTCUT_REORDER_EASING}`;
+        tile.style.transform = 'translate3d(0, 0, 0)';
+        tile._xShortcutLayoutAnimationTimer = window.setTimeout(() => {
+          tile._xShortcutLayoutAnimationTimer = 0;
+          clearShortcutTileLayoutAnimation(tile);
+        }, SHORTCUT_REORDER_ANIMATION_MS + 80);
+      });
+    });
+  }
+
+  function setShortcutDragTileTransform(state, pointerX, pointerY) {
+    if (!state || !state.tile || !state.tile.style ||
+        typeof state.tile.getBoundingClientRect !== 'function') {
+      return;
+    }
+    const rect = state.tile.getBoundingClientRect();
+    const currentX = Number(state.translateX) || 0;
+    const currentY = Number(state.translateY) || 0;
+    const baseLeft = rect.left - currentX;
+    const baseTop = rect.top - currentY;
+    const nextX = pointerX - state.grabOffsetX - baseLeft;
+    const nextY = pointerY - state.grabOffsetY - baseTop;
+    state.translateX = nextX;
+    state.translateY = nextY;
+    state.tile.style.transition = 'none';
+    state.tile.style.transform = `translate3d(${nextX}px, ${nextY}px, 0)`;
+  }
+
+  function settleShortcutDragTile(tile) {
+    if (!tile || !tile.style) {
+      return;
+    }
+    tile.setAttribute('data-shortcut-dropping', 'true');
+    tile.style.pointerEvents = '';
+    tile.style.transition = `transform ${SHORTCUT_DROP_ANIMATION_MS}ms ${SHORTCUT_REORDER_EASING}`;
+    tile.style.transform = 'translate3d(0, 0, 0)';
+    if (tile._xShortcutDropTimer) {
+      window.clearTimeout(tile._xShortcutDropTimer);
+    }
+    tile._xShortcutDropTimer = window.setTimeout(() => {
+      tile._xShortcutDropTimer = 0;
+      tile.removeAttribute('data-shortcut-dragging');
+      tile.removeAttribute('data-shortcut-dropping');
+      tile.style.removeProperty('transition');
+      tile.style.removeProperty('transform');
+      tile.style.removeProperty('will-change');
+      tile.style.pointerEvents = '';
+    }, SHORTCUT_DROP_ANIMATION_MS + 90);
+  }
+
+  function getShortcutTileInsertionIndex(tile) {
+    if (!tile) {
+      return -1;
+    }
+    return getShortcutReorderTiles().indexOf(tile);
+  }
+
+  function getShortcutDragInsertionIndex(pointerX, pointerY) {
+    if (!shortcutGrid || !shortcutDragState || !Number.isFinite(pointerX) ||
+        !Number.isFinite(pointerY)) {
+      return -1;
+    }
+    const draggedTile = shortcutDragState.tile;
+    const layoutItems = getShortcutReorderTiles()
+      .filter((tile) => tile && tile !== draggedTile)
+      .map((tile) => ({
+        tile,
+        rect: getShortcutTileLayoutRect(tile)
+      }))
+      .filter((item) => item.rect && item.rect.width > 0 && item.rect.height > 0);
+    if (!layoutItems.length) {
+      return 0;
+    }
+    let nearestItem = layoutItems[0];
+    let nearestDistance = Infinity;
+    layoutItems.forEach((item) => {
+      const rect = item.rect;
+      const verticalDistance = pointerY < rect.top
+        ? rect.top - pointerY
+        : pointerY > rect.bottom
+          ? pointerY - rect.bottom
+          : 0;
+      if (verticalDistance < nearestDistance) {
+        nearestDistance = verticalDistance;
+        nearestItem = item;
+      }
+    });
+    const rowCenterY = nearestItem.rect.centerY;
+    const rowTiles = layoutItems
+      .filter((item) => Math.abs(item.rect.centerY - rowCenterY) <=
+        Math.max(8, Math.min(item.rect.height, nearestItem.rect.height) / 2))
+      .sort((first, second) => first.rect.left - second.rect.left);
+    const insertionAnchor = rowTiles.find((item) => pointerX < item.rect.centerX);
+    if (insertionAnchor) {
+      return layoutItems.findIndex((item) => item.tile === insertionAnchor.tile);
+    }
+    const lastRowTile = rowTiles[rowTiles.length - 1];
+    return layoutItems.findIndex((item) => item.tile === lastRowTile.tile) + 1;
+  }
+
+  function moveShortcutTileElement(tile, targetIndex) {
+    if (!shortcutGrid || !tile || tile.parentNode !== shortcutGrid ||
+        !Number.isFinite(targetIndex)) {
+      return false;
+    }
+    const currentIndex = getShortcutTileInsertionIndex(tile);
+    const remainingTiles = getShortcutReorderTiles().filter((item) => item !== tile);
+    const boundedIndex = Math.max(0, Math.min(remainingTiles.length, targetIndex));
+    if (currentIndex === boundedIndex) {
+      return false;
+    }
+    shortcutGrid.insertBefore(tile, remainingTiles[boundedIndex] || null);
+    refreshShortcutTileCacheFromDom();
+    return true;
+  }
+
+  function moveShortcutItem(shortcutId, targetIndex) {
+    if (!shortcutId || !Number.isFinite(targetIndex)) {
+      return false;
+    }
+    const currentIndex = newtabShortcuts.findIndex((item) => item && item.id === shortcutId);
+    if (currentIndex < 0) {
+      return false;
+    }
+    const nextShortcuts = newtabShortcuts.slice();
+    const shortcutItem = nextShortcuts.splice(currentIndex, 1)[0];
+    const boundedIndex = Math.max(0, Math.min(nextShortcuts.length, targetIndex));
+    if (currentIndex === boundedIndex) {
+      return false;
+    }
+    nextShortcuts.splice(boundedIndex, 0, shortcutItem);
+    newtabShortcuts = nextShortcuts;
+    return true;
+  }
+
+  function persistShortcutOrder() {
+    const options = getShortcutStoreOptions();
+    newtabShortcuts = NEWTAB_SHORTCUTS_STORE.normalizeShortcuts(newtabShortcuts, options);
+    if (!storageArea) {
+      return Promise.resolve(newtabShortcuts);
+    }
+    return NEWTAB_SHORTCUTS_STORE.saveShortcuts(storageArea, newtabShortcuts, options).then((items) => {
+      newtabShortcuts = Array.isArray(items) ? items : newtabShortcuts;
+      return newtabShortcuts;
+    });
+  }
+
+  function startShortcutDrag(event, tile) {
+    if (!shortcutGrid || !tile || !shortcutDragState || shortcutDragState.tile !== tile) {
+      return;
+    }
+    shortcutDragState.isDragging = true;
+    hideShortcutTooltip();
+    resetShortcutDockHover();
+    shortcutGrid.setAttribute('data-shortcut-dragging', 'true');
+    tile.setAttribute('data-shortcut-dragging', 'true');
+    tile.setAttribute('aria-grabbed', 'true');
+    tile.style.pointerEvents = 'none';
+    tile.style.willChange = 'transform';
+    setShortcutDragTileTransform(shortcutDragState, Number(event.clientX), Number(event.clientY));
+    if (typeof tile.setPointerCapture === 'function') {
+      try {
+        tile.setPointerCapture(event.pointerId);
+      } catch (error) {
+        // Pointer capture can fail if the browser already canceled the pointer.
+      }
+    }
+  }
+
+  function finishShortcutDrag(event, options) {
+    if (!shortcutDragState) {
+      return;
+    }
+    if (event && shortcutDragState.pointerId !== event.pointerId) {
+      return;
+    }
+    const state = shortcutDragState;
+    shortcutDragState = null;
+    const tile = state.tile;
+    if (shortcutGrid) {
+      shortcutGrid.removeAttribute('data-shortcut-dragging');
+    }
+    if (tile) {
+      tile.removeAttribute('aria-grabbed');
+      if (typeof tile.releasePointerCapture === 'function' && event) {
+        try {
+          tile.releasePointerCapture(event.pointerId);
+        } catch (error) {
+          // Ignore stale pointer capture releases.
+        }
+      }
+      if (state.isDragging) {
+        settleShortcutDragTile(tile);
+      } else {
+        tile.removeAttribute('data-shortcut-dragging');
+        tile.removeAttribute('data-shortcut-dropping');
+        tile.style.pointerEvents = '';
+      }
+      if (state.isDragging) {
+        tile._xShortcutSuppressClick = true;
+        window.setTimeout(() => {
+          tile._xShortcutSuppressClick = false;
+        }, 0);
+      }
+    }
+    if (state.isDragging && state.hasReordered) {
+      if (event && typeof event.preventDefault === 'function') {
+        event.preventDefault();
+      }
+      persistShortcutOrder().then(() => {
+        scheduleWallpaperAdaptiveToneUpdate();
+      });
+      return;
+    }
+    if (options && options.cancel) {
+      resetShortcutDockHover();
+    }
+  }
+
+  function handleShortcutDragPointerDown(event) {
+    if (isShortcutContextMenuNode(event.target)) {
+      return;
+    }
+    const tile = getShortcutTileFromNode(event.target);
+    const shortcutId = getShortcutTileId(tile);
+    if (!tile || !shortcutId || (event.pointerType === 'mouse' && event.button !== 0)) {
+      return;
+    }
+    closeShortcutContextMenu();
+    shortcutDragState = {
+      pointerId: event.pointerId,
+      tile,
+      shortcutId,
+      startX: Number(event.clientX),
+      startY: Number(event.clientY),
+      grabOffsetX: 0,
+      grabOffsetY: 0,
+      translateX: 0,
+      translateY: 0,
+      isDragging: false,
+      hasReordered: false
+    };
+    if (typeof tile.getBoundingClientRect === 'function') {
+      const rect = tile.getBoundingClientRect();
+      shortcutDragState.grabOffsetX = Number(event.clientX) - rect.left;
+      shortcutDragState.grabOffsetY = Number(event.clientY) - rect.top;
+    }
+    if (typeof tile.setPointerCapture === 'function') {
+      try {
+        tile.setPointerCapture(event.pointerId);
+      } catch (error) {
+        // Pointer capture can fail if the browser already canceled the pointer.
+      }
+    }
+  }
+
+  function handleShortcutDragPointerMove(event) {
+    if (!shortcutDragState || shortcutDragState.pointerId !== event.pointerId) {
+      return;
+    }
+    const pointerX = Number(event.clientX);
+    const pointerY = Number(event.clientY);
+    if (!Number.isFinite(pointerX) || !Number.isFinite(pointerY)) {
+      return;
+    }
+    const dx = pointerX - shortcutDragState.startX;
+    const dy = pointerY - shortcutDragState.startY;
+    if (!shortcutDragState.isDragging &&
+        Math.hypot(dx, dy) < SHORTCUT_DRAG_START_THRESHOLD_PX) {
+      return;
+    }
+    if (!shortcutDragState.isDragging) {
+      startShortcutDrag(event, shortcutDragState.tile);
+    }
+    if (!shortcutDragState.isDragging) {
+      return;
+    }
+    event.preventDefault();
+    setShortcutDragTileTransform(shortcutDragState, pointerX, pointerY);
+    const targetIndex = getShortcutDragInsertionIndex(pointerX, pointerY);
+    if (targetIndex < 0 || targetIndex === getShortcutTileInsertionIndex(shortcutDragState.tile)) {
+      return;
+    }
+    const beforeRects = getShortcutTileRectMap();
+    if (moveShortcutItem(shortcutDragState.shortcutId, targetIndex) &&
+        moveShortcutTileElement(shortcutDragState.tile, targetIndex)) {
+      animateShortcutLayoutShift(beforeRects, shortcutDragState.tile);
+      setShortcutDragTileTransform(shortcutDragState, pointerX, pointerY);
+      shortcutDragState.hasReordered = true;
+    }
+  }
+
+  function handleShortcutDragPointerUp(event) {
+    finishShortcutDrag(event);
+  }
+
+  function handleShortcutDragPointerCancel(event) {
+    finishShortcutDrag(event, { cancel: true });
+  }
+
+  function renderShortcutTile(shortcut) {
+    const title = getShortcutTitle(shortcut);
+    const shortcutHost = shortcut && shortcut.host ? shortcut.host : getHostFromUrl(shortcut && shortcut.url);
+    const themeSuggestion = { type: 'shortcut', url: shortcut.url, title };
+    const immediateTheme = getImmediateThemeForSuggestion(themeSuggestion);
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = 'x-nt-shortcut-tile';
+    tile.draggable = false;
+    tile.setAttribute('data-shortcut-id', shortcut.id || shortcut.url || '');
+    tile.setAttribute('data-shortcut-url', shortcut.url || '');
+    tile.setAttribute('data-shortcut-title', title);
+    tile.setAttribute('data-shortcut-draggable', 'true');
+    tile.setAttribute('data-tooltip', title);
+    tile.setAttribute('aria-label', formatMessage('open_prefix', '打开 {title}', { title }));
+    tile._xHost = shortcutHost;
+    tile._xTheme = immediateTheme;
+    applyShortcutTileTheme(tile, immediateTheme, shortcutHost);
+    queueThemeForTarget(tile, themeSuggestion, (theme) => {
+      if (!tile.isConnected) {
+        return;
+      }
+      tile._xTheme = theme || tile._xTheme;
+      applyShortcutTileTheme(tile, theme, shortcutHost);
+    }, { priority: 0 });
+    tile.addEventListener('click', (event) => {
+      if (tile._xShortcutSuppressClick) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      hideShortcutTooltip();
+      navigateToUrl(shortcut.url);
+    });
+    tile.addEventListener('contextmenu', handleShortcutContextMenu);
+    tile.addEventListener('dragstart', handleShortcutNativeDragStart);
+
+    const icon = document.createElement('span');
+    icon.className = 'x-nt-shortcut-icon';
+    const faviconMask = document.createElement('span');
+    faviconMask.className = 'x-nt-shortcut-favicon-mask';
+    const img = document.createElement('img');
+    img.className = 'x-nt-shortcut-favicon';
+    img.alt = '';
+    img.loading = 'lazy';
+    img.draggable = false;
+    img.setAttribute('draggable', 'false');
+    attachFaviconWithFallbacks(img, shortcut.url, shortcut.host, {
+      primaryUrl: getBrowserPageFaviconUrl(shortcut.url)
+    });
+    faviconMask.appendChild(img);
+    icon.appendChild(faviconMask);
+
+    tile.appendChild(icon);
+    shortcutTiles.push(tile);
+    bindShortcutTooltip(tile, () => tile.getAttribute('data-shortcut-title') || title, {
+      maxWidth: 360
+    });
+    return tile;
+  }
+
+  function renderShortcuts() {
+    if (!shortcutGrid || !addShortcutButton) {
+      return;
+    }
+    hideShortcutTooltip();
+    closeShortcutContextMenu();
+    shortcutGrid.innerHTML = '';
+    shortcutTiles.length = 0;
+    const items = NEWTAB_SHORTCUTS_STORE.normalizeShortcuts
+      ? NEWTAB_SHORTCUTS_STORE.normalizeShortcuts(newtabShortcuts, getShortcutStoreOptions())
+      : [];
+    newtabShortcuts = items;
+    items.forEach((shortcut) => {
+      shortcutGrid.appendChild(renderShortcutTile(shortcut));
+    });
+    shortcutGrid.appendChild(addShortcutButton);
+    if (shortcutSection) {
+      shortcutSection.setAttribute('data-count', String(items.length));
+    }
+    applyNewtabShortcutsVisibility();
+    updateShortcutLanguageStrings();
+    scheduleWallpaperAdaptiveToneUpdate();
+  }
+
+  function loadShortcuts() {
+    if (!storageArea) {
+      newtabShortcuts = typeof NEWTAB_SHORTCUTS_STORE.getDefaultShortcuts === 'function'
+        ? NEWTAB_SHORTCUTS_STORE.getDefaultShortcuts(getShortcutStoreOptions())
+        : [];
+      renderShortcuts();
+      return Promise.resolve(newtabShortcuts);
+    }
+    return NEWTAB_SHORTCUTS_STORE.loadShortcuts(storageArea, getShortcutStoreOptions()).then((items) => {
+      newtabShortcuts = Array.isArray(items) ? items : [];
+      renderShortcuts();
+      return newtabShortcuts;
+    });
+  }
+
+  function loadNewtabShortcutsVisibility() {
+    if (!storageArea) {
+      newtabShortcutsVisible = true;
+      applyNewtabShortcutsVisibility();
+      return Promise.resolve(newtabShortcutsVisible);
+    }
+    return new Promise((resolve) => {
+      storageArea.get([NEWTAB_SHORTCUTS_VISIBLE_STORAGE_KEY], (result) => {
+        const raw = result && result[NEWTAB_SHORTCUTS_VISIBLE_STORAGE_KEY];
+        const nextValue = normalizeNewtabShortcutsVisible(raw);
+        newtabShortcutsVisible = nextValue;
+        if (raw !== nextValue) {
+          storageArea.set({ [NEWTAB_SHORTCUTS_VISIBLE_STORAGE_KEY]: nextValue });
+        }
+        applyNewtabShortcutsVisibility();
+        resolve(newtabShortcutsVisible);
+      });
+    });
+  }
+
+  function loadVisibleShortcuts() {
+    const shortcutsReadyPromise = loadShortcuts();
+    return shortcutsReadyPromise;
+  }
+
+  function persistShortcuts(nextShortcuts, toastMessage) {
+    const options = getShortcutStoreOptions();
+    const normalized = NEWTAB_SHORTCUTS_STORE.normalizeShortcuts(nextShortcuts, options);
+    if (!storageArea) {
+      newtabShortcuts = normalized;
+      renderShortcuts();
+      if (toastMessage) {
+        showToast(toastMessage);
+      }
+      return Promise.resolve(true);
+    }
+    return NEWTAB_SHORTCUTS_STORE.saveShortcuts(storageArea, normalized, options).then((items) => {
+      newtabShortcuts = Array.isArray(items) ? items : normalized;
+      renderShortcuts();
+      if (toastMessage) {
+        showToast(toastMessage);
+      }
+      return true;
+    });
+  }
+
+  function saveNewShortcutFromDialog(title, url) {
+    const options = getShortcutStoreOptions();
+    const nextShortcut = NEWTAB_SHORTCUTS_STORE.createShortcutRecord({ title, url }, options);
+    if (!nextShortcut) {
+      setShortcutError(t('newtab_shortcuts_invalid_url', 'Enter a valid http or https URL.'));
+      return Promise.resolve(false);
+    }
+    if (!storageArea) {
+      const withoutDuplicate = newtabShortcuts.filter((item) => item && item.url !== nextShortcut.url);
+      const nextShortcuts = withoutDuplicate.concat(nextShortcut).slice(-MAX_NEWTAB_SHORTCUTS);
+      return persistShortcuts(nextShortcuts, t('newtab_shortcuts_added', 'Shortcut added'));
+    }
+    return NEWTAB_SHORTCUTS_STORE.saveShortcut(storageArea, { title, url }, options).then((items) => {
+      newtabShortcuts = Array.isArray(items) ? items : [];
+      renderShortcuts();
+      showToast(t('newtab_shortcuts_added', 'Shortcut added'));
+      return true;
+    });
+  }
+
+  function saveEditedShortcutFromDialog(title, url) {
+    const currentShortcut = getShortcutById(shortcutDialogEditingId);
+    if (!currentShortcut) {
+      setShortcutError(t('newtab_shortcuts_invalid_url', 'Enter a valid http or https URL.'));
+      return Promise.resolve(false);
+    }
+    const options = getShortcutStoreOptions();
+    const nextShortcut = NEWTAB_SHORTCUTS_STORE.createShortcutRecord({ title, url }, options);
+    if (!nextShortcut) {
+      setShortcutError(t('newtab_shortcuts_invalid_url', 'Enter a valid http or https URL.'));
+      return Promise.resolve(false);
+    }
+    nextShortcut.id = currentShortcut.id;
+    nextShortcut.createdAt = currentShortcut.createdAt;
+    nextShortcut.updatedAt = Date.now();
+    const nextShortcuts = [];
+    newtabShortcuts.forEach((item) => {
+      if (!item) {
+        return;
+      }
+      if (item.id === currentShortcut.id) {
+        nextShortcuts.push(nextShortcut);
+        return;
+      }
+      if (item.url === nextShortcut.url) {
+        return;
+      }
+      nextShortcuts.push(item);
+    });
+    return persistShortcuts(nextShortcuts, t('newtab_shortcuts_edited', 'Shortcut updated'));
+  }
+
+  function saveShortcutFromDialog(title, url) {
+    if (shortcutDialogMode === SHORTCUT_DIALOG_MODE_EDIT) {
+      return saveEditedShortcutFromDialog(title, url);
+    }
+    return saveNewShortcutFromDialog(title, url);
+  }
+
+  function removeShortcutById(shortcutId) {
+    const id = String(shortcutId || '');
+    if (!id) {
+      return Promise.resolve(false);
+    }
+    const nextShortcuts = newtabShortcuts.filter((item) => item && item.id !== id);
+    if (nextShortcuts.length === newtabShortcuts.length) {
+      return Promise.resolve(false);
+    }
+    return persistShortcuts(nextShortcuts, t('newtab_shortcuts_removed', 'Shortcut removed'));
+  }
+
+  function handleShortcutFormSubmit(event) {
+    if (event) {
+      event.preventDefault();
+    }
+    const title = shortcutNameInput ? shortcutNameInput.value : '';
+    const url = shortcutUrlInput ? shortcutUrlInput.value : '';
+    setShortcutError('');
+    if (shortcutDoneButton) {
+      shortcutDoneButton.disabled = true;
+    }
+    saveShortcutFromDialog(title, url).then((saved) => {
+      if (saved) {
+        closeShortcutDialog({ restoreFocus: true });
+      }
+    }).finally(() => {
+      if (shortcutDoneButton) {
+        shortcutDoneButton.disabled = false;
+      }
+    });
+  }
+
+  function createShortcutsSection() {
+    shortcutSection = document.createElement('section');
+    shortcutSection.id = '_x_extension_newtab_shortcuts_2026_unique_';
+    shortcutSection.className = 'x-nt-shortcuts-section';
+    shortcutSection.setAttribute('aria-label', t('newtab_shortcuts_section_label', 'Shortcuts'));
+
+    shortcutGrid = document.createElement('div');
+    shortcutGrid.className = 'x-nt-shortcuts-grid';
+
+    addShortcutButton = document.createElement('button');
+    addShortcutButton.type = 'button';
+    addShortcutButton.className = 'x-nt-shortcut-tile x-nt-shortcut-tile--add';
+    addShortcutButton.innerHTML = `
+      <span class="x-nt-shortcut-icon x-nt-shortcut-icon--add">${getRiSvg('ri-add-line', 'ri-size-28')}</span>
+    `;
+    bindShortcutTooltip(addShortcutButton, () =>
+      addShortcutButton.getAttribute('data-tooltip') || t('newtab_shortcuts_add', 'Add shortcut'), {
+        maxWidth: 260
+      });
+    addShortcutButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      hideShortcutTooltip();
+      openShortcutDialog({ sourceElement: event.currentTarget });
+    });
+
+    shortcutGrid.appendChild(addShortcutButton);
+    shortcutGrid.addEventListener('pointerdown', handleShortcutDragPointerDown);
+    shortcutGrid.addEventListener('pointerover', handleShortcutDockPointerOver);
+    shortcutGrid.addEventListener('pointermove', handleShortcutDockPointerMove);
+    shortcutGrid.addEventListener('pointermove', handleShortcutDragPointerMove);
+    shortcutGrid.addEventListener('pointerup', handleShortcutDragPointerUp);
+    shortcutGrid.addEventListener('pointercancel', handleShortcutDragPointerCancel);
+    shortcutGrid.addEventListener('pointerleave', resetShortcutDockHover);
+    shortcutSection.appendChild(shortcutGrid);
+    updateShortcutLanguageStrings();
+  }
+
+  function createShortcutDialog() {
+    shortcutDialogBackdrop = document.createElement('div');
+    shortcutDialogBackdrop.className = 'x-nt-shortcut-dialog-backdrop';
+    shortcutDialogBackdrop.hidden = true;
+    shortcutDialogBackdrop.setAttribute('data-open', 'false');
+
+    shortcutDialog = document.createElement('div');
+    shortcutDialog.className = 'x-nt-shortcut-dialog';
+    shortcutDialog.setAttribute('role', 'dialog');
+    shortcutDialog.setAttribute('aria-modal', 'true');
+    shortcutDialog.setAttribute('aria-labelledby', '_x_extension_newtab_shortcut_dialog_title_2026_unique_');
+
+    shortcutForm = document.createElement('form');
+    shortcutForm.className = 'x-nt-shortcut-form';
+    shortcutForm.addEventListener('submit', handleShortcutFormSubmit);
+
+    shortcutDialogTitle = document.createElement('h2');
+    shortcutDialogTitle.id = '_x_extension_newtab_shortcut_dialog_title_2026_unique_';
+    shortcutDialogTitle.className = 'x-nt-shortcut-dialog-title';
+
+    const nameField = document.createElement('label');
+    nameField.className = 'x-nt-shortcut-field';
+    shortcutNameLabel = document.createElement('span');
+    const nameInputShell = document.createElement('div');
+    nameInputShell.className = '_x_extension_shortcut_input_affix_2026_unique_';
+    nameInputShell.setAttribute('data-has-prefix', 'false');
+    shortcutNameInput = document.createElement('input');
+    shortcutNameInput.type = 'text';
+    shortcutNameInput.autocomplete = 'off';
+    shortcutNameInput.maxLength = 64;
+    shortcutNameInput.className = '_x_extension_shortcut_input_2024_unique_';
+    nameInputShell.appendChild(shortcutNameInput);
+    nameField.appendChild(shortcutNameLabel);
+    nameField.appendChild(nameInputShell);
+
+    const urlField = document.createElement('label');
+    urlField.className = 'x-nt-shortcut-field';
+    shortcutUrlLabel = document.createElement('span');
+    const urlInputShell = document.createElement('div');
+    urlInputShell.className = '_x_extension_shortcut_input_affix_2026_unique_';
+    urlInputShell.setAttribute('data-has-prefix', 'false');
+    shortcutUrlInput = document.createElement('input');
+    shortcutUrlInput.type = 'text';
+    shortcutUrlInput.inputMode = 'url';
+    shortcutUrlInput.autocomplete = 'url';
+    shortcutUrlInput.required = true;
+    shortcutUrlInput.className = '_x_extension_shortcut_input_2024_unique_';
+    urlInputShell.appendChild(shortcutUrlInput);
+    urlField.appendChild(shortcutUrlLabel);
+    urlField.appendChild(urlInputShell);
+
+    shortcutError = document.createElement('div');
+    shortcutError.className = 'x-nt-shortcut-error';
+    shortcutError.setAttribute('data-visible', 'false');
+    shortcutError.setAttribute('role', 'alert');
+
+    const actions = document.createElement('div');
+    actions.className = 'x-nt-shortcut-dialog-actions';
+    shortcutCancelButton = document.createElement('button');
+    shortcutCancelButton.type = 'button';
+    shortcutCancelButton.className = 'x-lumno-action-button x-lumno-action-button--secondary x-nt-shortcut-dialog-button x-nt-shortcut-dialog-button--secondary';
+    shortcutCancelButton.addEventListener('click', () => closeShortcutDialog({ restoreFocus: true }));
+    shortcutDoneButton = document.createElement('button');
+    shortcutDoneButton.type = 'submit';
+    shortcutDoneButton.className = 'x-lumno-action-button x-lumno-action-button--primary x-nt-shortcut-dialog-button x-nt-shortcut-dialog-button--primary';
+    actions.appendChild(shortcutCancelButton);
+    actions.appendChild(shortcutDoneButton);
+
+    shortcutForm.appendChild(shortcutDialogTitle);
+    shortcutForm.appendChild(nameField);
+    shortcutForm.appendChild(urlField);
+    shortcutForm.appendChild(shortcutError);
+    shortcutForm.appendChild(actions);
+    shortcutDialog.appendChild(shortcutForm);
+    shortcutDialogBackdrop.appendChild(shortcutDialog);
+    shortcutDialogBackdrop.addEventListener('pointerdown', (event) => {
+      if (event.target === shortcutDialogBackdrop) {
+        closeShortcutDialog({ restoreFocus: true });
+      }
+    });
+    shortcutDialog.addEventListener('pointerdown', (event) => {
+      event.stopPropagation();
+    });
+    shortcutDialogBackdrop.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeShortcutDialog({ restoreFocus: true });
+      }
+    });
+    updateShortcutDialogLanguageStrings();
+  }
+
+  createShortcutsSection();
+  createShortcutDialog();
+
   const bookmarkSection = document.createElement('section');
   bookmarkSection.id = '_x_extension_newtab_bookmarks_2024_unique_';
   setContentSectionVisible(bookmarkSection, false);
@@ -4929,6 +6649,10 @@
   bookmarkGrid = document.createElement('div');
   bookmarkGrid.id = '_x_extension_newtab_bookmarks_grid_2024_unique_';
   bookmarkGrid.setAttribute('data-view-mode', currentBookmarkViewMode);
+  bookmarkGrid.addEventListener('pointerdown', handleBookmarkDragPointerDown, true);
+  bookmarkGrid.addEventListener('pointermove', handleBookmarkDragPointerMove);
+  bookmarkGrid.addEventListener('pointerup', handleBookmarkDragPointerUp);
+  bookmarkGrid.addEventListener('pointercancel', handleBookmarkDragPointerCancel);
   applyBookmarkGridColumns();
   bookmarksView = NEWTAB_BOOKMARKS_VIEW.createBookmarksView({
     documentObj: document,
@@ -4957,11 +6681,13 @@
     applyCardTheme: applyBookmarkCardTheme,
     shouldDelayHoverFromRecent: shouldDelayBookmarkHoverFromRecent,
     hoverDelayFromRecentMs: BOOKMARK_HOVER_DELAY_FROM_RECENT_MS,
+    shouldSuppressHover: shouldSuppressBookmarkHover,
     bindCursorTooltip,
     hideCursorTooltip,
     openFolder: openBookmarkFolder,
     openFolderMenu: openBookmarkCascadeMenu,
-    navigateToUrl
+    navigateToUrl,
+    openUrl: openUrlFromNewtabCard
   });
   bookmarkCascadeRuntime = NEWTAB_BOOKMARK_CASCADE_MENU.createBookmarkCascadeMenuRuntime({
     documentObj: document,
@@ -4989,6 +6715,10 @@
       return id ? (bookmarkFolderItemsCache.get(id) || []) : [];
     },
     navigateToUrl,
+    openUrl: openUrlFromNewtabCard,
+    shouldSuppressHover: shouldSuppressBookmarkHover,
+    bindCursorTooltip,
+    hideCursorTooltip,
     showTopActionTooltip,
     hideTopActionTooltip
   });
@@ -5081,6 +6811,9 @@
     showTopActionTooltip,
     hideTopActionTooltip,
     navigateToUrl,
+    bindCursorTooltip,
+    hideCursorTooltip,
+    openUrl: openUrlFromNewtabCard,
     togglePinned: togglePinnedRecentSite,
     hideTemporarily: hideRecentSiteTemporarily
   });
@@ -5094,23 +6827,17 @@
   let recentLoadToken = 0;
   let recentDataDirty = true;
   let recentLoadedOnce = false;
-  const bottomDock = document.createElement('div');
-  bottomDock.id = '_x_extension_newtab_bottom_dock_2024_unique_';
-  const bottomDockScroller = document.createElement('div');
-  bottomDockScroller.id = '_x_extension_newtab_bottom_dock_scroller_2024_unique_';
-  const sectionSafeCorridor = document.createElement('div');
-  sectionSafeCorridor.id = '_x_extension_newtab_section_safe_corridor_2026_unique_';
-  layoutController = NEWTAB_LAYOUT.createLayoutController({
+  const bottomDockRuntime = NEWTAB_DOCK.createBottomDockRuntime({
     documentObj: document,
     windowObj: window,
+    layoutRuntime: NEWTAB_LAYOUT,
     root,
     searchLayer: () => searchLayer,
     inputParts: () => inputParts,
     wordmarkContainer: () => wordmarkContainer,
-    bottomDock,
+    shortcutSection: () => shortcutSection,
     bookmarkSection,
     recentSection,
-    sectionSafeCorridor,
     suggestionsContainer,
     suggestionsSurface,
     suggestionsOutline,
@@ -5126,13 +6853,11 @@
       narrowViewportMaxWidthPx: SEARCH_LAYOUT_NARROW_VIEWPORT_MAX_WIDTH_PX,
       narrowTopInsetPx: SEARCH_LAYOUT_NARROW_TOP_INSET_PX,
       shortViewportMaxHeightPx: SEARCH_LAYOUT_SHORT_VIEWPORT_MAX_HEIGHT_PX,
-      shortMinTopPx: SEARCH_LAYOUT_SHORT_MIN_TOP_PX,
-      bottomDockTopReservePx: BOTTOM_DOCK_TOP_RESERVE_PX,
-      compactDockViewportMaxHeightPx: BOTTOM_DOCK_COMPACT_VIEWPORT_MAX_HEIGHT_PX,
-      compactDockSearchGapPx: BOTTOM_DOCK_COMPACT_SEARCH_GAP_PX,
-      compactDockMinTopReservePx: BOTTOM_DOCK_COMPACT_MIN_TOP_RESERVE_PX
+      shortMinTopPx: SEARCH_LAYOUT_SHORT_MIN_TOP_PX
     }
   });
+  const bottomDock = bottomDockRuntime.element;
+  layoutController = bottomDockRuntime.layoutController;
   applyNewtabWidthMode();
 
   bookmarkPagerPrevButton.addEventListener('click', () => {
@@ -5459,6 +7184,578 @@
     if (layoutController && typeof layoutController.updateSearchEntryLayout === 'function') {
       layoutController.updateSearchEntryLayout();
     }
+  }
+
+  function getBookmarkCardFromNode(node) {
+    return node && typeof node.closest === 'function'
+      ? node.closest('.x-nt-bookmark-card')
+      : null;
+  }
+
+  function getBookmarkCardId(card) {
+    return card && typeof card.getAttribute === 'function'
+      ? card.getAttribute('data-bookmark-id') || ''
+      : '';
+  }
+
+  function getBookmarkCardParentId(card) {
+    return card && typeof card.getAttribute === 'function'
+      ? card.getAttribute('data-bookmark-parent-id') || ''
+      : '';
+  }
+
+  function getBookmarkReorderCards() {
+    return bookmarkGrid
+      ? Array.from(bookmarkGrid.querySelectorAll('.x-nt-bookmark-card[data-bookmark-draggable="true"]'))
+      : [];
+  }
+
+  function getBookmarkCardInsertionIndex(card) {
+    if (!card) {
+      return -1;
+    }
+    return getBookmarkReorderCards().indexOf(card);
+  }
+
+  function getBookmarkCardAllIndex(bookmarkId) {
+    const id = String(bookmarkId || '');
+    return id
+      ? bookmarkAllItems.findIndex((item) => item && String(item.id || '') === id)
+      : -1;
+  }
+
+  function getBookmarkPageStartIndex() {
+    return Math.max(0, bookmarkCurrentPage * getBookmarkLimit());
+  }
+
+  function getBookmarkCardLayoutRect(card) {
+    if (!card || !bookmarkGrid || typeof card.offsetLeft !== 'number' ||
+        typeof card.offsetTop !== 'number') {
+      return null;
+    }
+    const offsetParent = card.offsetParent && typeof card.offsetParent.getBoundingClientRect === 'function'
+      ? card.offsetParent
+      : bookmarkGrid;
+    const parentRect = typeof offsetParent.getBoundingClientRect === 'function'
+      ? offsetParent.getBoundingClientRect()
+      : { left: 0, top: 0 };
+    const width = Number(card.offsetWidth) || 0;
+    const height = Number(card.offsetHeight) || 0;
+    const left = parentRect.left + card.offsetLeft;
+    const top = parentRect.top + card.offsetTop;
+    return {
+      left,
+      top,
+      right: left + width,
+      bottom: top + height,
+      width,
+      height,
+      centerX: left + (width / 2),
+      centerY: top + (height / 2)
+    };
+  }
+
+  function clearBookmarkCardLayoutAnimation(card) {
+    if (!card || !card.style) {
+      return;
+    }
+    if (card._xBookmarkLayoutAnimationTimer) {
+      window.clearTimeout(card._xBookmarkLayoutAnimationTimer);
+      card._xBookmarkLayoutAnimationTimer = 0;
+    }
+    card.style.removeProperty('transition');
+    if (card.getAttribute && card.getAttribute('data-bookmark-dragging') !== 'true' &&
+        card.getAttribute('data-bookmark-dropping') !== 'true') {
+      card.style.removeProperty('transform');
+    }
+  }
+
+  function getBookmarkCachedRectMap(state) {
+    const rects = new Map();
+    const layoutItems = Array.isArray(state && state.layoutItems) ? state.layoutItems : [];
+    layoutItems.forEach((item) => {
+      if (item && item.card && item.rect) {
+        rects.set(item.card, item.rect);
+      }
+    });
+    return rects;
+  }
+
+  function animateBookmarkLayoutShift(beforeRects, draggedCard) {
+    if (!beforeRects || !bookmarkGrid) {
+      return;
+    }
+    const cardsToAnimate = getBookmarkReorderCards().filter((card) =>
+      card && card !== draggedCard && card.style && beforeRects.has(card)
+    );
+    cardsToAnimate.forEach(clearBookmarkCardLayoutAnimation);
+    const shifts = [];
+    cardsToAnimate.forEach((card) => {
+      const before = beforeRects.get(card);
+      const after = getBookmarkCardLayoutRect(card);
+      if (!before || !after) {
+        return;
+      }
+      const dx = before.left - after.left;
+      const dy = before.top - after.top;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+        return;
+      }
+      shifts.push({ card, dx, dy });
+    });
+    shifts.forEach(({ card, dx, dy }) => {
+      card.style.transition = 'none';
+      card.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+    });
+    window.requestAnimationFrame(() => {
+      shifts.forEach(({ card }) => {
+        if (!card.isConnected) {
+          return;
+        }
+        card.style.transition = `transform ${BOOKMARK_REORDER_ANIMATION_MS}ms ${BOOKMARK_REORDER_EASING}`;
+        card.style.transform = 'translate3d(0, 0, 0)';
+        card._xBookmarkLayoutAnimationTimer = window.setTimeout(() => {
+          card._xBookmarkLayoutAnimationTimer = 0;
+          clearBookmarkCardLayoutAnimation(card);
+        }, BOOKMARK_REORDER_ANIMATION_MS + 80);
+      });
+    });
+  }
+
+  function updateBookmarkDragLayoutCache(state) {
+    if (!state || !state.card) {
+      return;
+    }
+    const draggedCard = state.card;
+    state.layoutItems = getBookmarkReorderCards()
+      .filter((card) => card && card !== draggedCard)
+      .map((card) => ({
+        card,
+        rect: getBookmarkCardLayoutRect(card)
+      }))
+      .filter((item) => item.rect && item.rect.width > 0 && item.rect.height > 0);
+    const draggedLayoutRect = getBookmarkCardLayoutRect(draggedCard);
+    if (draggedLayoutRect) {
+      state.baseLeft = draggedLayoutRect.left;
+      state.baseTop = draggedLayoutRect.top;
+    }
+  }
+
+  function cancelBookmarkDragMoveFrame(state) {
+    if (!state || !state.moveFrameId) {
+      return;
+    }
+    window.cancelAnimationFrame(state.moveFrameId);
+    state.moveFrameId = 0;
+  }
+
+  function setBookmarkDragCardTransform(state, pointerX, pointerY) {
+    if (!state || !state.card || !state.card.style) {
+      return;
+    }
+    const baseLeft = Number(state.baseLeft) || 0;
+    const baseTop = Number(state.baseTop) || 0;
+    const nextX = pointerX - state.grabOffsetX - baseLeft;
+    const nextY = pointerY - state.grabOffsetY - baseTop;
+    state.translateX = nextX;
+    state.translateY = nextY;
+    state.card.style.transition = 'none';
+    state.card.style.transform = `translate3d(${nextX}px, ${nextY}px, 0)`;
+  }
+
+  function settleBookmarkDragCard(card) {
+    if (!card || !card.style) {
+      return;
+    }
+    card.setAttribute('data-bookmark-dropping', 'true');
+    card.style.pointerEvents = '';
+    card.style.transition = `transform ${BOOKMARK_DROP_ANIMATION_MS}ms ${BOOKMARK_REORDER_EASING}`;
+    card.style.transform = 'translate3d(0, 0, 0)';
+    if (card._xBookmarkDropTimer) {
+      window.clearTimeout(card._xBookmarkDropTimer);
+    }
+    card._xBookmarkDropTimer = window.setTimeout(() => {
+      card._xBookmarkDropTimer = 0;
+      card.removeAttribute('data-bookmark-dragging');
+      card.removeAttribute('data-bookmark-dropping');
+      card.style.removeProperty('transition');
+      card.style.removeProperty('transform');
+      card.style.removeProperty('will-change');
+      card.style.pointerEvents = '';
+    }, BOOKMARK_DROP_ANIMATION_MS + 90);
+  }
+
+  function getBookmarkDragInsertionIndex(pointerX, pointerY) {
+    if (!bookmarkGrid || !bookmarkDragState || !Number.isFinite(pointerX) ||
+        !Number.isFinite(pointerY)) {
+      return -1;
+    }
+    const layoutItems = Array.isArray(bookmarkDragState.layoutItems)
+      ? bookmarkDragState.layoutItems
+      : [];
+    if (!layoutItems.length) {
+      return 0;
+    }
+    let nearestItem = layoutItems[0];
+    let nearestDistance = Infinity;
+    layoutItems.forEach((item) => {
+      const rect = item.rect;
+      const verticalDistance = pointerY < rect.top
+        ? rect.top - pointerY
+        : pointerY > rect.bottom
+          ? pointerY - rect.bottom
+          : 0;
+      if (verticalDistance < nearestDistance) {
+        nearestDistance = verticalDistance;
+        nearestItem = item;
+      }
+    });
+    const rowCenterY = nearestItem.rect.centerY;
+    const rowCards = layoutItems
+      .filter((item) => Math.abs(item.rect.centerY - rowCenterY) <=
+        Math.max(8, Math.min(item.rect.height, nearestItem.rect.height) / 2))
+      .sort((first, second) => first.rect.left - second.rect.left);
+    const insertionAnchor = rowCards.find((item) => pointerX < item.rect.centerX);
+    if (insertionAnchor) {
+      return layoutItems.findIndex((item) => item.card === insertionAnchor.card);
+    }
+    const lastRowCard = rowCards[rowCards.length - 1];
+    return layoutItems.findIndex((item) => item.card === lastRowCard.card) + 1;
+  }
+
+  function processBookmarkDragMove(state) {
+    if (!state || bookmarkDragState !== state || !state.isDragging) {
+      return;
+    }
+    state.moveFrameId = 0;
+    const pointerX = Number(state.pendingPointerX);
+    const pointerY = Number(state.pendingPointerY);
+    if (!Number.isFinite(pointerX) || !Number.isFinite(pointerY)) {
+      return;
+    }
+    setBookmarkDragCardTransform(state, pointerX, pointerY);
+    const targetPageIndex = getBookmarkDragInsertionIndex(pointerX, pointerY);
+    const currentPageIndex = Number.isFinite(state.pageIndex)
+      ? state.pageIndex
+      : getBookmarkCardInsertionIndex(state.card);
+    if (targetPageIndex < 0 || targetPageIndex === currentPageIndex) {
+      return;
+    }
+    const targetAllIndex = getBookmarkPageStartIndex() + targetPageIndex;
+    const beforeRects = getBookmarkCachedRectMap(state);
+    if (moveBookmarkItemInMemory(state.bookmarkId, targetAllIndex) &&
+        moveBookmarkCardElement(state.card, targetPageIndex)) {
+      animateBookmarkLayoutShift(beforeRects, state.card);
+      updateBookmarkDragLayoutCache(state);
+      setBookmarkDragCardTransform(state, pointerX, pointerY);
+      state.pageIndex = targetPageIndex;
+      state.hasReordered = true;
+    }
+  }
+
+  function scheduleBookmarkDragMove(state, pointerX, pointerY) {
+    if (!state || !state.isDragging) {
+      return;
+    }
+    state.pendingPointerX = pointerX;
+    state.pendingPointerY = pointerY;
+    if (state.moveFrameId) {
+      return;
+    }
+    state.moveFrameId = window.requestAnimationFrame(() => {
+      processBookmarkDragMove(state);
+    });
+  }
+
+  function moveBookmarkCardElement(card, targetIndex) {
+    if (!bookmarkGrid || !card || card.parentNode !== bookmarkGrid ||
+        !Number.isFinite(targetIndex)) {
+      return false;
+    }
+    const currentIndex = getBookmarkCardInsertionIndex(card);
+    const remainingCards = getBookmarkReorderCards().filter((item) => item !== card);
+    const boundedIndex = Math.max(0, Math.min(remainingCards.length, targetIndex));
+    if (currentIndex === boundedIndex) {
+      return false;
+    }
+    bookmarkGrid.insertBefore(card, remainingCards[boundedIndex] || null);
+    return true;
+  }
+
+  function moveBookmarkItemInMemory(bookmarkId, targetAllIndex) {
+    const currentIndex = getBookmarkCardAllIndex(bookmarkId);
+    if (currentIndex < 0 || !Number.isFinite(targetAllIndex)) {
+      return false;
+    }
+    const nextItems = bookmarkAllItems.slice();
+    const movedItem = nextItems.splice(currentIndex, 1)[0];
+    const boundedIndex = Math.max(0, Math.min(nextItems.length, targetAllIndex));
+    if (currentIndex === boundedIndex) {
+      return false;
+    }
+    nextItems.splice(boundedIndex, 0, movedItem);
+    bookmarkAllItems = nextItems;
+    return true;
+  }
+
+  function getBookmarkMoveDestination(bookmarkId) {
+    const movedIndex = getBookmarkCardAllIndex(bookmarkId);
+    if (movedIndex < 0) {
+      return null;
+    }
+    const movedItem = bookmarkAllItems[movedIndex];
+    const parentId = String((movedItem && movedItem.parentId) || bookmarkCurrentFolderId || '');
+    const sourceIndex = Number(movedItem && movedItem.index);
+    if (!parentId) {
+      return null;
+    }
+    const afterItem = bookmarkAllItems.slice(movedIndex + 1).find((item) =>
+      item && String(item.parentId || parentId) === parentId && Number.isFinite(Number(item.index))
+    );
+    let destinationIndex = 0;
+    if (afterItem) {
+      destinationIndex = Number(afterItem.index);
+    } else {
+      const beforeItems = bookmarkAllItems.slice(0, movedIndex).reverse();
+      const beforeItem = beforeItems.find((item) =>
+        item && String(item.parentId || parentId) === parentId && Number.isFinite(Number(item.index))
+      );
+      destinationIndex = beforeItem ? Number(beforeItem.index) + 1 : 0;
+    }
+    if (Number.isFinite(sourceIndex) && sourceIndex < destinationIndex) {
+      destinationIndex -= 1;
+    }
+    return {
+      parentId,
+      index: Math.max(0, Math.round(destinationIndex))
+    };
+  }
+
+  function moveChromeBookmarkNode(bookmarkId, destination) {
+    return new Promise((resolve, reject) => {
+      if (typeof chrome === 'undefined' || !chrome.bookmarks || typeof chrome.bookmarks.move !== 'function' ||
+          !bookmarkId || !destination) {
+        reject(new Error('Chrome bookmarks.move is unavailable.'));
+        return;
+      }
+      chrome.bookmarks.move(String(bookmarkId), {
+        parentId: String(destination.parentId || ''),
+        index: Math.max(0, Number(destination.index) || 0)
+      }, (node) => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message || 'Failed to move bookmark.'));
+          return;
+        }
+        resolve(node);
+      });
+    });
+  }
+
+  function persistBookmarkDragOrder(state) {
+    if (!state || !state.bookmarkId) {
+      return Promise.resolve(false);
+    }
+    const destination = getBookmarkMoveDestination(state.bookmarkId);
+    if (!destination) {
+      return Promise.resolve(false);
+    }
+    return moveChromeBookmarkNode(state.bookmarkId, destination).then(() => {
+      markBookmarkTreeDirty();
+      loadBookmarks({ force: true });
+      return true;
+    }).catch((error) => {
+      console.warn('[Lumno] Failed to reorder bookmark', error);
+      markBookmarkTreeDirty();
+      loadBookmarks({ force: true });
+      return false;
+    });
+  }
+
+  function isBookmarkDragActive() {
+    return Boolean(
+      (bookmarkDragState && bookmarkDragState.isDragging) ||
+      (bookmarkGrid && bookmarkGrid.getAttribute('data-bookmark-dragging') === 'true')
+    );
+  }
+
+  function isBookmarkReorderInteractionActive() {
+    return Boolean(bookmarkDragState || isBookmarkDragActive());
+  }
+
+  function shouldSuppressBookmarkHover(target) {
+    return Boolean(
+      target &&
+      isBookmarkReorderInteractionActive() &&
+      (
+        (target.classList &&
+          typeof target.classList.contains === 'function' &&
+          target.classList.contains('x-nt-bookmark-card')) ||
+        (typeof target.closest === 'function' &&
+          target.closest('.x-nt-bookmark-card, .x-nt-bookmark-cascade-item'))
+      )
+    );
+  }
+
+  function startBookmarkDrag(event, card) {
+    if (!bookmarkGrid || !card || !bookmarkDragState || bookmarkDragState.card !== card) {
+      return;
+    }
+    bookmarkDragState.isDragging = true;
+    hideCursorTooltip();
+    closeBookmarkCascadeMenu();
+    bookmarkGrid.setAttribute('data-bookmark-dragging', 'true');
+    card.setAttribute('data-bookmark-dragging', 'true');
+    card.setAttribute('aria-grabbed', 'true');
+    if (typeof card._xDeactivateBookmarkHoverVisual === 'function') {
+      card._xDeactivateBookmarkHoverVisual();
+    }
+    card.style.pointerEvents = 'none';
+    card.style.willChange = 'transform';
+    updateBookmarkDragLayoutCache(bookmarkDragState);
+    setBookmarkDragCardTransform(bookmarkDragState, Number(event.clientX), Number(event.clientY));
+    if (typeof card.setPointerCapture === 'function') {
+      try {
+        card.setPointerCapture(event.pointerId);
+      } catch (error) {
+        // Pointer capture can fail if the browser already canceled the pointer.
+      }
+    }
+  }
+
+  function finishBookmarkDrag(event) {
+    if (!bookmarkDragState) {
+      return;
+    }
+    if (event && bookmarkDragState.pointerId !== event.pointerId) {
+      return;
+    }
+    const state = bookmarkDragState;
+    if (state.isDragging && state.moveFrameId) {
+      cancelBookmarkDragMoveFrame(state);
+      processBookmarkDragMove(state);
+    }
+    bookmarkDragState = null;
+    const card = state.card;
+    if (bookmarkGrid) {
+      bookmarkGrid.removeAttribute('data-bookmark-dragging');
+    }
+    if (card) {
+      card.removeAttribute('aria-grabbed');
+      if (typeof card.releasePointerCapture === 'function' && event) {
+        try {
+          card.releasePointerCapture(event.pointerId);
+        } catch (error) {
+          // Ignore stale pointer capture releases.
+        }
+      }
+      if (state.isDragging) {
+        settleBookmarkDragCard(card);
+      } else {
+        card.removeAttribute('data-bookmark-dragging');
+        card.removeAttribute('data-bookmark-dropping');
+        card.style.pointerEvents = '';
+      }
+      if (state.isDragging) {
+        card._xBookmarkSuppressClick = true;
+        window.setTimeout(() => {
+          card._xBookmarkSuppressClick = false;
+        }, 0);
+      }
+    }
+    if (state.isDragging && state.hasReordered) {
+      if (event && typeof event.preventDefault === 'function') {
+        event.preventDefault();
+      }
+      persistBookmarkDragOrder(state);
+    }
+  }
+
+  function handleBookmarkDragPointerDown(event) {
+    if (bookmarkPageAnimating) {
+      return;
+    }
+    const card = getBookmarkCardFromNode(event.target);
+    const bookmarkId = getBookmarkCardId(card);
+    const parentId = getBookmarkCardParentId(card);
+    if (!card || !bookmarkId || !parentId ||
+        card.getAttribute('data-bookmark-draggable') !== 'true' ||
+        (event.pointerType === 'mouse' && event.button !== 0)) {
+      return;
+    }
+    hideCursorTooltip();
+    closeBookmarkCascadeMenu();
+    bookmarkDragState = {
+      pointerId: event.pointerId,
+      card,
+      bookmarkId,
+      parentId,
+      startX: Number(event.clientX),
+      startY: Number(event.clientY),
+      grabOffsetX: 0,
+      grabOffsetY: 0,
+      baseLeft: 0,
+      baseTop: 0,
+      translateX: 0,
+      translateY: 0,
+      pendingPointerX: Number(event.clientX),
+      pendingPointerY: Number(event.clientY),
+      moveFrameId: 0,
+      pageIndex: getBookmarkCardInsertionIndex(card),
+      layoutItems: [],
+      isDragging: false,
+      hasReordered: false
+    };
+    const rect = getBookmarkCardLayoutRect(card) ||
+      (typeof card.getBoundingClientRect === 'function' ? card.getBoundingClientRect() : null);
+    if (rect) {
+      bookmarkDragState.grabOffsetX = Number(event.clientX) - rect.left;
+      bookmarkDragState.grabOffsetY = Number(event.clientY) - rect.top;
+      bookmarkDragState.baseLeft = rect.left;
+      bookmarkDragState.baseTop = rect.top;
+    }
+    if (typeof card._xDeactivateBookmarkHoverVisual === 'function') {
+      card._xDeactivateBookmarkHoverVisual();
+    }
+    if (typeof card.setPointerCapture === 'function') {
+      try {
+        card.setPointerCapture(event.pointerId);
+      } catch (error) {
+        // Pointer capture can fail if the browser already canceled the pointer.
+      }
+    }
+  }
+
+  function handleBookmarkDragPointerMove(event) {
+    if (!bookmarkDragState || bookmarkDragState.pointerId !== event.pointerId) {
+      return;
+    }
+    const pointerX = Number(event.clientX);
+    const pointerY = Number(event.clientY);
+    if (!Number.isFinite(pointerX) || !Number.isFinite(pointerY)) {
+      return;
+    }
+    const dx = pointerX - bookmarkDragState.startX;
+    const dy = pointerY - bookmarkDragState.startY;
+    if (!bookmarkDragState.isDragging &&
+        Math.hypot(dx, dy) < BOOKMARK_DRAG_START_THRESHOLD_PX) {
+      return;
+    }
+    if (!bookmarkDragState.isDragging) {
+      startBookmarkDrag(event, bookmarkDragState.card);
+    }
+    if (!bookmarkDragState.isDragging) {
+      return;
+    }
+    event.preventDefault();
+    scheduleBookmarkDragMove(bookmarkDragState, pointerX, pointerY);
+  }
+
+  function handleBookmarkDragPointerUp(event) {
+    finishBookmarkDrag(event);
+  }
+
+  function handleBookmarkDragPointerCancel(event) {
+    finishBookmarkDrag(event);
   }
 
   function renderBookmarks(items) {
@@ -6011,7 +8308,7 @@
     button.setAttribute('aria-label', label);
     button.setAttribute('data-tooltip', label);
     button.removeAttribute('title');
-    button.innerHTML = getRiSvg('ri-close-line', 'ri-size-16');
+    button.innerHTML = getRiSvg('ri-subtract-line', 'ri-size-16');
     button.disabled = !enabled;
     button.tabIndex = enabled ? 0 : -1;
     button.setAttribute('aria-hidden', enabled ? 'false' : 'true');
@@ -6266,6 +8563,12 @@
     return typeof FAVICON_UTILS.shouldBlockFaviconForHost === 'function'
       ? FAVICON_UTILS.shouldBlockFaviconForHost(hostname)
       : false;
+  }
+
+  function shouldAvoidDirectFaviconForHost(hostname) {
+    return typeof FAVICON_UTILS.shouldAvoidDirectFaviconForHost === 'function'
+      ? FAVICON_UTILS.shouldAvoidDirectFaviconForHost(hostname)
+      : (isLocalNetworkHost(hostname) || isSuspiciousLocalFaviconHost(hostname));
   }
 
   function normalizeSearchBlacklistMatchModes(value) {
@@ -6854,6 +9157,50 @@
     card.style.setProperty('--x-nt-bookmark-shadow-rgb', colors.shadowRgb);
   }
 
+  function getShortcutIconColors(theme, host) {
+    const fallbackTheme = theme || buildFallbackThemeForHost(host) || defaultTheme;
+    const resolvedTheme = getThemeForMode(fallbackTheme);
+    const accentRgb = normalizeAccentRgb(resolvedTheme.accentRgb || parseCssColor(resolvedTheme.accent)) || defaultAccentColor;
+    const isDark = document.body && document.body.getAttribute('data-theme') === 'dark';
+    const baseTarget = isDark ? [22, 22, 22] : [255, 255, 255];
+    const iconBgRgb = mixColor(accentRgb, baseTarget, isDark ? 0.72 : 0.82);
+    return {
+      iconBg: rgbToCss(iconBgRgb),
+      iconColor: getReadableTextColor(iconBgRgb)
+    };
+  }
+
+  function isShortcutThemeDefaultForWallpaper(theme) {
+    const source = getThemeSource(theme);
+    if (!theme || theme._xIsDefault || source === 'fallback') {
+      return true;
+    }
+    if (source === 'favicon') {
+      const accentRgb = normalizeAccentRgb(theme.accentRgb || parseCssColor(theme.accent));
+      return theme._xThemeNeutral === true ||
+        normalizeThemeConfidence(theme._xThemeConfidence, accentRgb) === 'neutral';
+    }
+    return isLowConfidenceTheme(theme);
+  }
+
+  function applyShortcutTileTheme(tile, theme, host) {
+    if (!tile) {
+      return;
+    }
+    const fallbackTheme = theme || buildFallbackThemeForHost(host) || defaultTheme;
+    const isDefaultTheme = isShortcutThemeDefaultForWallpaper(fallbackTheme);
+    const colors = getShortcutIconColors(theme, host);
+    tile.setAttribute('data-shortcut-theme-default', isDefaultTheme ? 'true' : 'false');
+    tile.setAttribute('data-shortcut-theme-source', getThemeSource(fallbackTheme));
+    if (!isDefaultTheme) {
+      tile.style.removeProperty('--x-nt-shortcut-wallpaper-icon-bg');
+      tile.style.removeProperty('--x-nt-shortcut-wallpaper-icon-color');
+    }
+    tile.style.setProperty('--x-nt-shortcut-icon-bg', colors.iconBg);
+    tile.style.setProperty('--x-nt-shortcut-icon-color', colors.iconColor);
+    scheduleWallpaperAdaptiveToneUpdate();
+  }
+
   function shouldDelayBookmarkHoverFromRecent(pointerType) {
     if (pointerType && pointerType !== 'mouse') {
       return false;
@@ -7172,6 +9519,14 @@
     const siteUrl = buildSearchUrl(provider.template, trimmedQuery);
     if (!siteUrl) {
       return false;
+    }
+    if (disposition === 'backgroundTab') {
+      chrome.runtime.sendMessage({
+        action: 'createTab',
+        url: siteUrl,
+        disposition: 'backgroundTab'
+      });
+      return true;
     }
     navigateToUrl(siteUrl);
     return true;
@@ -7564,6 +9919,163 @@
     return '';
   }
 
+  function normalizeTabMatchUrl(url) {
+    if (!url) {
+      return '';
+    }
+    try {
+      const parsed = new URL(url);
+      const protocol = String(parsed.protocol || '').toLowerCase();
+      if (protocol !== 'http:' && protocol !== 'https:') {
+        return String(url).trim().toLowerCase();
+      }
+      const host = normalizeHost(parsed.hostname);
+      let path = parsed.pathname || '/';
+      path = path.replace(/\/+$/, '');
+      if (!path) {
+        path = '/';
+      }
+      return `${host}${path}${parsed.search || ''}`;
+    } catch (e) {
+      return String(url).trim().toLowerCase();
+    }
+  }
+
+  function getMatchedOpenTabIdForSuggestion(suggestion) {
+    if (!suggestion || !suggestion.url || !Array.isArray(tabs) || tabs.length === 0) {
+      return null;
+    }
+    const target = normalizeTabMatchUrl(suggestion.url);
+    if (!target) {
+      return null;
+    }
+    for (let i = 0; i < tabs.length; i += 1) {
+      const tab = tabs[i];
+      if (!tab || typeof tab.id !== 'number' || !tab.url) {
+        continue;
+      }
+      const current = normalizeTabMatchUrl(tab.url);
+      if (current && current === target) {
+        return tab.id;
+      }
+    }
+    return null;
+  }
+
+  function shouldSwitchMatchedTabSuggestion(suggestion, index) {
+    if (!suggestion || typeof suggestion._xMatchedTabId !== 'number') {
+      return false;
+    }
+    if (!openTabQuickSwitchEnabled) {
+      return false;
+    }
+    return index === 0;
+  }
+
+  function shouldUseNewTabForSwitchAction(suggestion, event, item) {
+    if (!event || !event.shiftKey) {
+      return false;
+    }
+    const action = item && item._xVisitButtonAction ? item._xVisitButtonAction : 'switch';
+    if (SUGGESTION_ACTION_MODEL &&
+        typeof SUGGESTION_ACTION_MODEL.shouldOpenSwitchActionInNewTab === 'function') {
+      return SUGGESTION_ACTION_MODEL.shouldOpenSwitchActionInNewTab(suggestion, {
+        action,
+        openSwitchInNewTab: true
+      });
+    }
+    return Boolean(suggestion && suggestion.url && action === 'switch');
+  }
+
+  function shouldOpenSearchResultInBackgroundTab(event) {
+    const config = {
+      openInBackgroundTab: Boolean(event && (event.metaKey || event.ctrlKey)),
+      openInCurrentTab: Boolean(event && event.altKey)
+    };
+    if (SUGGESTION_ACTION_MODEL &&
+        typeof SUGGESTION_ACTION_MODEL.getSearchResultOpenDisposition === 'function') {
+      return SUGGESTION_ACTION_MODEL.getSearchResultOpenDisposition(config) === 'backgroundTab';
+    }
+    return Boolean(config.openInBackgroundTab && !config.openInCurrentTab);
+  }
+
+  function getSearchResultNewTabDisposition(event) {
+    return shouldOpenSearchResultInBackgroundTab(event) ? 'backgroundTab' : 'newTab';
+  }
+
+  function openSearchResultUrl(suggestion, query, event) {
+    if (!suggestion || !suggestion.url) {
+      return false;
+    }
+    recordSearchSuggestionSelection(suggestion, query);
+    if (shouldOpenSearchResultInBackgroundTab(event)) {
+      chrome.runtime.sendMessage({
+        action: 'createTab',
+        url: suggestion.url,
+        disposition: 'backgroundTab'
+      });
+      return true;
+    }
+    navigateToUrl(suggestion.url);
+    return true;
+  }
+
+  function openMatchedTabSuggestion(suggestion, event, item, query) {
+    if (shouldUseNewTabForSwitchAction(suggestion, event, item) ||
+        shouldOpenSearchResultInBackgroundTab(event)) {
+      recordSearchSuggestionSelection(suggestion, query);
+      chrome.runtime.sendMessage({
+        action: 'createTab',
+        url: suggestion.url,
+        disposition: getSearchResultNewTabDisposition(event)
+      });
+      return;
+    }
+    chrome.runtime.sendMessage({
+      action: 'switchToTab',
+      tabId: suggestion._xMatchedTabId
+    });
+  }
+
+  function refreshTabsForSearchContext(callback) {
+    if (!chrome || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') {
+      if (typeof callback === 'function') {
+        callback(false);
+      }
+      return;
+    }
+    const request = { action: 'getTabsForOverlay' };
+    if (typeof currentNewtabTabId === 'number') {
+      request.currentTabId = currentNewtabTabId;
+    }
+    let settled = false;
+    let timeout = null;
+    const finish = (ok) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (timeout !== null) {
+        clearTimeout(timeout);
+      }
+      if (typeof callback === 'function') {
+        callback(ok);
+      }
+    };
+    timeout = setTimeout(() => finish(false), 240);
+    chrome.runtime.sendMessage(request, (response) => {
+      if (chrome.runtime && chrome.runtime.lastError) {
+        finish(false);
+        return;
+      }
+      tabs = response && Array.isArray(response.tabs) ? response.tabs : [];
+      currentNewtabTabId = response && typeof response.currentTabId === 'number'
+        ? response.currentTabId
+        : null;
+      finish(true);
+    });
+  }
+
   function resolveQuickNavigation(query) {
     const directUrlSuggestion = getDirectUrlSuggestion(query);
     if (directUrlSuggestion) {
@@ -7578,14 +10090,7 @@
     });
   }
 
-  const suggestionItems = [];
-  let selectedIndex = -1;
-  let currentSuggestions = [];
-  let lastSuggestionResponse = [];
-  let siteSearchTriggerState = null;
-  let lastRenderedQuery = '';
-  let lastRenderedActionContextKey = '';
-  const suggestionsView = NEWTAB_SUGGESTIONS_VIEW.createSuggestionsView({
+  suggestionsView = NEWTAB_SUGGESTIONS_VIEW.createSuggestionsView({
     document,
     container: suggestionsContainer,
     items: suggestionItems,
@@ -7639,25 +10144,44 @@
     getBrandAccentForUrl,
     buildThemeFromAccent,
     actionModel: SUGGESTION_ACTION_MODEL,
+    shouldSwitchMatchedTabSuggestion,
     defaultTheme,
     urlHighlightTheme,
     openTabSuggestionLimit: NEWTAB_OPEN_TAB_SUGGESTION_LIMIT
   });
   let openInCurrentTabModifierActive = false;
+  let openSwitchInNewTabModifierActive = false;
+  let openInBackgroundTabModifierActive = false;
 
-  function setOpenInCurrentTabModifierActive(active) {
-    const nextActive = Boolean(active);
-    if (openInCurrentTabModifierActive === nextActive) {
+  function setSuggestionActionModifiersActive(openInCurrentTabActive, openSwitchInNewTabActive, openInBackgroundTabActive) {
+    const nextOpenInCurrentTabActive = Boolean(openInCurrentTabActive);
+    const nextOpenSwitchInNewTabActive = Boolean(openSwitchInNewTabActive);
+    const nextOpenInBackgroundTabActive = Boolean(openInBackgroundTabActive);
+    if (openInCurrentTabModifierActive === nextOpenInCurrentTabActive &&
+        openSwitchInNewTabModifierActive === nextOpenSwitchInNewTabActive &&
+        openInBackgroundTabModifierActive === nextOpenInBackgroundTabActive) {
       return;
     }
-    openInCurrentTabModifierActive = nextActive;
+    openInCurrentTabModifierActive = nextOpenInCurrentTabActive;
+    openSwitchInNewTabModifierActive = nextOpenSwitchInNewTabActive;
+    openInBackgroundTabModifierActive = nextOpenInBackgroundTabActive;
     if (suggestionsView && typeof suggestionsView.setOpenInCurrentTabModifierActive === 'function') {
-      suggestionsView.setOpenInCurrentTabModifierActive(nextActive);
+      suggestionsView.setOpenInCurrentTabModifierActive(nextOpenInCurrentTabActive);
+    }
+    if (suggestionsView && typeof suggestionsView.setOpenSwitchInNewTabModifierActive === 'function') {
+      suggestionsView.setOpenSwitchInNewTabModifierActive(nextOpenSwitchInNewTabActive);
+    }
+    if (suggestionsView && typeof suggestionsView.setOpenInBackgroundTabModifierActive === 'function') {
+      suggestionsView.setOpenInBackgroundTabModifierActive(nextOpenInBackgroundTabActive);
     }
   }
 
-  function syncOpenInCurrentTabModifierFromEvent(event) {
-    setOpenInCurrentTabModifierActive(Boolean(event && event.altKey));
+  function syncSuggestionActionModifiersFromEvent(event) {
+    setSuggestionActionModifiersActive(
+      Boolean(event && event.altKey),
+      Boolean(event && event.shiftKey),
+      Boolean(event && (event.metaKey || event.ctrlKey))
+    );
   }
 
   function getAutoHighlightIndex() {
@@ -7711,10 +10235,13 @@
   }
 
   function updateSelection() {
+    if (!suggestionsView) {
+      return;
+    }
     suggestionsView.updateSelection(selectedIndex);
   }
 
-  function activateRenderedSuggestion(suggestion, query) {
+  function activateRenderedSuggestion(suggestion, query, event, index, item) {
     if (suggestion.type === 'commandNewTab') {
       chrome.runtime.sendMessage({ action: 'openNewTab' });
       return;
@@ -7733,16 +10260,27 @@
       focusSearchInputPreservingScroll();
       return;
     }
+    if (Number.isInteger(index) && shouldSwitchMatchedTabSuggestion(suggestion, index)) {
+      openMatchedTabSuggestion(suggestion, event, item, query);
+      return;
+    }
     if (suggestion.provider && suggestion.searchQuery) {
-      runSiteSearchProviderQuery(suggestion.provider, suggestion.searchQuery, 'currentTab');
+      runSiteSearchProviderQuery(
+        suggestion.provider,
+        suggestion.searchQuery,
+        shouldOpenSearchResultInBackgroundTab(event) ? 'backgroundTab' : 'currentTab'
+      );
+      return;
+    }
+    if (shouldOpenSearchResultInBackgroundTab(event) && suggestion.url) {
+      openSearchResultUrl(suggestion, query, event);
       return;
     }
     if (suggestion.forceSearch && suggestion.searchQuery) {
       navigateToQuery(suggestion.searchQuery, true);
       return;
     }
-    recordSearchSuggestionSelection(suggestion, query);
-    navigateToUrl(suggestion.url);
+    openSearchResultUrl(suggestion, query, event);
   }
 
   function deleteRenderedHistorySuggestion(suggestion) {
@@ -7925,6 +10463,19 @@
       let allSuggestions = siteSearchQueryModeActive
         ? (siteSearchSuggestion ? [siteSearchSuggestion] : [])
         : (modeCommandActive ? [...preSuggestions] : [...preSuggestions, newTabSuggestion, ...suggestions]);
+      allSuggestions.forEach((item) => {
+        if (!item || !item.url) {
+          return;
+        }
+        const matchedTabId = getMatchedOpenTabIdForSuggestion(item);
+        if (typeof matchedTabId === 'number') {
+          item._xMatchedTabId = matchedTabId;
+          return;
+        }
+        if (Object.prototype.hasOwnProperty.call(item, '_xMatchedTabId')) {
+          delete item._xMatchedTabId;
+        }
+      });
       allSuggestions = filterBlacklistedSuggestions(allSuggestions, query);
 
       const onlyKeywordSuggestions = allSuggestions.length > 0 &&
@@ -7987,6 +10538,25 @@
         } else if (!strongNavigationMatch && topSiteMatch && preferAutocompleteFirst) {
           primaryHighlightIndex = 0;
           primaryHighlightReason = 'topSite';
+        }
+        if (!siteSearchState && query && openTabQuickSwitchEnabled) {
+          const openTabMatch = typeof SEARCH_UTILS.findSearchOpenTabMatchIndex === 'function'
+            ? SEARCH_UTILS.findSearchOpenTabMatchIndex(allSuggestions, {
+              rawQuery: latestRawQuery.trim(),
+              primaryHighlightIndex,
+              currentTabId: currentNewtabTabId,
+              openTabQuickSwitchEnabled,
+              getDirectNavigationUrl
+            })
+            : { index: -1, reason: '' };
+          if (openTabMatch.index >= 0) {
+            if (openTabMatch.index > 0) {
+              const [openTabMatchSuggestion] = allSuggestions.splice(openTabMatch.index, 1);
+              allSuggestions.unshift(openTabMatchSuggestion);
+            }
+            primaryHighlightIndex = 0;
+            primaryHighlightReason = openTabMatch.reason || 'openTab';
+          }
         }
         if (query && primaryHighlightIndex < 0 && allSuggestions.length > 0) {
           primaryHighlightIndex = 0;
@@ -8111,16 +10681,21 @@
           renderSuggestions([], requestQuery);
           return;
         }
-        if (response && response.suggestions) {
-          renderSuggestions(response.suggestions, requestQuery);
-          return;
-        }
-        renderSuggestions([], requestQuery);
+        const responseSuggestions = response && response.suggestions ? response.suggestions : [];
+        refreshTabsForSearchContext(() => {
+          if (requestSeq !== suggestionRequestSeq) {
+            return;
+          }
+          if (requestQuery !== latestQuery) {
+            return;
+          }
+          renderSuggestions(responseSuggestions, requestQuery);
+        });
       });
     }, immediate ? 0 : 120);
   }
 
-  const inputParts = createSearchInput({
+  inputParts = createSearchInput({
     useImportantStyles: false,
     useInlineBaseStyles: false,
     containerId: '_x_extension_newtab_input_container_2024_unique_',
@@ -8214,7 +10789,7 @@
       updateModeBadge('');
     },
     onKeyDown: function(event) {
-      syncOpenInCurrentTabModifierFromEvent(event);
+      syncSuggestionActionModifiersFromEvent(event);
       dismissAutocompletePreviewOnNonTabKey(event);
       if (event.key !== 'Backspace' && !event.metaKey && !event.ctrlKey && !event.altKey) {
         latestRawQuery = inputParts.input.value;
@@ -8299,10 +10874,13 @@
         setVisibleThemeMode(getNextThemeMode(currentThemeMode));
         return;
       }
-      const executeSuggestion = (selectedSuggestion) => {
+      const executeSuggestion = (selectedSuggestion, event, activeSuggestionIndex) => {
         if (!selectedSuggestion) {
           return false;
         }
+        const activeItem = Number.isInteger(activeSuggestionIndex)
+          ? suggestionItems[activeSuggestionIndex]
+          : null;
         if (selectedSuggestion.type === 'modeSwitch') {
           setVisibleThemeMode(selectedSuggestion.nextMode);
           return true;
@@ -8321,33 +10899,46 @@
           return true;
         }
         if (selectedSuggestion.provider && selectedSuggestion.searchQuery) {
-          return runSiteSearchProviderQuery(selectedSuggestion.provider, selectedSuggestion.searchQuery, 'currentTab');
+          return runSiteSearchProviderQuery(
+            selectedSuggestion.provider,
+            selectedSuggestion.searchQuery,
+            shouldOpenSearchResultInBackgroundTab(event) ? 'backgroundTab' : 'currentTab'
+          );
+        }
+        if (shouldSwitchMatchedTabSuggestion(selectedSuggestion, activeSuggestionIndex)) {
+          openMatchedTabSuggestion(selectedSuggestion, event, activeItem, query);
+          return true;
+        }
+        if (shouldOpenSearchResultInBackgroundTab(event) && selectedSuggestion.url) {
+          return openSearchResultUrl(selectedSuggestion, query, event);
         }
         if (selectedSuggestion.forceSearch && selectedSuggestion.searchQuery) {
           navigateToQuery(selectedSuggestion.searchQuery, true);
           return true;
         }
         if (selectedSuggestion.url) {
-          recordSearchSuggestionSelection(selectedSuggestion, query);
-          navigateToUrl(selectedSuggestion.url);
-          return true;
+          return openSearchResultUrl(selectedSuggestion, query, event);
         }
         return false;
       };
       if (selectedIndex >= 0 && currentSuggestions[selectedIndex]) {
-        if (executeSuggestion(currentSuggestions[selectedIndex])) {
+        if (executeSuggestion(currentSuggestions[selectedIndex], event, selectedIndex)) {
           return;
         }
       } else {
         const autoIndex = getAutoHighlightIndex();
         if (autoIndex >= 0 && currentSuggestions[autoIndex]) {
-          if (executeSuggestion(currentSuggestions[autoIndex])) {
+          if (executeSuggestion(currentSuggestions[autoIndex], event, autoIndex)) {
             return;
           }
         }
       }
       if (siteSearchState) {
-        if (runSiteSearchProviderQuery(siteSearchState, query, 'currentTab')) {
+        if (runSiteSearchProviderQuery(
+          siteSearchState,
+          query,
+          shouldOpenSearchResultInBackgroundTab(event) ? 'backgroundTab' : 'currentTab'
+        )) {
           return;
         }
       }
@@ -8355,26 +10946,46 @@
       if (inlineSearchState && inlineSearchState.isAuto &&
           inlineSearchState.rawInput === currentRawInput) {
         if (inlineSearchState.provider && inlineSearchState.query) {
-          if (runSiteSearchProviderQuery(inlineSearchState.provider, inlineSearchState.query, 'currentTab')) {
+          if (runSiteSearchProviderQuery(
+            inlineSearchState.provider,
+            inlineSearchState.query,
+            shouldOpenSearchResultInBackgroundTab(event) ? 'backgroundTab' : 'currentTab'
+          )) {
             return;
           }
         } else if (inlineSearchState.url) {
-          navigateToUrl(inlineSearchState.url);
+          openSearchResultUrl({
+            url: inlineSearchState.url,
+            title: inlineSearchState.url,
+            type: 'inlineSiteSearch'
+          }, query, event);
           return;
         }
       }
       if (autocompleteState && autocompleteState.url) {
-        recordSearchSuggestionSelection({
+        openSearchResultUrl({
           url: autocompleteState.url,
           title: autocompleteState.title || '',
           type: 'autocomplete'
-        }, query);
-        navigateToUrl(autocompleteState.url);
+        }, query, event);
         return;
       }
       resolveQuickNavigation(query).then((targetUrl) => {
+        const backgroundOpen = shouldOpenSearchResultInBackgroundTab(event);
         if (targetUrl) {
-          navigateToUrl(targetUrl);
+          openSearchResultUrl({
+            url: targetUrl,
+            title: query,
+            type: 'quickNavigation'
+          }, query, event);
+          return;
+        }
+        if (backgroundOpen) {
+          chrome.runtime.sendMessage({
+            action: 'searchOrNavigate',
+            query: query,
+            disposition: 'backgroundTab'
+          });
           return;
         }
         navigateToQuery(query);
@@ -8723,6 +11334,12 @@
     if (feedbackControl && (target === feedbackControl || feedbackControl.contains(target))) {
       return false;
     }
+    if (shortcutSection && (target === shortcutSection || shortcutSection.contains(target))) {
+      return false;
+    }
+    if (shortcutDialogBackdrop && (target === shortcutDialogBackdrop || shortcutDialogBackdrop.contains(target))) {
+      return false;
+    }
     if (rightIcon && (target === rightIcon || rightIcon.contains(target))) {
       return false;
     }
@@ -8898,10 +11515,13 @@
   }
 
   if (storageArea) {
-    storageArea.get([SEARCH_RESULT_PRIORITY_STORAGE_KEY], (result) => {
+    storageArea.get([SEARCH_RESULT_PRIORITY_STORAGE_KEY, OVERLAY_TAB_PRIORITY_STORAGE_KEY], (result) => {
       const raw = result ? result[SEARCH_RESULT_PRIORITY_STORAGE_KEY] : null;
       const nextMode = normalizeSearchResultPriority(raw);
       searchResultPriorityMode = nextMode;
+      openTabQuickSwitchEnabled = normalizeOverlayTabPriorityMode(
+        result ? result[OVERLAY_TAB_PRIORITY_STORAGE_KEY] : null
+      );
       if (raw !== nextMode) {
         storageArea.set({ [SEARCH_RESULT_PRIORITY_STORAGE_KEY]: nextMode });
       }
@@ -9041,7 +11661,7 @@
   };
 
   document.addEventListener('keydown', function(event) {
-    syncOpenInCurrentTabModifierFromEvent(event);
+    syncSuggestionActionModifiersFromEvent(event);
     if (event.key !== 'Tab') {
       return;
     }
@@ -9053,10 +11673,10 @@
     }
   }, true);
   document.addEventListener('keyup', function(event) {
-    syncOpenInCurrentTabModifierFromEvent(event);
+    syncSuggestionActionModifiersFromEvent(event);
   }, true);
   window.addEventListener('blur', function() {
-    setOpenInCurrentTabModifierActive(false);
+    setSuggestionActionModifiersActive(false, false, false);
   });
 
   getSiteSearchProviders();
@@ -9154,22 +11774,24 @@
   searchLayer.appendChild(inputParts.container);
   root.appendChild(searchLayer);
   const newtabUpdateNoticeAnchor = root.nextSibling;
+  if (shortcutSection) {
+    document.body.insertBefore(shortcutSection, newtabUpdateNoticeAnchor);
+  }
   if (updateNoticeController && updateNoticeController.element) {
     document.body.insertBefore(updateNoticeController.element, newtabUpdateNoticeAnchor);
   }
   document.body.insertBefore(suggestionsSurface, newtabUpdateNoticeAnchor);
   document.body.insertBefore(suggestionsOutline, newtabUpdateNoticeAnchor);
   document.body.insertBefore(suggestionsContainer, newtabUpdateNoticeAnchor);
-  bottomDockScroller.appendChild(bookmarkSection);
-  bottomDockScroller.appendChild(sectionSafeCorridor);
-  bottomDockScroller.appendChild(recentSection);
-  bottomDock.appendChild(bottomDockScroller);
-  document.body.appendChild(bottomDock);
+  bottomDockRuntime.mount(document.body);
   if (wallpaperControl) {
     document.body.appendChild(wallpaperControl);
   }
   if (feedbackControl) {
     document.body.appendChild(feedbackControl);
+  }
+  if (shortcutDialogBackdrop) {
+    document.body.appendChild(shortcutDialogBackdrop);
   }
   if (BOOKMARK_CASCADE_DEBUG_UI_ENABLED && bookmarkCascadeRuntime && bookmarkCascadeRuntime.getDebugControl()) {
     document.body.appendChild(bookmarkCascadeRuntime.getDebugControl());
@@ -9223,17 +11845,21 @@
     scheduleWallpaperAdaptiveToneUpdate();
     positionBookmarkCascadeLevels();
   }, { passive: true });
-  bottomDockScroller.addEventListener('scroll', scheduleWallpaperAdaptiveToneUpdate, { passive: true });
+  bottomDockRuntime.onScroll(scheduleWallpaperAdaptiveToneUpdate, { passive: true });
+  const shortcutsReadyPromise = loadNewtabShortcutsVisibility().then(loadVisibleShortcuts);
   Promise.all([
     bootstrapInitialThemeMode(),
     bootstrapInitialLanguageMode(),
     bootstrapInitialWallpaper(),
     bootstrapInitialWallpaperOverlay(),
     bootstrapInitialWallpaperEffect(),
+    bootstrapInitialNewtabFavicon(),
     loadSearchBlacklistItems(),
     loadFaviconRequestBlacklistItems()
   ]).then(() => {
     hydrateSectionsFromCache();
+    return shortcutsReadyPromise;
+  }).then(() => {
     loadRecentSites();
     loadBookmarks();
     maybeShowFileAccessNotice();

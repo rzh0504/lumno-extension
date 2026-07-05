@@ -16,14 +16,54 @@ assert.strictEqual(
   'Alt/Option should not rewrite non-new-tab actions'
 );
 assert.strictEqual(
+  actionModel.getModifierAdjustedAction('openNewTab', { openInBackgroundTab: true }),
+  'openBackgroundTab',
+  'Command/Ctrl should present open-new-tab actions as background-tab opening'
+);
+assert.strictEqual(
+  actionModel.getModifierAdjustedAction('go', { openInBackgroundTab: true }),
+  'openBackgroundTab',
+  'Command/Ctrl should present current-tab Enter actions as background-tab opening'
+);
+assert.strictEqual(
+  actionModel.getModifierAdjustedAction('openNewTab', {
+    openInCurrentTab: true,
+    openInBackgroundTab: true
+  }),
+  'go',
+  'Alt/Option current-tab labels should take priority over Command/Ctrl background labels'
+);
+assert.strictEqual(
   actionModel.getModifierAdjustedAction('switch', { openSwitchInNewTab: true }),
   'openNewTab',
   'Shift should present switch actions as open-new-tab navigation'
 );
 assert.strictEqual(
+  actionModel.getModifierAdjustedAction('switch', { openInBackgroundTab: true }),
+  'openBackgroundTab',
+  'Command/Ctrl should present matched open-tab switch actions as background duplicate opening'
+);
+assert.strictEqual(
+  actionModel.getModifierAdjustedAction('switch', {
+    openSwitchInNewTab: true,
+    openInBackgroundTab: true
+  }),
+  'openBackgroundTab',
+  'Shift+Command/Ctrl should present matched open-tab switch actions as background duplicate opening'
+);
+assert.strictEqual(
   actionModel.getModifierAdjustedAction('switch', { openInCurrentTab: true, openSwitchInNewTab: true }),
   'openNewTab',
   'Shift should keep switch actions as open-new-tab navigation even when Alt/Option is also held'
+);
+assert.strictEqual(
+  actionModel.getModifierAdjustedAction('switch', {
+    openInCurrentTab: true,
+    openSwitchInNewTab: true,
+    openInBackgroundTab: true
+  }),
+  'openNewTab',
+  'Alt/Option should keep Shift switch labels foreground even when Command/Ctrl is also held'
 );
 
 const historySuggestion = {
@@ -56,6 +96,32 @@ assert.strictEqual(
   ),
   false,
   'Shift should not duplicate switch results that do not have a URL to open'
+);
+assert.strictEqual(
+  actionModel.getSearchResultOpenDisposition({ openInBackgroundTab: true }),
+  'backgroundTab',
+  'Command/Ctrl should request background-tab opening for search results'
+);
+assert.strictEqual(
+  actionModel.getSearchResultOpenDisposition({
+    openInCurrentTab: true,
+    openInBackgroundTab: true
+  }),
+  'currentTab',
+  'Alt/Option current-tab behavior should take priority over Command/Ctrl background opening'
+);
+assert.strictEqual(
+  actionModel.getSearchResultOpenDisposition({
+    openSwitchInNewTab: true,
+    openInBackgroundTab: true
+  }),
+  'backgroundTab',
+  'Shift can still choose the new-tab switch result while Command/Ctrl makes that new tab background'
+);
+assert.strictEqual(
+  actionModel.getSearchResultOpenDisposition({}),
+  'newTab',
+  'search results that explicitly create tabs should default to foreground new tabs'
 );
 
 console.log('suggestion action model tests passed');

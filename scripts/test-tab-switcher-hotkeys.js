@@ -189,6 +189,66 @@ assert.match(
   /if \(restricted\)[\s\S]*isSearchCommandSource\(source\) && \(isLumnoNewtabUrl\(activeUrl\) \|\| isBrowserNewtabUrl\(activeUrl\)\)[\s\S]*requestFocusVisibleNewtabInput\(source,\s*activeTab\.id\)[\s\S]*return;/,
   'show-search commands on restricted Lumno/browser newtab URLs should keep focusing the visible newtab input'
 );
+assert.match(
+  openOverlayBlock,
+  /if \(action === 'none'\)[\s\S]*fallback-open-browser-newtab[\s\S]*openBrowserNewtabFallback\(\)[\s\S]*return;/,
+  'restricted browser-setting action should open the browser-selected newtab provider instead of suppressing the shortcut'
+);
+assert.strictEqual(
+  (manifest.permissions || []).includes('management'),
+  false,
+  'automatic restricted action detection should not add the broad extension management permission'
+);
+assert.match(
+  backgroundSource,
+  /const BROWSER_NEWTAB_PROVIDER_DETECTION_MS = \d+;[\s\S]*const browserNewtabProviderCandidateTabIds = new Map\(\);/,
+  'background should keep a bounded candidate window for browser-selected newtab provider detection'
+);
+assert.match(
+  backgroundSource,
+  /const RESTRICTED_ACTION_AUTO_BROWSER_SETTING_DONE_STORAGE_KEY = '_x_extension_restricted_action_auto_browser_setting_done_2026_unique_';/,
+  'background should persist a one-shot marker after automatic browser-setting selection'
+);
+assert.match(
+  backgroundSource,
+  /function rememberBrowserNewtabProviderCandidate\(tab\)[\s\S]*isPotentialBrowserNewtabProviderCandidate\(tab\)[\s\S]*browserNewtabProviderCandidateTabIds\.set/,
+  'background should only track tabs that look like browser-created newtab candidates'
+);
+assert.match(
+  backgroundSource,
+  /let restrictedActionAutoBrowserSettingDoneCache = false;/,
+  'background should cache whether automatic restricted-action selection has already run'
+);
+assert.match(
+  backgroundSource,
+  /function setRestrictedActionFromBrowserNewtabProvider\(providerType,\s*tab,\s*stage\)[\s\S]*restrictedActionAutoBrowserSettingDoneCache[\s\S]*RESTRICTED_ACTION_AUTO_BROWSER_SETTING_DONE_STORAGE_KEY[\s\S]*storageArea\.set\(payload\)/,
+  'background should set the browser-setting action and one-shot marker together'
+);
+assert.match(
+  backgroundSource,
+  /function maybeAutoSelectRestrictedBrowserSetting\(tab,\s*stage\)[\s\S]*restrictedActionAutoBrowserSettingDoneCache[\s\S]*providerType === 'other-extension'[\s\S]*setRestrictedActionFromBrowserNewtabProvider/,
+  'background should auto-select browser setting when a browser newtab resolves to another extension provider'
+);
+assert.match(
+  backgroundSource,
+  /changes\[RESTRICTED_ACTION_AUTO_BROWSER_SETTING_DONE_STORAGE_KEY\][\s\S]*restrictedActionAutoBrowserSettingDoneCache = next === true;/,
+  'background should keep the one-shot marker cache synced from storage changes'
+);
+assert.match(
+  backgroundSource,
+  /chrome\.tabs\.onCreated\.addListener\(\(tab\) => \{[\s\S]*rememberBrowserNewtabProviderCandidate\(tab\);[\s\S]*maybeAutoSelectRestrictedBrowserSetting\(tab,\s*'created'\);/,
+  'tab creation should feed automatic newtab-provider detection before hotkey recovery work'
+);
+assert.match(
+  backgroundSource,
+  /chrome\.tabs\.onUpdated\.addListener\(\(tabId,\s*changeInfo,\s*tab\) => \{[\s\S]*maybeAutoSelectRestrictedBrowserSetting\([\s\S]*'updated/,
+  'tab URL updates should resolve browser-created newtab candidates into the active provider'
+);
+assert.doesNotMatch(
+  openOverlayBlock,
+  /if \(action === 'none'\)[\s\S]*restricted_action_none[\s\S]*return;/,
+  'restricted browser-setting action should no longer be treated as no action'
+);
 assert.strictEqual(
   /TAB_SWITCHER_RUNTIME_VERSION|getTabSwitcherRuntimeVersionOnTab|tab_switcher_runtime_stale|runtimeVersion/.test(backgroundSource),
   false,

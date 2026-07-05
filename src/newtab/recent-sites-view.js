@@ -100,6 +100,11 @@
     const showTopActionTooltip = getFunction(options, 'showTopActionTooltip');
     const hideTopActionTooltip = getFunction(options, 'hideTopActionTooltip');
     const navigateToUrl = getFunction(options, 'navigateToUrl');
+    const openUrl = getFunction(options, 'openUrl', function(url) {
+      navigateToUrl(url);
+    });
+    const bindCursorTooltip = getFunction(options, 'bindCursorTooltip');
+    const hideCursorTooltip = getFunction(options, 'hideCursorTooltip');
     const togglePinned = getFunction(options, 'togglePinned', function() {
       return Promise.resolve(null);
     });
@@ -109,10 +114,15 @@
 
     function clear() {
       hideTopActionTooltip();
+      hideCursorTooltip();
       if (grid) {
         grid.innerHTML = '';
       }
       cards.length = 0;
+    }
+
+    function shouldOpenUrlInBackground(event) {
+      return Boolean(event && (event.metaKey || event.ctrlKey));
     }
 
     function buildCard(item, index) {
@@ -198,6 +208,7 @@
       actionLine.appendChild(actionIcon);
       card._xActionText = actionText;
       card._xTitleText = safeTitleText;
+      card.setAttribute('data-cursor-tooltip', safeTitleText);
 
       const pinButton = documentObj.createElement('button');
       pinButton.type = 'button';
@@ -216,6 +227,7 @@
 
       let isCardPointerActive = false;
       let hasNavigateAttempted = false;
+      let suppressClickAfterPointerNavigation = false;
       let rollbackTimerId = null;
       let hoverUnlockTimerId = null;
       let isHoverLocked = false;
@@ -259,7 +271,16 @@
           hasNavigateAttempted = false;
         }, 180);
       };
-      const navigateFromCard = () => {
+      const resetBackgroundOpenGuard = () => {
+        if (!windowObj || typeof windowObj.setTimeout !== 'function') {
+          hasNavigateAttempted = false;
+          return;
+        }
+        windowObj.setTimeout(() => {
+          hasNavigateAttempted = false;
+        }, 0);
+      };
+      const navigateFromCard = (event) => {
         if (hasNavigateAttempted) {
           return;
         }
@@ -267,7 +288,12 @@
         if (!isHoverLocked) {
           card.classList.remove(rollbackClassName);
         }
-        navigateToUrl(item.url);
+        const openInBackgroundTab = shouldOpenUrlInBackground(event);
+        openUrl(item.url, { openInBackgroundTab });
+        if (openInBackgroundTab) {
+          resetBackgroundOpenGuard();
+          return;
+        }
         scheduleRollbackIfPending();
       };
       const swallowPinEvent = (event) => {
@@ -289,7 +315,8 @@
             // Ignore capture errors and keep pointer flow fallback.
           }
         }
-        navigateFromCard();
+        suppressClickAfterPointerNavigation = true;
+        navigateFromCard(event);
       });
       card.addEventListener('pointercancel', () => {
         isCardPointerActive = false;
@@ -303,6 +330,7 @@
       });
       card.addEventListener('pointerleave', () => {
         hideTopActionTooltip();
+        hideCursorTooltip();
         if (!hasNavigateAttempted && !isHoverLocked) {
           card.classList.remove(rollbackClassName);
         }
@@ -315,13 +343,21 @@
       };
       documentObj.addEventListener('visibilitychange', onVisibilityChange);
       windowObj.addEventListener('pagehide', markNavigationSuccess, { once: true });
-      card.addEventListener('click', () => {
-        navigateFromCard();
+      bindCursorTooltip(card, () => card._xTitleText || safeTitleText, {
+        maxWidth: 460
+      });
+      card.addEventListener('click', (event) => {
+        if (suppressClickAfterPointerNavigation) {
+          suppressClickAfterPointerNavigation = false;
+          event.preventDefault();
+          return;
+        }
+        navigateFromCard(event);
       });
       card.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          navigateFromCard();
+          navigateFromCard(event);
         }
       });
       pinButton.addEventListener('pointerdown', swallowPinEvent);

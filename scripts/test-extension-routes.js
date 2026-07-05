@@ -1,4 +1,6 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const routes = require('../src/shared/extension-routes.js');
 
 const chromeApi = {
@@ -20,6 +22,12 @@ assert.strictEqual(
 );
 
 assert.strictEqual(
+  routes.buildLumnoNewtabUrl(chromeApi, { focus: true }),
+  'chrome-extension://abc/src/newtab/lumno-newtab.html?focus=1',
+  'forced Lumno newtab URL should use the standalone extension route'
+);
+
+assert.strictEqual(
   routes.buildOptionsUrl(chromeApi, 'appearance'),
   'chrome-extension://abc/src/options/options.html#appearance',
   'options hash URL should use the extension route'
@@ -38,6 +46,12 @@ assert.strictEqual(
 );
 
 assert.strictEqual(
+  routes.classifyExtensionUrl('chrome-extension://abc/src/newtab/lumno-newtab.html?focus=1'),
+  'newtab',
+  'standalone Lumno newtab URLs should be classified as newtab'
+);
+
+assert.strictEqual(
   routes.classifyExtensionUrl('chrome-extension://abc/src/options/options.html#appearance'),
   'options',
   'options URLs should be classified'
@@ -53,6 +67,23 @@ assert.strictEqual(
   routes.classifyExtensionUrl('chrome-extension://abc/src/other/page.html'),
   'other',
   'unknown extension URLs should be classified as other'
+);
+
+const repoRoot = path.resolve(__dirname, '..');
+const manifest = require('../manifest.json');
+assert.strictEqual(
+  manifest.chrome_url_overrides.newtab,
+  routes.ROUTE_PATHS.newtab,
+  'manifest should keep the browser newtab override on the canonical override route'
+);
+assert.notStrictEqual(
+  routes.ROUTE_PATHS.lumnoNewtab,
+  manifest.chrome_url_overrides.newtab,
+  'forced Lumno newtab route should not be the browser override route'
+);
+assert.ok(
+  fs.existsSync(path.join(repoRoot, routes.ROUTE_PATHS.lumnoNewtab)),
+  'forced Lumno newtab standalone HTML should exist'
 );
 
 console.log('extension route tests passed');

@@ -175,6 +175,13 @@
       ? config.onDeleteHistory
       : noop;
     let openInCurrentTabModifierActive = false;
+    let openSwitchInNewTabModifierActive = false;
+    let openInBackgroundTabModifierActive = false;
+    const shouldSwitchMatchedTabSuggestion = typeof config.shouldSwitchMatchedTabSuggestion === 'function'
+      ? config.shouldSwitchMatchedTabSuggestion
+      : function() {
+        return false;
+      };
     const showTopActionTooltip = typeof config.showTopActionTooltip === 'function'
       ? config.showTopActionTooltip
       : noop;
@@ -442,6 +449,8 @@
           return t('action_switch', '切换');
         case 'open':
           return t('action_open', '打开');
+        case 'openBackgroundTab':
+          return t('action_open_background_new_tab', '在后台新开');
         case 'openNewTab':
           return t('action_open_new_tab', '新开');
         case 'go':
@@ -516,8 +525,19 @@
     function getModifierAdjustedAction(action) {
       if (actionModel && typeof actionModel.getModifierAdjustedAction === 'function') {
         return actionModel.getModifierAdjustedAction(action, {
-          openInCurrentTab: openInCurrentTabModifierActive
+          openInCurrentTab: openInCurrentTabModifierActive,
+          openSwitchInNewTab: openSwitchInNewTabModifierActive,
+          openInBackgroundTab: openInBackgroundTabModifierActive
         });
+      }
+      if (openSwitchInNewTabModifierActive && action === 'switch') {
+        return openInBackgroundTabModifierActive && !openInCurrentTabModifierActive
+          ? 'openBackgroundTab'
+          : 'openNewTab';
+      }
+      if (openInBackgroundTabModifierActive && !openInCurrentTabModifierActive &&
+          (action === 'openNewTab' || action === 'go' || action === 'switch')) {
+        return 'openBackgroundTab';
       }
       return openInCurrentTabModifierActive && action === 'openNewTab' ? 'go' : action;
     }
@@ -1106,6 +1126,9 @@
         setSuggestionActionTagsVisible(actionTags, false);
 
         const isMergedHighlight = Boolean(mergedProvider && primarySuggestion === suggestion && isPrimaryHighlight);
+        const shouldSwitchMatchedTab = isPrimaryHighlight &&
+          (primaryHighlightReason === 'openTab' || primaryHighlightReason === 'currentOpenTab') &&
+          shouldSwitchMatchedTabSuggestion(suggestion, index);
         const itemActionModel = createSearchActionModel({
           suggestion,
           isPrimaryHighlight,
@@ -1113,7 +1136,7 @@
           primaryHighlightReason,
           onlyKeywordSuggestions,
           isMergedHighlight,
-          shouldSwitchMatchedTab: false,
+          shouldSwitchMatchedTab,
           enterAction: 'go'
         });
         const actionTagNodes = [];
@@ -1162,12 +1185,12 @@
           updateSelection(getSelectedIndex());
         });
 
-        suggestionItem.addEventListener('click', function() {
-          onActivateSuggestion(suggestion, query);
+        suggestionItem.addEventListener('click', function(event) {
+          onActivateSuggestion(suggestion, query, event, index, suggestionItem);
         });
         visitButton.addEventListener('click', function(event) {
           event.stopPropagation();
-          onActivateSuggestion(suggestion, query);
+          onActivateSuggestion(suggestion, query, event, index, suggestionItem);
         });
 
         leftSide.appendChild(iconNode);
@@ -1274,6 +1297,22 @@
           return;
         }
         openInCurrentTabModifierActive = nextActive;
+        updateModifierActionLabels();
+      },
+      setOpenSwitchInNewTabModifierActive(active) {
+        const nextActive = Boolean(active);
+        if (openSwitchInNewTabModifierActive === nextActive) {
+          return;
+        }
+        openSwitchInNewTabModifierActive = nextActive;
+        updateModifierActionLabels();
+      },
+      setOpenInBackgroundTabModifierActive(active) {
+        const nextActive = Boolean(active);
+        if (openInBackgroundTabModifierActive === nextActive) {
+          return;
+        }
+        openInBackgroundTabModifierActive = nextActive;
         updateModifierActionLabels();
       },
       clear,

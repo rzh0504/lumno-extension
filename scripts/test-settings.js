@@ -28,10 +28,20 @@ assert.strictEqual(settings.normalizeNewtabWordmarkVisible(false), false);
 assert.strictEqual(settings.normalizeNewtabWordmarkVisible(true), true);
 assert.strictEqual(settings.normalizeNewtabWordmarkVisible(undefined), true);
 
+assert.strictEqual(settings.normalizeNewtabShortcutsVisible(false), false);
+assert.strictEqual(settings.normalizeNewtabShortcutsVisible(true), true);
+assert.strictEqual(settings.normalizeNewtabShortcutsVisible(undefined), true);
+assert.strictEqual(settings.normalizeNewtabShortcutsVisible('false'), true);
+
 assert.strictEqual(settings.normalizeUpdateNoticeEnabled(false), false);
 assert.strictEqual(settings.normalizeUpdateNoticeEnabled(true), true);
 assert.strictEqual(settings.normalizeUpdateNoticeEnabled(undefined), true);
 assert.strictEqual(settings.normalizeUpdateNoticeEnabled('false'), true);
+
+assert.strictEqual(settings.normalizeFaviconEnhancedFetchEnabled(false), false);
+assert.strictEqual(settings.normalizeFaviconEnhancedFetchEnabled(true), true);
+assert.strictEqual(settings.normalizeFaviconEnhancedFetchEnabled(undefined), true);
+assert.strictEqual(settings.normalizeFaviconEnhancedFetchEnabled('false'), true);
 
 assert.strictEqual(settings.normalizeOverlaySizeMode('compact'), 'compact');
 assert.strictEqual(settings.normalizeOverlaySizeMode('large'), 'large');

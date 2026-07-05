@@ -181,5 +181,45 @@ assert.strictEqual(
   '在受限页行为',
   'Simplified Chinese restricted behavior title should match the requested copy'
 );
+assert.strictEqual(
+  zhCnMessages.restricted_action_default.message,
+  '前往 Lumno 新标签页',
+  'Simplified Chinese restricted default action should make Lumno newtab explicit'
+);
+assert.strictEqual(
+  zhCnMessages.restricted_action_none.message,
+  '遵循浏览器设置',
+  'Simplified Chinese restricted none action should describe browser newtab fallback behavior'
+);
+assert.match(
+  generalContent,
+  /data-restricted-action="none"[\s\S]*data-i18n="restricted_action_none"/,
+  'browser-setting restricted action should keep the localized label'
+);
+assert.doesNotMatch(
+  generalContent,
+  /restricted_action_browser_setting_tooltip|data-restricted-action="none"[\s\S]*ri-information-line/,
+  'browser-setting restricted action should not keep the superseded tooltip copy'
+);
+assert.match(
+  optionsJs,
+  /const RESTRICTED_ACTION_AUTO_BROWSER_SETTING_DONE_STORAGE_KEY = '_x_extension_restricted_action_auto_browser_setting_done_2026_unique_';/,
+  'options should know the one-shot automatic restricted-action marker'
+);
+assert.match(
+  optionsJs,
+  /function createRestrictedActionStorageUpdate\(action\)[\s\S]*RESTRICTED_ACTION_STORAGE_KEY[\s\S]*RESTRICTED_ACTION_AUTO_BROWSER_SETTING_DONE_STORAGE_KEY/,
+  'manual restricted-action changes should mark automatic selection as already handled'
+);
+assert.match(
+  optionsJs,
+  /restrictedActionSelect\.addEventListener\('change'[\s\S]*storageArea\.set\(createRestrictedActionStorageUpdate\(next\)\)/,
+  'select-based restricted-action changes should set the one-shot marker'
+);
+assert.match(
+  optionsJs,
+  /button\.addEventListener\('click'[\s\S]*storageArea\.set\(createRestrictedActionStorageUpdate\(nextAction\)\)/,
+  'tab-button restricted-action changes should set the one-shot marker'
+);
 
 console.log('options shortcut reference tests passed');

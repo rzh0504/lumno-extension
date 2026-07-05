@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/images/lumno-newtab-favicon.svg" data-lumno-newtab-favicon="true" data-newtab-favicon-id="alternate" />
     <title>New Tab</title>
     <script src="wallpaper-preload.js"></script>
     <link rel="stylesheet" href="../../assets/fonts/open-sans/open-sans.css" />
@@ -152,6 +153,34 @@
         --x-nt-bottom-dock-corridor-size: 16px;
         --x-nt-bottom-dock-top-padding: 24px;
         --x-nt-bottom-dock-bottom-padding: 60px;
+        --x-nt-shortcuts-reserved-height: 82px;
+        --x-nt-shortcut-tile-size: 64px;
+        --x-nt-shortcut-icon-size: 48px;
+        --x-nt-shortcut-icon-radius: 16px;
+        --x-nt-shortcut-favicon-size: 28px;
+        --x-nt-shortcuts-section-margin-top: 18px;
+        --x-nt-shortcuts-grid-row-gap: 10px;
+        --x-nt-shortcuts-grid-column-gap: 4px;
+        --x-nt-shortcuts-grid-padding: 10px 8px 12px;
+        --x-nt-shortcut-tile-padding: 8px;
+        --x-nt-shortcut-hover-scale-near: 1.28;
+        --x-nt-shortcut-hover-rise-near: -6px;
+        --x-nt-shortcut-hover-scale-drag: 1.2;
+        --x-nt-shortcut-hover-rise-drag: -4px;
+        --x-nt-shortcut-hover-scale-mid: 1.14;
+        --x-nt-shortcut-hover-rise-mid: -3px;
+        --x-nt-shortcut-hover-shift-mid: 4px;
+        --x-nt-shortcut-hover-scale-far: 1.05;
+        --x-nt-shortcut-hover-rise-far: -1px;
+        --x-nt-shortcut-hover-shift-far: 1px;
+        --x-nt-shortcut-dock-duration: 300ms;
+        --x-nt-shortcut-dock-ease: cubic-bezier(0.22, 1, 0.36, 1);
+        --x-nt-shortcut-favicon-radius: max(
+          6px,
+          calc(var(--x-nt-shortcut-icon-radius, 16px) - ((var(--x-nt-shortcut-icon-size, 48px) - var(--x-nt-shortcut-favicon-size, 28px)) / 2))
+        );
+        --x-nt-shortcut-smooth-mask-outer: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M32 0H68C97.12 0 100 2.88 100 32V68C100 97.12 97.12 100 68 100H32C2.88 100 0 97.12 0 68V32C0 2.88 2.88 0 32 0Z' fill='black'/%3E%3C/svg%3E");
+        --x-nt-shortcut-smooth-mask-inner: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M20 0H80C98.2 0 100 1.8 100 20V80C100 98.2 98.2 100 80 100H20C1.8 100 0 98.2 0 80V20C0 1.8 1.8 0 20 0Z' fill='black'/%3E%3C/svg%3E");
       }
       body[data-wallpaper-active="true"] {
         --x-nt-wallpaper-overlay: var(--x-nt-wallpaper-effect-overlay);
@@ -392,6 +421,569 @@
         border-color: transparent;
         box-shadow: none;
       }
+      .x-nt-shortcuts-section {
+        width: 90vw;
+        max-width: var(--x-nt-search-max-width, 720px);
+        min-height: var(--x-nt-shortcuts-reserved-height, 82px);
+        margin: var(--x-nt-shortcuts-section-margin-top, 18px) auto 0;
+        position: relative;
+        z-index: 2;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        box-sizing: border-box;
+      }
+      body:not([data-nt-ready="1"]) .x-nt-shortcuts-section {
+        visibility: hidden;
+      }
+      .x-nt-shortcuts-section[data-visible="false"] {
+        display: none;
+      }
+      .x-nt-shortcuts-grid {
+        width: auto;
+        max-width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: flex-end;
+        gap: var(--x-nt-shortcuts-grid-row-gap, 10px) var(--x-nt-shortcuts-grid-column-gap, 4px);
+        padding: var(--x-nt-shortcuts-grid-padding, 10px 8px 12px);
+        box-sizing: border-box;
+      }
+      .x-nt-shortcut-tile {
+        all: unset;
+        width: var(--x-nt-shortcut-tile-size, 64px);
+        min-height: var(--x-nt-shortcut-tile-size, 64px);
+        padding: var(--x-nt-shortcut-tile-padding, 8px);
+        border-radius: 10px;
+        display: inline-grid;
+        place-items: center;
+        color: var(--x-nt-text, #111827);
+        box-sizing: border-box;
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        z-index: 1;
+      }
+      .x-nt-shortcut-tile[data-shortcut-draggable="true"] {
+        cursor: grab;
+        touch-action: none;
+      }
+      .x-nt-shortcuts-grid[data-shortcut-dragging="true"] .x-nt-shortcut-tile {
+        cursor: grabbing;
+      }
+      .x-nt-shortcut-tile[data-shortcut-dragging="true"],
+      .x-nt-shortcut-tile[data-shortcut-dropping="true"] {
+        z-index: 8;
+      }
+      .x-nt-shortcut-tile:focus-visible {
+        outline: 2px solid var(--x-nt-bookmark-focus, rgba(0, 0, 0, 0.22));
+        outline-offset: 2px;
+      }
+      .x-nt-shortcut-tile--add {
+        color: var(--x-nt-text, #111827);
+      }
+      .x-nt-shortcut-icon {
+        --x-nt-shortcut-dock-scale: 1;
+        --x-nt-shortcut-dock-shift-x: 0px;
+        --x-nt-shortcut-dock-rise: 0px;
+        width: var(--x-nt-shortcut-icon-size, 48px);
+        height: var(--x-nt-shortcut-icon-size, 48px);
+        border-radius: var(--x-nt-shortcut-icon-radius, 16px);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--x-nt-shortcut-wallpaper-icon-bg, var(--x-nt-shortcut-icon-bg, rgba(241, 245, 249, 0.9)));
+        color: var(--x-nt-shortcut-wallpaper-icon-color, var(--x-nt-shortcut-icon-color, var(--x-nt-text, #111827)));
+        border: 0;
+        box-shadow: none;
+        box-sizing: border-box;
+        overflow: hidden;
+        flex: 0 0 auto;
+        transform: translate3d(
+          var(--x-nt-shortcut-dock-shift-x, 0px),
+          var(--x-nt-shortcut-dock-rise, 0px),
+          0
+        ) scale(var(--x-nt-shortcut-dock-scale, 1));
+        transform-origin: 50% 100%;
+        transition:
+          transform var(--x-nt-shortcut-dock-duration, 300ms) var(--x-nt-shortcut-dock-ease, cubic-bezier(0.22, 1, 0.36, 1)),
+          background-color 160ms ease,
+          color 160ms ease,
+          filter 160ms ease;
+        will-change: auto;
+        -webkit-mask-image: var(--x-nt-shortcut-smooth-mask-outer);
+        mask-image: var(--x-nt-shortcut-smooth-mask-outer);
+        -webkit-mask-size: 100% 100%;
+        mask-size: 100% 100%;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+      }
+      body[data-theme="dark"] .x-nt-shortcut-icon {
+        background: var(--x-nt-shortcut-wallpaper-icon-bg, var(--x-nt-shortcut-icon-bg, rgba(255, 255, 255, 0.09)));
+      }
+      .x-nt-shortcut-icon--add {
+        color: var(--x-nt-shortcut-add-color, var(--x-nt-text, #111827));
+        background: var(--x-nt-shortcut-add-bg, rgba(248, 250, 252, 0.92));
+        border: none;
+        box-shadow: none;
+      }
+      body[data-theme="dark"] .x-nt-shortcut-icon--add {
+        color: var(--x-nt-shortcut-add-color, #e5e7eb);
+        background: var(--x-nt-shortcut-add-bg, rgba(255, 255, 255, 0.13));
+      }
+      body[data-nt-bottom-dock-density="compact"] {
+        --x-nt-shortcuts-reserved-height: 54px;
+        --x-nt-shortcuts-section-margin-top: 8px;
+        --x-nt-shortcuts-grid-row-gap: 6px;
+        --x-nt-shortcuts-grid-column-gap: 0px;
+        --x-nt-shortcuts-grid-padding: 5px 6px 7px;
+        --x-nt-shortcut-tile-size: 48px;
+        --x-nt-shortcut-tile-padding: 6px;
+        --x-nt-shortcut-icon-size: 36px;
+        --x-nt-shortcut-icon-radius: 13px;
+        --x-nt-shortcut-favicon-size: 22px;
+        --x-nt-shortcut-hover-scale-near: 1.16;
+        --x-nt-shortcut-hover-rise-near: -4px;
+        --x-nt-shortcut-hover-scale-drag: 1.12;
+        --x-nt-shortcut-hover-rise-drag: -3px;
+        --x-nt-shortcut-hover-scale-mid: 1.08;
+        --x-nt-shortcut-hover-rise-mid: -2px;
+        --x-nt-shortcut-hover-shift-mid: 2px;
+        --x-nt-shortcut-hover-scale-far: 1.02;
+        --x-nt-shortcut-hover-rise-far: 0px;
+        --x-nt-shortcut-hover-shift-far: 0px;
+      }
+      body[data-nt-bottom-dock-density="tiny"] {
+        --x-nt-shortcuts-reserved-height: 42px;
+        --x-nt-shortcuts-section-margin-top: 6px;
+        --x-nt-shortcuts-grid-row-gap: 4px;
+        --x-nt-shortcuts-grid-column-gap: 0px;
+        --x-nt-shortcuts-grid-padding: 3px 4px 5px;
+        --x-nt-shortcut-tile-size: 36px;
+        --x-nt-shortcut-tile-padding: 4px;
+        --x-nt-shortcut-icon-size: 28px;
+        --x-nt-shortcut-icon-radius: 10px;
+        --x-nt-shortcut-favicon-size: 18px;
+        --x-nt-shortcut-hover-scale-near: 1.08;
+        --x-nt-shortcut-hover-rise-near: -2px;
+        --x-nt-shortcut-hover-scale-drag: 1.06;
+        --x-nt-shortcut-hover-rise-drag: -2px;
+        --x-nt-shortcut-hover-scale-mid: 1.03;
+        --x-nt-shortcut-hover-rise-mid: 0px;
+        --x-nt-shortcut-hover-shift-mid: 0px;
+        --x-nt-shortcut-hover-scale-far: 1;
+        --x-nt-shortcut-hover-rise-far: 0px;
+        --x-nt-shortcut-hover-shift-far: 0px;
+      }
+      .x-nt-shortcut-tile[data-dock-distance="0"] {
+        z-index: 6;
+      }
+      .x-nt-shortcut-tile[data-dock-distance="1"] {
+        z-index: 5;
+      }
+      .x-nt-shortcut-tile[data-dock-distance="2"] {
+        z-index: 4;
+      }
+      .x-nt-shortcut-tile[data-dock-distance="0"] .x-nt-shortcut-icon {
+        --x-nt-shortcut-dock-scale: var(--x-nt-shortcut-hover-scale-near, 1.28);
+        --x-nt-shortcut-dock-rise: var(--x-nt-shortcut-hover-rise-near, -6px);
+      }
+      .x-nt-shortcut-tile[data-shortcut-context-menu-open="true"] .x-nt-shortcut-icon {
+        filter: brightness(0.92);
+      }
+      .x-nt-shortcut-tile[data-shortcut-dragging="true"] .x-nt-shortcut-icon,
+      .x-nt-shortcut-tile[data-shortcut-dropping="true"] .x-nt-shortcut-icon {
+        --x-nt-shortcut-dock-scale: var(--x-nt-shortcut-hover-scale-drag, 1.2);
+        --x-nt-shortcut-dock-rise: var(--x-nt-shortcut-hover-rise-drag, -4px);
+      }
+      .x-nt-shortcut-tile[data-dock-distance] .x-nt-shortcut-icon,
+      .x-nt-shortcut-tile[data-shortcut-context-menu-open="true"] .x-nt-shortcut-icon,
+      .x-nt-shortcut-tile[data-shortcut-dragging="true"] .x-nt-shortcut-icon,
+      .x-nt-shortcut-tile[data-shortcut-dropping="true"] .x-nt-shortcut-icon {
+        will-change: transform;
+      }
+      .x-nt-shortcut-tile[data-dock-distance="1"] .x-nt-shortcut-icon {
+        --x-nt-shortcut-dock-scale: var(--x-nt-shortcut-hover-scale-mid, 1.14);
+        --x-nt-shortcut-dock-rise: var(--x-nt-shortcut-hover-rise-mid, -3px);
+      }
+      .x-nt-shortcut-tile[data-dock-distance="2"] .x-nt-shortcut-icon {
+        --x-nt-shortcut-dock-scale: var(--x-nt-shortcut-hover-scale-far, 1.05);
+        --x-nt-shortcut-dock-rise: var(--x-nt-shortcut-hover-rise-far, -1px);
+      }
+      .x-nt-shortcut-tile[data-dock-side="before"][data-dock-distance="1"] .x-nt-shortcut-icon {
+        --x-nt-shortcut-dock-shift-x: calc(var(--x-nt-shortcut-hover-shift-mid, 4px) * -1);
+      }
+      .x-nt-shortcut-tile[data-dock-side="after"][data-dock-distance="1"] .x-nt-shortcut-icon {
+        --x-nt-shortcut-dock-shift-x: var(--x-nt-shortcut-hover-shift-mid, 4px);
+      }
+      .x-nt-shortcut-tile[data-dock-side="before"][data-dock-distance="2"] .x-nt-shortcut-icon {
+        --x-nt-shortcut-dock-shift-x: calc(var(--x-nt-shortcut-hover-shift-far, 1px) * -1);
+      }
+      .x-nt-shortcut-tile[data-dock-side="after"][data-dock-distance="2"] .x-nt-shortcut-icon {
+        --x-nt-shortcut-dock-shift-x: var(--x-nt-shortcut-hover-shift-far, 1px);
+      }
+      .x-nt-shortcut-favicon-mask {
+        width: var(--x-nt-shortcut-favicon-size, 28px);
+        height: var(--x-nt-shortcut-favicon-size, 28px);
+        border-radius: var(--x-nt-shortcut-favicon-radius, 8px);
+        display: inline-grid;
+        place-items: center;
+        overflow: hidden;
+        color: var(--x-nt-shortcut-favicon-mask-color, var(--x-nt-shortcut-icon-color, currentColor));
+        box-sizing: border-box;
+        -webkit-mask-image: var(--x-nt-shortcut-smooth-mask-inner);
+        mask-image: var(--x-nt-shortcut-smooth-mask-inner);
+        -webkit-mask-size: 100% 100%;
+        mask-size: 100% 100%;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+      }
+      .x-nt-shortcut-favicon {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+        border-radius: inherit;
+        -webkit-user-drag: none;
+        user-select: none;
+      }
+      .x-nt-shortcut-favicon-mask .x-nt-favicon-fallback {
+        width: 100%;
+        height: 100%;
+        border-radius: inherit;
+        background: transparent;
+        color: inherit;
+        padding: 0;
+      }
+      .x-nt-shortcut-context-menu {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 1px;
+        height: 1px;
+        pointer-events: none;
+        z-index: 10040;
+      }
+      .x-nt-shortcut-context-menu ._x_extension_select_trigger_2024_unique_ {
+        width: 1px;
+        min-width: 1px;
+        height: 1px;
+        min-height: 1px;
+        padding: 0;
+        border: 0;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .x-nt-shortcut-context-menu-portal {
+        --x-nt-shortcut-context-menu-radius: 12px;
+        --x-nt-shortcut-context-menu-padding: 6px;
+        border-radius: var(--x-nt-shortcut-context-menu-radius, 12px);
+        padding: var(--x-nt-shortcut-context-menu-padding, 6px);
+        pointer-events: auto;
+      }
+      .x-nt-shortcut-dialog-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 10040;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        box-sizing: border-box;
+        background: rgba(15, 23, 42, 0.12);
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 160ms ease, backdrop-filter 160ms ease;
+      }
+      .x-nt-shortcut-dialog-backdrop[hidden] {
+        display: none;
+      }
+      .x-nt-shortcut-dialog-backdrop[data-open="true"] {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .x-nt-shortcut-dialog {
+        --x-nt-shortcut-dialog-enter-x: 0px;
+        --x-nt-shortcut-dialog-enter-y: 12px;
+        --input-focus-color: rgba(59, 130, 246, 0.65);
+        --input-focus-shadow: rgba(59, 130, 246, 0.2);
+        --input-placeholder: rgba(100, 116, 139, 0.7);
+        --input-focus-bg: rgba(59, 130, 246, 0.08);
+        --control-bg: rgba(15, 23, 42, 0.04);
+        --tab-border: rgba(15, 23, 42, 0.05);
+        --panel-text: #111827;
+        width: min(420px, 100%);
+        border-radius: 27px;
+        background: var(--x-nt-shortcut-dialog-bg, rgb(255 255 255 / 0.98));
+        border: 1px solid var(--x-nt-panel-border, rgba(0, 0, 0, 0.08));
+        box-shadow: var(--x-nt-panel-shadow-focus, 0 18px 44px rgba(0, 0, 0, 0.1));
+        backdrop-filter: blur(var(--x-nt-panel-blur, 24px)) saturate(var(--x-nt-panel-saturate, 165%));
+        -webkit-backdrop-filter: blur(var(--x-nt-panel-blur, 24px)) saturate(var(--x-nt-panel-saturate, 165%));
+        box-sizing: border-box;
+        color: #111827;
+        opacity: 0;
+        overflow: hidden;
+        filter: blur(6px);
+        transform: translate3d(var(--x-nt-shortcut-dialog-enter-x, 0px), var(--x-nt-shortcut-dialog-enter-y, 12px), 0) scale(0.98);
+        transform-origin: center bottom;
+        transition:
+          opacity 160ms ease,
+          transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+          filter 180ms cubic-bezier(0.22, 1, 0.36, 1);
+        will-change: auto;
+      }
+      .x-nt-shortcut-dialog-backdrop[data-open="true"] .x-nt-shortcut-dialog {
+        opacity: 1;
+        filter: blur(0);
+        transform: translate3d(0, 0, 0) scale(1);
+        will-change: transform, opacity, filter;
+      }
+      .x-nt-shortcut-dialog-backdrop[data-preparing="true"] .x-nt-shortcut-dialog {
+        transition: none;
+        will-change: transform, opacity, filter;
+      }
+      body[data-theme="dark"] .x-nt-shortcut-dialog {
+        --x-nt-shortcut-dialog-bg: rgb(20 20 20 / 0.98);
+        --input-focus-color: rgba(191, 219, 254, 0.7);
+        --input-focus-shadow: rgba(59, 130, 246, 0.3);
+        --input-placeholder: rgba(148, 163, 184, 0.7);
+        --input-focus-bg: #383838;
+        --control-bg: #2f2f2f;
+        --tab-border: rgba(255, 255, 255, 0.12);
+        --panel-text: #f8fafc;
+        color: #f8fafc;
+      }
+      .x-nt-shortcut-form {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        padding: 24px;
+        box-sizing: border-box;
+      }
+      .x-nt-shortcut-dialog-title {
+        margin: 0;
+        color: inherit;
+        font-size: 18px;
+        font-weight: 600;
+        line-height: 1.25;
+      }
+      .x-nt-shortcut-field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        color: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1;
+      }
+      .x-nt-shortcut-dialog ._x_extension_shortcut_input_affix_2026_unique_ {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        border-radius: 10px;
+        border: 1px solid var(--tab-border);
+        background: var(--control-bg);
+        transition: border-color 180ms ease, background-color 200ms ease;
+        overflow: hidden;
+      }
+      .x-nt-shortcut-dialog ._x_extension_shortcut_input_affix_2026_unique_:focus-within,
+      .x-nt-shortcut-dialog ._x_extension_shortcut_input_affix_2026_unique_:hover {
+        border-color: var(--input-focus-color);
+        background: var(--input-focus-bg);
+      }
+      .x-nt-shortcut-dialog ._x_extension_shortcut_input_2024_unique_ {
+        padding: 8px 10px;
+        border-radius: 10px;
+        border: 1px solid var(--tab-border);
+        background: var(--control-bg);
+        color: var(--panel-text);
+        font-size: 13px;
+        font-family: inherit;
+        box-sizing: border-box;
+        transition: border-color 180ms ease, background-color 200ms ease;
+        outline: none;
+      }
+      .x-nt-shortcut-dialog ._x_extension_shortcut_input_affix_2026_unique_ ._x_extension_shortcut_input_2024_unique_ {
+        border: none;
+        background: transparent;
+        border-radius: 0;
+        padding-left: 2px;
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .x-nt-shortcut-dialog ._x_extension_shortcut_input_affix_2026_unique_[data-has-prefix="false"] ._x_extension_shortcut_input_2024_unique_ {
+        padding-left: 10px;
+      }
+      .x-nt-shortcut-dialog ._x_extension_shortcut_input_affix_2026_unique_ ._x_extension_shortcut_input_2024_unique_:focus,
+      .x-nt-shortcut-dialog ._x_extension_shortcut_input_affix_2026_unique_ ._x_extension_shortcut_input_2024_unique_:hover {
+        border: none;
+        background: transparent;
+      }
+      .x-nt-shortcut-dialog ._x_extension_shortcut_input_2024_unique_::placeholder {
+        color: var(--input-placeholder);
+      }
+      .x-nt-shortcut-dialog ._x_extension_shortcut_input_2024_unique_:hover,
+      .x-nt-shortcut-dialog ._x_extension_shortcut_input_2024_unique_:focus {
+        border-color: var(--input-focus-color);
+        background: var(--input-focus-bg);
+      }
+      .x-nt-shortcut-error {
+        min-height: 16px;
+        color: #dc2626;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 16px;
+      }
+      .x-nt-shortcut-error[data-visible="false"] {
+        visibility: hidden;
+      }
+      body[data-theme="dark"] .x-nt-shortcut-error {
+        color: #fca5a5;
+      }
+      .x-nt-shortcut-dialog-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+      .x-lumno-action-button {
+        all: unset;
+        position: relative;
+        min-height: 36px;
+        padding: 0 16px;
+        border-radius: 999px;
+        border: 1px solid var(--x-lumno-action-border-color, transparent);
+        background: var(--x-lumno-action-bg, transparent);
+        background-clip: padding-box;
+        color: var(--x-lumno-action-color, #1f2937);
+        box-shadow: var(--x-lumno-action-shadow, none);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        box-sizing: border-box;
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1;
+        white-space: nowrap;
+        cursor: pointer;
+        transition:
+          transform 120ms ease,
+          filter 120ms ease,
+          background 160ms ease,
+          border-color 160ms ease,
+          color 160ms ease,
+          box-shadow 160ms ease;
+      }
+      .x-lumno-action-button::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        box-shadow: var(--x-lumno-action-before-shadow, none);
+      }
+      .x-lumno-action-button:hover {
+        background: var(--x-lumno-action-hover-bg, var(--x-lumno-action-bg, transparent));
+        border-color: var(--x-lumno-action-hover-border-color, var(--x-lumno-action-border-color, transparent));
+        color: var(--x-lumno-action-hover-color, var(--x-lumno-action-color, #1f2937));
+        box-shadow: var(--x-lumno-action-hover-shadow, var(--x-lumno-action-shadow, none));
+      }
+      .x-lumno-action-button:active {
+        transform: translateY(1px) scale(0.98);
+        filter: brightness(0.96);
+      }
+      .x-lumno-action-button:focus-visible {
+        outline: 2px solid rgba(75, 84, 95, 0.35);
+        outline-offset: 2px;
+      }
+      .x-lumno-action-button:disabled {
+        opacity: 0.62;
+        cursor: default;
+        transform: none;
+        filter: none;
+      }
+      .x-lumno-action-button--primary {
+        --x-lumno-action-border-color: #040404;
+        --x-lumno-action-bg: linear-gradient(180deg, #404859 0%, #273042 100%);
+        --x-lumno-action-color: #ffffff;
+        --x-lumno-action-shadow:
+          0 10px 3px rgba(0, 0, 0, 0),
+          0 6px 2px rgba(0, 0, 0, 0.008),
+          0 3px 2px rgba(0, 0, 0, 0.035),
+          0 2px 2px rgba(0, 0, 0, 0.065),
+          0 0 1px rgba(0, 0, 0, 0.075);
+        --x-lumno-action-before-shadow: inset 0 1px 1.6px rgba(255, 255, 255, 0.34);
+        --x-lumno-action-hover-bg: linear-gradient(180deg, #4a5467 0%, #2f3a4f 100%);
+        --x-lumno-action-hover-shadow:
+          0 12px 4px rgba(0, 0, 0, 0),
+          0 7px 3px rgba(0, 0, 0, 0.015),
+          0 4px 3px rgba(0, 0, 0, 0.045),
+          0 2px 2px rgba(0, 0, 0, 0.075),
+          0 0 1px rgba(0, 0, 0, 0.09);
+      }
+      .x-lumno-action-button--secondary {
+        --x-lumno-action-border-color: rgba(15, 23, 42, 0.06);
+        --x-lumno-action-bg: #ffffff;
+        --x-lumno-action-color: #1f2937;
+        --x-lumno-action-shadow:
+          0 2px 2px rgba(15, 23, 42, 0.025),
+          0 1px 1px rgba(15, 23, 42, 0.035),
+          0 0 1px rgba(15, 23, 42, 0.06),
+          inset 0 1px 0 rgba(255, 255, 255, 0.75);
+        --x-lumno-action-hover-border-color: rgba(15, 23, 42, 0.08);
+        --x-lumno-action-hover-shadow:
+          0 2px 3px rgba(15, 23, 42, 0.032),
+          0 1px 1px rgba(15, 23, 42, 0.045),
+          0 0 1px rgba(15, 23, 42, 0.07),
+          inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      }
+      .x-nt-shortcut-dialog-button {
+        min-width: 72px;
+        height: 36px;
+      }
+      body[data-theme="dark"] .x-lumno-action-button--primary {
+        --x-lumno-action-bg: linear-gradient(180deg, #4a566c 0%, #334157 100%);
+        --x-lumno-action-color: #f8fafc;
+        --x-lumno-action-hover-bg: linear-gradient(180deg, #56647c 0%, #3a4b66 100%);
+      }
+      body[data-theme="dark"] .x-lumno-action-button--secondary {
+        --x-lumno-action-border-color: rgba(148, 163, 184, 0.18);
+        --x-lumno-action-bg: color-mix(in srgb, rgb(20 20 20) 86%, #475569 14%);
+        --x-lumno-action-color: #f8fafc;
+        --x-lumno-action-shadow: 0 1px 1px rgba(0, 0, 0, 0.18);
+        --x-lumno-action-hover-bg: color-mix(in srgb, rgb(20 20 20) 78%, #5b6b84 22%);
+        --x-lumno-action-hover-border-color: rgba(164, 180, 207, 0.32);
+        --x-lumno-action-hover-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .x-nt-shortcut-icon {
+          transform: translate3d(0, 0, 0) scale(1);
+          transition: none;
+          will-change: auto;
+        }
+        .x-nt-shortcut-dialog-backdrop {
+          transition: opacity 120ms ease;
+        }
+        .x-nt-shortcut-dialog {
+          filter: none;
+          transform: translate3d(0, 0, 0) scale(1);
+          transition: opacity 120ms ease;
+          will-change: auto;
+        }
+        .x-lumno-action-button {
+          transition:
+            background 160ms ease,
+            border-color 160ms ease,
+            color 160ms ease,
+            box-shadow 160ms ease;
+        }
+        .x-lumno-action-button:active {
+          transform: none;
+        }
+      }
       #_x_extension_newtab_wordmark_2026_unique_ > button {
         all: unset;
         display: inline-flex;
@@ -485,12 +1077,34 @@
       }
       #_x_extension_newtab_bottom_dock_2024_unique_ {
         all: unset;
+        --x-nt-dock-heading-size: 14px;
+        --x-nt-dock-bookmark-card-height: 51px;
+        --x-nt-dock-bookmark-card-padding: 13px 15px;
+        --x-nt-dock-bookmark-icon-size: 22px;
+        --x-nt-dock-bookmark-title-size: 14px;
+        --x-nt-dock-recent-card-padding: 7px 7px 12px;
+        --x-nt-dock-recent-card-gap: 10px;
+        --x-nt-dock-recent-card-radius: 28px;
+        --x-nt-dock-recent-card-hover-transform: rotate(-3deg) scale(1.01, 1.005);
+        --x-nt-dock-recent-inner-height: 104px;
+        --x-nt-dock-recent-inner-hover-height: 124px;
+        --x-nt-dock-recent-inner-hover-offset: 20px;
+        --x-nt-dock-recent-inner-padding: 13px 13px 14px 15px;
+        --x-nt-dock-recent-inner-radius: 20px;
+        --x-nt-dock-recent-favicon-size: 25px;
+        --x-nt-dock-recent-name-size: 14px;
+        --x-nt-dock-recent-title-size: 12px;
+        --x-nt-dock-recent-title-line-height: 16px;
+        --x-nt-dock-recent-title-lines: 3;
+        --x-nt-dock-recent-title-hover-lines: 4;
+        --x-nt-dock-recent-url-size: 14px;
         position: fixed;
         left: 50%;
         bottom: 0;
         transform: translateX(-50%);
         width: min(var(--x-nt-content-viewport-width, 96vw), var(--x-nt-content-max-width, 1040px));
         max-height: calc(100vh - 240px);
+        max-height: calc(100dvh - 240px);
         display: none;
         flex-direction: column;
         align-items: stretch;
@@ -498,6 +1112,64 @@
         z-index: 2;
         pointer-events: auto;
         overflow: visible;
+      }
+      #_x_extension_newtab_bottom_dock_2024_unique_[data-density="compact"] {
+        --x-nt-section-inner-gap: 8px;
+        --x-nt-grid-row-gap: 6px;
+        --x-nt-bottom-dock-section-gap: 6px;
+        --x-nt-bottom-dock-corridor-size: 4px;
+        --x-nt-bottom-dock-top-padding: 10px;
+        --x-nt-bottom-dock-bottom-padding: 22px;
+        --x-nt-dock-heading-size: 13px;
+        --x-nt-dock-bookmark-card-height: 44px;
+        --x-nt-dock-bookmark-card-padding: 9px 12px;
+        --x-nt-dock-bookmark-icon-size: 20px;
+        --x-nt-dock-bookmark-title-size: 13px;
+        --x-nt-dock-recent-card-padding: 6px 6px 9px;
+        --x-nt-dock-recent-card-gap: 7px;
+        --x-nt-dock-recent-card-radius: 22px;
+        --x-nt-dock-recent-card-hover-transform: rotate(-1.5deg) scale(1.006);
+        --x-nt-dock-recent-inner-height: 86px;
+        --x-nt-dock-recent-inner-hover-height: 94px;
+        --x-nt-dock-recent-inner-hover-offset: 8px;
+        --x-nt-dock-recent-inner-padding: 10px 10px 11px 12px;
+        --x-nt-dock-recent-inner-radius: 16px;
+        --x-nt-dock-recent-favicon-size: 22px;
+        --x-nt-dock-recent-name-size: 13px;
+        --x-nt-dock-recent-title-size: 11px;
+        --x-nt-dock-recent-title-line-height: 14px;
+        --x-nt-dock-recent-title-lines: 2;
+        --x-nt-dock-recent-title-hover-lines: 2;
+        --x-nt-dock-recent-url-size: 12px;
+      }
+      #_x_extension_newtab_bottom_dock_2024_unique_[data-density="tiny"] {
+        --x-nt-section-inner-gap: 6px;
+        --x-nt-grid-row-gap: 5px;
+        --x-nt-bottom-dock-section-gap: 4px;
+        --x-nt-bottom-dock-corridor-size: 0px;
+        --x-nt-bottom-dock-top-padding: 8px;
+        --x-nt-bottom-dock-bottom-padding: 16px;
+        --x-nt-dock-heading-size: 12px;
+        --x-nt-dock-bookmark-card-height: 40px;
+        --x-nt-dock-bookmark-card-padding: 7px 10px;
+        --x-nt-dock-bookmark-icon-size: 18px;
+        --x-nt-dock-bookmark-title-size: 12px;
+        --x-nt-dock-recent-card-padding: 5px 5px 8px;
+        --x-nt-dock-recent-card-gap: 6px;
+        --x-nt-dock-recent-card-radius: 20px;
+        --x-nt-dock-recent-card-hover-transform: scale(1.004);
+        --x-nt-dock-recent-inner-height: 72px;
+        --x-nt-dock-recent-inner-hover-height: 72px;
+        --x-nt-dock-recent-inner-hover-offset: 0px;
+        --x-nt-dock-recent-inner-padding: 8px 9px 9px 10px;
+        --x-nt-dock-recent-inner-radius: 14px;
+        --x-nt-dock-recent-favicon-size: 20px;
+        --x-nt-dock-recent-name-size: 12px;
+        --x-nt-dock-recent-title-size: 11px;
+        --x-nt-dock-recent-title-line-height: 13px;
+        --x-nt-dock-recent-title-lines: 1;
+        --x-nt-dock-recent-title-hover-lines: 1;
+        --x-nt-dock-recent-url-size: 12px;
       }
       #_x_extension_newtab_bottom_dock_scroller_2024_unique_ {
         all: unset;
@@ -537,7 +1209,7 @@
         box-sizing: border-box;
       }
       .x-nt-bookmarks-heading {
-        font-size: 14px;
+        font-size: var(--x-nt-dock-heading-size, 14px);
         font-weight: 500;
         color: var(--x-nt-bookmark-heading-color, #000000);
         font-family: "Open Sans", "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -713,8 +1385,8 @@
         display: flex;
         align-items: center;
         gap: 7px;
-        height: 51px;
-        padding: 13px 15px;
+        height: var(--x-nt-dock-bookmark-card-height, 51px);
+        padding: var(--x-nt-dock-bookmark-card-padding, 13px 15px);
         border-radius: 16px;
         background:
           linear-gradient(
@@ -737,6 +1409,27 @@
           border-color 170ms ease,
           backdrop-filter 170ms ease,
           -webkit-backdrop-filter 170ms ease;
+      }
+      .x-nt-bookmark-card[data-bookmark-draggable="true"] {
+        cursor: grab;
+        touch-action: none;
+      }
+      #_x_extension_newtab_bookmarks_grid_2024_unique_[data-bookmark-dragging="true"] .x-nt-bookmark-card {
+        cursor: grabbing;
+        transition: transform 170ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .x-nt-bookmark-card[data-bookmark-dragging="true"],
+      .x-nt-bookmark-card[data-bookmark-dropping="true"] {
+        z-index: 8;
+      }
+      #_x_extension_newtab_bookmarks_grid_2024_unique_[data-bookmark-dragging="true"] .x-nt-bookmark-card.x-nt-bookmark-card--hover:not([data-bookmark-dragging="true"]):not([data-bookmark-dropping="true"]) {
+        transform: translate3d(0, 0, 0);
+        box-shadow: var(--x-nt-bookmark-card-shadow, 0 8px 20px rgba(15, 23, 42, 0.08));
+        backdrop-filter: blur(var(--x-nt-bookmark-card-blur, 5px));
+        -webkit-backdrop-filter: blur(var(--x-nt-bookmark-card-blur, 5px));
+      }
+      #_x_extension_newtab_bookmarks_grid_2024_unique_[data-bookmark-dragging="true"] .x-nt-bookmark-card.x-nt-bookmark-card--hover:not([data-bookmark-dragging="true"]):not([data-bookmark-dropping="true"])::before {
+        opacity: 0;
       }
       .x-nt-bookmark-card::before {
         content: "";
@@ -798,12 +1491,14 @@
         outline-offset: 2px;
       }
       .x-nt-bookmark-icon {
-        width: 22px;
-        height: 22px;
+        width: var(--x-nt-dock-bookmark-icon-size, 22px);
+        height: var(--x-nt-dock-bookmark-icon-size, 22px);
         border-radius: 7px;
         background: var(--x-nt-bookmark-icon-color, var(--x-nt-bookmark-icon-bg, rgba(241, 245, 249, 0.92)));
         object-fit: contain;
         flex-shrink: 0;
+        -webkit-user-drag: none;
+        user-select: none;
       }
       .x-nt-bookmark-icon--figma {
         width: 25px;
@@ -862,7 +1557,7 @@
       .x-nt-bookmark-title {
         min-width: 0;
         flex: 1 1 auto;
-        font-size: 14px;
+        font-size: var(--x-nt-dock-bookmark-title-size, 14px);
         font-weight: 500;
         color: var(--x-nt-bookmark-title, #111827);
         font-family: "Open Sans", "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -901,6 +1596,8 @@
         margin-left: -3px;
         transform: rotate(var(--x-nt-folder-favicon-rot, 0deg));
         transform-origin: center center;
+        -webkit-user-drag: none;
+        user-select: none;
       }
       .x-nt-folder-preview-favicon:first-child {
         margin-left: 0;
@@ -942,6 +1639,12 @@
           "Helvetica Neue", Arial, sans-serif;
         line-height: 1;
         color: #1f2937;
+      }
+      .x-nt-bookmark-cursor-tooltip {
+        --x-extension-tooltip-z-index: 10003;
+      }
+      .x-nt-shortcut-tooltip {
+        --x-extension-tooltip-z-index: 10004;
       }
       .x-nt-bookmark-cascade-debug-svg {
         position: fixed;
@@ -1239,7 +1942,7 @@
         box-sizing: border-box;
       }
       .x-nt-recent-heading {
-        font-size: 14px;
+        font-size: var(--x-nt-dock-heading-size, 14px);
         font-weight: 500;
         color: var(--x-nt-recent-heading-color, #000000);
         font-family: "Open Sans", "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -1249,18 +1952,18 @@
       .x-nt-recent-card {
         all: unset;
         --x-nt-recent-card-color: var(--x-nt-recent-card-bg);
-        --x-nt-recent-title-line-height: 16px;
-        --x-nt-recent-title-lines: 3;
+        --x-nt-recent-title-line-height: var(--x-nt-dock-recent-title-line-height, 16px);
+        --x-nt-recent-title-lines: var(--x-nt-dock-recent-title-lines, 3);
         display: flex;
         flex-direction: column;
-        padding: 7px 7px 12px;
-        border-radius: 28px;
+        padding: var(--x-nt-dock-recent-card-padding, 7px 7px 12px);
+        border-radius: var(--x-nt-dock-recent-card-radius, 28px);
         background: var(--x-nt-recent-card-color, var(--x-nt-recent-card-bg));
         border: 1px solid rgba(0, 0, 0, 0.1);
         border-color: var(--x-nt-recent-card-border-color, rgba(0, 0, 0, 0.1));
         box-shadow: var(--x-nt-recent-card-shadow);
         cursor: pointer;
-        gap: 10px;
+        gap: var(--x-nt-dock-recent-card-gap, 10px);
         box-sizing: border-box;
         position: relative;
         transform-origin: center;
@@ -1270,13 +1973,13 @@
       }
       .x-nt-recent-card:hover {
         box-shadow: var(--x-nt-recent-card-shadow-hover);
-        --x-nt-recent-title-lines: 4;
-        transform: rotate(-3deg) scale(1.01, 1.005);
+        --x-nt-recent-title-lines: var(--x-nt-dock-recent-title-hover-lines, 4);
+        transform: var(--x-nt-dock-recent-card-hover-transform, rotate(-3deg) scale(1.01, 1.005));
       }
       .x-nt-recent-card.x-nt-recent-card--rollback,
       .x-nt-recent-card.x-nt-recent-card--rollback:hover {
         box-shadow: var(--x-nt-recent-card-shadow);
-        --x-nt-recent-title-lines: 3;
+        --x-nt-recent-title-lines: var(--x-nt-dock-recent-title-lines, 3);
         transform: none;
       }
       .x-nt-recent-card--alt {
@@ -1291,7 +1994,7 @@
         background: rgba(var(--x-nt-recent-inner-base-rgb, 255, 255, 255), var(--x-nt-recent-inner-alpha, 1));
         border: 1px solid rgba(0, 0, 0, 0.1);
         border-color: var(--x-nt-recent-card-border-color, rgba(0, 0, 0, 0.1));
-        border-radius: 20px;
+        border-radius: var(--x-nt-dock-recent-inner-radius, 20px);
         box-shadow: var(--x-nt-recent-inner-shadow);
         backdrop-filter: blur(var(--x-nt-recent-inner-blur, 0px));
         -webkit-backdrop-filter: blur(var(--x-nt-recent-inner-blur, 0px));
@@ -1300,23 +2003,23 @@
         grid-template-columns: 25px 1fr;
         column-gap: 7px;
         row-gap: 3px;
-        padding: 13px 13px 14px 15px;
-        height: 104px;
+        padding: var(--x-nt-dock-recent-inner-padding, 13px 13px 14px 15px);
+        height: var(--x-nt-dock-recent-inner-height, 104px);
         box-sizing: border-box;
         align-content: start;
         align-items: start;
         transition: height 220ms ease, transform 220ms ease, margin-bottom 220ms ease;
       }
       .x-nt-recent-card:hover .x-nt-recent-inner {
-        height: 124px;
-        transform: translateY(-20px);
-        margin-bottom: -20px;
+        height: var(--x-nt-dock-recent-inner-hover-height, 124px);
+        transform: translateY(calc(var(--x-nt-dock-recent-inner-hover-offset, 20px) * -1));
+        margin-bottom: calc(var(--x-nt-dock-recent-inner-hover-offset, 20px) * -1);
         /* background-image: linear-gradient(rgba(var(--x-nt-recent-inner-tint-rgb, 247, 232, 218), 0) 0%,rgba(var(--x-nt-recent-inner-tint-rgb, 247, 232, 218), 0.02) 100%),
           linear-gradient(90deg, rgb(var(--x-nt-recent-inner-base-rgb, 255, 255, 255)) 0%, rgb(var(--x-nt-recent-inner-base-rgb, 255, 255, 255)) 100%); */
       }
       .x-nt-recent-card.x-nt-recent-card--rollback .x-nt-recent-inner,
       .x-nt-recent-card.x-nt-recent-card--rollback:hover .x-nt-recent-inner {
-        height: 104px;
+        height: var(--x-nt-dock-recent-inner-height, 104px);
         transform: none;
         margin-bottom: 0;
       }
@@ -1328,7 +2031,7 @@
         position: absolute;
         inset: 0;
         padding: 1px;
-        border-radius: 20px;
+        border-radius: var(--x-nt-dock-recent-inner-radius, 20px);
         background: linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 100%);
         -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
         -webkit-mask-composite: xor;
@@ -1343,15 +2046,15 @@
         padding-right: 30px;
       }
       .x-nt-recent-favicon {
-        width: 25px;
-        height: 25px;
+        width: var(--x-nt-dock-recent-favicon-size, 25px);
+        height: var(--x-nt-dock-recent-favicon-size, 25px);
         border-radius: 6px;
         object-fit: contain;
         background: rgba(255, 255, 255, 0.01);
         flex-shrink: 0;
       }
       .x-nt-recent-name {
-        font-size: 14px;
+        font-size: var(--x-nt-dock-recent-name-size, 14px);
         font-weight: 500;
         color: var(--x-nt-recent-title);
         font-family: "Open Sans", "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -1363,7 +2066,7 @@
       }
       .x-nt-recent-title {
         grid-column: 2 / -1;
-        font-size: 12px;
+        font-size: var(--x-nt-dock-recent-title-size, 12px);
         font-weight: 400;
         color: var(--x-nt-recent-title);
         font-family: "Open Sans", "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -1383,7 +2086,7 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        font-size: 14px;
+        font-size: var(--x-nt-dock-recent-url-size, 14px);
         color: var(--x-nt-recent-url);
         font-family: "Open Sans", "PingFang SC", "PingFang SC Regular", "PingFangSC-Regular",
           -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
@@ -3600,6 +4303,61 @@
         border-radius: inherit;
         transition: filter 140ms ease;
       }
+      .x-nt-favicon-group {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .x-nt-favicon-title {
+        color: var(--x-nt-text, #111827);
+      }
+      .x-nt-favicon-options {
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+        gap: var(--x-nt-panel-grid-gap);
+        padding: 2px 2px 0;
+        box-sizing: border-box;
+      }
+      .x-nt-favicon-option {
+        width: calc((100% - (var(--x-nt-panel-grid-gap) * 2)) / 3);
+        flex: 0 0 calc((100% - (var(--x-nt-panel-grid-gap) * 2)) / 3);
+      }
+      .x-nt-favicon-thumb {
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(107, 114, 128, 0.07);
+        border: none;
+      }
+      .x-nt-favicon-thumb .x-nt-favicon-image {
+        width: 52px;
+        height: 52px;
+        max-width: 62%;
+        max-height: 62%;
+        object-fit: contain;
+        border-radius: 10px;
+      }
+      .x-nt-favicon-svg-preview {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #000000;
+        --x-nt-favicon-shadow-opacity: 0.2;
+        --x-nt-favicon-main-opacity: 0.5;
+      }
+      .x-nt-favicon-svg-preview svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .x-nt-favicon-option[data-selected="true"] .x-nt-favicon-thumb::after {
+        inset: 0;
+        border-radius: inherit;
+      }
       .x-nt-wallpaper-tile:hover .x-nt-wallpaper-thumb img,
       .x-nt-wallpaper-tile:focus-visible .x-nt-wallpaper-thumb img {
         filter: brightness(0.92) saturate(1.04);
@@ -3755,6 +4513,15 @@
       body[data-theme="dark"] .x-nt-wallpaper-upload-thumb {
         border-color: rgba(156, 163, 175, 0.34);
         background: rgba(255, 255, 255, 0.06);
+      }
+      body[data-theme="dark"] .x-nt-favicon-thumb {
+        border-color: rgba(156, 163, 175, 0.18);
+        background: rgba(255, 255, 255, 0.06);
+      }
+      body[data-theme="dark"] .x-nt-favicon-svg-preview {
+        color: #f1f3f4;
+        --x-nt-favicon-shadow-opacity: 0.34;
+        --x-nt-favicon-main-opacity: 0.72;
       }
       body[data-theme="dark"] .x-nt-wallpaper-tile:hover .x-nt-wallpaper-thumb img,
       body[data-theme="dark"] .x-nt-wallpaper-tile:focus-visible .x-nt-wallpaper-thumb img {
@@ -4390,6 +5157,9 @@
         color: #1e3a8a;
       }
       @media (max-width: 860px) {
+        :root {
+          --x-nt-shortcuts-reserved-height: 82px;
+        }
         .x-nt-wallpaper-control {
           right: 12px;
           bottom: 12px;
@@ -4407,6 +5177,9 @@
         }
         #_x_extension_newtab_recent_sites_grid_2024_unique_ {
           grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .x-nt-shortcuts-section {
+          max-width: min(90vw, var(--x-nt-search-max-width, 720px));
         }
       }
       @media (min-width: 521px) and (max-width: 1440px) {
@@ -4447,11 +5220,12 @@
         }
         #_x_extension_newtab_bookmarks_2024_unique_,
         #_x_extension_newtab_recent_sites_2024_unique_ {
-          min-width: 500px;
+          min-width: 0;
+          width: min(96vw, var(--x-nt-content-max-width, 1040px));
         }
         #_x_extension_newtab_bookmarks_grid_2024_unique_,
         #_x_extension_newtab_recent_sites_grid_2024_unique_ {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+          grid-template-columns: minmax(0, 1fr);
         }
       }
       @media (max-height: 800px) {
@@ -4473,6 +5247,12 @@
           --x-nt-bottom-dock-corridor-size: 6px;
           --x-nt-bottom-dock-top-padding: 16px;
           --x-nt-bottom-dock-bottom-padding: 36px;
+          --x-nt-shortcuts-reserved-height: 72px;
+          --x-nt-shortcut-tile-size: 58px;
+          --x-nt-shortcut-icon-size: 44px;
+          --x-nt-shortcut-icon-radius: 15px;
+          --x-nt-shortcut-favicon-size: 26px;
+          --x-nt-shortcuts-section-margin-top: 12px;
         }
         .x-nt-wallpaper-control {
           right: 10px;
@@ -4496,6 +5276,7 @@
           --x-nt-bottom-dock-corridor-size: 4px;
           --x-nt-bottom-dock-top-padding: 14px;
           --x-nt-bottom-dock-bottom-padding: 32px;
+          --x-nt-shortcuts-section-margin-top: 8px;
         }
         .x-nt-wallpaper-control {
           right: 8px;
@@ -4518,6 +5299,9 @@
         }
       }
       @media (max-height: 430px) {
+        :root {
+          --x-nt-shortcuts-section-margin-top: 6px;
+        }
         .x-nt-wallpaper-panel {
           max-height: calc(100vh - 68px);
           max-height: calc(100dvh - 68px);
@@ -4555,11 +5339,13 @@
     <script src="page-notice.js"></script>
     <script src="toast.js"></script>
     <script src="layout.js"></script>
+    <script src="dock.js"></script>
     <script src="recent-sites-view.js"></script>
     <script src="bookmarks-view.js"></script>
     <script src="bookmark-cascade-position.js"></script>
     <script src="bookmark-cascade-menu.js"></script>
     <script src="suggestions-view.js"></script>
+    <script src="shortcuts-store.js"></script>
     <script src="wallpaper-local-store.js"></script>
     <script src="wallpaper-adaptive-tone.js"></script>
     <script src="wallpaper-effects.js"></script>

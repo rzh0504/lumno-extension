@@ -110,6 +110,12 @@
   "settings_search_result_sources_title": {
     "message": "Visible Result Types"
   },
+  "settings_favicon_enhanced_fetch_title": {
+    "message": "Enhanced Icon and Theme Color Fetching"
+  },
+  "settings_favicon_enhanced_fetch_desc": {
+    "message": "Turn this off if intranet or VPN pages show a local network access prompt."
+  },
   "search_result_priority_autocomplete": {
     "message": "Autocomplete First"
   },
@@ -288,10 +294,10 @@
     "message": "Restricted pages (for example, chrome://) cannot open the command bar. Pressing the shortcut follows the rule set here."
   },
   "restricted_action_default": {
-    "message": "Go to new tab"
+    "message": "Go to Lumno new tab"
   },
   "restricted_action_none": {
-    "message": "No action"
+    "message": "Follow browser setting"
   },
   "newtab_file_access_notice_title": {
     "message": "To use Lumno on local PDF or HTML pages, enable file URL access."
@@ -387,7 +393,10 @@
     "message": "Dark"
   },
   "settings_newtab_wordmark_title": {
-    "message": "Show logo above the New Tab search bar"
+    "message": "Show brand mark above the New Tab search bar"
+  },
+  "settings_newtab_shortcuts_title": {
+    "message": "Shortcuts"
   },
   "settings_wallpaper_title": {
     "message": "New Tab wallpaper"
@@ -444,7 +453,22 @@
     "message": "Wallpaper"
   },
   "newtab_logo_title": {
-    "message": "Logo"
+    "message": "Brand mark"
+  },
+  "newtab_favicon_title": {
+    "message": "New Tab favicon"
+  },
+  "newtab_favicon_name_default": {
+    "message": "Default"
+  },
+  "newtab_favicon_name_alternate": {
+    "message": "Alternate"
+  },
+  "newtab_favicon_select_label": {
+    "message": "Select {name} favicon"
+  },
+  "newtab_favicon_save_error": {
+    "message": "Failed to save favicon"
   },
   "newtab_wallpaper_builtin_section": {
     "message": "Built-in"
@@ -720,10 +744,10 @@
     "message": "Search and Recent Blacklist"
   },
   "blacklist_section_desc": {
-    "message": "If you don't want certain URLs to appear in search results, Recent, or Most Visited, add them here."
+    "message": "Add URLs here to keep them out of Lumno search results and the new tab page."
   },
   "blacklist_group_custom": {
-    "message": "Hide These URLs"
+    "message": "Block Globally"
   },
   "blacklist_label_url": {
     "message": "URL rule"
@@ -789,7 +813,7 @@
     "message": "e.g. baidu.com"
   },
   "blacklist_add": {
-    "message": "Add hide rule"
+    "message": "Add"
   },
   "blacklist_empty": {
     "message": "No blacklisted URLs yet"
@@ -814,18 +838,6 @@
   },
   "blacklist_removed_toast": {
     "message": "Removed from blacklist"
-  },
-  "favicon_blacklist_section_title": {
-    "message": "Only Stop Favicon Fetching"
-  },
-  "favicon_blacklist_section_desc": {
-    "message": "If a LAN or VPN site triggers local network permission prompts, add its URL here. This won't affect showing, searching, or opening the page."
-  },
-  "favicon_blacklist_add": {
-    "message": "Add exclusion rule"
-  },
-  "favicon_blacklist_removed_toast": {
-    "message": "Removed from favicon exclusions"
   },
   "shortcuts_group_builtin": {
     "message": "Built-in"
@@ -920,9 +932,6 @@
   "blacklist_clear": {
     "message": "Clear hide rules"
   },
-  "favicon_blacklist_clear": {
-    "message": "Clear exclusion rules"
-  },
   "toast_cleared": {
     "message": "Cleared"
   },
@@ -931,9 +940,6 @@
   },
   "confirm_clear_blacklist": {
     "message": "Clear the hide rules?"
-  },
-  "confirm_clear_favicon_blacklist": {
-    "message": "Clear exclusion rules?"
   },
   "confirm_reset_builtin": {
     "message": "Reset built-in list?"
@@ -1024,6 +1030,12 @@
   },
   "action_open_new_tab": {
     "message": "New Tab"
+  },
+  "action_open_background_new_tab": {
+    "message": "Open in Background"
+  },
+  "action_open_background_tab": {
+    "message": "Open in Background"
   },
   "action_go_current_tab": {
     "message": "Go"
@@ -1426,6 +1438,54 @@
   },
   "shortcut_reference_document_pip_child_desc": {
     "message": "Move to a smaller child element while choosing a web clip"
+  },
+  "newtab_shortcuts_section_label": {
+    "message": "Shortcuts"
+  },
+  "newtab_shortcuts_add": {
+    "message": "Add shortcut"
+  },
+  "newtab_shortcuts_dialog_title": {
+    "message": "Add shortcut"
+  },
+  "newtab_shortcuts_name_label": {
+    "message": "Name"
+  },
+  "newtab_shortcuts_name_placeholder": {
+    "message": "Lumno"
+  },
+  "newtab_shortcuts_url_label": {
+    "message": "URL"
+  },
+  "newtab_shortcuts_url_placeholder": {
+    "message": "https://example.com"
+  },
+  "newtab_shortcuts_cancel": {
+    "message": "Cancel"
+  },
+  "newtab_shortcuts_done": {
+    "message": "Done"
+  },
+  "newtab_shortcuts_save": {
+    "message": "Save"
+  },
+  "newtab_shortcuts_invalid_url": {
+    "message": "Enter a valid http or https URL"
+  },
+  "newtab_shortcuts_added": {
+    "message": "Shortcut added"
+  },
+  "newtab_shortcuts_edited": {
+    "message": "Shortcut updated"
+  },
+  "newtab_shortcuts_removed": {
+    "message": "Shortcut removed"
+  },
+  "newtab_shortcuts_edit_dialog_title": {
+    "message": "Edit shortcut"
+  },
+  "newtab_shortcuts_context_menu_label": {
+    "message": "Shortcut actions"
   },
   "settings_tab_switcher_title": {
     "message": "AltQ tab switcher"

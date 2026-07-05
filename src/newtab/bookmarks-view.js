@@ -41,6 +41,26 @@
     return `${id}::${type}::${title}::${url}::${themeUrl}`;
   }
 
+  function applyBookmarkCardMetadata(card, item, index) {
+    if (!card || !item || typeof card.setAttribute !== 'function') {
+      return;
+    }
+    const bookmarkId = item.id ? String(item.id) : '';
+    const parentId = item.parentId ? String(item.parentId) : '';
+    const itemIndex = Number(item.index);
+    card.draggable = false;
+    card._xBookmarkItem = item;
+    card._xBookmarkPageIndex = Number.isFinite(index) ? index : 0;
+    card.setAttribute('data-bookmark-id', bookmarkId);
+    card.setAttribute('data-bookmark-type', item.type ? String(item.type) : '');
+    card.setAttribute('data-bookmark-parent-id', parentId);
+    card.setAttribute('data-bookmark-index', Number.isFinite(itemIndex) ? String(itemIndex) : '');
+    card.setAttribute(
+      'data-bookmark-draggable',
+      bookmarkId && parentId && Number.isFinite(itemIndex) ? 'true' : 'false'
+    );
+  }
+
   function createBookmarksView(options) {
     const documentObj = getOption(options, 'documentObj', root.document);
     const windowObj = getOption(options, 'windowObj', root.window);
@@ -109,11 +129,27 @@
     const shouldDelayHoverFromRecent = getFunction(options, 'shouldDelayHoverFromRecent', function() {
       return false;
     });
+    const shouldSuppressHover = getFunction(options, 'shouldSuppressHover', function() {
+      return false;
+    });
     const bindCursorTooltip = getFunction(options, 'bindCursorTooltip');
     const hideCursorTooltip = getFunction(options, 'hideCursorTooltip');
     const openFolder = getFunction(options, 'openFolder');
     const openFolderMenu = getFunction(options, 'openFolderMenu');
     const navigateToUrl = getFunction(options, 'navigateToUrl');
+    const openUrl = getFunction(options, 'openUrl', function(url) {
+      navigateToUrl(url);
+    });
+
+    function shouldOpenUrlInBackground(event) {
+      return Boolean(event && (event.metaKey || event.ctrlKey));
+    }
+
+    function openBookmarkUrl(url, event) {
+      openUrl(url, {
+        openInBackgroundTab: shouldOpenUrlInBackground(event)
+      });
+    }
 
     function clear() {
       hideCursorTooltip();
@@ -189,6 +225,7 @@
       const card = documentObj.createElement('button');
       card.type = 'button';
       card.className = 'x-nt-bookmark-card';
+      card.draggable = false;
       if (isFolder) {
         card.classList.add('x-nt-bookmark-card--folder');
         if (menuMode) {
@@ -236,6 +273,8 @@
         if (index < 4) {
           favicon.fetchPriority = 'high';
         }
+        favicon.draggable = false;
+        favicon.setAttribute('draggable', 'false');
         attachFaviconWithFallbacks(favicon, item.url, host, {
           primaryUrl: getPrimaryFaviconCandidateForBookmark(item.url),
           browserUrl: getBrowserFaviconCandidateForBookmark(item.url, host)
@@ -274,6 +313,8 @@
           previewFavicon.loading = 'eager';
           previewFavicon.decoding = 'async';
           previewFavicon.setAttribute('aria-hidden', 'true');
+          previewFavicon.draggable = false;
+          previewFavicon.setAttribute('draggable', 'false');
           attachFaviconWithFallbacks(previewFavicon, url, previewHost, {
             primaryUrl: getPrimaryFaviconCandidateForBookmark(url),
             browserUrl: getBrowserFaviconCandidateForBookmark(url, previewHost)
@@ -296,6 +337,7 @@
         menuMode &&
         (isMenuVisualLocked || card.getAttribute('aria-expanded') === 'true')
       );
+      const isHoverSuppressed = (event) => shouldSuppressHover(card, event) === true;
       const setHoverVisualActive = (active) => {
         if (isHoverVisualActive === active) {
           return;
@@ -326,10 +368,16 @@
         }
         setHoverVisualActive(false);
       };
+      card._xDeactivateBookmarkHoverVisual = deactivateBookmarkHoverVisual;
       if (isFolder && menuMode) {
         card._xSetBookmarkMenuVisualActive = setMenuVisualLocked;
       }
       const activateBookmarkHoverVisual = (event) => {
+        if (isHoverSuppressed(event)) {
+          clearHoverIntentTimer();
+          setHoverVisualActive(false);
+          return;
+        }
         const pointerType = event && typeof event.pointerType === 'string' ? event.pointerType : '';
         if (!shouldDelayHoverFromRecent(pointerType)) {
           clearHoverIntentTimer();
@@ -360,13 +408,23 @@
       });
       card.addEventListener('pointerdown', () => {
         clearHoverIntentTimer();
-        setHoverVisualActive(true);
+        if (isHoverSuppressed()) {
+          setHoverVisualActive(false);
+        }
+      });
+      card.addEventListener('dragstart', (event) => {
+        event.preventDefault();
       });
       bindCursorTooltip(card, () => card._xTitleText || titleText, {
         maxWidth: 460,
         shouldShow: () => isBookmarkTitleTruncated(title)
       });
-      card.addEventListener('click', () => {
+      card.addEventListener('click', (event) => {
+        if (card._xBookmarkSuppressClick) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
         hideCursorTooltip();
         if (isFolder) {
           if (menuMode) {
@@ -377,7 +435,7 @@
           openFolder(item.id);
           return;
         }
-        navigateToUrl(item.url);
+        openBookmarkUrl(item.url, event);
       });
       card.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -391,7 +449,7 @@
             openFolder(item.id);
             return;
           }
-          navigateToUrl(item.url);
+          openBookmarkUrl(item.url, event);
         }
       });
       return card;
@@ -440,6 +498,7 @@
           }
         }
         if (card && grid) {
+          applyBookmarkCardMetadata(card, item, index);
           applyCardTheme(card, card._xTheme, card._xHost || '');
           cards.push(card);
           grid.appendChild(card);

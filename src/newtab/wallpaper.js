@@ -7,7 +7,8 @@
     localWallpaper: '_x_extension_newtab_local_wallpaper_2026_unique_',
     overlay: '_x_extension_newtab_wallpaper_overlay_2026_unique_',
     effect: '_x_extension_newtab_wallpaper_effect_2026_unique_',
-    wordmark: '_x_extension_newtab_wordmark_visible_2026_unique_'
+    wordmark: '_x_extension_newtab_wordmark_visible_2026_unique_',
+    favicon: '_x_extension_newtab_favicon_2026_unique_'
   };
   const PRELOAD_STORAGE_KEY = '_x_extension_newtab_wallpaper_preload_2026_unique_';
 
@@ -27,6 +28,7 @@
     const NEWTAB_WALLPAPER_OVERLAY_STORAGE_KEY = storageKeys.overlay;
     const NEWTAB_WALLPAPER_EFFECT_STORAGE_KEY = storageKeys.effect;
     const NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY = storageKeys.wordmark;
+    const NEWTAB_FAVICON_STORAGE_KEY = storageKeys.favicon;
     const t = typeof options.t === 'function'
       ? options.t
       : function(_key, fallback) { return fallback || ''; };
@@ -51,6 +53,11 @@
     const setThemeScope = typeof options.setThemeScope === 'function'
       ? options.setThemeScope
       : function() {};
+    const BroadcastChannelCtor = typeof options.BroadcastChannel === 'function'
+      ? options.BroadcastChannel
+      : (window && typeof window.BroadcastChannel === 'function'
+        ? window.BroadcastChannel
+        : (typeof globalThis.BroadcastChannel === 'function' ? globalThis.BroadcastChannel : null));
     const searchWidthConfig = Object.assign({
       min: 720,
       max: 1040,
@@ -212,6 +219,44 @@
       { type: 'halftone', labelKey: 'newtab_wallpaper_effect_halftone', fallback: 'Halftone' },
       { type: 'ascii', labelKey: 'newtab_wallpaper_effect_ascii', fallback: 'ASCII' }
     ];
+    const NEWTAB_FAVICON_DEFAULT_ID = 'default';
+    const NEWTAB_FAVICON_OPTIONS = [
+      {
+        id: 'default',
+        nameKey: 'newtab_favicon_name_default',
+        fallbackName: 'Default',
+        file: 'assets/images/lumno.png',
+        type: 'image/png'
+      },
+      {
+        id: 'alternate',
+        nameKey: 'newtab_favicon_name_alternate',
+        fallbackName: 'Alternate',
+        file: 'assets/images/lumno-newtab-favicon.svg',
+        preview: 'inlineSvg',
+        themeAwareSvg: true,
+        type: 'image/svg+xml',
+        sizes: 'any'
+      }
+    ];
+    const NEWTAB_FAVICON_THEME_QUERY = '(prefers-color-scheme: dark)';
+    const NEWTAB_FAVICON_THEME_BROADCAST_CHANNEL = 'lumno:newtab-favicon-theme';
+    const NEWTAB_FAVICON_THEME_REFRESH_ACTION = 'lumno:newtab-favicon-theme-refresh';
+    const NEWTAB_FAVICON_PRELOAD_STORAGE_KEY = '_x_extension_newtab_favicon_preload_2026_unique_';
+    const NEWTAB_FAVICON_SVG_SHADOW_PATH = 'M14.1832 28.5107C14.7736 26.0503 17.4872 24.8712 19.8045 25.8872L29.0688 29.9483C23.1024 42.5571 20.9583 59.1892 34.0764 74.4517C35.5367 76.1508 37.0158 77.6786 38.5039 79.0511C15.0742 61.6944 10.3754 44.3784 14.1832 28.5107ZM50.1563 62.6667C55.3534 57.1072 64.2555 57.3891 69.0898 63.2669L69.4706 63.7295C65.5069 61.937 61.0203 61.3468 56.5866 62.1747L49.3526 63.5259L50.1563 62.6667Z';
+    const NEWTAB_FAVICON_SVG_MAIN_PATH = 'M34.0761 74.4516C15.8955 53.2991 27.0297 29.5157 37.0262 17.4579C38.6314 15.5217 41.5522 15.6368 43.1924 17.5435L54.2217 30.3654C58.8053 35.6938 59.7099 43.2656 56.5107 49.524L49.3531 63.5257L56.8412 62.1274C64.6007 60.6784 72.5332 63.5719 77.5374 69.6765L83.762 77.2699C85.0646 78.859 85.0813 81.1684 83.4746 82.4491C74.4334 89.6554 52.1633 95.4955 34.0761 74.4516Z';
+    const NEWTAB_FAVICON_THEMES = {
+      light: {
+        color: '#000000',
+        shadowOpacity: '0.2',
+        mainOpacity: '0.5'
+      },
+      dark: {
+        color: '#f1f3f4',
+        shadowOpacity: '0.34',
+        mainOpacity: '0.72'
+      }
+    };
     const WALLPAPER_PANEL_RESIZE_DURATION_MS = 260;
     const WALLPAPER_PANEL_RESIZE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
     const WALLPAPER_VISUAL_TRANSITION_MS = 220;
@@ -220,10 +265,12 @@
 
     let initialWallpaperApplied = false;
     let hasWallpaperBootstrapStarted = false;
+    let hasNewtabFaviconBootstrapStarted = false;
     let resolveInitialWallpaperReady = null;
     const initialWallpaperReadyPromise = new Promise((resolve) => {
       resolveInitialWallpaperReady = resolve;
     });
+    let initialNewtabFaviconReadyPromise = null;
     let initialWallpaperOverlayReadyPromise = null;
     let wallpaperControl = null;
     let wallpaperButton = null;
@@ -261,6 +308,14 @@
     let wallpaperEffectSpacingControl = null;
     let wallpaperEffectSpacingLabel = null;
     let wallpaperEffectSpacingSlider = null;
+    let newtabFaviconTitle = null;
+    let newtabFaviconOptions = null;
+    let newtabFaviconThemeQueryList = null;
+    let newtabFaviconThemeChangeHandler = null;
+    let hasNewtabFaviconLifecycleListeners = false;
+    let newtabFaviconLifecycleRefreshHandler = null;
+    let newtabFaviconThemeBroadcastChannel = null;
+    let hasNewtabFaviconThemeBroadcastListener = false;
     let wallpaperSliderValueBubble = null;
     let wallpaperSliderValueHideTimer = null;
     let wallpaperSliderValueTarget = null;
@@ -693,6 +748,7 @@
     let lastActiveWallpaperId = '';
     let localWallpaperOverrideActive = false;
     let currentWordmarkVisible = normalizeNewtabWordmarkVisible(getWordmarkVisible());
+    let currentNewtabFaviconId = NEWTAB_FAVICON_DEFAULT_ID;
 
     function isCustomWallpaperId(id) {
       if (localWallpaperStore) {
@@ -730,6 +786,217 @@
 
     function normalizeNewtabWordmarkVisible(value) {
       return value !== false;
+    }
+
+    function getNewtabFaviconById(id) {
+      const normalizedId = String(id || '').trim();
+      return NEWTAB_FAVICON_OPTIONS.find((item) => item && item.id === normalizedId) || null;
+    }
+
+    function normalizeNewtabFaviconId(value) {
+      const raw = value && typeof value === 'object' && value.id
+        ? value.id
+        : value;
+      const id = String(raw || '').trim();
+      return getNewtabFaviconById(id) ? id : NEWTAB_FAVICON_DEFAULT_ID;
+    }
+
+    function getNewtabFaviconDisplayName(item) {
+      if (!item) {
+        return '';
+      }
+      return t(item.nameKey, item.fallbackName || item.id || '');
+    }
+
+    function getNewtabFaviconUrl(item) {
+      return item && item.file ? getRuntimeAssetUrl(item.file) : '';
+    }
+
+    function getNewtabFaviconThemeQueryList() {
+      if (!window || typeof window.matchMedia !== 'function') {
+        return null;
+      }
+      try {
+        return window.matchMedia(NEWTAB_FAVICON_THEME_QUERY);
+      } catch (_error) {
+        return null;
+      }
+    }
+
+    function getNewtabFaviconBrowserTheme() {
+      const queryList = getNewtabFaviconThemeQueryList();
+      return queryList && queryList.matches ? 'dark' : 'light';
+    }
+
+    function buildNewtabFaviconSvgDataUrl(themeName) {
+      const theme = NEWTAB_FAVICON_THEMES[themeName] || NEWTAB_FAVICON_THEMES.light;
+      const svg = [
+        '<svg width="104" height="104" viewBox="0 0 104 104" fill="none" xmlns="http://www.w3.org/2000/svg">',
+        `<path opacity="${theme.shadowOpacity}" d="${NEWTAB_FAVICON_SVG_SHADOW_PATH}" fill="${theme.color}"/>`,
+        `<path d="${NEWTAB_FAVICON_SVG_MAIN_PATH}" fill="${theme.color}" fill-opacity="${theme.mainOpacity}"/>`,
+        '</svg>'
+      ].join('');
+      return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+    }
+
+    function getNewtabFaviconHref(item) {
+      if (item && item.themeAwareSvg) {
+        return buildNewtabFaviconSvgDataUrl(getNewtabFaviconBrowserTheme());
+      }
+      return getNewtabFaviconUrl(item);
+    }
+
+    function cacheNewtabFaviconPreloadId(id) {
+      const normalizedId = normalizeNewtabFaviconId(id);
+      try {
+        if (window && window.localStorage) {
+          window.localStorage.setItem(NEWTAB_FAVICON_PRELOAD_STORAGE_KEY, normalizedId);
+        }
+      } catch (_error) {
+        // The main runtime still applies the favicon even when localStorage is unavailable.
+      }
+    }
+
+    function clearNewtabFaviconThemeListener() {
+      if (!newtabFaviconThemeQueryList || !newtabFaviconThemeChangeHandler) {
+        newtabFaviconThemeQueryList = null;
+        newtabFaviconThemeChangeHandler = null;
+        return;
+      }
+      if (typeof newtabFaviconThemeQueryList.removeEventListener === 'function') {
+        newtabFaviconThemeQueryList.removeEventListener('change', newtabFaviconThemeChangeHandler);
+      } else if (typeof newtabFaviconThemeQueryList.removeListener === 'function') {
+        newtabFaviconThemeQueryList.removeListener(newtabFaviconThemeChangeHandler);
+      }
+      newtabFaviconThemeQueryList = null;
+      newtabFaviconThemeChangeHandler = null;
+    }
+
+    function applyNewtabFaviconLinkAttributes(link, item) {
+      const themeName = item && item.themeAwareSvg ? getNewtabFaviconBrowserTheme() : '';
+      link.setAttribute('rel', 'icon');
+      link.setAttribute('type', item.type || 'image/png');
+      link.setAttribute('href', getNewtabFaviconHref(item));
+      if (item.sizes) {
+        link.setAttribute('sizes', item.sizes);
+      } else {
+        link.removeAttribute('sizes');
+      }
+      link.setAttribute('data-newtab-favicon-id', item.id);
+      if (themeName) {
+        link.setAttribute('data-lumno-newtab-favicon-theme', themeName);
+      } else {
+        link.removeAttribute('data-lumno-newtab-favicon-theme');
+      }
+    }
+
+    function refreshNewtabFaviconLink() {
+      const item = getNewtabFaviconById(currentNewtabFaviconId) ||
+        getNewtabFaviconById(NEWTAB_FAVICON_DEFAULT_ID);
+      const link = getNewtabFaviconLink();
+      if (link && item) {
+        applyNewtabFaviconLinkAttributes(link, item);
+      }
+    }
+
+    function refreshNewtabFaviconLinkIfThemeAware() {
+      const item = getNewtabFaviconById(currentNewtabFaviconId);
+      if (item && item.themeAwareSvg) {
+        refreshNewtabFaviconLink();
+      }
+    }
+
+    function getNewtabFaviconThemeBroadcastChannel() {
+      if (newtabFaviconThemeBroadcastChannel) {
+        return newtabFaviconThemeBroadcastChannel;
+      }
+      if (typeof BroadcastChannelCtor !== 'function') {
+        return null;
+      }
+      try {
+        newtabFaviconThemeBroadcastChannel = new BroadcastChannelCtor(NEWTAB_FAVICON_THEME_BROADCAST_CHANNEL);
+      } catch (_error) {
+        newtabFaviconThemeBroadcastChannel = null;
+      }
+      return newtabFaviconThemeBroadcastChannel;
+    }
+
+    function bindNewtabFaviconThemeBroadcastListener() {
+      if (hasNewtabFaviconThemeBroadcastListener) {
+        return;
+      }
+      hasNewtabFaviconThemeBroadcastListener = true;
+      const channel = getNewtabFaviconThemeBroadcastChannel();
+      if (!channel) {
+        return;
+      }
+      const handleMessage = (event) => {
+        const data = event && event.data ? event.data : null;
+        if (!data || data.action !== NEWTAB_FAVICON_THEME_REFRESH_ACTION) {
+          return;
+        }
+        refreshNewtabFaviconLinkIfThemeAware();
+      };
+      if (typeof channel.addEventListener === 'function') {
+        channel.addEventListener('message', handleMessage);
+      } else {
+        channel.onmessage = handleMessage;
+      }
+    }
+
+    function broadcastNewtabFaviconThemeRefresh() {
+      const channel = getNewtabFaviconThemeBroadcastChannel();
+      if (!channel || typeof channel.postMessage !== 'function') {
+        return;
+      }
+      try {
+        channel.postMessage({
+          action: NEWTAB_FAVICON_THEME_REFRESH_ACTION,
+          at: Date.now()
+        });
+      } catch (_error) {
+        // BroadcastChannel can be unavailable in constrained extension contexts.
+      }
+    }
+
+    function bindNewtabFaviconLifecycleRefreshListeners() {
+      if (hasNewtabFaviconLifecycleListeners) {
+        return;
+      }
+      hasNewtabFaviconLifecycleListeners = true;
+      newtabFaviconLifecycleRefreshHandler = () => {
+        refreshNewtabFaviconLinkIfThemeAware();
+      };
+      if (window && typeof window.addEventListener === 'function') {
+        window.addEventListener('focus', newtabFaviconLifecycleRefreshHandler, { passive: true });
+        window.addEventListener('pageshow', newtabFaviconLifecycleRefreshHandler, { passive: true });
+      }
+      if (document && typeof document.addEventListener === 'function') {
+        document.addEventListener('visibilitychange', newtabFaviconLifecycleRefreshHandler, { passive: true });
+      }
+    }
+
+    function bindNewtabFaviconThemeListener(item) {
+      clearNewtabFaviconThemeListener();
+      if (!item || !item.themeAwareSvg) {
+        return;
+      }
+      bindNewtabFaviconLifecycleRefreshListeners();
+      bindNewtabFaviconThemeBroadcastListener();
+      const queryList = getNewtabFaviconThemeQueryList();
+      if (!queryList) {
+        return;
+      }
+      newtabFaviconThemeQueryList = queryList;
+      newtabFaviconThemeChangeHandler = () => {
+        refreshNewtabFaviconLinkIfThemeAware();
+        broadcastNewtabFaviconThemeRefresh();
+      };
+      if (typeof queryList.addEventListener === 'function') {
+        queryList.addEventListener('change', newtabFaviconThemeChangeHandler);
+      } else if (typeof queryList.addListener === 'function') {
+        queryList.addListener(newtabFaviconThemeChangeHandler);
+      }
     }
 
     function normalizeNewtabWallpaperId(value) {
@@ -1885,7 +2152,7 @@
         logoEnabledToggle.setAttribute('aria-checked', currentWordmarkVisible ? 'true' : 'false');
         logoEnabledToggle.setAttribute(
           'aria-label',
-          t('settings_newtab_wordmark_title', 'Show logo above the New Tab search bar')
+          t('settings_newtab_wordmark_title', 'Show brand mark above the New Tab search bar')
         );
       }
     }
@@ -1903,6 +2170,93 @@
         return;
       }
       storageArea.set({ [NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY]: nextValue });
+    }
+
+    function getNewtabFaviconOptionButtons() {
+      if (!newtabFaviconOptions) {
+        return [];
+      }
+      return Array.from(newtabFaviconOptions.children || []).filter((child) => {
+        return child && String(child.className || '').split(/\s+/).includes('x-nt-favicon-option');
+      });
+    }
+
+    function getNewtabFaviconLink() {
+      const head = document.head || document.getElementsByTagName && document.getElementsByTagName('head')[0];
+      if (!head) {
+        return null;
+      }
+      const children = Array.from(head.children || []);
+      let link = children.find((child) => child &&
+        String(child.tagName || '').toUpperCase() === 'LINK' &&
+        child.getAttribute &&
+        child.getAttribute('data-lumno-newtab-favicon') === 'true');
+      if (!link) {
+        link = document.createElement('link');
+        link.setAttribute('data-lumno-newtab-favicon', 'true');
+        head.appendChild(link);
+      }
+      return link;
+    }
+
+    function updateNewtabFaviconSelectionUi() {
+      const currentItem = getNewtabFaviconById(currentNewtabFaviconId) ||
+        getNewtabFaviconById(NEWTAB_FAVICON_DEFAULT_ID);
+      if (newtabFaviconTitle) {
+        newtabFaviconTitle.textContent = t('newtab_favicon_title', 'New Tab favicon');
+      }
+      if (newtabFaviconOptions) {
+        newtabFaviconOptions.setAttribute('aria-label', t('newtab_favicon_title', 'New Tab favicon'));
+      }
+      getNewtabFaviconOptionButtons().forEach((button) => {
+        const item = getNewtabFaviconById(button.getAttribute('data-newtab-favicon-id'));
+        if (!item) {
+          return;
+        }
+        const selected = currentItem && item.id === currentItem.id;
+        const name = getNewtabFaviconDisplayName(item);
+        button.setAttribute('data-selected', selected ? 'true' : 'false');
+        button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        button.setAttribute('aria-label', formatMessage('newtab_favicon_select_label', 'Select {name} favicon', {
+          name
+        }));
+      });
+    }
+
+    function applyNewtabFavicon(value) {
+      const nextId = normalizeNewtabFaviconId(value);
+      const item = getNewtabFaviconById(nextId) || getNewtabFaviconById(NEWTAB_FAVICON_DEFAULT_ID);
+      currentNewtabFaviconId = item ? item.id : NEWTAB_FAVICON_DEFAULT_ID;
+      cacheNewtabFaviconPreloadId(currentNewtabFaviconId);
+      bindNewtabFaviconThemeListener(item);
+      const link = getNewtabFaviconLink();
+      if (link && item) {
+        applyNewtabFaviconLinkAttributes(link, item);
+      }
+      updateNewtabFaviconSelectionUi();
+    }
+
+    function persistNewtabFavicon(value) {
+      const nextId = normalizeNewtabFaviconId(value);
+      applyNewtabFavicon(nextId);
+      writeStorageValue(storageArea, NEWTAB_FAVICON_STORAGE_KEY, nextId, () => {
+        showToast(t('newtab_favicon_save_error', 'Failed to save favicon'), true);
+      });
+    }
+
+    function bootstrapInitialNewtabFavicon() {
+      if (hasNewtabFaviconBootstrapStarted) {
+        return initialNewtabFaviconReadyPromise || Promise.resolve();
+      }
+      hasNewtabFaviconBootstrapStarted = true;
+      initialNewtabFaviconReadyPromise = readStorageValue(storageArea, NEWTAB_FAVICON_STORAGE_KEY).then((storedValue) => {
+        const nextId = normalizeNewtabFaviconId(storedValue.value);
+        applyNewtabFavicon(nextId);
+        if (storedValue.hasValue && storedValue.value !== nextId) {
+          writeStorageValue(storageArea, NEWTAB_FAVICON_STORAGE_KEY, nextId);
+        }
+      });
+      return initialNewtabFaviconReadyPromise;
     }
 
     function getWallpaperAppearanceOptionButtons() {
@@ -2562,7 +2916,7 @@
         wallpaperLocalGrid.setAttribute('aria-label', t('newtab_wallpaper_local_section', 'Local'));
       }
       if (logoPanelTitle) {
-        logoPanelTitle.textContent = t('newtab_logo_title', 'Logo');
+        logoPanelTitle.textContent = t('newtab_logo_title', 'Brand mark');
       }
     }
 
@@ -2610,6 +2964,7 @@
       updateCustomWallpaperUploadTile();
       updateWallpaperSectionLanguageStrings();
       updateLogoSwitchUi();
+      updateNewtabFaviconSelectionUi();
       updateWallpaperAppearanceModeLabels();
       updateWallpaperScaleLanguageStrings();
       updateWallpaperTileLanguageStrings();
@@ -3230,12 +3585,70 @@
       return headerSection.section;
     }
 
+    function createNewtabFaviconPreview(item) {
+      if (item && item.preview === 'inlineSvg') {
+        return createDomElement('span', {
+          className: 'x-nt-favicon-image x-nt-favicon-svg-preview',
+          attrs: { 'aria-hidden': 'true' },
+          innerHTML: [
+            '<svg viewBox="0 0 104 104" fill="none" xmlns="http://www.w3.org/2000/svg">',
+            `<path opacity="var(--x-nt-favicon-shadow-opacity, 0.2)" d="${NEWTAB_FAVICON_SVG_SHADOW_PATH}" fill="currentColor"/>`,
+            `<path d="${NEWTAB_FAVICON_SVG_MAIN_PATH}" fill="currentColor" fill-opacity="var(--x-nt-favicon-main-opacity, 0.5)"/>`,
+            '</svg>'
+          ].join('')
+        });
+      }
+      const image = createDomElement('img', { className: 'x-nt-favicon-image' });
+      image.src = getNewtabFaviconUrl(item);
+      image.alt = '';
+      image.draggable = false;
+      return image;
+    }
+
+    function createNewtabFaviconOption(item) {
+      const preview = createNewtabFaviconPreview(item);
+      const tile = createDomElement('button', {
+        className: 'x-nt-wallpaper-tile x-nt-favicon-option',
+        attrs: {
+          'data-newtab-favicon-id': item.id,
+          'data-selected': 'false',
+          'aria-pressed': 'false'
+        },
+        children: [
+          createWallpaperThumb([preview], 'x-nt-favicon-thumb'),
+          createWallpaperCheckMark()
+        ]
+      });
+      tile.type = 'button';
+      tile.addEventListener('click', () => {
+        persistNewtabFavicon(item.id);
+      });
+      return tile;
+    }
+
+    function createNewtabFaviconGroup() {
+      const group = createDomElement('div', { className: 'x-nt-favicon-group' });
+      newtabFaviconTitle = createDomElement('div', {
+        className: 'x-nt-wallpaper-panel-title x-nt-favicon-title'
+      });
+      newtabFaviconOptions = createDomElement('div', {
+        className: 'x-nt-favicon-options',
+        attrs: { role: 'group' }
+      });
+      NEWTAB_FAVICON_OPTIONS.forEach((item) => {
+        newtabFaviconOptions.appendChild(createNewtabFaviconOption(item));
+      });
+      appendChildren(group, [newtabFaviconTitle, newtabFaviconOptions]);
+      return group;
+    }
+
     function createLogoSection() {
       const logoSection = createSwitchPanelSection(() => {
         persistWordmarkVisible(logoEnabledToggle.checked);
       });
       logoPanelTitle = logoSection.title;
       logoEnabledToggle = logoSection.toggle;
+      logoSection.section.appendChild(createNewtabFaviconGroup());
       return logoSection.section;
     }
 
@@ -3257,6 +3670,7 @@
       updateCustomWallpaperUploadTile();
       updateWallpaperSelectionUi();
       updateWallpaperAppearanceSelectionUi();
+      updateNewtabFaviconSelectionUi();
     }
 
     function openWallpaperPanel() {
@@ -3452,6 +3866,15 @@
         }
         handled = true;
       }
+      if (NEWTAB_FAVICON_STORAGE_KEY && changes[NEWTAB_FAVICON_STORAGE_KEY]) {
+        const raw = changes[NEWTAB_FAVICON_STORAGE_KEY].newValue;
+        const nextId = normalizeNewtabFaviconId(raw);
+        applyNewtabFavicon(nextId);
+        if (storageArea && raw !== nextId) {
+          writeStorageValue(storageArea, NEWTAB_FAVICON_STORAGE_KEY, nextId);
+        }
+        handled = true;
+      }
       return handled;
     }
 
@@ -3478,6 +3901,7 @@
       bootstrapInitialWallpaper,
       bootstrapInitialWallpaperOverlay,
       bootstrapInitialWallpaperEffect,
+      bootstrapInitialNewtabFavicon,
       handleStorageChange,
       scheduleAdaptiveToneUpdate: scheduleWallpaperAdaptiveToneUpdate
     };

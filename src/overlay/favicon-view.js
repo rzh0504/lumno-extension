@@ -15,9 +15,15 @@
     const getGstaticFaviconUrl = typeof config.getGstaticFaviconUrl === 'function' ? config.getGstaticFaviconUrl : (() => '');
     const getChromeFaviconUrl = typeof config.getChromeFaviconUrl === 'function' ? config.getChromeFaviconUrl : (() => '');
     const shouldBlockFaviconForHost = typeof config.shouldBlockFaviconForHost === 'function' ? config.shouldBlockFaviconForHost : (() => false);
+    const shouldAvoidDirectFaviconForHost = typeof config.shouldAvoidDirectFaviconForHost === 'function'
+      ? config.shouldAvoidDirectFaviconForHost
+      : (() => false);
     const shouldBlockOverlayFaviconForHost = typeof config.shouldBlockOverlayFaviconForHost === 'function'
       ? config.shouldBlockOverlayFaviconForHost
       : shouldBlockFaviconForHost;
+    const isEnhancedFaviconFetchEnabled = typeof config.isEnhancedFaviconFetchEnabled === 'function'
+      ? config.isEnhancedFaviconFetchEnabled
+      : (() => true);
     const isFaviconProxyUrl = typeof config.isFaviconProxyUrl === 'function' ? config.isFaviconProxyUrl : (() => false);
     const isBlockedLocalFaviconUrl = typeof config.isBlockedLocalFaviconUrl === 'function'
       ? config.isBlockedLocalFaviconUrl
@@ -55,6 +61,7 @@
         getGstaticFaviconUrl,
         getChromeFaviconUrl,
         shouldBlockFaviconForHost: shouldBlockOverlayFaviconForHost,
+        shouldAvoidDirectFaviconForHost,
         isBlockedLocalFaviconUrl
       })
       : null;
@@ -370,6 +377,9 @@
     }
 
     function getRootFaviconDataSourceUrls(pageUrl) {
+      if (!isEnhancedFaviconFetchEnabled()) {
+        return [];
+      }
       try {
         const parsed = new URL(String(pageUrl || ''));
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {

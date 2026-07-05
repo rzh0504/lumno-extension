@@ -85,23 +85,26 @@
 
   function buildBookmarkNodeMap(nodes) {
     const nodeMap = new Map();
-    const walk = (node, parentId) => {
+    const walk = (node, parentId, index) => {
       if (!node) {
         return;
       }
       const nodeId = String(node.id || '');
       if (nodeId) {
         node.parentId = node.parentId || parentId || '';
+        if (typeof node.index !== 'number') {
+          node.index = Number.isFinite(index) ? index : 0;
+        }
         nodeMap.set(nodeId, node);
       }
       const children = Array.isArray(node.children) ? node.children : [];
       for (let i = 0; i < children.length; i += 1) {
-        walk(children[i], nodeId);
+        walk(children[i], nodeId, i);
       }
     };
     const rootNodes = Array.isArray(nodes) ? nodes : [];
     for (let i = 0; i < rootNodes.length; i += 1) {
-      walk(rootNodes[i], '');
+      walk(rootNodes[i], '', i);
     }
     return nodeMap;
   }
@@ -133,6 +136,8 @@
         results.push({
           id: String(item.id || ''),
           type: 'bookmark',
+          parentId: String(item.parentId || ''),
+          index: typeof item.index === 'number' ? item.index : index,
           title,
           url,
           host,
@@ -154,6 +159,8 @@
       results.push({
         id: String(item.id || ''),
         type: 'folder',
+        parentId: String(item.parentId || ''),
+        index: typeof item.index === 'number' ? item.index : index,
         title,
         url: '',
         host,

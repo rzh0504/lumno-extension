@@ -150,6 +150,11 @@ function testBookmarkStore() {
   assert.strictEqual(cache.folderItemsCache.get('10').length, 2);
 
   const folderItem = cache.folderItemsCache.get('10').find((item) => item.type === 'folder');
+  const firstBookmarkItem = cache.folderItemsCache.get('10').find((item) => item.type === 'bookmark');
+  assert.strictEqual(firstBookmarkItem.parentId, '10');
+  assert.strictEqual(firstBookmarkItem.index, 0);
+  assert.strictEqual(folderItem.parentId, '10');
+  assert.strictEqual(folderItem.index, 2);
   assert.strictEqual(folderItem.themeUrl, 'https://figma.com/files');
   assert.deepStrictEqual(folderItem.previewUrls, [
     'https://figma.com/files',
@@ -233,6 +238,64 @@ function createFakeElement(tagName) {
     addEventListener() {},
     removeEventListener() {}
   };
+}
+
+function testBookmarkViewWritesDragMetadata() {
+  const sandbox = { globalThis: null };
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(fs.readFileSync(path.join(repoRoot, 'src/newtab/bookmarks-view.js'), 'utf8'), sandbox, {
+    filename: 'src/newtab/bookmarks-view.js'
+  });
+  const documentObj = {
+    createElement: createFakeElement
+  };
+  const grid = createFakeElement('div');
+  const view = sandbox.LumnoNewtabBookmarksView.createBookmarksView({
+    documentObj,
+    windowObj: {
+      setTimeout,
+      clearTimeout
+    },
+    grid,
+    cards: [],
+    t: (_key, fallback) => fallback || '',
+    formatMessage: (_key, fallback, values) => fallback.replace('{title}', values.title),
+    sanitizeDisplayText: (text) => String(text || ''),
+    getHostFromUrl: (url) => new URL(url).hostname,
+    getSiteDisplayName: (host, title) => title || host,
+    getUrlDisplay: (url) => url,
+    getRiSvg: () => '',
+    getFigmaFolderSvg: () => '',
+    normalizeHost: (host) => String(host || '').toLowerCase(),
+    attachFaviconWithFallbacks() {},
+    getBrowserPageFaviconUrl: () => '',
+    isLocalNetworkHost: () => false,
+    getChromeFaviconUrl: () => '',
+    getImmediateThemeForSuggestion: () => null,
+    queueThemeForTarget() {},
+    applyCardTheme() {}
+  });
+
+  view.render([{
+    id: '11',
+    parentId: '10',
+    index: 3,
+    type: 'bookmark',
+    title: 'OpenAI',
+    url: 'https://openai.com/',
+    host: 'openai.com'
+  }], {
+    folderId: '10',
+    rootFolderId: '10'
+  });
+
+  const card = grid.children[0];
+  assert.strictEqual(card.getAttribute('data-bookmark-id'), '11');
+  assert.strictEqual(card.getAttribute('data-bookmark-parent-id'), '10');
+  assert.strictEqual(card.getAttribute('data-bookmark-index'), '3');
+  assert.strictEqual(card.getAttribute('data-bookmark-draggable'), 'true');
+  assert.strictEqual(card.draggable, false);
+  assert.strictEqual(card.children[0].draggable, false);
 }
 
 function testRecentViewUsesCanonicalFaviconPageUrl() {
@@ -467,6 +530,7 @@ testRecentStore()
   .then(() => {
     testBookmarkStore();
     testBookmarkCacheHydrationGuard();
+    testBookmarkViewWritesDragMetadata();
     testRecentViewUsesCanonicalFaviconPageUrl();
     testRecentViewPassesBrowserPageFaviconCandidate();
     testBookmarkViewPassesBrowserFaviconCandidateForLocalUrl();

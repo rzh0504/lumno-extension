@@ -70,6 +70,7 @@
     const bottomDockTopReservePx = getOptionNumber(constants, 'bottomDockTopReservePx', 240);
     const compactDockViewportMaxHeightPx = getOptionNumber(constants, 'compactDockViewportMaxHeightPx', 0);
     const compactDockSearchGapPx = getOptionNumber(constants, 'compactDockSearchGapPx', 32);
+    const compactDockShortcutGapPx = getOptionNumber(constants, 'compactDockShortcutGapPx', 8);
     const compactDockMinTopReservePx = getOptionNumber(constants, 'compactDockMinTopReservePx', 168);
     const suggestionsBottomInsetPx = getOptionNumber(constants, 'suggestionsBottomInsetPx', 14);
     const visibleAttribute = 'data-visible';
@@ -93,6 +94,10 @@
 
     function getBottomDock() {
       return resolveElement(options.bottomDock);
+    }
+
+    function getShortcutSection() {
+      return resolveElement(options.shortcutSection);
     }
 
     function getBookmarkSection() {
@@ -336,12 +341,19 @@
         const root = getRoot();
         const rootRect = root ? root.getBoundingClientRect() : null;
         const rootBottom = rootRect ? Number(rootRect.bottom) || 0 : 0;
+        let compactTopReserve = compactDockMinTopReservePx;
         if (rootBottom > 0) {
-          bottomDockTopReserve = Math.min(
-            bottomDockTopReservePx,
-            Math.max(compactDockMinTopReservePx, Math.ceil(rootBottom + compactDockSearchGapPx))
-          );
+          compactTopReserve = Math.max(compactTopReserve, Math.ceil(rootBottom + compactDockSearchGapPx));
         }
+        const shortcutSection = getShortcutSection();
+        if (isSectionVisible(shortcutSection)) {
+          const shortcutRect = shortcutSection.getBoundingClientRect();
+          const shortcutBottom = shortcutRect ? Number(shortcutRect.bottom) || 0 : 0;
+          if (shortcutBottom > 0) {
+            compactTopReserve = Math.max(compactTopReserve, Math.ceil(shortcutBottom + compactDockShortcutGapPx));
+          }
+        }
+        bottomDockTopReserve = compactTopReserve;
       }
       const bottomDockMaxHeight = Math.max(0, viewportHeight - bottomDockTopReserve);
       const bookmarkVisible = isSectionVisible(bookmarkSection);
@@ -352,6 +364,16 @@
       body.classList.remove('x-nt-stack-layout');
       body.classList.add('x-nt-bottom-layout');
       body.classList.toggle('x-nt-no-bookmarks', !bookmarkVisible);
+      const previousDockDensity = typeof bottomDock.getAttribute === 'function'
+        ? bottomDock.getAttribute('data-density')
+        : '';
+      const dockDensity = bottomDockMaxHeight <= 260
+        ? 'tiny'
+        : bottomDockMaxHeight <= 360
+          ? 'compact'
+          : 'default';
+      body.setAttribute('data-nt-bottom-dock-density', dockDensity);
+      bottomDock.setAttribute('data-density', dockDensity);
       sectionSafeCorridor.style.setProperty('display', (bookmarkVisible && recentVisible) ? 'block' : 'none', 'important');
       bottomDock.style.setProperty('max-height', `${bottomDockMaxHeight}px`, 'important');
       bottomDock.style.setProperty('display', (bookmarkVisible || recentVisible) ? 'flex' : 'none', 'important');
@@ -359,6 +381,13 @@
         preserveCurrentTop: Boolean(callbacks && callbacks.preserveSearchEntryLayout)
       });
       updateSuggestionsFloatingLayout();
+      if (previousDockDensity !== dockDensity && typeof windowObj.requestAnimationFrame === 'function') {
+        windowObj.requestAnimationFrame(() => {
+          updateBottomDockLayout({
+            preserveSearchEntryLayout: true
+          });
+        });
+      }
     }
 
     function setSuggestionsVisible(visible) {

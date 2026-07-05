@@ -138,6 +138,7 @@ const NEWTAB_FAVICON_THEME = globalThis.LumnoNewtabFaviconTheme || {};
 const BACKGROUND_NEWTAB_FALLBACK = globalThis.LumnoBackgroundNewtabFallback || {};
 const isLocalFileLikeTargetUrl = BACKGROUND_NEWTAB_FALLBACK.isLocalFileLikeTargetUrl;
 const checkFileSchemeAccess = BACKGROUND_NEWTAB_FALLBACK.checkFileSchemeAccess;
+const openBrowserNewtabFallback = BACKGROUND_NEWTAB_FALLBACK.openBrowserNewtabFallback;
 const openNewtabFallback = BACKGROUND_NEWTAB_FALLBACK.openNewtabFallback;
 const openNewtabFallbackForUrl = BACKGROUND_NEWTAB_FALLBACK.openNewtabFallbackForUrl;
 const BACKGROUND_SHORTCUT_RULES = globalThis.LumnoShortcutRules || {};
@@ -796,10 +797,23 @@ function isLumnoNewtabUrl(url) {
   if (!value || !chrome || !chrome.runtime || typeof chrome.runtime.getURL !== 'function') {
     return false;
   }
-  const lumnoNewtabPrefix = typeof EXTENSION_ROUTES.buildNewtabUrl === 'function'
-    ? EXTENSION_ROUTES.buildNewtabUrl(chrome)
-    : chrome.runtime.getURL('src/newtab/newtab.html');
-  return value === lumnoNewtabPrefix || value.startsWith(`${lumnoNewtabPrefix}?`);
+  const routeType = typeof EXTENSION_ROUTES.classifyExtensionUrl === 'function'
+    ? EXTENSION_ROUTES.classifyExtensionUrl(value)
+    : '';
+  if (routeType === 'newtab' && isOwnExtensionUrl(value)) {
+    return true;
+  }
+  const routeBuilders = [
+    EXTENSION_ROUTES.buildNewtabUrl,
+    EXTENSION_ROUTES.buildLumnoNewtabUrl
+  ].filter((builder) => typeof builder === 'function');
+  const prefixes = routeBuilders.length > 0
+    ? routeBuilders.map((builder) => builder(chrome))
+    : [
+        chrome.runtime.getURL('src/newtab/newtab.html'),
+        chrome.runtime.getURL('src/newtab/lumno-newtab.html')
+      ];
+  return prefixes.some((prefix) => value === prefix || value.startsWith(`${prefix}?`));
 }
 
 function isBrowserNewtabUrl(url) {
@@ -822,6 +836,136 @@ function isOwnExtensionUrl(url) {
       String(parsed.hostname || '') === String(chrome.runtime.id);
   } catch (e) {
     return false;
+  }
+}
+
+function isLumnoBrowserOverrideNewtabUrl(url) {
+  const value = String(url || '');
+  if (!value || !isOwnExtensionUrl(value) || !chrome || !chrome.runtime || typeof chrome.runtime.getURL !== 'function') {
+    return false;
+  }
+  const newtabPrefix = typeof EXTENSION_ROUTES.buildNewtabUrl === 'function'
+    ? EXTENSION_ROUTES.buildNewtabUrl(chrome)
+    : chrome.runtime.getURL('src/newtab/newtab.html');
+  return value === newtabPrefix || value.startsWith(`${newtabPrefix}?`);
+}
+
+function isOtherExtensionUrl(url) {
+  if (!url || !chrome || !chrome.runtime || !chrome.runtime.id) {
+    return false;
+  }
+  try {
+    const parsed = new URL(String(url));
+    return isBrowserExtensionProtocol(parsed.protocol) &&
+      String(parsed.hostname || '') !== String(chrome.runtime.id);
+  } catch (e) {
+    return false;
+  }
+}
+
+function pruneBrowserNewtabProviderCandidates(now) {
+  const currentTime = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+  browserNewtabProviderCandidateTabIds.forEach((createdAt, tabId) => {
+    if (currentTime - Number(createdAt || 0) > BROWSER_NEWTAB_PROVIDER_DETECTION_MS) {
+      browserNewtabProviderCandidateTabIds.delete(tabId);
+    }
+  });
+}
+
+function isPotentialBrowserNewtabProviderCandidate(tab) {
+  if (!tab || typeof tab.id !== 'number') {
+    return false;
+  }
+  const directUrl = typeof tab.url === 'string' ? tab.url : '';
+  const pendingUrl = typeof tab.pendingUrl === 'string' ? tab.pendingUrl : '';
+  const resolvedUrl = getResolvedTabUrl(tab);
+  return isBrowserNewtabUrl(directUrl) ||
+    isBrowserNewtabUrl(pendingUrl) ||
+    isBrowserNewtabUrl(resolvedUrl) ||
+    (!directUrl && !pendingUrl && tab.status === 'loading');
+}
+
+function rememberBrowserNewtabProviderCandidate(tab) {
+  pruneBrowserNewtabProviderCandidates();
+  if (!isPotentialBrowserNewtabProviderCandidate(tab)) {
+    return;
+  }
+  browserNewtabProviderCandidateTabIds.set(tab.id, Date.now());
+}
+
+function isRecentBrowserNewtabProviderCandidate(tab) {
+  if (!tab || typeof tab.id !== 'number') {
+    return false;
+  }
+  pruneBrowserNewtabProviderCandidates();
+  return browserNewtabProviderCandidateTabIds.has(tab.id);
+}
+
+function getBrowserNewtabProviderType(tab) {
+  const url = getResolvedTabUrl(tab);
+  if (!url) {
+    return '';
+  }
+  if (isLumnoBrowserOverrideNewtabUrl(url)) {
+    return 'lumno';
+  }
+  if (isOtherExtensionUrl(url)) {
+    return 'other-extension';
+  }
+  if (isBrowserNewtabUrl(url) && tab && tab.status === 'complete') {
+    return 'browser';
+  }
+  return '';
+}
+
+function setRestrictedActionFromBrowserNewtabProvider(providerType, tab, stage) {
+  if (providerType !== 'other-extension') {
+    return;
+  }
+  if (restrictedActionAutoBrowserSettingDoneCache) {
+    return;
+  }
+  const url = getResolvedTabUrl(tab);
+  restrictedActionAutoBrowserSettingDoneCache = true;
+  restrictedActionCache = 'none';
+  const payload = {
+    [RESTRICTED_ACTION_STORAGE_KEY]: 'none',
+    [RESTRICTED_ACTION_AUTO_BROWSER_SETTING_DONE_STORAGE_KEY]: true
+  };
+  if (storageArea && typeof storageArea.set === 'function') {
+    storageArea.set(payload);
+  }
+  logHotkeyDebug('restricted-action-auto-browser-setting', {
+    providerType,
+    stage: stage || '',
+    url: String(url || '')
+  });
+}
+
+function maybeAutoSelectRestrictedBrowserSetting(tab, stage) {
+  if (!tab || typeof tab.id !== 'number') {
+    return;
+  }
+  if (restrictedActionAutoBrowserSettingDoneCache) {
+    return;
+  }
+  const isCandidate = isRecentBrowserNewtabProviderCandidate(tab) ||
+    isPotentialBrowserNewtabProviderCandidate(tab);
+  if (!isCandidate) {
+    return;
+  }
+  const providerType = getBrowserNewtabProviderType(tab);
+  if (!providerType) {
+    return;
+  }
+  if (providerType === 'lumno') {
+    browserNewtabProviderCandidateTabIds.delete(tab.id);
+    return;
+  }
+  if (providerType === 'other-extension') {
+    setRestrictedActionFromBrowserNewtabProvider(providerType, tab, stage);
+    browserNewtabProviderCandidateTabIds.delete(tab.id);
+    return;
   }
 }
 
@@ -1044,7 +1188,9 @@ const BOOKMARK_COUNT_STORAGE_KEY = '_x_extension_bookmark_count_2024_unique_';
 const BOOKMARK_COLUMNS_STORAGE_KEY = '_x_extension_bookmark_columns_2024_unique_';
 const PINNED_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_pinned_recent_sites_2026_unique_';
 const HIDDEN_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_hidden_recent_sites_2026_unique_';
+const NEWTAB_SHORTCUTS_STORAGE_KEY = '_x_extension_newtab_shortcuts_2026_unique_';
 const RESTRICTED_ACTION_STORAGE_KEY = '_x_extension_restricted_action_2024_unique_';
+const RESTRICTED_ACTION_AUTO_BROWSER_SETTING_DONE_STORAGE_KEY = '_x_extension_restricted_action_auto_browser_setting_done_2026_unique_';
 const OVERLAY_TAB_PRIORITY_STORAGE_KEY = '_x_extension_overlay_tab_priority_2024_unique_';
 const TAB_RANK_SCORE_DEBUG_STORAGE_KEY = '_x_extension_tab_rank_score_debug_2026_unique_';
 const AUTO_PIP_ENABLED_STORAGE_KEY = '_x_extension_auto_pip_enabled_2026_unique_';
@@ -1080,6 +1226,7 @@ const TAB_SWITCHER_OPENING_GUARD_MS = 2000;
 const tabSwitcherOpeningByWindowKey = new Map();
 const HOTKEY_DUP_GUARD_MS = 180;
 const PAGE_HOTKEY_NEWTAB_RECOVER_MS = 1200;
+const BROWSER_NEWTAB_PROVIDER_DETECTION_MS = 6000;
 const TAB_SWITCHER_LIMIT = 5;
 const TAB_SWITCHER_CAPTURE_DELAY_MS = 220;
 const TAB_SWITCHER_PRIORITY_CAPTURE_DELAY_MS = 90;
@@ -1103,10 +1250,12 @@ const TAB_SWITCH_STATS_STORAGE_KEY = '_x_extension_tab_switch_stats_2026_unique_
 const PINNED_TAB_SNAPSHOT_DEBOUNCE_MS = 600;
 const PINNED_TAB_RESTORE_MAX_TABS = 24;
 let restrictedActionCache = 'default';
+let restrictedActionAutoBrowserSettingDoneCache = false;
 let documentPipEnabledCache = false;
 let tabSwitcherEnabledCache = true;
 let pinnedTabRecoveryEnabledCache = false;
 const hotkeyInvokeAtByTabId = new Map();
+const browserNewtabProviderCandidateTabIds = new Map();
 let lastPageHotkeyContext = null;
 const tabSwitchEventsByTabId = new Map();
 const tabLastAccessedByTabId = new Map();
@@ -1973,6 +2122,7 @@ function sortTabsForOverlay(tabs) {
 if (storageArea) {
   storageArea.get([
     RESTRICTED_ACTION_STORAGE_KEY,
+    RESTRICTED_ACTION_AUTO_BROWSER_SETTING_DONE_STORAGE_KEY,
     DOCUMENT_PIP_ENABLED_STORAGE_KEY,
     TAB_SWITCHER_ENABLED_STORAGE_KEY,
     PINNED_TAB_RECOVERY_ENABLED_STORAGE_KEY
@@ -1983,6 +2133,7 @@ if (storageArea) {
       storageArea.set({ [RESTRICTED_ACTION_STORAGE_KEY]: normalized });
     }
     restrictedActionCache = normalized;
+    restrictedActionAutoBrowserSettingDoneCache = result[RESTRICTED_ACTION_AUTO_BROWSER_SETTING_DONE_STORAGE_KEY] === true;
     const documentPipStored = result[DOCUMENT_PIP_ENABLED_STORAGE_KEY];
     const normalizedDocumentPip = documentPipStored === true;
     if (documentPipStored !== normalizedDocumentPip) {
@@ -3172,7 +3323,8 @@ function openOverlayOnTab(activeTab, tabs, source) {
       source: source || ''
     });
     if (action === 'none') {
-      logHotkeyDebug('suppressed', { reason: 'restricted_action_none', source: source || '' });
+      logHotkeyDebug('fallback-open-browser-newtab', { reason: 'restricted_url', source: source || '' });
+      openBrowserNewtabFallback();
       return;
     }
     if (action === 'default') {
@@ -3935,6 +4087,8 @@ if (chrome && chrome.runtime && chrome.runtime.onConnect) {
 }
 
 chrome.tabs.onCreated.addListener((tab) => {
+  rememberBrowserNewtabProviderCandidate(tab);
+  maybeAutoSelectRestrictedBrowserSetting(tab, 'created');
   const recentContext = getRecentPageHotkeyContext(tab && typeof tab.windowId === 'number' ? tab.windowId : null);
   if (!recentContext || !tab || typeof tab.id !== 'number') {
     schedulePersistPinnedTabSnapshot();
@@ -4050,6 +4204,19 @@ if (chrome && chrome.tabs && chrome.tabs.onUpdated) {
     if (!changeInfo) {
       return;
     }
+    if (typeof changeInfo.url === 'string' || changeInfo.status === 'complete') {
+      const providerTab = Object.assign({}, tab || {}, {
+        id: typeof tabId === 'number' ? tabId : (tab && tab.id),
+        status: changeInfo.status || (tab && tab.status)
+      });
+      if (typeof changeInfo.url === 'string') {
+        providerTab.url = changeInfo.url;
+      }
+      maybeAutoSelectRestrictedBrowserSetting(
+        providerTab,
+        changeInfo.status === 'complete' ? 'updated-complete' : 'updated'
+      );
+    }
     if (typeof changeInfo.url === 'string') {
       // URL changed means the tab semantic target changed; reset historical switch stats.
       clearTabSwitchStat(tabId);
@@ -4160,7 +4327,9 @@ function runInteractiveSiteSearchProvider(provider, query, sender, disposition) 
   const prompt = String(query || '').trim();
   const entryUrl = getSiteSearchProviderEntryUrl(provider, prompt);
   const submitStrategy = String((provider && provider.submitStrategy) || '').trim();
-  const targetDisposition = disposition === 'currentTab' ? 'currentTab' : 'newTab';
+  const targetDisposition = disposition === 'currentTab'
+    ? 'currentTab'
+    : (disposition === 'backgroundTab' ? 'backgroundTab' : 'newTab');
   return new Promise((resolve) => {
     if (!entryUrl || !prompt || !isInteractiveSiteSearchProvider(provider)) {
       resolve({ ok: false, reason: 'invalid-provider-request' });
@@ -4228,7 +4397,7 @@ function runInteractiveSiteSearchProvider(provider, query, sender, disposition) 
       });
       return;
     }
-    chrome.tabs.create({ url: entryUrl, active: true }, (tab) => {
+    chrome.tabs.create({ url: entryUrl, active: targetDisposition !== 'backgroundTab' }, (tab) => {
       if (chrome.runtime && chrome.runtime.lastError) {
         finish({ ok: false, reason: chrome.runtime.lastError.message || 'tab-create-failed' });
         return;
@@ -4599,20 +4768,35 @@ function handleSearchMessage(request, sender, sendResponse) {
     case 'searchOrNavigate': {
       const query = request.query ? String(request.query) : '';
       const forceSearch = Boolean(request.forceSearch);
+      const openInBackgroundTab = request.disposition === 'backgroundTab';
+      const createResolvedTab = (url, callback) => {
+        chrome.tabs.create({
+          url: url,
+          active: !openInBackgroundTab
+        }, callback);
+      };
       loadShortcutRules().then((rules) => {
         const shortcutUrl = getShortcutUrl(query, rules);
         if (shortcutUrl) {
-          chrome.tabs.create({ url: shortcutUrl });
-          sendResponse({ ok: true, url: shortcutUrl });
+          createResolvedTab(shortcutUrl, () => {
+            sendResponse({ ok: true, url: shortcutUrl });
+          });
           return;
         }
         const directUrl = !forceSearch ? getDirectNavigationUrl(query) : '';
         if (directUrl) {
-          chrome.tabs.create({ url: directUrl });
-          sendResponse({ ok: true, url: directUrl });
+          createResolvedTab(directUrl, () => {
+            sendResponse({ ok: true, url: directUrl });
+          });
         } else {
           // It's a search query - use browser default search engine
           const fallbackUrl = buildDefaultSearchUrl(query);
+          if (openInBackgroundTab) {
+            createResolvedTab(fallbackUrl, () => {
+              sendResponse({ ok: true, url: fallbackUrl });
+            });
+            return;
+          }
           if (chrome && chrome.search && typeof chrome.search.query === 'function') {
             markPendingSearchTab(null);
             try {
@@ -4620,8 +4804,9 @@ function handleSearchMessage(request, sender, sendResponse) {
                 if (chrome.runtime && chrome.runtime.lastError) {
                   pendingSearchAt = 0;
                   pendingSearchTabId = null;
-                  chrome.tabs.create({ url: fallbackUrl });
-                  sendResponse({ ok: true, url: fallbackUrl });
+                  createResolvedTab(fallbackUrl, () => {
+                    sendResponse({ ok: true, url: fallbackUrl });
+                  });
                   return;
                 }
                 sendResponse({ ok: true, url: fallbackUrl });
@@ -4632,8 +4817,9 @@ function handleSearchMessage(request, sender, sendResponse) {
               pendingSearchTabId = null;
             }
           }
-          chrome.tabs.create({ url: fallbackUrl });
-          sendResponse({ ok: true, url: fallbackUrl });
+          createResolvedTab(fallbackUrl, () => {
+            sendResponse({ ok: true, url: fallbackUrl });
+          });
         }
       });
       return true;
@@ -4814,15 +5000,15 @@ function handleExtensionPageMessage(request, sender, sendResponse) {
         });
         return true;
       }
-      chrome.tabs.create({ url: targetUrl }, () => {
+      chrome.tabs.create({ url: targetUrl, active: request.disposition !== 'backgroundTab' }, () => {
         sendResponse({ ok: !(chrome.runtime && chrome.runtime.lastError) });
       });
       return true;
     }
     case 'openNewTab': {
-      const newtabUrl = typeof EXTENSION_ROUTES.buildNewtabUrl === 'function'
-        ? EXTENSION_ROUTES.buildNewtabUrl(chrome, { focus: true })
-        : chrome.runtime.getURL('src/newtab/newtab.html?focus=1');
+      const newtabUrl = typeof EXTENSION_ROUTES.buildLumnoNewtabUrl === 'function'
+        ? EXTENSION_ROUTES.buildLumnoNewtabUrl(chrome, { focus: true })
+        : chrome.runtime.getURL('src/newtab/lumno-newtab.html?focus=1');
       chrome.tabs.create({ url: newtabUrl }, () => {
         sendResponse({ ok: !(chrome.runtime && chrome.runtime.lastError) });
       });
@@ -4911,6 +5097,8 @@ let searchBlacklistCache = null;
 let searchBlacklistPromise = null;
 let faviconRequestBlacklistCache = null;
 let faviconRequestBlacklistPromise = null;
+let faviconEnhancedFetchEnabledCache = null;
+let faviconEnhancedFetchEnabledPromise = null;
 let searchResultSourceTypesCache = null;
 let searchResultSourceTypesPromise = null;
 let searchSelectionStatsCache = null;
@@ -4943,6 +5131,7 @@ const SITE_SEARCH_STORAGE_KEY = '_x_extension_site_search_custom_2024_unique_';
 const SITE_SEARCH_DISABLED_STORAGE_KEY = '_x_extension_site_search_disabled_2024_unique_';
 const SEARCH_BLACKLIST_STORAGE_KEY = '_x_extension_search_blacklist_2026_unique_';
 const FAVICON_REQUEST_BLACKLIST_STORAGE_KEY = '_x_extension_favicon_request_blacklist_2026_unique_';
+const FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY = '_x_extension_favicon_enhanced_fetch_enabled_2026_unique_';
 const BLACKLIST_UTILS = globalThis.LumnoBlacklistUtils || {};
 const SEARCH_UTILS = globalThis.LumnoSearchUtils || {};
 const AI_PROVIDER_SUBMIT = globalThis.LumnoAiProviderSubmit || {};
@@ -4966,6 +5155,7 @@ migrateStorageIfNeeded([
   BOOKMARK_COLUMNS_STORAGE_KEY,
   PINNED_RECENT_SITES_STORAGE_KEY,
   HIDDEN_RECENT_SITES_STORAGE_KEY,
+  NEWTAB_SHORTCUTS_STORAGE_KEY,
   AUTO_PIP_ENABLED_STORAGE_KEY,
   TAB_SWITCHER_ENABLED_STORAGE_KEY,
   DOCUMENT_PIP_ENABLED_STORAGE_KEY,
@@ -4980,7 +5170,8 @@ migrateStorageIfNeeded([
   SITE_SEARCH_STORAGE_KEY,
   SITE_SEARCH_DISABLED_STORAGE_KEY,
   SEARCH_BLACKLIST_STORAGE_KEY,
-  FAVICON_REQUEST_BLACKLIST_STORAGE_KEY
+  FAVICON_REQUEST_BLACKLIST_STORAGE_KEY,
+  FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY
 ]);
 const FAVICON_PROXY_SIZE = 128;
 let backgroundFaviconUrlResolver = null;
@@ -5017,7 +5208,8 @@ function getBackgroundFaviconUrlResolver() {
     backgroundFaviconUrlResolver = FAVICON_UTILS.createFaviconUrlResolver({
       chromeApi: chrome,
       size: FAVICON_PROXY_SIZE,
-      shouldBlockFaviconForHost
+      shouldBlockFaviconForHost,
+      shouldAvoidDirectFaviconForHost
     });
   }
   return backgroundFaviconUrlResolver;
@@ -5177,6 +5369,12 @@ function normalizeHost(hostname) {
     return 'feishu.cn';
   }
   return stripped;
+}
+
+function isLocalNetworkHost(hostname) {
+  return typeof FAVICON_UTILS.isLocalNetworkHost === 'function'
+    ? FAVICON_UTILS.isLocalNetworkHost(hostname)
+    : false;
 }
 
 function getSearchEngineByHostname(hostname) {
@@ -5549,29 +5747,78 @@ function normalizeLocaleForMessages(locale) {
     : 'en';
 }
 
-function isLocalNetworkHost(hostname) {
-  return typeof FAVICON_UTILS.isLocalNetworkHost === 'function'
-    ? FAVICON_UTILS.isLocalNetworkHost(hostname)
-    : false;
-}
-
-function isSuspiciousLocalFaviconHost(hostname) {
-  return typeof FAVICON_UTILS.isSuspiciousLocalFaviconHost === 'function'
-    ? FAVICON_UTILS.isSuspiciousLocalFaviconHost(hostname)
-    : false;
-}
-
 function shouldBlockFaviconForHost(hostname) {
   return typeof FAVICON_UTILS.shouldBlockFaviconForHost === 'function'
     ? FAVICON_UTILS.shouldBlockFaviconForHost(hostname)
     : false;
 }
 
+function shouldAvoidDirectFaviconForHost(hostname) {
+  return typeof FAVICON_UTILS.shouldAvoidDirectFaviconForHost === 'function'
+    ? FAVICON_UTILS.shouldAvoidDirectFaviconForHost(hostname)
+    : false;
+}
+
+function isAllowedFaviconProxyRequestUrl(url) {
+  return typeof FAVICON_UTILS.isAllowedFaviconProxyRequestUrl === 'function'
+    ? FAVICON_UTILS.isAllowedFaviconProxyRequestUrl(url)
+    : /^chrome-extension:\/\/[^/]+\/_favicon\//i.test(String(url || '').trim()) ||
+      /^chrome:\/\/favicon2\//i.test(String(url || '').trim());
+}
+
+function isFaviconRequestBlockedByBlacklist(url) {
+  return !isAllowedFaviconProxyRequestUrl(url) && isUrlBlockedByFaviconRequestBlacklist(url);
+}
+
 function isBlockedLocalFaviconUrl(url) {
   const blockedByLocalRules = typeof FAVICON_UTILS.isBlockedLocalFaviconUrl === 'function'
     ? FAVICON_UTILS.isBlockedLocalFaviconUrl(url)
     : false;
-  return blockedByLocalRules || isUrlBlockedByFaviconRequestBlacklist(url);
+  return blockedByLocalRules || isFaviconRequestBlockedByBlacklist(url);
+}
+
+function getFaviconHostPolicy(hostname) {
+  if (typeof FAVICON_UTILS.getFaviconHostPolicy === 'function') {
+    return FAVICON_UTILS.getFaviconHostPolicy(hostname, {
+      shouldBlockFaviconForHost,
+      shouldAvoidDirectFaviconForHost
+    });
+  }
+  return {
+    hardBlocked: Boolean(shouldBlockFaviconForHost(hostname)),
+    avoidDirect: Boolean(shouldAvoidDirectFaviconForHost(hostname))
+  };
+}
+
+function getFaviconTargetPolicy(targetUrl, hostOverride) {
+  const inputUrl = String(targetUrl || '').trim();
+  if (!inputUrl) {
+    return { ok: false, inputUrl: '', parsed: null };
+  }
+  let parsed = null;
+  try {
+    parsed = new URL(inputUrl);
+  } catch (e) {
+    return { ok: false, inputUrl, parsed: null };
+  }
+  if (!/^https?:$/i.test(parsed.protocol)) {
+    return { ok: false, inputUrl, parsed };
+  }
+  const hosts = [parsed.hostname, hostOverride].filter(Boolean);
+  const policies = hosts.map((host) => getFaviconHostPolicy(host));
+  const hardBlocked = policies.some((policy) => policy.hardBlocked);
+  const avoidDirect = policies.some((policy) => policy.avoidDirect);
+  const requestBlacklisted = isUrlBlockedByFaviconRequestBlacklist(inputUrl);
+  return {
+    ok: true,
+    inputUrl,
+    parsed,
+    normalizedHost: normalizeFaviconHost(hostOverride || parsed.hostname),
+    hardBlocked,
+    avoidDirect,
+    requestBlacklisted,
+    directFetchBlocked: requestBlacklisted || hardBlocked || avoidDirect
+  };
 }
 
 function normalizeFaviconHost(hostname) {
@@ -5646,7 +5893,8 @@ function fetchManifestThemeColor(manifestUrl) {
   }
   try {
     const parsed = new URL(manifestUrl);
-    if (!/^https?:$/i.test(parsed.protocol) || shouldBlockFaviconForHost(parsed.hostname)) {
+    const policy = getFaviconHostPolicy(parsed.hostname);
+    if (!/^https?:$/i.test(parsed.protocol) || policy.hardBlocked || policy.avoidDirect) {
       return Promise.resolve(null);
     }
   } catch (e) {
@@ -5696,23 +5944,23 @@ function resolveSiteThemeColor(targetUrl, hostOverride, preferredTheme) {
   if (!inputUrl) {
     return Promise.resolve(null);
   }
-  return loadFaviconRequestBlacklistItems().then(() => {
-    let parsed = null;
-    try {
-      parsed = new URL(inputUrl);
-    } catch (e) {
+  return Promise.all([
+    loadFaviconRequestBlacklistItems(),
+    loadFaviconEnhancedFetchEnabled()
+  ]).then(([, enhancedFetchEnabled]) => {
+    const targetPolicy = getFaviconTargetPolicy(inputUrl, hostOverride);
+    if (!targetPolicy.ok) {
       return null;
     }
-    if (!/^https?:$/i.test(parsed.protocol)) {
+    if (!enhancedFetchEnabled) {
       return null;
     }
-    if (isUrlBlockedByFaviconRequestBlacklist(inputUrl) ||
-        shouldBlockFaviconForHost(parsed.hostname) ||
-        (hostOverride && shouldBlockFaviconForHost(hostOverride))) {
+    if (targetPolicy.directFetchBlocked) {
       logBlockedLocalFavicon(targetUrl || hostOverride || '', 'resolveSiteThemeColor');
       return null;
     }
-    const normalizedHost = normalizeFaviconHost(hostOverride || parsed.hostname);
+    const parsed = targetPolicy.parsed;
+    const normalizedHost = targetPolicy.normalizedHost;
     const normalizedTheme = normalizeThemePreference(preferredTheme);
     const cacheKey = `${normalizedHost}::${parsed.origin}::${normalizedTheme || 'auto'}`;
     if (siteThemeColorCache.has(cacheKey)) {
@@ -5755,22 +6003,19 @@ function resolveSiteThemeColor(targetUrl, hostOverride, preferredTheme) {
   });
 }
 
-function buildFaviconFallbackCandidates(pageUrl, hostOverride, fallbackUrl) {
+function buildFaviconFallbackCandidates(pageUrl, hostOverride, fallbackUrl, options) {
   const candidates = [];
   const inputUrl = String(pageUrl || '').trim();
   const fallback = String(fallbackUrl || '').trim();
-  let host = normalizeFaviconHost(hostOverride || '');
-  if (!host && inputUrl) {
-    try {
-      host = normalizeFaviconHost(new URL(inputUrl).hostname);
-    } catch (e) {
-      host = '';
-    }
-  }
-  if (host && shouldBlockFaviconForHost(host)) {
+  const settings = options && typeof options === 'object' ? options : {};
+  const targetPolicy = settings.targetPolicy || getFaviconTargetPolicy(inputUrl, hostOverride);
+  if (targetPolicy.hardBlocked) {
     return [];
   }
-  if (fallback && !isBlockedLocalFaviconUrl(fallback)) {
+  if (fallback &&
+      !settings.skipDirectFallback &&
+      !isBlockedLocalFaviconUrl(fallback) &&
+      !isFaviconRequestBlockedByBlacklist(fallback)) {
     candidates.push({ url: fallback, score: 30 });
   }
   if (inputUrl) {
@@ -5802,23 +6047,22 @@ function resolveFaviconCandidates(targetUrl, hostOverride, fallbackUrl) {
   if (!inputUrl) {
     return Promise.resolve([]);
   }
-  return loadFaviconRequestBlacklistItems().then(() => {
-    let parsed = null;
-    try {
-      parsed = new URL(inputUrl);
-    } catch (e) {
+  return Promise.all([
+    loadFaviconRequestBlacklistItems(),
+    loadFaviconEnhancedFetchEnabled()
+  ]).then(([, enhancedFetchEnabled]) => {
+    const targetPolicy = getFaviconTargetPolicy(inputUrl, hostOverride);
+    if (!targetPolicy.ok) {
       return [];
     }
-    if (!/^https?:$/i.test(parsed.protocol)) {
-      return [];
-    }
-    if (isUrlBlockedByFaviconRequestBlacklist(inputUrl) ||
-        shouldBlockFaviconForHost(parsed.hostname) ||
-        (hostOverride && shouldBlockFaviconForHost(hostOverride))) {
+    if (targetPolicy.hardBlocked) {
       logBlockedLocalFavicon(targetUrl || hostOverride || '', 'resolveFaviconCandidates');
       return [];
     }
-    return dedupeAndSortFaviconCandidates(buildFaviconFallbackCandidates(inputUrl, hostOverride, fallbackUrl));
+    return dedupeAndSortFaviconCandidates(buildFaviconFallbackCandidates(inputUrl, hostOverride, fallbackUrl, {
+      skipDirectFallback: !enhancedFetchEnabled || targetPolicy.requestBlacklisted || targetPolicy.avoidDirect,
+      targetPolicy
+    }));
   });
 }
 
@@ -5873,13 +6117,13 @@ function fetchFaviconData(url) {
     return Promise.resolve(null);
   }
   return loadFaviconRequestBlacklistItems().then(() => {
-    if (isBlockedLocalFaviconUrl(url) || isUrlBlockedByFaviconRequestBlacklist(url)) {
+    if (isBlockedLocalFaviconUrl(url) || isFaviconRequestBlockedByBlacklist(url)) {
       logBlockedLocalFavicon(url, 'fetchFaviconData');
       return null;
     }
     try {
       const parsed = new URL(url);
-      if (shouldBlockFaviconForHost(parsed.hostname)) {
+      if (getFaviconHostPolicy(parsed.hostname).hardBlocked) {
         return null;
       }
     } catch (e) {
@@ -6029,6 +6273,14 @@ function normalizeFaviconRequestBlacklistItems(items) {
   return [];
 }
 
+function normalizeFaviconEnhancedFetchEnabled(value) {
+  const settings = globalThis.LumnoSettings || {};
+  if (typeof settings.normalizeFaviconEnhancedFetchEnabled === 'function') {
+    return settings.normalizeFaviconEnhancedFetchEnabled(value);
+  }
+  return value !== false;
+}
+
 function normalizeSearchResultSourceTypes(value) {
   const settings = globalThis.LumnoSettings || {};
   if (typeof settings.normalizeSearchResultSourceTypes === 'function') {
@@ -6133,6 +6385,34 @@ function loadFaviconRequestBlacklistItems() {
     faviconRequestBlacklistPromise = null;
   });
   return faviconRequestBlacklistPromise;
+}
+
+function loadFaviconEnhancedFetchEnabled() {
+  if (typeof faviconEnhancedFetchEnabledCache === 'boolean') {
+    return Promise.resolve(faviconEnhancedFetchEnabledCache);
+  }
+  if (faviconEnhancedFetchEnabledPromise) {
+    return faviconEnhancedFetchEnabledPromise;
+  }
+  faviconEnhancedFetchEnabledPromise = new Promise((resolve) => {
+    if (!storageArea) {
+      faviconEnhancedFetchEnabledCache = true;
+      resolve(true);
+      return;
+    }
+    storageArea.get([FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY], (result) => {
+      const rawValue = result && result[FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY];
+      const enabled = normalizeFaviconEnhancedFetchEnabled(rawValue);
+      faviconEnhancedFetchEnabledCache = enabled;
+      if (rawValue !== enabled) {
+        storageArea.set({ [FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY]: enabled });
+      }
+      resolve(enabled);
+    });
+  }).finally(() => {
+    faviconEnhancedFetchEnabledPromise = null;
+  });
+  return faviconEnhancedFetchEnabledPromise;
 }
 
 function getFaviconRequestMatchUrl(url) {
@@ -6440,6 +6720,10 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
       storageArea.set({ [RESTRICTED_ACTION_STORAGE_KEY]: restrictedActionCache });
     }
   }
+  if (changes[RESTRICTED_ACTION_AUTO_BROWSER_SETTING_DONE_STORAGE_KEY]) {
+    const next = changes[RESTRICTED_ACTION_AUTO_BROWSER_SETTING_DONE_STORAGE_KEY].newValue;
+    restrictedActionAutoBrowserSettingDoneCache = next === true;
+  }
   if (changes[DOCUMENT_PIP_ENABLED_STORAGE_KEY]) {
     const next = changes[DOCUMENT_PIP_ENABLED_STORAGE_KEY].newValue;
     const normalized = next === true;
@@ -6474,6 +6758,10 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (changes[FAVICON_REQUEST_BLACKLIST_STORAGE_KEY]) {
     faviconRequestBlacklistCache = null;
     faviconRequestBlacklistPromise = null;
+  }
+  if (changes[FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY]) {
+    faviconEnhancedFetchEnabledCache = null;
+    faviconEnhancedFetchEnabledPromise = null;
   }
   if (changes[SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY]) {
     searchResultSourceTypesCache = null;
@@ -6680,7 +6968,7 @@ function getTopSitesCached() {
   }, [], LOCAL_SUGGEST_SOURCE_TIMEOUT_MS).catch(() => []);
 }
 
-function getFallbackHistoryItemsCached() {
+function getFallbackHistoryItemsCached(policy) {
   const now = Date.now();
   if (historyFallbackCache.expiresAt > now && Array.isArray(historyFallbackCache.items)) {
     return Promise.resolve(historyFallbackCache.items);
@@ -6688,11 +6976,18 @@ function getFallbackHistoryItemsCached() {
   if (!chrome || !chrome.history || typeof chrome.history.search !== 'function') {
     return Promise.resolve([]);
   }
+  const settings = policy && typeof policy === 'object' ? policy : {};
+  const fallbackMaxResults = Number(settings.fallbackHistoryMaxResults) > 0
+    ? Math.floor(Number(settings.fallbackHistoryMaxResults))
+    : 600;
+  const fallbackWindowDays = Number(settings.fallbackHistoryWindowDays) > 0
+    ? Number(settings.fallbackHistoryWindowDays)
+    : 365;
   return callChromeApiWithTimeout((done) => {
     chrome.history.search({
       text: '',
-      maxResults: 240,
-      startTime: Date.now() - (90 * 24 * 60 * 60 * 1000)
+      maxResults: fallbackMaxResults,
+      startTime: Date.now() - (fallbackWindowDays * 24 * 60 * 60 * 1000)
     }, (items) => {
       const list = Array.isArray(items) ? items : [];
       historyFallbackCache = {
@@ -6700,6 +6995,30 @@ function getFallbackHistoryItemsCached() {
         expiresAt: Date.now() + HISTORY_FALLBACK_CACHE_TTL_MS
       };
       done(list);
+    });
+  }, [], LOCAL_SUGGEST_SOURCE_TIMEOUT_MS).catch(() => []);
+}
+
+function getOpenTabSearchItems() {
+  if (!chrome || !chrome.tabs || typeof chrome.tabs.query !== 'function') {
+    return Promise.resolve([]);
+  }
+  return callChromeApiWithTimeout((done) => {
+    chrome.tabs.query({}, (tabs) => {
+      const items = (Array.isArray(tabs) ? tabs : [])
+        .map((tab) => {
+          const url = getResolvedTabUrl(tab);
+          if (!url || typeof tab.id !== 'number') {
+            return null;
+          }
+          return {
+            title: String(tab.title || '').replace(/\s+/g, ' ').trim() || url,
+            url,
+            _xMatchedTabId: tab.id
+          };
+        })
+        .filter(Boolean);
+      done(items);
     });
   }, [], LOCAL_SUGGEST_SOURCE_TIMEOUT_MS).catch(() => []);
 }
@@ -6884,6 +7203,7 @@ async function getSearchSuggestions(query) {
   const allowHistory = sourceTypeSet.has('history');
 
   try {
+    const openTabsPromise = getOpenTabSearchItems();
     const [
       engineSuggestions,
       historyItemsRaw,
@@ -6892,6 +7212,7 @@ async function getSearchSuggestions(query) {
       fallbackHistoryItems,
       allBookmarks,
       searchBlacklistItems,
+      faviconRequestBlacklistItems,
       searchSelectionStats
     ] = await Promise.all([
       withTimeout(
@@ -6917,7 +7238,7 @@ async function getSearchSuggestions(query) {
           chrome.bookmarks.search({ query: context.lookupQuery }, done);
         }, [], LOCAL_SUGGEST_SOURCE_TIMEOUT_MS)
         : Promise.resolve([]),
-      allowHistory ? getFallbackHistoryItemsCached() : Promise.resolve([]),
+      allowHistory ? getFallbackHistoryItemsCached(searchPolicy) : Promise.resolve([]),
       allowBookmarks ? getAllBookmarksCached() : Promise.resolve([]),
       loadSearchBlacklistItems(),
       loadFaviconRequestBlacklistItems(),
@@ -6975,6 +7296,8 @@ async function getSearchSuggestions(query) {
         reasons.push('来源：书签');
       } else if (sourceType === 'topSite') {
         reasons.push('来源：常用站点');
+      } else if (sourceType === 'openTab') {
+        reasons.push('来源：打开的标签页');
       } else if (sourceType === 'history') {
         reasons.push('来源：浏览历史');
       }
@@ -7002,9 +7325,6 @@ async function getSearchSuggestions(query) {
     function buildSearchSuggestionFavicon(url) {
       if (isOwnExtensionUrl(url)) {
         return getOwnExtensionFaviconUrl();
-      }
-      if (isUrlBlockedByFaviconRequestBlacklist(url)) {
-        return '';
       }
       if (isBrowserInternalPageUrl(url)) {
         return getPageFaviconCandidateUrl(url);
@@ -7103,6 +7423,25 @@ async function getSearchSuggestions(query) {
       return suggestion;
     }
 
+    function upsertOpenTabSuggestion(item) {
+      if (!item || !item.url || typeof item._xMatchedTabId !== 'number') {
+        return null;
+      }
+      const itemKey = getSuggestionKey(item);
+      const existingIndex = suggestionIndexByKey.get(itemKey);
+      if (typeof existingIndex === 'number') {
+        suggestions[existingIndex] = {
+          ...suggestions[existingIndex],
+          _xMatchedTabId: item._xMatchedTabId
+        };
+        return suggestions[existingIndex];
+      }
+      return upsertSuggestion(item, 'openTab', {
+        _xMatchedTabId: item._xMatchedTabId,
+        scoreAdjustment: 12
+      });
+    }
+
     historyItems.forEach((item) => {
       if (!item || !item.title || isSearchEngineResultUrl(item.url)) {
         return;
@@ -7153,6 +7492,11 @@ async function getSearchSuggestions(query) {
         path: buildBookmarkPath(bookmark),
         scoreAdjustment: 4
       });
+    });
+
+    const openTabMatches = collectSearchMatches(await openTabsPromise);
+    openTabMatches.forEach((item) => {
+      upsertOpenTabSuggestion(item);
     });
 
     if (typeof searchUtils.buildSearchBrandDirectSuggestion === 'function') {

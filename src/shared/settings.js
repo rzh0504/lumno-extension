@@ -8,7 +8,9 @@
   const THEME_STORAGE_KEY = '_x_extension_theme_mode_2024_unique_';
   const NEWTAB_THEME_MODE_STORAGE_KEY = '_x_extension_newtab_theme_mode_2026_unique_';
   const NEWTAB_THEME_SCOPE_STORAGE_KEY = '_x_extension_newtab_theme_scope_2026_unique_';
+  const NEWTAB_SHORTCUTS_VISIBLE_STORAGE_KEY = '_x_extension_newtab_shortcuts_visible_2026_unique_';
   const UPDATE_NOTICE_ENABLED_STORAGE_KEY = '_x_extension_update_notice_enabled_2026_unique_';
+  const FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY = '_x_extension_favicon_enhanced_fetch_enabled_2026_unique_';
 
   function normalizeLocale(locale) {
     const raw = String(locale || '').trim();
@@ -63,7 +65,15 @@
     return value !== false;
   }
 
+  function normalizeNewtabShortcutsVisible(value) {
+    return value !== false;
+  }
+
   function normalizeUpdateNoticeEnabled(value) {
+    return value !== false;
+  }
+
+  function normalizeFaviconEnhancedFetchEnabled(value) {
     return value !== false;
   }
 
@@ -157,13 +167,17 @@
     THEME_STORAGE_KEY,
     NEWTAB_THEME_MODE_STORAGE_KEY,
     NEWTAB_THEME_SCOPE_STORAGE_KEY,
+    NEWTAB_SHORTCUTS_VISIBLE_STORAGE_KEY,
     UPDATE_NOTICE_ENABLED_STORAGE_KEY,
+    FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY,
     normalizeLocale,
     localeToHtmlLang,
     normalizeNewtabWidthMode,
     normalizeNewtabSearchWidth,
     normalizeNewtabWordmarkVisible,
+    normalizeNewtabShortcutsVisible,
     normalizeUpdateNoticeEnabled,
+    normalizeFaviconEnhancedFetchEnabled,
     normalizeOverlaySizeMode,
     normalizeOverlayTabPriorityMode,
     normalizeSearchResultPriority,

@@ -30,6 +30,23 @@
     return /^chrome:\/\/favicon2\//i.test(String(url || '').trim());
   }
 
+  function isSafeVirtualFaviconRequestUrl(url) {
+    const raw = String(url || '').trim();
+    if (!raw) {
+      return false;
+    }
+    if (isChromeMonogramFaviconUrl(raw)) {
+      return true;
+    }
+    try {
+      const parsed = new URL(raw);
+      return parsed.protocol === 'chrome-extension:' &&
+        String(parsed.pathname || '').toLowerCase().startsWith('/_favicon/');
+    } catch (e) {
+      return false;
+    }
+  }
+
   function getHttpPageUrl(value) {
     const raw = String(value || '').trim();
     if (!raw) {
@@ -41,6 +58,16 @@
     } catch (e) {
       return '';
     }
+  }
+
+  function getFaviconPageSearchParam(parsedUrl) {
+    if (!parsedUrl || !parsedUrl.searchParams) {
+      return '';
+    }
+    return parsedUrl.searchParams.get('pageUrl') ||
+      parsedUrl.searchParams.get('url') ||
+      parsedUrl.searchParams.get('domain_url') ||
+      '';
   }
 
   function getPageUrlFromFaviconProxyUrl(url) {
@@ -58,12 +85,7 @@
       const isGoogleS2Favicon = /(?:^|\.)google\.[^/]+$/i.test(lowerHost) && lowerPath.includes('/s2/favicons');
       const isFaviconIs = /(?:^|\.)favicon\.is$/i.test(lowerHost);
       if (isExtensionFavicon || isChromeFavicon || isGstaticFavicon || isGoogleS2Favicon || isFaviconIs) {
-        const directPageUrl = getHttpPageUrl(
-          parsed.searchParams.get('pageUrl') ||
-            parsed.searchParams.get('url') ||
-            parsed.searchParams.get('domain_url') ||
-            ''
-        );
+        const directPageUrl = getHttpPageUrl(getFaviconPageSearchParam(parsed));
         if (directPageUrl) {
           return directPageUrl;
         }
@@ -847,6 +869,38 @@
     return false;
   }
 
+  function shouldAvoidDirectFaviconForHost(hostname) {
+    return isLocalNetworkHost(hostname) || isSuspiciousLocalFaviconHost(hostname);
+  }
+
+  function getFaviconHostPolicy(hostname, options) {
+    const config = options || {};
+    const shouldBlockHost = typeof config.shouldBlockFaviconForHost === 'function'
+      ? config.shouldBlockFaviconForHost
+      : shouldBlockFaviconForHost;
+    const shouldAvoidDirectHost = typeof config.shouldAvoidDirectFaviconForHost === 'function'
+      ? config.shouldAvoidDirectFaviconForHost
+      : shouldAvoidDirectFaviconForHost;
+    const host = String(hostname || '').trim();
+    if (!host) {
+      return { hardBlocked: false, avoidDirect: false };
+    }
+    return {
+      hardBlocked: Boolean(shouldBlockHost(host)),
+      avoidDirect: Boolean(shouldAvoidDirectHost(host))
+    };
+  }
+
+  function shouldBlockDirectFaviconHost(hostname, options) {
+    const policy = getFaviconHostPolicy(hostname, options);
+    return policy.hardBlocked || policy.avoidDirect;
+  }
+
+  function isAllowedFaviconProxyRequestUrl(url) {
+    const raw = String(url || '').trim();
+    return Boolean(raw && (isSafeVirtualFaviconRequestUrl(raw) || isFaviconProxyUrl(raw)));
+  }
+
   function getFaviconUrlHostCandidate(url) {
     const raw = String(url || '').trim();
     if (!raw) {
@@ -875,46 +929,59 @@
     return value.replace(/^\[|\]$/g, '').split(':')[0];
   }
 
+  function getFaviconUrlPolicy(url, options) {
+    const raw = String(url || '').trim();
+    const config = options || {};
+    const allowProxyAvoidDirect = config.allowProxyAvoidDirect !== false;
+    if (!raw) {
+      return { hardBlocked: false, avoidDirect: false };
+    }
+    if (isBrowserInternalPageUrl(raw)) {
+      return { hardBlocked: false, avoidDirect: false };
+    }
+    const canonicalProxyPage = getPageUrlFromFaviconProxyUrl(raw);
+    let hostCandidate = '';
+    if (canonicalProxyPage) {
+      hostCandidate = getFaviconUrlHostCandidate(canonicalProxyPage);
+    } else {
+      try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          return { hardBlocked: false, avoidDirect: false };
+        }
+        const nestedPageUrl = getFaviconPageSearchParam(parsed);
+        if (nestedPageUrl && nestedPageUrl !== raw) {
+          const nestedPolicy = getFaviconUrlPolicy(nestedPageUrl, config);
+          if (nestedPolicy.hardBlocked || nestedPolicy.avoidDirect) {
+            return nestedPolicy;
+          }
+        }
+        hostCandidate = parsed.hostname;
+      } catch (e) {
+        hostCandidate = getFaviconUrlHostCandidate(raw);
+      }
+    }
+    const hostPolicy = getFaviconHostPolicy(hostCandidate, config);
+    if (canonicalProxyPage && allowProxyAvoidDirect) {
+      return {
+        hardBlocked: hostPolicy.hardBlocked,
+        avoidDirect: false
+      };
+    }
+    return hostPolicy;
+  }
+
+  function isFaviconUrlPolicyBlocked(url, options) {
+    const policy = getFaviconUrlPolicy(url, options);
+    return policy.hardBlocked || policy.avoidDirect;
+  }
+
   function isBlockedLocalFaviconUrl(url) {
     const raw = String(url || '').trim();
     if (!raw) {
       return false;
     }
-    try {
-      const parsed = new URL(raw);
-      const protocol = String(parsed.protocol || '').toLowerCase();
-      const nestedUrl = parsed.searchParams.get('pageUrl') || parsed.searchParams.get('url') || '';
-      if (nestedUrl) {
-        const nestedHostCandidate = getFaviconUrlHostCandidate(nestedUrl);
-        if (nestedHostCandidate && shouldBlockFaviconForHost(nestedHostCandidate)) {
-          return true;
-        }
-        try {
-          const nestedParsed = new URL(nestedUrl);
-          if (shouldBlockFaviconForHost(nestedParsed.hostname)) {
-            return true;
-          }
-        } catch (e) {
-          // Ignore malformed nested URL.
-        }
-      }
-      if (protocol === 'chrome-extension:' && parsed.pathname.startsWith('/_favicon/')) {
-        return false;
-      }
-      if (protocol === 'chrome:' && parsed.hostname === 'favicon2') {
-        return false;
-      }
-      if ((protocol === 'http:' || protocol === 'https:') && shouldBlockFaviconForHost(parsed.hostname)) {
-        return true;
-      }
-    } catch (e) {
-      // Ignore malformed URL.
-    }
-    const hostCandidate = getFaviconUrlHostCandidate(raw);
-    if (hostCandidate && shouldBlockFaviconForHost(hostCandidate)) {
-      return true;
-    }
-    return false;
+    return isFaviconUrlPolicyBlocked(raw);
   }
 
   function getFaviconResolverSize(options) {
@@ -934,6 +1001,9 @@
     const shouldBlockHost = typeof config.shouldBlockFaviconForHost === 'function'
       ? config.shouldBlockFaviconForHost
       : shouldBlockFaviconForHost;
+    const shouldAvoidDirectHost = typeof config.shouldAvoidDirectFaviconForHost === 'function'
+      ? config.shouldAvoidDirectFaviconForHost
+      : shouldAvoidDirectFaviconForHost;
     const blockFaviconUrl = typeof config.isBlockedLocalFaviconUrl === 'function'
       ? config.isBlockedLocalFaviconUrl
       : isBlockedLocalFaviconUrl;
@@ -1037,20 +1107,10 @@
     }
 
     function isBlockedFaviconPageUrl(pageUrl) {
-      const raw = String(pageUrl || '').trim();
-      if (!raw) {
-        return false;
-      }
-      if (isBrowserInternalPageUrl(raw)) {
-        return false;
-      }
-      try {
-        const parsed = new URL(raw);
-        return Boolean(shouldBlockHost(parsed.hostname));
-      } catch (e) {
-        const hostCandidate = getFaviconUrlHostCandidate(raw);
-        return Boolean(hostCandidate && shouldBlockHost(hostCandidate));
-      }
+      return getFaviconUrlPolicy(pageUrl, {
+        shouldBlockFaviconForHost: shouldBlockHost,
+        shouldAvoidDirectFaviconForHost: () => false
+      }).hardBlocked;
     }
 
     function isBlockedFaviconUrl(url) {
@@ -1058,26 +1118,12 @@
       if (!raw) {
         return false;
       }
-      try {
-        const parsed = new URL(raw);
-        const protocol = String(parsed.protocol || '').toLowerCase();
-        const nestedUrl = parsed.searchParams.get('pageUrl') || parsed.searchParams.get('url') || '';
-        if (nestedUrl) {
-          if (isBrowserInternalPageUrl(nestedUrl)) {
-            return false;
-          }
-          if (isBlockedFaviconPageUrl(nestedUrl)) {
-            return true;
-          }
-        }
-        if ((protocol === 'http:' || protocol === 'https:') && shouldBlockHost(parsed.hostname)) {
-          return true;
-        }
-      } catch (e) {
-        const hostCandidate = getFaviconUrlHostCandidate(raw);
-        if (hostCandidate && shouldBlockHost(hostCandidate)) {
-          return true;
-        }
+      const policy = getFaviconUrlPolicy(raw, {
+        shouldBlockFaviconForHost: shouldBlockHost,
+        shouldAvoidDirectFaviconForHost: shouldAvoidDirectHost
+      });
+      if (policy.hardBlocked || policy.avoidDirect) {
+        return true;
       }
       return Boolean(blockFaviconUrl(raw));
     }
@@ -1092,7 +1138,11 @@
       }
       try {
         const parsed = new URL(raw);
-        if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') && shouldBlockHost(parsed.hostname)) {
+        if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+            shouldBlockDirectFaviconHost(parsed.hostname, {
+              shouldBlockFaviconForHost: shouldBlockHost,
+              shouldAvoidDirectFaviconForHost: shouldAvoidDirectHost
+            })) {
           return '';
         }
         return raw;
@@ -1240,12 +1290,16 @@
     getThemeColorConfidence,
     getThemeMediaScore,
     getPageUrlFromFaviconProxyUrl,
+    getFaviconHostPolicy,
+    getFaviconUrlPolicy,
     hasThemeTokenInUrl,
     hostHasExplicitDarkFavicon,
     isBlockedLocalFaviconUrl,
     isBrowserInternalPageUrl,
     isChromeMonogramFaviconUrl,
     isFaviconProxyUrl,
+    isAllowedFaviconProxyRequestUrl,
+    isSafeVirtualFaviconRequestUrl,
     isLocalNetworkHost,
     isSuspiciousLocalFaviconHost,
     normalizeFaviconThemePreference,
@@ -1256,6 +1310,8 @@
     parseHtmlThemeColorCandidates,
     pickBestThemeColorCandidate,
     shouldSkipThemeUpgradeCandidate,
-    shouldBlockFaviconForHost
+    shouldBlockFaviconForHost,
+    shouldBlockDirectFaviconHost,
+    shouldAvoidDirectFaviconForHost
   });
 });

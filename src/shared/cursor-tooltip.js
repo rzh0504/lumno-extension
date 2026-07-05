@@ -6,6 +6,11 @@
   root.LumnoCursorTooltip = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function(root) {
   const HOST_CLASS = '_x_extension_cursor_tooltip_host_2026_unique_';
+  const TAG_CLASS = '_x_extension_cursor_tooltip_tag_2026_unique_';
+  const TAG_KEY_CLASS = '_x_extension_cursor_tooltip_tag_key_2026_unique_';
+  const TAG_LABEL_CLASS = '_x_extension_cursor_tooltip_tag_label_2026_unique_';
+  const WINDOWS_LOGO_CLASS = '_x_extension_cursor_tooltip_windows_logo_2026_unique_';
+  const WINDOWS_LOGO_PANE_CLASS = '_x_extension_cursor_tooltip_windows_logo_pane_2026_unique_';
   const DEFAULT_VISIBLE_ATTRIBUTE = 'data-visible';
   const DEFAULT_BOUND_ATTRIBUTE = 'data-cursor-tooltip-bound';
   const DEFAULT_TEXT_ATTRIBUTE = 'data-cursor-tooltip';
@@ -20,6 +25,28 @@
 
   function getWindow(options) {
     return (options && options.windowObj) || (root && root.window) || root || {};
+  }
+
+  function getNavigator(options) {
+    const windowObj = getWindow(options);
+    return (windowObj && windowObj.navigator) || (root && root.navigator) || {};
+  }
+
+  function isMacPlatform(options) {
+    const navigatorObj = getNavigator(options);
+    const source = `${navigatorObj.platform || ''} ${navigatorObj.userAgent || ''}`.toLowerCase();
+    return /mac|iphone|ipad|ipod/.test(source);
+  }
+
+  function getCursorTooltipTagKeyText(options) {
+    const config = options || {};
+    if (typeof config.getTagKeyText === 'function') {
+      return String(config.getTagKeyText(config) || '').trim();
+    }
+    if (config.tagKeyText !== undefined && config.tagKeyText !== null) {
+      return String(config.tagKeyText || '').trim();
+    }
+    return isMacPlatform(config) ? '⌘' : 'win';
   }
 
   function getRequestAnimationFrame(windowObj) {
@@ -152,21 +179,22 @@
       return true;
     }
     try {
-      return config.shouldShow(target) !== false;
+      return config.shouldShow(target, config.inputEvent || null) !== false;
     } catch (error) {
       return false;
     }
   }
 
-  function createElement(doc, options) {
+  function createElement(doc, options, tooltipKind) {
     const baseTooltip = getBaseTooltip();
     const decorateElement = typeof options.decorateElement === 'function'
       ? options.decorateElement
       : null;
+    const kind = tooltipKind || 'cursor';
     if (typeof baseTooltip.createElement === 'function') {
       return baseTooltip.createElement(doc, Object.assign({}, options, {
         decorateElement: (element) => {
-          setAttribute(element, 'data-tooltip-kind', 'cursor');
+          setAttribute(element, 'data-tooltip-kind', kind);
           if (decorateElement) {
             decorateElement(element);
           }
@@ -185,6 +213,68 @@
       element.textContent = String(text || '');
     }
     return element;
+  }
+
+  function clearElement(element) {
+    if (!element) {
+      return;
+    }
+    if (typeof element.replaceChildren === 'function') {
+      element.replaceChildren();
+    }
+    element.textContent = '';
+  }
+
+  function createTagPart(tag, className, text) {
+    if (!tag) {
+      return null;
+    }
+    const doc = tag.ownerDocument || getDocument();
+    const part = doc && typeof doc.createElement === 'function'
+      ? doc.createElement('span')
+      : null;
+    if (!part) {
+      return null;
+    }
+    addClass(part, className);
+    part.textContent = String(text || '');
+    tag.appendChild(part);
+    return part;
+  }
+
+  function isWindowsLogoKeyText(text) {
+    return String(text || '').trim().toLowerCase() === 'win';
+  }
+
+  function createWindowsLogo(key) {
+    if (!key) {
+      return null;
+    }
+    const doc = key.ownerDocument || getDocument();
+    const logo = doc && typeof doc.createElement === 'function'
+      ? doc.createElement('span')
+      : null;
+    if (!logo) {
+      return null;
+    }
+    addClass(logo, WINDOWS_LOGO_CLASS);
+    setAttribute(logo, 'aria-hidden', 'true');
+    for (let index = 0; index < 4; index += 1) {
+      const pane = doc.createElement('span');
+      addClass(pane, WINDOWS_LOGO_PANE_CLASS);
+      setAttribute(pane, 'data-cursor-tooltip-windows-logo-pane', String(index + 1));
+      logo.appendChild(pane);
+    }
+    key.appendChild(logo);
+    return logo;
+  }
+
+  function getCursorTooltipTagText(target, pointInput, options) {
+    const config = options || {};
+    if (typeof config.getTagText === 'function') {
+      return String(config.getTagText(pointInput || {}, target) || '').trim();
+    }
+    return String(config.tagText || '').trim();
   }
 
   function positionAtPoint(element, point, options) {
@@ -241,9 +331,12 @@
     const setTimer = getSetTimeout(windowObj);
     const clearTimer = getClearTimeout(windowObj);
     let element = null;
+    let tagElement = null;
     let hideTimer = null;
     let currentTarget = null;
     let lastPoint = null;
+    let activeBinding = null;
+    let modifierListenersAttached = false;
     let token = 0;
 
     function ensureElement() {
@@ -258,9 +351,241 @@
       return element;
     }
 
+    function ensureTagElement() {
+      if (tagElement) {
+        return tagElement;
+      }
+      const tagOptions = Object.assign({}, config, {
+        id: config.id ? `${config.id}_tag` : '',
+        className: [config.className, TAG_CLASS].filter(Boolean).join(' ')
+      });
+      tagElement = createElement(documentObj, tagOptions, 'cursor-tag');
+      if (tagElement) {
+        setAttribute(tagElement, 'data-cursor-tooltip-tag', 'true');
+      }
+      const appendTo = config.appendTo || (documentObj && documentObj.body);
+      if (appendTo && typeof appendTo.appendChild === 'function' && tagElement) {
+        appendTo.appendChild(tagElement);
+      }
+      return tagElement;
+    }
+
+    function hideCursorTooltipTag() {
+      if (element) {
+        setAttribute(element, 'data-cursor-tooltip-tag-visible', 'false');
+      }
+      if (!tagElement) {
+        return null;
+      }
+      setAttribute(tagElement, DEFAULT_VISIBLE_ATTRIBUTE, 'false');
+      setAttribute(tagElement, 'aria-hidden', 'true');
+      return tagElement;
+    }
+
+    function renderCursorTooltipTag(tagText, renderOptions) {
+      const text = String(tagText || '').trim();
+      if (element) {
+        setAttribute(element, 'data-cursor-tooltip-tag-visible', text ? 'true' : 'false');
+      }
+      if (!text) {
+        hideCursorTooltipTag();
+        return null;
+      }
+      const tag = ensureTagElement();
+      if (!tag) {
+        return null;
+      }
+      const keyText = getCursorTooltipTagKeyText(Object.assign({}, config, renderOptions || {}));
+      const drawWindowsLogo = isWindowsLogoKeyText(keyText);
+      clearElement(tag);
+      const key = createTagPart(tag, TAG_KEY_CLASS, drawWindowsLogo ? '' : keyText);
+      const label = createTagPart(tag, TAG_LABEL_CLASS, text);
+      if (!key || !label) {
+        tag.textContent = `${keyText} ${text}`.trim();
+      } else {
+        setAttribute(key, 'aria-hidden', 'true');
+        setAttribute(key, 'data-cursor-tooltip-tag-key', keyText);
+        if (drawWindowsLogo && !createWindowsLogo(key)) {
+          key.textContent = keyText;
+        }
+      }
+      setAttribute(tag, 'aria-label', `${keyText} ${text}`.trim());
+      setAttribute(tag, DEFAULT_VISIBLE_ATTRIBUTE, 'false');
+      setAttribute(tag, 'aria-hidden', 'true');
+      return tag;
+    }
+
+    function setCursorTooltipTagVisible(visible) {
+      if (!tagElement) {
+        return;
+      }
+      const nextVisible = visible ? 'true' : 'false';
+      setAttribute(tagElement, DEFAULT_VISIBLE_ATTRIBUTE, nextVisible);
+      setAttribute(tagElement, 'aria-hidden', visible ? 'false' : 'true');
+    }
+
+    function positionCursorTooltipTag(tag, tooltipPosition, options) {
+      if (!tag || !tooltipPosition) {
+        return null;
+      }
+      const positionOptions = options || {};
+      const positionMode = positionOptions.positionMode === 'absolute' ? 'absolute' : 'fixed';
+      const margin = getNumber(positionOptions.margin, 8);
+      const gap = getNumber(positionOptions.tagGap, 6);
+      const viewportWidth = getNumber(windowObj.innerWidth, 1024);
+      const viewportHeight = getNumber(windowObj.innerHeight, 768);
+      const boundaryElement = positionOptions.boundaryElement || null;
+      const boundaryRect = positionMode === 'absolute'
+        ? getElementRect(boundaryElement, { top: 0, left: 0, right: viewportWidth, bottom: viewportHeight, width: viewportWidth, height: viewportHeight })
+        : { top: 0, left: 0, right: viewportWidth, bottom: viewportHeight, width: viewportWidth, height: viewportHeight };
+      const availableWidth = Math.max(120, Math.floor((boundaryRect.width || viewportWidth) - (margin * 2)));
+      const configuredMaxWidth = positionOptions.tagMaxWidth === undefined ? 220 : positionOptions.tagMaxWidth;
+      const resolvedMaxWidth = typeof configuredMaxWidth === 'number'
+        ? `${Math.min(configuredMaxWidth, availableWidth)}px`
+        : (normalizeCssLength(configuredMaxWidth) || `${availableWidth}px`);
+      setStyleProperty(tag, 'max-width', resolvedMaxWidth);
+      setStyleProperty(tag, 'width', 'max-content');
+      setAttribute(tag, 'data-tooltip-position', positionMode);
+
+      const tagRect = getElementRect(tag);
+      const maxLeft = Math.max(margin, (boundaryRect.width || viewportWidth) - tagRect.width - margin);
+      const maxTop = Math.max(margin, (boundaryRect.height || viewportHeight) - tagRect.height - margin);
+      const left = Math.max(margin, Math.min(tooltipPosition.left, maxLeft));
+      const top = Math.max(margin, Math.min(tooltipPosition.top - tagRect.height - gap, maxTop));
+      setStyleProperty(tag, 'left', `${Math.round(left)}px`);
+      setStyleProperty(tag, 'top', `${Math.round(top)}px`);
+      return Object.freeze({ top: Math.round(top), left: Math.round(left) });
+    }
+
+    function setActiveBinding(target, resolveText, settings, pointInput) {
+      activeBinding = {
+        target,
+        resolveText,
+        settings: settings || {},
+        lastPoint: getPointFromInput(pointInput, target)
+      };
+    }
+
+    function clearActiveBinding(target) {
+      if (!target || (activeBinding && activeBinding.target === target)) {
+        activeBinding = null;
+      }
+    }
+
+    function getModifierRefreshInput(event, binding) {
+      const source = event || {};
+      const point = (binding && binding.lastPoint) || lastPoint || getPointFromInput(null, binding && binding.target);
+      return {
+        type: source.type || 'modifierchange',
+        key: source.key || '',
+        clientX: point.clientX,
+        clientY: point.clientY,
+        metaKey: Boolean(source.metaKey),
+        ctrlKey: Boolean(source.ctrlKey),
+        altKey: Boolean(source.altKey),
+        shiftKey: Boolean(source.shiftKey)
+      };
+    }
+
+    function isModifierRefreshEvent(event) {
+      if (!event) {
+        return false;
+      }
+      const key = String(event.key || '');
+      return Boolean(
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.shiftKey ||
+        key === 'Meta' ||
+        key === 'Control' ||
+        key === 'Alt' ||
+        key === 'Shift'
+      );
+    }
+
+    function hideWithOptions(hideOptions) {
+      const preserveActiveBinding = Boolean(hideOptions && hideOptions.preserveActiveBinding);
+      if (!preserveActiveBinding) {
+        activeBinding = null;
+      }
+      if (!element) {
+        hideCursorTooltipTag();
+        return null;
+      }
+      token += 1;
+      const hideToken = token;
+      currentTarget = null;
+      setAttribute(element, DEFAULT_VISIBLE_ATTRIBUTE, 'false');
+      setAttribute(element, 'aria-hidden', 'true');
+      hideCursorTooltipTag();
+      if (hideTimer) {
+        clearTimer(hideTimer);
+      }
+      hideTimer = setTimer(() => {
+        if (hideToken !== token || !element) {
+          return;
+        }
+        setAttribute(element, DEFAULT_VISIBLE_ATTRIBUTE, 'false');
+        hideTimer = null;
+      }, getNumber(config.hideDelay, 120));
+      return element;
+    }
+
+    function refreshActiveBinding(event) {
+      const binding = activeBinding;
+      if (!binding || !binding.target) {
+        return null;
+      }
+      const input = getModifierRefreshInput(event, binding);
+      const eventOptions = Object.assign({}, binding.settings, {
+        inputEvent: input
+      });
+      if (!shouldShowTarget(binding.target, eventOptions)) {
+        return hideWithOptions({ preserveActiveBinding: true });
+      }
+      return show(binding.target, binding.resolveText(binding.target), input, eventOptions);
+    }
+
+    function handleModifierRefreshEvent(event) {
+      if (!isModifierRefreshEvent(event)) {
+        return;
+      }
+      refreshActiveBinding(event);
+    }
+
+    function handleModifierBlur() {
+      refreshActiveBinding({
+        type: 'blur',
+        key: '',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false
+      });
+    }
+
+    function attachModifierListeners() {
+      if (modifierListenersAttached) {
+        return;
+      }
+      const listenerTarget = windowObj && typeof windowObj.addEventListener === 'function'
+        ? windowObj
+        : (documentObj && typeof documentObj.addEventListener === 'function' ? documentObj : null);
+      if (!listenerTarget) {
+        return;
+      }
+      modifierListenersAttached = true;
+      listenerTarget.addEventListener('keydown', handleModifierRefreshEvent, true);
+      listenerTarget.addEventListener('keyup', handleModifierRefreshEvent, true);
+      listenerTarget.addEventListener('blur', handleModifierBlur, true);
+    }
+
     function show(target, text, pointInput, showOptions) {
       const content = String(text || '');
-      const mergedOptions = Object.assign({}, config, showOptions || {});
+      const mergedOptions = Object.assign({}, config, showOptions || {}, {
+        inputEvent: pointInput || null
+      });
       if (!target || !content || !shouldShowTarget(target, mergedOptions)) {
         return null;
       }
@@ -277,15 +602,20 @@
       currentTarget = target;
       lastPoint = getPointFromInput(pointInput, target);
       renderText(tooltip, content);
+      const tag = renderCursorTooltipTag(getCursorTooltipTagText(target, pointInput, mergedOptions), mergedOptions);
       setAttribute(tooltip, DEFAULT_VISIBLE_ATTRIBUTE, 'false');
       setAttribute(tooltip, 'aria-hidden', 'true');
-      positionAtPoint(tooltip, lastPoint, mergedOptions);
+      const tooltipPosition = positionAtPoint(tooltip, lastPoint, mergedOptions);
+      positionCursorTooltipTag(tag, tooltipPosition, mergedOptions);
       requestFrame(() => {
         if (showToken !== token || currentTarget !== target || !isTargetActive(target, documentObj, mergedOptions)) {
           return;
         }
         setAttribute(tooltip, DEFAULT_VISIBLE_ATTRIBUTE, 'true');
         setAttribute(tooltip, 'aria-hidden', 'false');
+        if (tag) {
+          setCursorTooltipTagVisible(true);
+        }
       });
       return tooltip;
     }
@@ -295,36 +625,31 @@
         return null;
       }
       lastPoint = getPointFromInput(pointInput, currentTarget);
-      positionAtPoint(element, lastPoint, Object.assign({}, config, moveOptions || {}));
+      const mergedOptions = Object.assign({}, config, moveOptions || {}, {
+        inputEvent: pointInput || null
+      });
+      if (!shouldShowTarget(currentTarget, mergedOptions)) {
+        hide();
+        return element;
+      }
+      const tag = renderCursorTooltipTag(getCursorTooltipTagText(currentTarget, pointInput, mergedOptions), mergedOptions);
+      const tooltipPosition = positionAtPoint(element, lastPoint, mergedOptions);
+      positionCursorTooltipTag(tag, tooltipPosition, mergedOptions);
+      if (tag) {
+        setCursorTooltipTagVisible(true);
+      }
       return element;
     }
 
-    function hide() {
-      if (!element) {
-        return null;
-      }
-      token += 1;
-      const hideToken = token;
-      currentTarget = null;
-      setAttribute(element, DEFAULT_VISIBLE_ATTRIBUTE, 'false');
-      setAttribute(element, 'aria-hidden', 'true');
-      if (hideTimer) {
-        clearTimer(hideTimer);
-      }
-      hideTimer = setTimer(() => {
-        if (hideToken !== token || !element) {
-          return;
-        }
-        setAttribute(element, DEFAULT_VISIBLE_ATTRIBUTE, 'false');
-        hideTimer = null;
-      }, getNumber(config.hideDelay, 120));
-      return element;
+    function hide(hideOptions) {
+      return hideWithOptions(hideOptions);
     }
 
     function bind(target, getText, bindOptions) {
       if (!target || typeof target.addEventListener !== 'function') {
         return null;
       }
+      attachModifierListeners();
       const settings = bindOptions || {};
       const boundAttribute = settings.boundAttribute || DEFAULT_BOUND_ATTRIBUTE;
       if (typeof target.getAttribute === 'function' && target.getAttribute(boundAttribute) === 'true') {
@@ -350,29 +675,50 @@
         : () => (typeof target.getAttribute === 'function'
           ? target.getAttribute(settings.attributeName || DEFAULT_TEXT_ATTRIBUTE)
           : '');
+      const getEventOptions = (event) => Object.assign({}, settings, {
+        inputEvent: event || null
+      });
       const showBoundTooltip = (event) => {
-        if (!shouldShowTarget(target, settings)) {
-          hide();
+        setActiveBinding(target, resolveText, settings, event);
+        const eventOptions = getEventOptions(event);
+        if (!shouldShowTarget(target, eventOptions)) {
+          hideWithOptions({ preserveActiveBinding: true });
           return;
         }
-        show(target, resolveText(target), event, settings);
+        show(target, resolveText(target), event, eventOptions);
       };
       const moveBoundTooltip = (event) => {
-        move(event, settings);
-      };
-      const showFocusTooltip = () => {
-        if (!shouldShowTarget(target, settings)) {
-          hide();
+        setActiveBinding(target, resolveText, settings, event);
+        const eventOptions = getEventOptions(event);
+        if (!shouldShowTarget(target, eventOptions)) {
+          hideWithOptions({ preserveActiveBinding: true });
           return;
         }
-        show(target, resolveText(target), getPointFromInput(null, target), settings);
+        if (!currentTarget || currentTarget !== target) {
+          show(target, resolveText(target), event, eventOptions);
+          return;
+        }
+        move(event, eventOptions);
+      };
+      const showFocusTooltip = () => {
+        setActiveBinding(target, resolveText, settings, null);
+        const eventOptions = getEventOptions(null);
+        if (!shouldShowTarget(target, eventOptions)) {
+          hideWithOptions({ preserveActiveBinding: true });
+          return;
+        }
+        show(target, resolveText(target), getPointFromInput(null, target), eventOptions);
+      };
+      const hideBoundTooltip = () => {
+        clearActiveBinding(target);
+        hide();
       };
       target.addEventListener('pointerenter', showBoundTooltip, true);
       target.addEventListener('pointermove', moveBoundTooltip);
-      target.addEventListener('pointerleave', hide);
-      target.addEventListener('pointercancel', hide);
+      target.addEventListener('pointerleave', hideBoundTooltip);
+      target.addEventListener('pointercancel', hideBoundTooltip);
       target.addEventListener('focus', showFocusTooltip);
-      target.addEventListener('blur', hide);
+      target.addEventListener('blur', hideBoundTooltip);
       return target;
     }
 
@@ -392,9 +738,13 @@
       get element() {
         return ensureElement();
       },
+      get tagElement() {
+        return ensureTagElement();
+      },
       show,
       move,
       hide,
+      refresh: refreshActiveBinding,
       bind,
       bindAll
     };
@@ -402,6 +752,10 @@
 
   return Object.freeze({
     hostClassName: HOST_CLASS,
+    tagClassName: TAG_CLASS,
+    tagKeyClassName: TAG_KEY_CLASS,
+    tagLabelClassName: TAG_LABEL_CLASS,
+    windowsLogoClassName: WINDOWS_LOGO_CLASS,
     createController,
     positionAtPoint
   });

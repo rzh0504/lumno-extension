@@ -338,8 +338,8 @@ assert.match(
 );
 assert.match(
   script,
-  /function navigateOnboardingToNewtab\(\)[\s\S]*?LumnoExtensionRoutes[\s\S]*?buildNewtabUrl[\s\S]*?focus:\s*true[\s\S]*?chromeApi\.runtime\.getURL\('src\/newtab\/newtab\.html\?focus=1'\)[\s\S]*?window\.location\.assign\(url\)/,
-  'final start action should navigate the onboarding tab to the focused newtab URL while preserving browser history'
+  /function navigateOnboardingToNewtab\(\)[\s\S]*?LumnoExtensionRoutes[\s\S]*?buildLumnoNewtabUrl[\s\S]*?focus:\s*true[\s\S]*?chromeApi\.runtime\.getURL\('src\/newtab\/lumno-newtab\.html\?focus=1'\)[\s\S]*?window\.location\.assign\(url\)/,
+  'final start action should navigate the onboarding tab to the standalone focused Lumno newtab URL while preserving browser history'
 );
 assert.match(
   script,
@@ -2301,7 +2301,7 @@ assert.match(
 );
 assert.match(
   html,
-  /\.lumno-overlay-panel \.x-lumno-search-input__field\s*\{[\s\S]*?padding-right:\s*64px;[\s\S]*?\}[\s\S]*?\.lumno-overlay-panel \.x-lumno-search-input__right-icon\s*\{[\s\S]*?right:\s*14px;[\s\S]*?\}/,
+  /\.lumno-overlay-panel \.x-lumno-search-input__container\s*\{[\s\S]*?--x-ext-input-right-icon-inset:\s*13px;[\s\S]*?\}[\s\S]*?\.lumno-overlay-panel \.x-lumno-search-input__field\s*\{[\s\S]*?padding-right:\s*64px;[\s\S]*?\}/,
   'overlay input should right-align the settings button without reserving a trailing action slot'
 );
 assert.doesNotMatch(

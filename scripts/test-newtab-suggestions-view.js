@@ -1209,8 +1209,241 @@ async function testOpenNewTabVisitButtonReflectsCurrentTabModifier() {
   );
 }
 
+async function testMatchedOpenTabActionReflectsShiftModifier() {
+  const document = createFakeDocument();
+  const container = document.createElement('div');
+  container.setConnected(true);
+  const items = [];
+  const defaultTheme = faviconTheme.createDefaultTheme();
+
+  const view = suggestionsView.createSuggestionsView({
+    document,
+    container,
+    items,
+    t: (key, fallback) => fallback || key,
+    getRiSvg: () => '',
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl,
+    getThemeHostForSuggestion: (suggestion) => getHostFromUrl(suggestion && suggestion.url),
+    shouldBlockFaviconForHost,
+    getImmediateThemeForSuggestion: () => defaultTheme,
+    getThemeForSuggestion: () => Promise.resolve(defaultTheme),
+    getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    getHoverColors: (theme) => faviconTheme.getHoverColors(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
+    applyMarkVariables: () => {},
+    actionModel: globalThis.LumnoSuggestionActionModel,
+    shouldSwitchMatchedTabSuggestion: (suggestion) => Boolean(suggestion && suggestion._xMatchedTabId === 42),
+    defaultTheme
+  });
+
+  view.render({
+    query: 'lumno',
+    primaryHighlightIndex: 0,
+    primaryHighlightReason: 'openTab',
+    suggestions: [{
+      type: 'history',
+      title: 'Lumno docs',
+      url: 'https://docs.example/lumno',
+      favicon: '',
+      _xMatchedTabId: 42
+    }]
+  });
+  view.updateSelection(-1);
+
+  const item = view.getItems()[0];
+  const actionTag = item && item._xActionTags ? item._xActionTags[0] : null;
+  assert.ok(actionTag && actionTag._xActionLabel, 'matched open tab should render an Enter action tag');
+  assert.strictEqual(
+    actionTag._xActionLabel.textContent,
+    '切换',
+    'matched open tab should default Enter to switching to the open tab'
+  );
+
+  assert.strictEqual(
+    typeof view.setOpenSwitchInNewTabModifierActive,
+    'function',
+    'newtab suggestions view should expose Shift modifier state for matched open-tab actions'
+  );
+  view.setOpenSwitchInNewTabModifierActive(true);
+  assert.strictEqual(
+    actionTag._xActionLabel.textContent,
+    '新开',
+    'Shift should change the matched open-tab Enter action label to opening in a new tab'
+  );
+}
+
+async function testCommandModifierShowsBackgroundOpenActionLabel() {
+  const document = createFakeDocument();
+  const container = document.createElement('div');
+  container.setConnected(true);
+  const items = [];
+  const defaultTheme = faviconTheme.createDefaultTheme();
+  const requestedKeys = new Set();
+  const translations = {
+    action_open_background_new_tab: '在后台新开'
+  };
+
+  const view = suggestionsView.createSuggestionsView({
+    document,
+    container,
+    items,
+    t: (key, fallback) => {
+      requestedKeys.add(key);
+      return translations[key] || fallback || key;
+    },
+    getRiSvg: () => '',
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl,
+    getThemeHostForSuggestion: (suggestion) => getHostFromUrl(suggestion && suggestion.url),
+    shouldBlockFaviconForHost,
+    getImmediateThemeForSuggestion: () => defaultTheme,
+    getThemeForSuggestion: () => Promise.resolve(defaultTheme),
+    getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    getHoverColors: (theme) => faviconTheme.getHoverColors(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
+    applyMarkVariables: () => {},
+    actionModel: globalThis.LumnoSuggestionActionModel,
+    defaultTheme
+  });
+
+  view.render({
+    query: 'lumno',
+    primaryHighlightIndex: 0,
+    primaryHighlightReason: 'topSite',
+    suggestions: [{
+      type: 'topSite',
+      title: 'Lumno',
+      url: 'https://lumno.example/',
+      favicon: ''
+    }]
+  });
+  view.updateSelection(-1);
+
+  const item = view.getItems()[0];
+  const actionTag = item && item._xActionTags ? item._xActionTags[0] : null;
+  assert.ok(actionTag && actionTag._xActionLabel, 'primary result should render an Enter action tag');
+  assert.strictEqual(
+    typeof view.setOpenInBackgroundTabModifierActive,
+    'function',
+    'newtab suggestions view should expose Command/Ctrl modifier state for background action labels'
+  );
+  view.setOpenInBackgroundTabModifierActive(true);
+  assert.strictEqual(
+    actionTag._xActionLabel.textContent,
+    '在后台新开',
+    'Command/Ctrl should change focused result Enter tag copy to background new-tab opening'
+  );
+  assert.ok(
+    requestedKeys.has('action_open_background_new_tab'),
+    'background new-tab action label should be resolved through i18n'
+  );
+  view.setOpenInCurrentTabModifierActive(true);
+  assert.strictEqual(
+    actionTag._xActionLabel.textContent,
+    '前往',
+    'Alt/Option should keep current-tab label priority over Command/Ctrl background label'
+  );
+}
+
+function testNewtabShiftEnterOpensMatchedTabInNewTab() {
+  const newtabJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/newtab.js'), 'utf8');
+  assert.ok(
+    /let openSwitchInNewTabModifierActive = false;/.test(newtabJs),
+    'newtab should track whether Shift is active for matched open-tab actions'
+  );
+  assert.ok(
+    /function syncSuggestionActionModifiersFromEvent\(event\)[\s\S]*Boolean\(event && event\.altKey\)[\s\S]*Boolean\(event && event\.shiftKey\)/.test(newtabJs),
+    'newtab should sync both Alt and Shift modifier state from keyboard events'
+  );
+  assert.ok(
+    /function openMatchedTabSuggestion\(suggestion,\s*event,\s*item,\s*query\)[\s\S]*shouldUseNewTabForSwitchAction\(suggestion,\s*event,\s*item\)[\s\S]*action:\s*'createTab'[\s\S]*disposition:\s*getSearchResultNewTabDisposition\(event\)[\s\S]*action:\s*'switchToTab'/.test(newtabJs),
+    'newtab Shift+Enter on a matched open-tab result should create a new tab instead of switching'
+  );
+  assert.ok(
+    /const executeSuggestion = \(selectedSuggestion,\s*event,\s*activeSuggestionIndex\) =>/.test(newtabJs) &&
+      /shouldSwitchMatchedTabSuggestion\(selectedSuggestion,\s*activeSuggestionIndex\)[\s\S]*openMatchedTabSuggestion\(selectedSuggestion,\s*event,\s*activeItem,\s*query\)/.test(newtabJs),
+    'newtab Enter handling should route matched open-tab results through the Shift-aware opener'
+  );
+}
+
+function testNewtabCommandEnterOpensFocusedResultInBackgroundTab() {
+  const newtabJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/newtab.js'), 'utf8');
+  const backgroundJs = fs.readFileSync(path.join(repoRoot, 'src/background/background.js'), 'utf8');
+  assert.ok(
+    /function shouldOpenSearchResultInBackgroundTab\(event\)[\s\S]*event\.metaKey \|\| event\.ctrlKey[\s\S]*event\.altKey/.test(newtabJs),
+    'newtab should treat Command/Ctrl, but not Alt/Option, as the background-open modifier'
+  );
+  assert.ok(
+    /function openSearchResultUrl\(suggestion,\s*query,\s*event\)[\s\S]*shouldOpenSearchResultInBackgroundTab\(event\)[\s\S]*action:\s*'createTab'[\s\S]*disposition:\s*'backgroundTab'[\s\S]*navigateToUrl\(suggestion\.url\)/.test(newtabJs),
+    'newtab should open Command/Ctrl activated URL search results in a background tab'
+  );
+  assert.ok(
+    /function openMatchedTabSuggestion\(suggestion,\s*event,\s*item,\s*query\)[\s\S]*disposition:\s*getSearchResultNewTabDisposition\(event\)/.test(newtabJs),
+    'newtab matched open-tab results should use the same foreground/background tab disposition helper'
+  );
+  assert.ok(
+    /chrome\.tabs\.create\(\{\s*url:\s*targetUrl,\s*active:\s*request\.disposition !== 'backgroundTab'\s*\}/.test(backgroundJs),
+    'background createTab should support backgroundTab by creating an inactive tab'
+  );
+  assert.ok(
+    /resolveQuickNavigation\(query\)\.then\(\(targetUrl\) => \{[\s\S]*if \(targetUrl\)[\s\S]*if \(backgroundOpen\)[\s\S]*action:\s*'searchOrNavigate'[\s\S]*disposition:\s*'backgroundTab'[\s\S]*navigateToQuery\(query\)/.test(newtabJs),
+    'newtab Cmd/Ctrl fallback should run shortcut parsing before requesting a background search'
+  );
+  assert.ok(
+    /case 'searchOrNavigate':[\s\S]*request\.disposition === 'backgroundTab'[\s\S]*loadShortcutRules\(\)\.then[\s\S]*getShortcutUrl\(query,\s*rules\)[\s\S]*createResolvedTab\(shortcutUrl[\s\S]*buildDefaultSearchUrl\(query\)/.test(backgroundJs),
+    'background searchOrNavigate should resolve configured shortcuts before applying background-tab creation'
+  );
+}
+
+function testOverlayCommandEnterOpensFocusedResultInBackgroundTab() {
+  const overlayJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/search-panel.js'), 'utf8');
+  assert.ok(
+    /let openInBackgroundTabModifierActive = false;/.test(overlayJs) &&
+      /case 'openBackgroundTab':[\s\S]*action_open_background_new_tab/.test(overlayJs) &&
+      /function syncSuggestionActionModifiersFromEvent\(event\)[\s\S]*event\.metaKey \|\| event\.ctrlKey/.test(overlayJs),
+    'overlay focused search result action tags should show the background-open i18n label while Command/Ctrl is held'
+  );
+  assert.ok(
+    /function shouldOpenSearchResultInBackgroundTab\(event\)[\s\S]*event\.metaKey \|\| event\.ctrlKey[\s\S]*event\.altKey/.test(overlayJs),
+    'overlay should treat Command/Ctrl, but not Alt/Option, as the background-open modifier'
+  );
+  assert.ok(
+    /function getSearchResultCreateDisposition\(suggestion,\s*event,\s*item\)[\s\S]*shouldUseCurrentTabForOpenNewTabAction\(suggestion,\s*event,\s*item\)[\s\S]*getSearchResultNewTabDisposition\(event\)/.test(overlayJs),
+    'overlay should preserve Alt/Option current-tab behavior before applying Command/Ctrl background opening'
+  );
+  assert.ok(
+    /function openMatchedTabSuggestion\(suggestion,\s*event,\s*item,\s*query\)[\s\S]*shouldOpenSearchResultInBackgroundTab\(event\)[\s\S]*disposition:\s*getSearchResultNewTabDisposition\(event\)/.test(overlayJs),
+    'overlay matched open-tab results should use the shared foreground/background disposition helper'
+  );
+  assert.ok(
+    /disposition:\s*getSearchResultCreateDisposition\(selectedSuggestion,\s*e,\s*activeItem\)/.test(overlayJs) &&
+      /disposition:\s*getSearchResultCreateDisposition\(suggestion,\s*event,\s*suggestionItem\)/.test(overlayJs),
+    'overlay Enter and click activation should use the background-aware create disposition helper'
+  );
+  assert.ok(
+    /resolveQuickNavigation\(query\)\.then\(\(targetUrl\) => \{[\s\S]*if \(targetUrl\)[\s\S]*else if \(shouldOpenSearchResultInBackgroundTab\(e\)\)[\s\S]*action:\s*'searchOrNavigate'[\s\S]*disposition:\s*'backgroundTab'[\s\S]*action:\s*'searchOrNavigate'[\s\S]*query:\s*query/.test(overlayJs),
+    'overlay Cmd/Ctrl fallback should defer to searchOrNavigate so shortcut parsing still runs first'
+  );
+}
+
 testSiteSearchProviderIconsUsePageFaviconCandidates();
 testSiteSearchTabHintRequiresExplicitTrigger();
+testNewtabShiftEnterOpensMatchedTabInNewTab();
+testNewtabCommandEnterOpensFocusedResultInBackgroundTab();
+testOverlayCommandEnterOpensFocusedResultInBackgroundTab();
 
 testLocalUrlSuggestionUsesFallbackTheme()
   .then(testDirectUrlSuggestionUsesFaviconWhenAvailable)
@@ -1226,6 +1459,8 @@ testLocalUrlSuggestionUsesFallbackTheme()
   .then(testTopSiteSuggestionCanUseHoverDeleteAction)
   .then(testAiProviderVisitButtonUsesWebAppLabel)
   .then(testOpenNewTabVisitButtonReflectsCurrentTabModifier)
+  .then(testMatchedOpenTabActionReflectsShiftModifier)
+  .then(testCommandModifierShowsBackgroundOpenActionLabel)
   .then(() => {
     console.log('newtab suggestions view tests passed');
   })

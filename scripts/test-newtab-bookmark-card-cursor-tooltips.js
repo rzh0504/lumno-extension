@@ -17,8 +17,28 @@ assertContains(
 );
 assertContains(
   bookmarksView,
+  "const shouldSuppressHover = getFunction(options, 'shouldSuppressHover'",
+  'bookmark cards should accept a shared hover suppression hook for drag reorder'
+);
+assertContains(
+  bookmarksView,
   "card.setAttribute('data-cursor-tooltip', titleText);",
   'bookmark cards should expose full titles through the cursor tooltip attribute'
+);
+assertContains(
+  bookmarksView,
+  "card.setAttribute('data-bookmark-parent-id', parentId);",
+  'bookmark cards should expose their Chrome bookmark parent id for same-folder reordering'
+);
+assertContains(
+  bookmarksView,
+  "card.setAttribute('data-bookmark-index', Number.isFinite(itemIndex) ? String(itemIndex) : '');",
+  'bookmark cards should expose their Chrome bookmark index for persistent reordering'
+);
+assertContains(
+  bookmarksView,
+  "card.addEventListener('dragstart', (event) => {",
+  'bookmark cards should block native browser drag previews'
 );
 assertContains(
   bookmarksView,
@@ -28,7 +48,11 @@ assertContains(
 assertContains(
   bookmarksView,
   'shouldShow: () => isBookmarkTitleTruncated(title)',
-  'bookmark card cursor tooltips should only show when the title is truncated before hover'
+  'bookmark card cursor tooltips should only show for truncated titles'
+);
+assert.ok(
+  !bookmarksView.includes('getTagText: isFolder ? null : getBackgroundOpenTagText'),
+  'bookmark URL cursor tooltips should not render an extra background-open badge'
 );
 assertContains(
   newtabJs,
@@ -49,6 +73,46 @@ assertContains(
   newtabJs,
   'hideCursorTooltip',
   'newtab should provide a way to hide the bookmark cursor tooltip when cards are cleared'
+);
+assertContains(
+  newtabJs,
+  'function handleBookmarkDragPointerDown(event) {',
+  'newtab should track bookmark card pointer drags'
+);
+assertContains(
+  newtabJs,
+  "bookmarkGrid.addEventListener('pointerdown', handleBookmarkDragPointerDown, true);",
+  'bookmark grid should capture pointer down before card hover handlers run'
+);
+assertContains(
+  newtabJs,
+  "bookmarkGrid.addEventListener('pointermove', handleBookmarkDragPointerMove);",
+  'bookmark grid should listen for drag movement'
+);
+assertContains(
+  newtabJs,
+  'function scheduleBookmarkDragMove(state, pointerX, pointerY) {',
+  'bookmark drag movement should be coalesced through requestAnimationFrame'
+);
+assertContains(
+  newtabJs,
+  'function updateBookmarkDragLayoutCache(state) {',
+  'bookmark drag reorder should cache layout measurements during a drag'
+);
+assertContains(
+  newtabJs,
+  'shouldSuppressHover: shouldSuppressBookmarkHover,',
+  'bookmark cards and cascade menus should share the drag hover suppression hook'
+);
+assertContains(
+  newtabJs,
+  'chrome.bookmarks.move(String(bookmarkId),',
+  'bookmark reorder should persist through the Chrome bookmarks API'
+);
+assertContains(
+  newtabJs,
+  'function isBookmarkCursorTooltipSuppressed(target) {',
+  'bookmark cursor tooltips should be suppressed during drag reorder'
 );
 
 console.log('newtab bookmark card cursor tooltip tests passed');

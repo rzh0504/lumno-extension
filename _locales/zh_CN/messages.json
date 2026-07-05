@@ -110,6 +110,12 @@
   "settings_search_result_sources_title": {
     "message": "显示结果类型"
   },
+  "settings_favicon_enhanced_fetch_title": {
+    "message": "增强图标与主题色获取"
+  },
+  "settings_favicon_enhanced_fetch_desc": {
+    "message": "内网或 VPN 页面若出现“请求访问局域网上其他设备”提示，可关闭此项。"
+  },
   "search_result_priority_autocomplete": {
     "message": "补全优先"
   },
@@ -288,10 +294,10 @@
     "message": "受限页（如 chrome://、扩展商店、部分 file:// 页面）无法开启聚焦搜索；按下快捷键将按此处规则处理"
   },
   "restricted_action_default": {
-    "message": "前往新标签页"
+    "message": "前往 Lumno 新标签页"
   },
   "restricted_action_none": {
-    "message": "无操作"
+    "message": "遵循浏览器设置"
   },
   "newtab_file_access_notice_title": {
     "message": "由于浏览器限制，若要在本地文件页面（如 PDF、HTML）中唤起聚焦搜索，请手动开启“允许访问文件网址”"
@@ -387,7 +393,10 @@
     "message": "深色"
   },
   "settings_newtab_wordmark_title": {
-    "message": "在新标签页搜索框上方显示 Logo"
+    "message": "在新标签页搜索框上方显示品牌标识"
+  },
+  "settings_newtab_shortcuts_title": {
+    "message": "快捷方式"
   },
   "settings_wallpaper_title": {
     "message": "新标签页壁纸"
@@ -444,7 +453,22 @@
     "message": "壁纸"
   },
   "newtab_logo_title": {
-    "message": "Logo"
+    "message": "品牌标识"
+  },
+  "newtab_favicon_title": {
+    "message": "新标签页 favicon"
+  },
+  "newtab_favicon_name_default": {
+    "message": "默认"
+  },
+  "newtab_favicon_name_alternate": {
+    "message": "备用"
+  },
+  "newtab_favicon_select_label": {
+    "message": "选择 {name} favicon"
+  },
+  "newtab_favicon_save_error": {
+    "message": "favicon 保存失败"
   },
   "newtab_wallpaper_builtin_section": {
     "message": "内置"
@@ -720,10 +744,10 @@
     "message": "搜索与最近访问黑名单"
   },
   "blacklist_section_desc": {
-    "message": "想让某些网址不再出现在搜索结果、最近访问或最常访问里，就加在这里。"
+    "message": "若要彻底禁止某些网址出现在 Lumno 的搜索结果和新标签页中，在此添加。"
   },
   "blacklist_group_custom": {
-    "message": "隐藏这些 URL"
+    "message": "全局禁用"
   },
   "blacklist_label_url": {
     "message": "URL 规则"
@@ -789,7 +813,7 @@
     "message": "baidu.com"
   },
   "blacklist_add": {
-    "message": "添加隐藏规则"
+    "message": "添加"
   },
   "blacklist_empty": {
     "message": "暂未添加黑名单 URL"
@@ -814,18 +838,6 @@
   },
   "blacklist_removed_toast": {
     "message": "已从黑名单移除"
-  },
-  "favicon_blacklist_section_title": {
-    "message": "只关掉图标抓取"
-  },
-  "favicon_blacklist_section_desc": {
-    "message": "要是某个局域网或 VPN 站点总弹本地网络权限提示，就加在这里。它还会正常显示、搜索和打开，只是不再抓图标和主题色。"
-  },
-  "favicon_blacklist_add": {
-    "message": "添加排除规则"
-  },
-  "favicon_blacklist_removed_toast": {
-    "message": "已从图标抓取排除中移除"
   },
   "shortcuts_group_builtin": {
     "message": "内置"
@@ -920,9 +932,6 @@
   "blacklist_clear": {
     "message": "清空隐藏规则"
   },
-  "favicon_blacklist_clear": {
-    "message": "清空排除规则"
-  },
   "toast_cleared": {
     "message": "已清空"
   },
@@ -931,9 +940,6 @@
   },
   "confirm_clear_blacklist": {
     "message": "确认清空隐藏规则？"
-  },
-  "confirm_clear_favicon_blacklist": {
-    "message": "确认清空排除规则？"
   },
   "confirm_reset_builtin": {
     "message": "确认重置内置列表？"
@@ -1024,6 +1030,12 @@
   },
   "action_open_new_tab": {
     "message": "新开"
+  },
+  "action_open_background_new_tab": {
+    "message": "在后台新开"
+  },
+  "action_open_background_tab": {
+    "message": "在后台打开"
   },
   "action_go_current_tab": {
     "message": "前往"
@@ -1426,6 +1438,54 @@
   },
   "shortcut_reference_document_pip_child_desc": {
     "message": "选择网页剪裁目标时切到更小的子级元素"
+  },
+  "newtab_shortcuts_section_label": {
+    "message": "快捷方式"
+  },
+  "newtab_shortcuts_add": {
+    "message": "添加快捷方式"
+  },
+  "newtab_shortcuts_dialog_title": {
+    "message": "添加快捷方式"
+  },
+  "newtab_shortcuts_name_label": {
+    "message": "名称"
+  },
+  "newtab_shortcuts_name_placeholder": {
+    "message": "Lumno"
+  },
+  "newtab_shortcuts_url_label": {
+    "message": "网址"
+  },
+  "newtab_shortcuts_url_placeholder": {
+    "message": "https://example.com"
+  },
+  "newtab_shortcuts_cancel": {
+    "message": "取消"
+  },
+  "newtab_shortcuts_done": {
+    "message": "完成"
+  },
+  "newtab_shortcuts_save": {
+    "message": "保存"
+  },
+  "newtab_shortcuts_invalid_url": {
+    "message": "请输入有效的 http 或 https 网址"
+  },
+  "newtab_shortcuts_added": {
+    "message": "已添加快捷方式"
+  },
+  "newtab_shortcuts_edited": {
+    "message": "已更新快捷方式"
+  },
+  "newtab_shortcuts_removed": {
+    "message": "已移除快捷方式"
+  },
+  "newtab_shortcuts_edit_dialog_title": {
+    "message": "编辑快捷方式"
+  },
+  "newtab_shortcuts_context_menu_label": {
+    "message": "快捷方式操作"
   },
   "settings_tab_switcher_title": {
     "message": "标签切换器"

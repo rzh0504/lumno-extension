@@ -33,7 +33,11 @@
     '--x-nt-wallpaper-icon-solid-bg',
     '--x-nt-wallpaper-icon-solid-bg-hover',
     '--x-nt-wallpaper-icon-solid-ink',
-    '--x-nt-wallpaper-icon-solid-ink-hover'
+    '--x-nt-wallpaper-icon-solid-ink-hover',
+    '--x-nt-shortcut-wallpaper-icon-bg',
+    '--x-nt-shortcut-wallpaper-icon-color',
+    '--x-nt-shortcut-add-bg',
+    '--x-nt-shortcut-add-color'
   ];
 
   function mixNumber(start, end, amount) {
@@ -151,6 +155,23 @@
     return best;
   }
 
+  function mixColorToMinLuminance(color, target, minLuminance) {
+    let low = 0;
+    let high = 1;
+    let best = color;
+    for (let index = 0; index < 8; index += 1) {
+      const amount = (low + high) / 2;
+      const mixed = mixColor(color, target, amount);
+      if (getColorLuminance(mixed) >= minLuminance) {
+        best = mixed;
+        high = amount;
+      } else {
+        low = amount;
+      }
+    }
+    return best;
+  }
+
   function isTexturedWallpaperEffect(effectType) {
     return effectType === 'ascii' || effectType === 'halftone';
   }
@@ -194,6 +215,156 @@
     return getColorLuminance(backgroundColor) >= 0.56
       ? { red: 30, green: 41, blue: 59 }
       : { red: 248, green: 250, blue: 252 };
+  }
+
+  function getColorChroma(color) {
+    const max = Math.max(color.red, color.green, color.blue);
+    const min = Math.min(color.red, color.green, color.blue);
+    return (max - min) / 255;
+  }
+
+  function getValidToneColor(color) {
+    return color && Number.isFinite(color.red) &&
+      Number.isFinite(color.green) &&
+      Number.isFinite(color.blue)
+      ? color
+      : { red: 128, green: 140, blue: 156 };
+  }
+
+  function getShortcutUrlBaseSurfaceColor(color, localLuminance, ink) {
+    const baseColor = getValidToneColor(color);
+    const surfaceLuminance = clampNumber(localLuminance, 0, 1);
+    const hueStrength = smoothstep((getColorChroma(baseColor) - 0.035) / 0.24);
+    if (ink === 'light') {
+      const tintAmount = mixNumber(0.025, 0.12, hueStrength);
+      const darkBase = surfaceLuminance <= 0.26
+        ? { red: 34, green: 38, blue: 46 }
+        : { red: 24, green: 28, blue: 35 };
+      const backgroundColor = mixColor(darkBase, baseColor, tintAmount);
+      const minSeparation = surfaceLuminance <= 0.3 ? 0.07 : 0.1;
+      const backgroundLuminance = getColorLuminance(backgroundColor);
+      if (Math.abs(backgroundLuminance - surfaceLuminance) >= minSeparation) {
+        return backgroundColor;
+      }
+      if (backgroundLuminance >= surfaceLuminance) {
+        return mixColorToMinLuminance(
+          backgroundColor,
+          { red: 70, green: 78, blue: 92 },
+          clampNumber(surfaceLuminance + minSeparation, 0, 0.36)
+        );
+      }
+      return mixColorToMaxLuminance(
+        backgroundColor,
+        { red: 12, green: 16, blue: 22 },
+        clampNumber(surfaceLuminance - minSeparation, 0.06, 1)
+      );
+    }
+
+    const tintAmount = mixNumber(0.055, 0.2, hueStrength);
+    const paleBase = surfaceLuminance >= 0.58
+      ? { red: 244, green: 246, blue: 248 }
+      : { red: 248, green: 250, blue: 252 };
+    let backgroundColor = mixColor(paleBase, baseColor, tintAmount);
+    const minSeparation = surfaceLuminance >= 0.78 ? 0.082 : 0.11;
+    const backgroundLuminance = getColorLuminance(backgroundColor);
+    if (Math.abs(backgroundLuminance - surfaceLuminance) >= minSeparation) {
+      return backgroundColor;
+    }
+    if (surfaceLuminance >= 0.72) {
+      const tintedGray = mixColor(
+        { red: 218, green: 224, blue: 232 },
+        baseColor,
+        hueStrength * 0.28
+      );
+      return mixColorToMaxLuminance(
+        backgroundColor,
+        tintedGray,
+        clampNumber(surfaceLuminance - minSeparation, 0, 1)
+      );
+    }
+    return mixColorToMinLuminance(
+      backgroundColor,
+      { red: 255, green: 255, blue: 255 },
+      clampNumber(surfaceLuminance + minSeparation, 0, 1)
+    );
+  }
+
+  function getShortcutUrlSurfaceColor(color, localLuminance, ink) {
+    const baseSurfaceColor = getShortcutUrlBaseSurfaceColor(color, localLuminance, ink);
+    const backgroundLuminance = getColorLuminance(baseSurfaceColor);
+    if (ink === 'light') {
+      const target = backgroundLuminance >= 0.26
+        ? { red: 18, green: 22, blue: 28 }
+        : { red: 52, green: 58, blue: 68 };
+      return mixColor(baseSurfaceColor, target, backgroundLuminance >= 0.26 ? 0.1 : 0.28);
+    }
+    const target = backgroundLuminance >= 0.56
+      ? { red: 255, green: 255, blue: 255 }
+      : { red: 248, green: 250, blue: 252 };
+    return mixColor(baseSurfaceColor, target, backgroundLuminance >= 0.56 ? 0.34 : 0.22);
+  }
+
+  function getShortcutAddSurfaceColor(urlSurfaceColor, ink) {
+    const backgroundLuminance = getColorLuminance(urlSurfaceColor);
+    if (ink === 'light') {
+      const target = backgroundLuminance >= 0.32
+        ? { red: 92, green: 102, blue: 118 }
+        : { red: 70, green: 78, blue: 92 };
+      return mixColor(urlSurfaceColor, target, backgroundLuminance >= 0.32 ? 0.14 : 0.24);
+    }
+    const target = backgroundLuminance >= 0.5
+      ? { red: 255, green: 255, blue: 255 }
+      : { red: 248, green: 250, blue: 252 };
+    return mixColor(urlSurfaceColor, target, backgroundLuminance >= 0.56 ? 0.28 : 0.18);
+  }
+
+  function getForcedShortcutSurfaceInk(ink, themeMode) {
+    return themeMode === 'dark' ? 'light' : ink;
+  }
+
+  function shouldApplyForcedIconBackground(element, mode) {
+    if (!element) {
+      return false;
+    }
+    if (mode === 'shortcut-add') {
+      return true;
+    }
+    if (mode === 'default-theme') {
+      return element.getAttribute('data-shortcut-theme-default') === 'true';
+    }
+    return true;
+  }
+
+  function clearForcedIconBackgroundStyles(element) {
+    if (!element) {
+      return;
+    }
+    element.removeAttribute('data-wallpaper-forced-icon-bg');
+    element.style.removeProperty('--x-nt-shortcut-wallpaper-icon-bg');
+    element.style.removeProperty('--x-nt-shortcut-wallpaper-icon-color');
+    element.style.removeProperty('--x-nt-shortcut-add-bg');
+    element.style.removeProperty('--x-nt-shortcut-add-color');
+  }
+
+  function applyForcedIconBackgroundStyles(element, luminance, ink, color, mode, themeMode) {
+    if (!shouldApplyForcedIconBackground(element, mode)) {
+      clearForcedIconBackgroundStyles(element);
+      return;
+    }
+    const forcedSurfaceInk = getForcedShortcutSurfaceInk(ink, themeMode);
+    const urlSurfaceColor = getShortcutUrlSurfaceColor(color, luminance, forcedSurfaceInk);
+    if (mode === 'shortcut-add') {
+      const addBackgroundColor = getShortcutAddSurfaceColor(urlSurfaceColor, forcedSurfaceInk);
+      element.setAttribute('data-wallpaper-forced-icon-bg', 'true');
+      setStyleProperty(element, '--x-nt-shortcut-add-bg', formatSolidRgb(addBackgroundColor));
+      setStyleProperty(element, '--x-nt-shortcut-add-color',
+        formatSolidRgb(getIconSolidForegroundColor(addBackgroundColor)));
+      return;
+    }
+    element.setAttribute('data-wallpaper-forced-icon-bg', 'true');
+    setStyleProperty(element, '--x-nt-shortcut-wallpaper-icon-bg', formatSolidRgb(urlSurfaceColor));
+    setStyleProperty(element, '--x-nt-shortcut-wallpaper-icon-color',
+      formatSolidRgb(getIconSolidForegroundColor(urlSurfaceColor)));
   }
 
   function applyIconSolidBackgroundStyles(element, luminance, ink, color, overlayAlpha, textureContrast, effectType) {
@@ -310,6 +481,12 @@
     let loadToken = 0;
     let toneFrame = 0;
 
+    function getDocumentThemeMode() {
+      return documentObj && documentObj.body && documentObj.body.getAttribute('data-theme') === 'dark'
+        ? 'dark'
+        : 'light';
+    }
+
     function requestFrame(callback) {
       if (windowObj && typeof windowObj.requestAnimationFrame === 'function') {
         return windowObj.requestAnimationFrame(callback);
@@ -351,6 +528,7 @@
         target.element.removeAttribute('data-wallpaper-icon-bg');
         target.element.removeAttribute('data-wallpaper-overlay-cover');
         target.element.style.removeProperty('--x-nt-wallpaper-local-luma');
+        clearForcedIconBackgroundStyles(target.element);
         clearAdaptiveToneStyles(target.element);
       });
       if (!options || options.updateWordmark !== false) {
@@ -588,6 +766,7 @@
       const viewport = getViewportSize();
       const effectType = documentObj.body.getAttribute('data-wallpaper-effect') || '';
       const overlayLuminance = clampNumber(getOverlayLuminance(), 0, 1);
+      const themeMode = getDocumentThemeMode();
       getToneTargets().forEach((target) => {
         if (!target || !target.element || !target.sampleElement) {
           return;
@@ -603,6 +782,7 @@
           target.element.removeAttribute('data-wallpaper-icon-bg');
           target.element.removeAttribute('data-wallpaper-overlay-cover');
           target.element.style.removeProperty('--x-nt-wallpaper-local-luma');
+          clearForcedIconBackgroundStyles(target.element);
           clearAdaptiveToneStyles(target.element);
           return;
         }
@@ -611,6 +791,7 @@
         const luminance = sample ? sample.luminance : null;
         if (!Number.isFinite(luminance)) {
           target.element.removeAttribute('data-wallpaper-overlay-cover');
+          clearForcedIconBackgroundStyles(target.element);
           clearAdaptiveToneStyles(target.element);
           return;
         }
@@ -642,6 +823,18 @@
           );
         } else {
           target.element.removeAttribute('data-wallpaper-icon-bg');
+        }
+        if (target.forcedIconBackground) {
+          applyForcedIconBackgroundStyles(
+            target.element,
+            luminance,
+            nextInk,
+            sample.color,
+            target.forcedIconBackground,
+            themeMode
+          );
+        } else {
+          clearForcedIconBackgroundStyles(target.element);
         }
       });
       applyWordmarkThemeAppearance();

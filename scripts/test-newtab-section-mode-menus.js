@@ -43,6 +43,7 @@ const customSelectJs = fs.readFileSync(customSelectJsPath, 'utf8');
 const customSelectCss = fs.readFileSync(customSelectCssPath, 'utf8');
 const menuSurfaceJs = fs.readFileSync(menuSurfaceJsPath, 'utf8');
 const menuSurfaceCss = fs.readFileSync(menuSurfaceCssPath, 'utf8');
+const compensatedCornerShapePattern = 'superellipse\\(1\\.25\\)';
 
 assertContains(
   customSelectJs,
@@ -123,6 +124,21 @@ assertContains(
   customSelectCss,
   '[data-icon-only="true"]',
   'shared custom select CSS should style icon-only triggers'
+);
+assert.match(
+  customSelectCss,
+  new RegExp(`@supports\\s*\\(\\s*corner-shape:\\s*${compensatedCornerShapePattern}\\s*\\)\\s*\\{`),
+  'shared custom select CSS should gate smooth dropdown corners behind @supports'
+);
+assert.match(
+  customSelectCss,
+  new RegExp(`\\._x_extension_select_menu_2024_unique_[\\s\\S]*?\\{[\\s\\S]*?corner-shape:\\s*${compensatedCornerShapePattern};`),
+  'shared custom select menu should use the same compensated corner shape as search'
+);
+assert.match(
+  customSelectCss,
+  new RegExp(`\\._x_extension_select_option_2024_unique_[\\s\\S]*?\\{[\\s\\S]*?corner-shape:\\s*${compensatedCornerShapePattern};`),
+  'shared custom select options should use the same compensated corner shape as search'
 );
 assertContains(
   menuSurfaceJs,

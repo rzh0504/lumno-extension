@@ -80,8 +80,16 @@
       return [];
     });
     const navigateToUrl = getFunction(config, 'navigateToUrl');
+    const openUrl = getFunction(config, 'openUrl', function(url) {
+      navigateToUrl(url);
+    });
+    const bindCursorTooltip = getFunction(config, 'bindCursorTooltip');
+    const hideCursorTooltip = getFunction(config, 'hideCursorTooltip');
     const showTopActionTooltip = getFunction(config, 'showTopActionTooltip');
     const hideTopActionTooltip = getFunction(config, 'hideTopActionTooltip');
+    const shouldSuppressHover = getFunction(config, 'shouldSuppressHover', function() {
+      return false;
+    });
 
     let bookmarkCascadeMenu = null;
     let bookmarkCascadeAnchor = null;
@@ -167,6 +175,10 @@
         bookmarkCascadePointer = point;
       }
       return bookmarkCascadePointer;
+    }
+
+    function isBookmarkCascadeHoverSuppressed(target, event) {
+      return shouldSuppressHover(target, event) === true;
     }
 
     function isPointInsideRect(point, rect) {
@@ -459,6 +471,11 @@
         cancelBookmarkCascadeHoverIntent();
         return;
       }
+      if (isBookmarkCascadeHoverSuppressed(task.triggerElement, null)) {
+        cancelBookmarkCascadeHoverIntent();
+        setBookmarkCascadeItemHoverSuppressed(task.triggerElement, true);
+        return;
+      }
       const point = bookmarkCascadePointer;
       const triggerRect = getBookmarkCascadeElementRect(task.triggerElement);
       const triggerHovered = typeof task.triggerElement.matches === 'function' &&
@@ -488,6 +505,11 @@
 
     function scheduleBookmarkCascadeHoverIntent(task, event) {
       if (!task || typeof task.run !== 'function') {
+        return;
+      }
+      if (isBookmarkCascadeHoverSuppressed(task.triggerElement, event)) {
+        cancelBookmarkCascadeHoverIntent();
+        setBookmarkCascadeItemHoverSuppressed(task.triggerElement, true);
         return;
       }
       const pointerType = event && typeof event.pointerType === 'string' ? event.pointerType : '';
@@ -651,6 +673,7 @@
       const optionsForClose = closeOptions || {};
       cancelBookmarkCascadeHoverIntent();
       cancelBookmarkCascadeDelayedClose();
+      hideCursorTooltip();
       bookmarkCascadeKeyboardLevelIndex = 0;
       if (bookmarkCascadeDebugLabelFrame) {
         cancelFrame(bookmarkCascadeDebugLabelFrame);
@@ -1082,6 +1105,16 @@
       return getBrowserPageFaviconUrl(url);
     }
 
+    function shouldOpenUrlInBackground(event) {
+      return Boolean(event && (event.metaKey || event.ctrlKey));
+    }
+
+    function openBookmarkCascadeUrl(url, event) {
+      openUrl(url, {
+        openInBackgroundTab: shouldOpenUrlInBackground(event)
+      });
+    }
+
     function createBookmarkCascadeItemIcon(item, index) {
       if (!documentObj) {
         return null;
@@ -1208,10 +1241,11 @@
           clearBookmarkCascadeLevelsFrom(safeLevelIndex + 1);
         };
 
-        const navigateLeafItem = () => {
+        const navigateLeafItem = (event) => {
           cancelBookmarkCascadeHoverIntent();
+          hideCursorTooltip();
           close();
-          navigateToUrl(item.url);
+          openBookmarkCascadeUrl(item.url, event);
         };
 
         bookmarkCascadeItemActions.set(itemButton, {
@@ -1264,6 +1298,10 @@
             }
           });
         } else {
+          bindCursorTooltip(itemButton, () => titleText, {
+            maxWidth: 460,
+            shouldShow: (_target, event) => shouldOpenUrlInBackground(event)
+          });
           itemButton.addEventListener('pointerenter', (event) => {
             clearBookmarkCascadePointerActiveItem(levelElement, itemButton, event);
             scheduleBookmarkCascadeHoverIntent({
@@ -1282,15 +1320,15 @@
             cancelBookmarkCascadeHoverIntent();
             activateLeafItem();
           });
-          itemButton.addEventListener('click', () => {
-            navigateLeafItem();
+          itemButton.addEventListener('click', (event) => {
+            navigateLeafItem(event);
           });
           itemButton.addEventListener('keydown', (event) => {
             if (!event || (event.key !== 'Enter' && event.key !== ' ')) {
               return;
             }
             event.preventDefault();
-            navigateLeafItem();
+            navigateLeafItem(event);
           });
         }
         contentElement.appendChild(itemButton);
@@ -1317,7 +1355,19 @@
       if (!folderId || !anchorElement || !documentObj || !documentObj.body) {
         return;
       }
+      if (isBookmarkCascadeHoverSuppressed(anchorElement, null)) {
+        if (typeof anchorElement._xSetBookmarkMenuVisualActive === 'function') {
+          anchorElement._xSetBookmarkMenuVisualActive(false);
+        }
+        return;
+      }
       Promise.resolve(ensureReady(false)).then((ready) => {
+        if (isBookmarkCascadeHoverSuppressed(anchorElement, null)) {
+          if (typeof anchorElement._xSetBookmarkMenuVisualActive === 'function') {
+            anchorElement._xSetBookmarkMenuVisualActive(false);
+          }
+          return;
+        }
         if (!ready || !anchorElement.isConnected) {
           if (typeof anchorElement._xSetBookmarkMenuVisualActive === 'function') {
             anchorElement._xSetBookmarkMenuVisualActive(false);

@@ -4,6 +4,8 @@ const vm = require('vm');
 
 const WALLPAPER_STORAGE_KEY = '_x_extension_newtab_wallpaper_2026_unique_';
 const LOCAL_WALLPAPER_STORAGE_KEY = '_x_extension_newtab_local_wallpaper_2026_unique_';
+const NEWTAB_FAVICON_STORAGE_KEY = '_x_extension_newtab_favicon_2026_unique_';
+const NEWTAB_FAVICON_PRELOAD_STORAGE_KEY = '_x_extension_newtab_favicon_preload_2026_unique_';
 const DEFAULT_WALLPAPER_ID = 'monet-coastal-white';
 const CUSTOM_WALLPAPER_ID_PREFIX = 'custom-wallpaper-';
 
@@ -153,17 +155,81 @@ function createFakeDocument() {
   const documentObj = {
     activeElement: null,
     body: null,
+    head: null,
     documentElement: null,
     createElement(tagName) {
       return createFakeElement(tagName, documentObj);
     }
   };
   documentObj.body = createFakeElement('body', documentObj);
+  documentObj.head = createFakeElement('head', documentObj);
   documentObj.documentElement = createFakeElement('html', documentObj);
   return documentObj;
 }
 
 function createFakeWindow() {
+  const mediaQueries = new Map();
+  const listenersByType = Object.create(null);
+  const localStorageData = new Map();
+  function getMediaQueryList(query) {
+    const text = String(query || '');
+    if (!mediaQueries.has(text)) {
+      const listeners = [];
+      mediaQueries.set(text, {
+        media: text,
+        matches: text.includes('prefers-reduced-motion'),
+        addEventListener(type, listener) {
+          if (String(type) === 'change' && typeof listener === 'function') {
+            listeners.push(listener);
+          }
+        },
+        removeEventListener(type, listener) {
+          if (String(type) !== 'change') {
+            return;
+          }
+          const index = listeners.indexOf(listener);
+          if (index !== -1) {
+            listeners.splice(index, 1);
+          }
+        },
+        addListener(listener) {
+          if (typeof listener === 'function') {
+            listeners.push(listener);
+          }
+        },
+        removeListener(listener) {
+          const index = listeners.indexOf(listener);
+          if (index !== -1) {
+            listeners.splice(index, 1);
+          }
+        },
+        _dispatch(matches) {
+          this.matches = Boolean(matches);
+          listeners.slice().forEach((listener) => listener(this));
+        },
+        _setMatches(matches) {
+          this.matches = Boolean(matches);
+        }
+      });
+    }
+    return mediaQueries.get(text);
+  }
+  function addWindowListener(type, listener) {
+    const key = String(type);
+    if (!listenersByType[key]) {
+      listenersByType[key] = [];
+    }
+    if (typeof listener === 'function') {
+      listenersByType[key].push(listener);
+    }
+  }
+  function removeWindowListener(type, listener) {
+    const key = String(type);
+    if (!listenersByType[key]) {
+      return;
+    }
+    listenersByType[key] = listenersByType[key].filter((item) => item !== listener);
+  }
   return {
     setTimeout,
     clearTimeout,
@@ -173,23 +239,80 @@ function createFakeWindow() {
     cancelAnimationFrame(id) {
       clearTimeout(id);
     },
-    addEventListener() {},
-    removeEventListener() {},
+    addEventListener: addWindowListener,
+    removeEventListener: removeWindowListener,
     innerWidth: 1280,
     innerHeight: 800,
     matchMedia(query) {
-      return {
-        matches: String(query || '').includes('prefers-reduced-motion'),
-        addEventListener() {},
-        removeEventListener() {}
-      };
+      return getMediaQueryList(query);
+    },
+    __setMediaMatch(query, matches) {
+      getMediaQueryList(query)._dispatch(matches);
+    },
+    __setMediaMatchSilently(query, matches) {
+      getMediaQueryList(query)._setMatches(matches);
+    },
+    __dispatchEvent(type) {
+      (listenersByType[String(type)] || []).slice().forEach((listener) => listener({ type: String(type) }));
     },
     localStorage: {
-      removeItem() {},
-      setItem() {},
-      getItem() {
-        return '';
+      removeItem(key) {
+        localStorageData.delete(String(key));
+      },
+      setItem(key, value) {
+        localStorageData.set(String(key), String(value));
+      },
+      getItem(key) {
+        return localStorageData.has(String(key)) ? localStorageData.get(String(key)) : '';
       }
+    },
+    __localStorageData: localStorageData
+  };
+}
+
+function createFakeBroadcastChannelClass() {
+  const channels = new Map();
+  return class FakeBroadcastChannel {
+    constructor(name) {
+      this.name = String(name || '');
+      this.onmessage = null;
+      this._listeners = [];
+      if (!channels.has(this.name)) {
+        channels.set(this.name, []);
+      }
+      channels.get(this.name).push(this);
+    }
+
+    addEventListener(type, listener) {
+      if (String(type) === 'message' && typeof listener === 'function') {
+        this._listeners.push(listener);
+      }
+    }
+
+    removeEventListener(type, listener) {
+      if (String(type) !== 'message') {
+        return;
+      }
+      this._listeners = this._listeners.filter((item) => item !== listener);
+    }
+
+    postMessage(data) {
+      const peers = channels.get(this.name) || [];
+      peers.forEach((peer) => {
+        if (peer === this) {
+          return;
+        }
+        const event = { data };
+        if (typeof peer.onmessage === 'function') {
+          peer.onmessage(event);
+        }
+        peer._listeners.slice().forEach((listener) => listener(event));
+      });
+    }
+
+    close() {
+      const peers = channels.get(this.name) || [];
+      channels.set(this.name, peers.filter((peer) => peer !== this));
     }
   };
 }
@@ -199,6 +322,237 @@ function getChildByClassName(element, className) {
     const classes = String(child.className || '').split(/\s+/);
     return classes.includes(className);
   });
+}
+
+function getDescendantsByClassName(element, className, results) {
+  const matches = results || [];
+  (element && element.children ? element.children : []).forEach((child) => {
+    const classes = String(child.className || '').split(/\s+/);
+    if (classes.includes(className)) {
+      matches.push(child);
+    }
+    getDescendantsByClassName(child, className, matches);
+  });
+  return matches;
+}
+
+function getDescendantByClassName(element, className) {
+  return getDescendantsByClassName(element, className)[0] || null;
+}
+
+function getDescendantByTagName(element, tagName) {
+  const needle = String(tagName || '').toUpperCase();
+  let match = null;
+  (function visit(node) {
+    if (!node || match) {
+      return;
+    }
+    (node.children || []).forEach((child) => {
+      if (match) {
+        return;
+      }
+      if (child.tagName === needle) {
+        match = child;
+        return;
+      }
+      visit(child);
+    });
+  })(element);
+  return match;
+}
+
+function decodeSvgDataUrl(url) {
+  const prefix = 'data:image/svg+xml;charset=UTF-8,';
+  assert.ok(String(url || '').startsWith(prefix), 'the alternate favicon should be rendered as an SVG data URL');
+  return decodeURIComponent(String(url).slice(prefix.length));
+}
+
+function assertSquareFaviconOptionCss(filePath) {
+  const source = fs.readFileSync(filePath, 'utf8');
+  const optionsRule = source.match(/\.x-nt-favicon-options\s*\{[\s\S]*?\}/);
+  assert.ok(optionsRule, `${filePath} should define favicon options layout`);
+  assert.match(optionsRule[0], /display:\s*flex;/, `${filePath} favicon options should not stretch as a grid`);
+  assert.match(optionsRule[0], /justify-content:\s*flex-start;/, `${filePath} favicon options should align left`);
+  assert.match(optionsRule[0], /gap:\s*var\(--x-nt-panel-grid-gap\);/, `${filePath} favicon options should use wallpaper grid gap`);
+  assert.doesNotMatch(optionsRule[0], /grid-template-columns/, `${filePath} favicon options should not use equal-width columns`);
+
+  const titleRule = source.match(/\.x-nt-favicon-title\s*\{[\s\S]*?\}/);
+  if (titleRule) {
+    assert.doesNotMatch(titleRule[0], /font-size:\s*13px;/, `${filePath} favicon title should match panel title size`);
+    assert.doesNotMatch(titleRule[0], /font-weight:\s*500;/, `${filePath} favicon title should match panel title weight`);
+  }
+
+  const optionRule = source.match(/\.x-nt-favicon-option\s*\{[\s\S]*?\}/);
+  assert.ok(optionRule, `${filePath} should define wallpaper-sized favicon option size`);
+  assert.match(
+    optionRule[0],
+    /width:\s*calc\(\(100% - \(var\(--x-nt-panel-grid-gap\) \* 2\)\) \/ 3\);/,
+    `${filePath} favicon option should match one wallpaper grid column`
+  );
+  assert.match(
+    optionRule[0],
+    /flex:\s*0\s+0\s+calc\(\(100% - \(var\(--x-nt-panel-grid-gap\) \* 2\)\) \/ 3\);/,
+    `${filePath} favicon option flex basis should match wallpaper grid columns`
+  );
+
+  const thumbRule = source.match(/\.x-nt-favicon-thumb\s*\{[\s\S]*?\}/);
+  assert.ok(thumbRule, `${filePath} should define favicon thumb size`);
+  assert.match(thumbRule[0], /width:\s*100%;/, `${filePath} favicon thumb should fill the wallpaper-width option`);
+  assert.match(thumbRule[0], /aspect-ratio:\s*1\s*\/\s*1;/, `${filePath} favicon thumb should use a square rounded rectangle`);
+  assert.match(thumbRule[0], /border:\s*none;/, `${filePath} favicon thumb should not add its own border`);
+  assert.doesNotMatch(thumbRule[0], /height:\s*44px;/, `${filePath} favicon thumb should not keep the compact fixed height`);
+
+  const selectedRule = source.match(/\.x-nt-favicon-option\[data-selected="true"\]\s+\.x-nt-favicon-thumb::after\s*\{[\s\S]*?\}/);
+  assert.ok(selectedRule, `${filePath} should define selected favicon outline alignment`);
+  assert.match(selectedRule[0], /inset:\s*0;/, `${filePath} selected favicon outline should not have inner spacing`);
+  assert.match(selectedRule[0], /border-radius:\s*inherit;/, `${filePath} selected favicon outline should inherit thumb radius`);
+}
+
+function readLocaleMessages(locale) {
+  return JSON.parse(fs.readFileSync(`_locales/${locale}/messages.json`, 'utf8'));
+}
+
+function assertBrandMarkCopy() {
+  const expected = {
+    zh_CN: {
+      title: '品牌标识',
+      toggle: '在新标签页搜索框上方显示品牌标识'
+    },
+    zh_TW: {
+      title: '品牌標識',
+      toggle: '在新分頁搜尋框上方顯示品牌標識'
+    },
+    en: {
+      title: 'Brand mark',
+      toggle: 'Show brand mark above the New Tab search bar'
+    },
+    ja: {
+      title: 'ブランドマーク',
+      toggle: '新しいタブの検索ボックス上にブランドマークを表示'
+    }
+  };
+  Object.keys(expected).forEach((locale) => {
+    const messages = readLocaleMessages(locale);
+    assert.strictEqual(messages.newtab_logo_title.message, expected[locale].title);
+    assert.strictEqual(messages.settings_newtab_wordmark_title.message, expected[locale].toggle);
+  });
+
+  const wallpaperSource = fs.readFileSync('src/newtab/wallpaper.js', 'utf8');
+  assert.match(wallpaperSource, /t\('newtab_logo_title', 'Brand mark'\)/);
+  assert.match(
+    wallpaperSource,
+    /t\('settings_newtab_wordmark_title', 'Show brand mark above the New Tab search bar'\)/
+  );
+  const optionsHtml = fs.readFileSync('src/options/options.html', 'utf8');
+  assert.match(optionsHtml, /在新标签页搜索框上方显示品牌标识/);
+}
+
+function assertThemeAwareAlternateFaviconAsset() {
+  const wallpaperSource = fs.readFileSync('src/newtab/wallpaper.js', 'utf8');
+  assert.match(
+    wallpaperSource,
+    /id:\s*'alternate'[\s\S]*?file:\s*'assets\/images\/lumno-newtab-favicon\.svg'/,
+    'alternate favicon option should use the theme-aware SVG asset'
+  );
+  assert.match(
+    wallpaperSource,
+    /id:\s*'alternate'[\s\S]*?type:\s*'image\/svg\+xml'/,
+    'alternate favicon should declare the SVG mime type'
+  );
+  assert.match(
+    wallpaperSource,
+    /function createNewtabFaviconPreview\(/,
+    'alternate favicon picker preview should render inline so it can follow UI theme'
+  );
+
+  const svg = fs.readFileSync('assets/images/lumno-newtab-favicon.svg', 'utf8');
+  assert.match(svg, /prefers-color-scheme:\s*dark/, 'alternate favicon SVG should adapt to dark Chrome themes');
+  assert.match(svg, /color:\s*#000000;/i, 'alternate favicon light theme should use the supplied SVG base color');
+  assert.match(svg, /--x-nt-favicon-main-opacity:\s*0\.5/i, 'alternate favicon should preserve the supplied SVG light opacity');
+  assert.match(svg, /--x-nt-favicon-main-opacity:\s*0\.72/i, 'alternate favicon dark theme should brighten the main mark');
+  assert.match(svg, /M14\.1832/, 'alternate favicon should use the supplied lumno1.svg shadow shape');
+  assert.match(svg, /M34\.0761/, 'alternate favicon should use the supplied lumno1.svg main shape');
+  assert.doesNotMatch(svg, /M15\.204/, 'alternate favicon should not keep the previous two-path source shape');
+  assert.match(wallpaperSource, /M14\.1832/, 'favicon picker preview should use the supplied lumno1.svg shadow shape');
+  assert.match(wallpaperSource, /M34\.0761/, 'favicon picker preview should use the supplied lumno1.svg main shape');
+  assert.doesNotMatch(wallpaperSource, /M15\.204/, 'favicon picker preview should not keep the previous two-path source shape');
+  assert.doesNotMatch(svg, /M41\.4736/, 'alternate favicon should not keep the older decorative source path');
+  assert.match(svg, /currentColor/, 'alternate favicon SVG should be tintable from its root color');
+  assert.doesNotMatch(svg, /fill="black"/i, 'alternate favicon should not keep fixed black fills');
+  assert.doesNotMatch(svg, /url\(#paint/i, 'alternate favicon should not depend on fixed gradient paints');
+
+  ['src/newtab/newtab.html'].forEach((filePath) => {
+    const html = fs.readFileSync(filePath, 'utf8');
+    assert.match(
+      html,
+      /body\[data-theme="dark"\]\s+\.x-nt-favicon-svg-preview\s*\{[\s\S]*?color:\s*#f1f3f4;[\s\S]*?--x-nt-favicon-main-opacity:\s*0\.72;/,
+      `${filePath} should tint the SVG picker preview from the actual UI dark theme`
+    );
+  });
+}
+
+function testNewtabFaviconPreloadAppliesCachedAlternateBeforeMainRuntime() {
+  const documentObj = createFakeDocument();
+  const windowObj = createFakeWindow();
+  windowObj.localStorage.setItem(NEWTAB_FAVICON_PRELOAD_STORAGE_KEY, 'alternate');
+  const sandbox = {
+    document: documentObj,
+    window: windowObj,
+    chrome: {
+      runtime: {
+        getURL: (path) => `chrome-extension://abc/${String(path || '').replace(/^\/+/, '')}`
+      }
+    }
+  };
+
+  vm.runInNewContext(fs.readFileSync('src/newtab/wallpaper-preload.js', 'utf8'), sandbox, {
+    filename: 'src/newtab/wallpaper-preload.js'
+  });
+
+  const faviconLink = documentObj.head.children.find((child) => child.tagName === 'LINK' &&
+    child.getAttribute('data-lumno-newtab-favicon') === 'true');
+  assert.ok(faviconLink, 'wallpaper preload should apply the cached New Tab favicon before main runtime');
+  assert.strictEqual(faviconLink.getAttribute('rel'), 'icon');
+  assert.strictEqual(faviconLink.getAttribute('type'), 'image/svg+xml');
+  assert.strictEqual(faviconLink.getAttribute('sizes'), 'any');
+  assert.strictEqual(faviconLink.getAttribute('data-newtab-favicon-id'), 'alternate');
+  assert.ok(
+    faviconLink.getAttribute('href').includes('assets/images/lumno-newtab-favicon.svg'),
+    'cached alternate favicon should use the theme-aware monochrome SVG asset before the colorful default can flash'
+  );
+
+  ['src/newtab/newtab.html', 'src/newtab/lumno-newtab.html'].forEach((filePath) => {
+    const html = fs.readFileSync(filePath, 'utf8');
+    const staticFaviconIndex = html.indexOf('data-lumno-newtab-favicon="true"');
+    const firstStylesheetIndex = html.indexOf('<link rel="stylesheet"');
+    assert.ok(staticFaviconIndex !== -1, `${filePath} should include a static monochrome favicon link`);
+    assert.ok(
+      staticFaviconIndex < html.indexOf('<title>'),
+      `${filePath} should expose the monochrome favicon before the title can use the extension default icon`
+    );
+    assert.ok(
+      staticFaviconIndex < html.indexOf('<script src="wallpaper-preload.js"></script>'),
+      `${filePath} should expose the monochrome favicon before the external preload script runs`
+    );
+    if (firstStylesheetIndex !== -1) {
+      assert.ok(
+        html.indexOf('<script src="wallpaper-preload.js"></script>') < firstStylesheetIndex,
+        `${filePath} should run wallpaper-preload before stylesheets so favicon is set early`
+      );
+    }
+  });
+
+  const fallbackHtml = fs.readFileSync('src/newtab/lumno-newtab.html', 'utf8');
+  assert.match(
+    fallbackHtml,
+    /new URL\('newtab\.html', window\.location\.href\)/,
+    'lumno-newtab fallback should redirect into the maintained primary newtab document'
+  );
+  assert.doesNotMatch(
+    fallbackHtml,
+    /<script src="newtab\.js"><\/script>/,
+    'lumno-newtab fallback should not duplicate the primary newtab runtime dependency list'
+  );
 }
 
 function createMemoryStorage(initialData) {
@@ -280,6 +634,7 @@ function createWallpaperSandbox(options) {
     globalThis: null,
     document: testDocument,
     window: testWindow,
+    BroadcastChannel: options && options.BroadcastChannel ? options.BroadcastChannel : undefined,
     chrome: {
       runtime: {
         getURL: (path) => `chrome-extension://abc/${String(path || '').replace(/^\/+/, '')}`
@@ -500,9 +855,184 @@ async function testLegacySyncedCustomWallpaperMigratesToLocalOnlySelection() {
   );
 }
 
+async function testNewtabFaviconOptionsRenderBelowLogoAndPersistSelection() {
+  const syncStorage = createMemoryStorage({
+    [NEWTAB_FAVICON_STORAGE_KEY]: 'default'
+  });
+  const { documentObj: testDocument, windowObj: testWindow, sandbox: testSandbox } = createWallpaperSandbox();
+  const testRuntime = testSandbox.LumnoNewtabWallpaper.createWallpaperRuntime({
+    documentObj: testDocument,
+    windowObj: testWindow,
+    storageArea: syncStorage,
+    storageKeys: {
+      favicon: NEWTAB_FAVICON_STORAGE_KEY
+    },
+    t: (_key, fallback) => fallback || '',
+    formatMessage: (_key, fallback, params) => String(fallback || '').replace('{name}', params.name),
+    getRiSvg: () => ''
+  });
+
+  await testRuntime.bootstrapInitialNewtabFavicon();
+  testRuntime.createControls();
+  const testControl = testRuntime.getControlElement();
+  testControl.children[1].click();
+  const testPanel = testControl.children[0];
+  const faviconGroup = getDescendantByClassName(testPanel, 'x-nt-favicon-group');
+  const faviconTitle = getDescendantByClassName(testPanel, 'x-nt-favicon-title');
+  const faviconOptions = getDescendantByClassName(testPanel, 'x-nt-favicon-options');
+
+  assert.ok(faviconGroup, 'Logo section should render a New Tab favicon group');
+  assert.strictEqual(faviconTitle.textContent, 'New Tab favicon');
+  assert.strictEqual(faviconOptions.children.length, 2, 'favicon selector should reserve two icon slots');
+  assert.strictEqual(faviconOptions.children[0].getAttribute('data-newtab-favicon-id'), 'default');
+  assert.strictEqual(faviconOptions.children[1].getAttribute('data-newtab-favicon-id'), 'alternate');
+  assert.strictEqual(faviconOptions.children[0].getAttribute('data-selected'), 'true');
+  assert.strictEqual(faviconOptions.children[1].getAttribute('data-selected'), 'false');
+
+  const firstIcon = getDescendantByTagName(faviconOptions.children[0], 'img');
+  assert.ok(
+    firstIcon.src.includes('assets/images/lumno.png'),
+    'default favicon option should use the current extension icon'
+  );
+  const secondIconPreview = getDescendantByClassName(faviconOptions.children[1], 'x-nt-favicon-svg-preview');
+  assert.ok(secondIconPreview, 'alternate favicon option should use an inline SVG preview');
+
+  faviconOptions.children[1].click();
+
+  assert.strictEqual(
+    syncStorage.data[NEWTAB_FAVICON_STORAGE_KEY],
+    'alternate',
+    'clicking the reserved favicon slot should persist the selected favicon id'
+  );
+  assert.strictEqual(
+    testWindow.localStorage.getItem(NEWTAB_FAVICON_PRELOAD_STORAGE_KEY),
+    'alternate',
+    'selecting the alternate favicon should cache it for the next New Tab preload'
+  );
+  assert.strictEqual(faviconOptions.children[0].getAttribute('data-selected'), 'false');
+  assert.strictEqual(faviconOptions.children[1].getAttribute('data-selected'), 'true');
+  const faviconLink = testDocument.head.children.find((child) => child.tagName === 'LINK');
+  assert.ok(faviconLink, 'selecting a favicon should apply a document icon link');
+  assert.strictEqual(faviconLink.getAttribute('rel'), 'icon');
+  assert.strictEqual(faviconLink.getAttribute('type'), 'image/svg+xml');
+  assert.strictEqual(faviconLink.getAttribute('sizes'), 'any');
+  assert.strictEqual(faviconLink.getAttribute('data-newtab-favicon-id'), 'alternate');
+  assert.strictEqual(faviconLink.getAttribute('data-lumno-newtab-favicon-theme'), 'light');
+  const lightHref = faviconLink.getAttribute('href');
+  const lightSvg = decodeSvgDataUrl(lightHref);
+  assert.match(lightSvg, /fill="#000000"/, 'light browser mode should use the dark original mark color');
+  assert.match(lightSvg, /fill-opacity="0\.5"/, 'light browser mode should preserve the supplied main opacity');
+
+  testWindow.__setMediaMatch('(prefers-color-scheme: dark)', true);
+
+  assert.strictEqual(faviconLink.getAttribute('data-lumno-newtab-favicon-theme'), 'dark');
+  const darkHref = faviconLink.getAttribute('href');
+  const darkSvg = decodeSvgDataUrl(darkHref);
+  assert.notStrictEqual(darkHref, lightHref, 'browser color-scheme changes should refresh the favicon href');
+  assert.match(darkSvg, /fill="#f1f3f4"/, 'dark browser mode should use a light visible mark color');
+  assert.match(darkSvg, /fill-opacity="0\.72"/, 'dark browser mode should brighten the main mark');
+
+  testWindow.__setMediaMatch('(prefers-color-scheme: dark)', false);
+
+  assert.strictEqual(faviconLink.getAttribute('data-lumno-newtab-favicon-theme'), 'light');
+  assert.strictEqual(
+    faviconLink.getAttribute('href'),
+    lightHref,
+    'switching the browser back to light mode should restore the light favicon'
+  );
+
+  testWindow.__setMediaMatchSilently('(prefers-color-scheme: dark)', true);
+  assert.strictEqual(
+    faviconLink.getAttribute('href'),
+    lightHref,
+    'background tabs can miss the media query change while staying on their old favicon'
+  );
+
+  testWindow.__dispatchEvent('focus');
+
+  assert.strictEqual(
+    faviconLink.getAttribute('data-lumno-newtab-favicon-theme'),
+    'dark',
+    'refocusing a background new tab should re-check the browser color scheme'
+  );
+  assert.match(
+    decodeSvgDataUrl(faviconLink.getAttribute('href')),
+    /fill="#f1f3f4"/,
+    'refocusing a background new tab should refresh to the dark favicon'
+  );
+}
+
+async function testNewtabFaviconThemeBroadcastRefreshesBackgroundTabs() {
+  const BroadcastChannel = createFakeBroadcastChannelClass();
+  const foregroundStorage = createMemoryStorage({
+    [NEWTAB_FAVICON_STORAGE_KEY]: 'alternate'
+  });
+  const backgroundStorage = createMemoryStorage({
+    [NEWTAB_FAVICON_STORAGE_KEY]: 'alternate'
+  });
+  const foreground = createWallpaperSandbox({ BroadcastChannel });
+  const background = createWallpaperSandbox({ BroadcastChannel });
+  const foregroundRuntime = foreground.sandbox.LumnoNewtabWallpaper.createWallpaperRuntime({
+    documentObj: foreground.documentObj,
+    windowObj: foreground.windowObj,
+    storageArea: foregroundStorage,
+    storageKeys: {
+      favicon: NEWTAB_FAVICON_STORAGE_KEY
+    },
+    t: (_key, fallback) => fallback || '',
+    getRiSvg: () => ''
+  });
+  const backgroundRuntime = background.sandbox.LumnoNewtabWallpaper.createWallpaperRuntime({
+    documentObj: background.documentObj,
+    windowObj: background.windowObj,
+    storageArea: backgroundStorage,
+    storageKeys: {
+      favicon: NEWTAB_FAVICON_STORAGE_KEY
+    },
+    t: (_key, fallback) => fallback || '',
+    getRiSvg: () => ''
+  });
+
+  await Promise.all([
+    foregroundRuntime.bootstrapInitialNewtabFavicon(),
+    backgroundRuntime.bootstrapInitialNewtabFavicon()
+  ]);
+  const backgroundFaviconLink = background.documentObj.head.children.find((child) => child.tagName === 'LINK');
+  const lightHref = backgroundFaviconLink.getAttribute('href');
+
+  assert.strictEqual(backgroundFaviconLink.getAttribute('data-lumno-newtab-favicon-theme'), 'light');
+
+  background.windowObj.__setMediaMatchSilently('(prefers-color-scheme: dark)', true);
+  foreground.windowObj.__setMediaMatch('(prefers-color-scheme: dark)', true);
+
+  assert.strictEqual(
+    backgroundFaviconLink.getAttribute('data-lumno-newtab-favicon-theme'),
+    'dark',
+    'a foreground new tab should broadcast browser theme changes to background new tabs'
+  );
+  assert.notStrictEqual(
+    backgroundFaviconLink.getAttribute('href'),
+    lightHref,
+    'background new tabs should refresh their favicon without being focused'
+  );
+  assert.match(
+    decodeSvgDataUrl(backgroundFaviconLink.getAttribute('href')),
+    /fill="#f1f3f4"/,
+    'broadcast refresh should update background new tabs to the dark favicon'
+  );
+}
+
 Promise.resolve()
+  .then(() => {
+    assertBrandMarkCopy();
+    assertThemeAwareAlternateFaviconAsset();
+    assertSquareFaviconOptionCss('src/newtab/newtab.html');
+  })
+  .then(testNewtabFaviconPreloadAppliesCachedAlternateBeforeMainRuntime)
   .then(testSyncedCustomWallpaperWithoutLocalRecordFallsBackToDefault)
   .then(testLegacySyncedCustomWallpaperMigratesToLocalOnlySelection)
+  .then(testNewtabFaviconOptionsRenderBelowLogoAndPersistSelection)
+  .then(testNewtabFaviconThemeBroadcastRefreshesBackgroundTabs)
   .then(() => {
     console.log('newtab wallpaper panel tests passed');
   })

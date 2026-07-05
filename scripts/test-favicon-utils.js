@@ -22,6 +22,16 @@ assert.strictEqual(utils.isFaviconProxyUrl('https://www.google.com/s2/favicons?d
 assert.strictEqual(utils.isFaviconProxyUrl('chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Fexample.com%2F'), true);
 assert.strictEqual(utils.isFaviconProxyUrl('https://t2.gstatic.cn/faviconV2?url=https%3A%2F%2Fexample.com%2F'), true);
 assert.strictEqual(utils.isFaviconProxyUrl('https://example.com/favicon.ico'), false);
+assert.strictEqual(
+  utils.isSafeVirtualFaviconRequestUrl('chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Fexample.com%2F'),
+  true
+);
+assert.strictEqual(utils.isSafeVirtualFaviconRequestUrl('chrome://favicon2/?pageUrl=https%3A%2F%2Fexample.com%2F'), true);
+assert.strictEqual(
+  utils.isSafeVirtualFaviconRequestUrl('https://t2.gstatic.cn/faviconV2?url=https%3A%2F%2Fexample.com%2F'),
+  false
+);
+assert.strictEqual(utils.isSafeVirtualFaviconRequestUrl('https://example.com/favicon.ico'), false);
 
 assert.strictEqual(
   utils.getExtensionFaviconUrl('https://example.com/a b', {
@@ -150,8 +160,29 @@ assert.strictEqual(utils.shouldBlockFaviconForHost('localhost'), false);
 assert.strictEqual(utils.shouldBlockFaviconForHost('192.168.1.8'), false);
 assert.strictEqual(utils.shouldBlockFaviconForHost('service.internal'), false);
 assert.strictEqual(utils.shouldBlockFaviconForHost('example.com'), false);
+assert.strictEqual(
+  typeof utils.shouldAvoidDirectFaviconForHost,
+  'function',
+  'favicon utils should expose a direct favicon avoidance predicate'
+);
+assert.strictEqual(utils.shouldAvoidDirectFaviconForHost('localhost'), true);
+assert.strictEqual(utils.shouldAvoidDirectFaviconForHost('192.168.1.8'), true);
+assert.strictEqual(utils.shouldAvoidDirectFaviconForHost('10.1.2.3'), true);
+assert.strictEqual(utils.shouldAvoidDirectFaviconForHost('service.internal'), true);
+assert.strictEqual(utils.shouldAvoidDirectFaviconForHost('example.com'), false);
+const localHostPolicy = utils.getFaviconHostPolicy('192.168.1.8');
+assert.strictEqual(localHostPolicy.hardBlocked, false);
+assert.strictEqual(localHostPolicy.avoidDirect, true);
+assert.strictEqual(utils.shouldBlockDirectFaviconHost('service.internal'), true);
+const proxyLocalPolicy = utils.getFaviconUrlPolicy('https://t2.gstatic.cn/faviconV2?url=http%3A%2F%2F192.168.1.8%2F&size=128');
+assert.strictEqual(proxyLocalPolicy.hardBlocked, false);
+assert.strictEqual(proxyLocalPolicy.avoidDirect, false);
 
-assert.strictEqual(utils.isBlockedLocalFaviconUrl('https://127.0.0.1/favicon.ico'), false);
+assert.strictEqual(utils.isBlockedLocalFaviconUrl('https://127.0.0.1/favicon.ico'), true);
+assert.strictEqual(utils.isBlockedLocalFaviconUrl('http://192.168.1.8/favicon.ico'), true);
+assert.strictEqual(utils.isBlockedLocalFaviconUrl('https://service.internal/favicon.svg'), true);
+assert.strictEqual(utils.isBlockedLocalFaviconUrl('https://example.com/icon.png?pageUrl=http%3A%2F%2F192.168.1.8%2F'), true);
+assert.strictEqual(utils.isBlockedLocalFaviconUrl('chrome-extension://abc/assets/images/lumno.png'), false);
 assert.strictEqual(
   utils.isBlockedLocalFaviconUrl('chrome://favicon2/?url=http%3A%2F%2F192.168.1.8%2F'),
   false
@@ -167,6 +198,10 @@ assert.strictEqual(
 );
 assert.strictEqual(
   utils.isBlockedLocalFaviconUrl('chrome-extension://abc/_favicon/?pageUrl=http%3A%2F%2F192.168.1.8%2F&size=128'),
+  false
+);
+assert.strictEqual(
+  utils.isBlockedLocalFaviconUrl('https://t2.gstatic.cn/faviconV2?url=http%3A%2F%2F192.168.1.8%2F&size=128'),
   false
 );
 assert.strictEqual(utils.isBlockedLocalFaviconUrl('https://example.com/favicon.ico'), false);

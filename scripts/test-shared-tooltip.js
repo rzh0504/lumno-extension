@@ -69,9 +69,11 @@ function createFakeElement(tagName) {
   const attributes = new Map();
   const classes = new Set();
   const properties = new Map();
+  const listeners = new Map();
   return {
     tagName,
     children,
+    listeners,
     isConnected: true,
     ownerDocument: null,
     className: '',
@@ -97,7 +99,11 @@ function createFakeElement(tagName) {
     setAttribute: (name, value) => attributes.set(name, String(value)),
     getAttribute: (name) => attributes.get(name) || '',
     removeAttribute: (name) => attributes.delete(name),
-    addEventListener: () => {},
+    addEventListener: (eventName, listener) => {
+      const existing = listeners.get(eventName) || [];
+      existing.push(listener);
+      listeners.set(eventName, existing);
+    },
     matches: () => true,
     getBoundingClientRect: () => ({ top: 80, left: 120, right: 152, bottom: 112, width: 32, height: 32 })
   };
@@ -147,6 +153,27 @@ assert.ok(
 
 controller.hide();
 assert.strictEqual(element.getAttribute('data-visible'), 'false', 'hide() should mark tooltip hidden');
+
+const focusTarget = createFakeElement('button');
+controller.bind(focusTarget, () => 'Focus tooltip');
+assert.strictEqual(
+  focusTarget.listeners.get('focus').length,
+  1,
+  'bind() should keep focus tooltips enabled by default'
+);
+
+const hoverOnlyTarget = createFakeElement('button');
+controller.bind(hoverOnlyTarget, () => 'Hover only tooltip', { showOnFocus: false });
+assert.strictEqual(
+  hoverOnlyTarget.listeners.get('mouseenter').length,
+  1,
+  'bind() should still attach hover listeners when focus tooltips are disabled'
+);
+assert.strictEqual(
+  hoverOnlyTarget.listeners.get('focus'),
+  undefined,
+  'bind() should skip focus listeners when showOnFocus is false'
+);
 
 const newtabHtml = fs.readFileSync(newtabHtmlPath, 'utf8');
 const optionsHtml = fs.readFileSync(optionsHtmlPath, 'utf8');

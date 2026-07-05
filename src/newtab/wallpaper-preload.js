@@ -1,6 +1,20 @@
 (function() {
   const PRELOAD_STORAGE_KEY = '_x_extension_newtab_wallpaper_preload_2026_unique_';
+  const FAVICON_STORAGE_KEY = '_x_extension_newtab_favicon_2026_unique_';
+  const FAVICON_PRELOAD_STORAGE_KEY = '_x_extension_newtab_favicon_preload_2026_unique_';
   const WALLPAPER_PATH_PATTERN = /^output\/imagegen\/[-.\w]+\.webp$/;
+  const FAVICON_OPTIONS = {
+    default: {
+      file: 'assets/images/lumno.png',
+      type: 'image/png',
+      sizes: ''
+    },
+    alternate: {
+      file: 'assets/images/lumno-newtab-favicon.svg',
+      type: 'image/svg+xml',
+      sizes: 'any'
+    }
+  };
 
   function readCachedWallpaperPath() {
     try {
@@ -21,6 +35,96 @@
       return window.chrome.runtime.getURL(path);
     }
     return `../../${path}`;
+  }
+
+  function normalizeFaviconId(value) {
+    const id = String(value || '').trim();
+    return Object.prototype.hasOwnProperty.call(FAVICON_OPTIONS, id) ? id : '';
+  }
+
+  function readCachedFaviconId() {
+    try {
+      return normalizeFaviconId(window.localStorage ?
+        window.localStorage.getItem(FAVICON_PRELOAD_STORAGE_KEY) :
+        '');
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function cacheFaviconId(id) {
+    const normalized = normalizeFaviconId(id);
+    if (!normalized) {
+      return;
+    }
+    try {
+      if (window.localStorage) {
+        window.localStorage.setItem(FAVICON_PRELOAD_STORAGE_KEY, normalized);
+      }
+    } catch (e) {
+      // Ignore private-mode or quota failures; the runtime still applies the favicon later.
+    }
+  }
+
+  function getFaviconLink() {
+    if (!document.head) {
+      return null;
+    }
+    const existing = Array.from(document.head.children || []).find((child) => {
+      return child &&
+        String(child.tagName || '').toUpperCase() === 'LINK' &&
+        child.getAttribute &&
+        child.getAttribute('data-lumno-newtab-favicon') === 'true';
+    });
+    if (existing) {
+      return existing;
+    }
+    const link = document.createElement('link');
+    link.setAttribute('data-lumno-newtab-favicon', 'true');
+    document.head.appendChild(link);
+    return link;
+  }
+
+  function applyFaviconId(id) {
+    const normalized = normalizeFaviconId(id);
+    const item = normalized ? FAVICON_OPTIONS[normalized] : null;
+    const link = item ? getFaviconLink() : null;
+    if (!link) {
+      return false;
+    }
+    link.setAttribute('rel', 'icon');
+    link.setAttribute('type', item.type);
+    link.setAttribute('href', getRuntimeUrl(item.file));
+    link.setAttribute('data-newtab-favicon-id', normalized);
+    if (item.sizes) {
+      link.setAttribute('sizes', item.sizes);
+    } else {
+      link.removeAttribute('sizes');
+    }
+    return true;
+  }
+
+  function applyStoredFaviconWhenAvailable() {
+    const cachedId = readCachedFaviconId();
+    if (cachedId) {
+      applyFaviconId(cachedId);
+    }
+    try {
+      const storage = window.chrome && window.chrome.storage && window.chrome.storage.sync;
+      if (!storage || typeof storage.get !== 'function') {
+        return;
+      }
+      storage.get([FAVICON_STORAGE_KEY], (result) => {
+        const nextId = normalizeFaviconId(result && result[FAVICON_STORAGE_KEY]);
+        if (!nextId) {
+          return;
+        }
+        cacheFaviconId(nextId);
+        applyFaviconId(nextId);
+      });
+    } catch (e) {
+      // Best-effort only; wallpaper.js applies the definitive favicon after boot.
+    }
   }
 
   function getCssUrlValue(url) {
@@ -49,6 +153,8 @@
       }
     }, { once: true });
   }
+
+  applyStoredFaviconWhenAvailable();
 
   const path = readCachedWallpaperPath();
   if (!path) {

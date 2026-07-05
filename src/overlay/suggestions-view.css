@@ -10,6 +10,7 @@
   min-height: 0;
   max-height: var(--x-ov-suggestions-max-height, 580px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   scrollbar-width: none;
   -ms-overflow-style: none;
   background: transparent;

@@ -177,6 +177,9 @@ function createRuntime(options) {
         const host = String(hostname || '').toLowerCase();
         return host === '127.0.0.1' || host === 'localhost';
       },
+      isEnhancedFaviconFetchEnabled() {
+        return config.enhancedFaviconFetchEnabled !== false;
+      },
       isBlockedLocalFaviconUrl() {
         return false;
       },
@@ -366,6 +369,38 @@ async function testOverlayFallsBackWhenLocalFaviconDataUnavailable() {
   assert.strictEqual(img.src, '', 'local overlay favicon should not assign a page-visible image src');
 }
 
+async function testOverlaySkipsRootIconProbeWhenEnhancedFetchDisabled() {
+  const requestedUrls = [];
+  const { runtime, localPageUrl, extensionUrl } = createRuntime({
+    enhancedFaviconFetchEnabled: false,
+    requestFaviconData(url) {
+      requestedUrls.push(url);
+      return Promise.resolve(null);
+    }
+  });
+  const img = createFakeImage();
+  let failed = false;
+
+  runtime.attachResolvedFaviconWithFallbacks(
+    img,
+    localPageUrl,
+    '127.0.0.1',
+    extensionUrl,
+    () => {
+      failed = true;
+    }
+  );
+
+  await wait(4);
+
+  assert.strictEqual(failed, true, 'disabled enhanced favicon fetching should still fall back cleanly');
+  assert.deepStrictEqual(
+    requestedUrls,
+    [extensionUrl],
+    'disabled enhanced favicon fetching should not probe root icon files'
+  );
+}
+
 async function testOverlayUsesChromeFavicon2ForBrowserInternalPages() {
   const requestedUrls = [];
   const {
@@ -446,6 +481,7 @@ async function testOverlayUsesExtensionFaviconProxyForBrowserInternalPagesWithou
 
 testOverlayResolvesLocalFaviconThroughDataUrl()
   .then(testOverlayFallsBackWhenLocalFaviconDataUnavailable)
+  .then(testOverlaySkipsRootIconProbeWhenEnhancedFetchDisabled)
   .then(testOverlayUsesChromeFavicon2ForBrowserInternalPages)
   .then(testOverlayUsesExtensionFaviconProxyForBrowserInternalPagesWithoutExplicitIcon)
   .then(testOverlayRendererLetsLocalFaviconsReachRuntime)

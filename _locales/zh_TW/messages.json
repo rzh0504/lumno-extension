@@ -110,6 +110,12 @@
   "settings_search_result_sources_title": {
     "message": "顯示結果類型"
   },
+  "settings_favicon_enhanced_fetch_title": {
+    "message": "增強圖示與主題色取得"
+  },
+  "settings_favicon_enhanced_fetch_desc": {
+    "message": "內網或 VPN 頁面若出現「要求存取區域網路上的其他裝置」提示，可關閉此項。"
+  },
   "search_result_priority_autocomplete": {
     "message": "補全優先"
   },
@@ -288,10 +294,10 @@
     "message": "受限頁（如 chrome://、擴充功能商店、部分 file:// 頁面）無法開啟聚焦搜尋；按下快捷鍵將依此處規則處理"
   },
   "restricted_action_default": {
-    "message": "前往新分頁"
+    "message": "前往 Lumno 新分頁"
   },
   "restricted_action_none": {
-    "message": "無操作"
+    "message": "遵循瀏覽器設定"
   },
   "newtab_file_access_notice_title": {
     "message": "由於瀏覽器限制，若要在本機檔案頁面（如 PDF、HTML）中喚起聚焦搜尋，請手動開啟「允許存取檔案網址」"
@@ -387,7 +393,10 @@
     "message": "深色"
   },
   "settings_newtab_wordmark_title": {
-    "message": "在新分頁搜尋框上方顯示 Logo"
+    "message": "在新分頁搜尋框上方顯示品牌標識"
+  },
+  "settings_newtab_shortcuts_title": {
+    "message": "快捷方式"
   },
   "settings_wallpaper_title": {
     "message": "新分頁壁紙"
@@ -444,7 +453,22 @@
     "message": "壁紙"
   },
   "newtab_logo_title": {
-    "message": "Logo"
+    "message": "品牌標識"
+  },
+  "newtab_favicon_title": {
+    "message": "新分頁 favicon"
+  },
+  "newtab_favicon_name_default": {
+    "message": "預設"
+  },
+  "newtab_favicon_name_alternate": {
+    "message": "備用"
+  },
+  "newtab_favicon_select_label": {
+    "message": "選擇 {name} favicon"
+  },
+  "newtab_favicon_save_error": {
+    "message": "favicon 儲存失敗"
   },
   "newtab_wallpaper_builtin_section": {
     "message": "內建"
@@ -711,10 +735,10 @@
     "message": "搜尋與最近訪問黑名單"
   },
   "blacklist_section_desc": {
-    "message": "想讓某些網址不再出現在搜尋結果、最近訪問或最常訪問裡，就加在這裡。"
+    "message": "若要徹底禁止某些網址出現在 Lumno 的搜尋結果和新分頁中，請在此加入。"
   },
   "blacklist_group_custom": {
-    "message": "隱藏這些 URL"
+    "message": "全域停用"
   },
   "blacklist_label_url": {
     "message": "URL 規則"
@@ -780,7 +804,7 @@
     "message": "baidu.com"
   },
   "blacklist_add": {
-    "message": "加入隱藏規則"
+    "message": "加入"
   },
   "blacklist_empty": {
     "message": "尚未加入黑名單 URL"
@@ -805,18 +829,6 @@
   },
   "blacklist_removed_toast": {
     "message": "已從黑名單移除"
-  },
-  "favicon_blacklist_section_title": {
-    "message": "只關掉圖標抓取"
-  },
-  "favicon_blacklist_section_desc": {
-    "message": "如果某個區域網路或 VPN 站點一直跳出本地網路權限提示，就加在這裡。它還是能正常顯示、搜尋和開啟，只是不再抓圖標和主題色。"
-  },
-  "favicon_blacklist_add": {
-    "message": "加入排除規則"
-  },
-  "favicon_blacklist_removed_toast": {
-    "message": "已從圖標抓取排除中移除"
   },
   "shortcuts_group_builtin": {
     "message": "內建"
@@ -920,9 +932,6 @@
   "blacklist_clear": {
     "message": "清空隱藏規則"
   },
-  "favicon_blacklist_clear": {
-    "message": "清空排除規則"
-  },
   "toast_cleared": {
     "message": "已清空"
   },
@@ -931,9 +940,6 @@
   },
   "confirm_clear_blacklist": {
     "message": "確認清空隱藏規則？"
-  },
-  "confirm_clear_favicon_blacklist": {
-    "message": "確認清空排除規則？"
   },
   "confirm_reset_builtin": {
     "message": "確認重設內建清單？"
@@ -1024,6 +1030,12 @@
   },
   "action_open_new_tab": {
     "message": "新開"
+  },
+  "action_open_background_new_tab": {
+    "message": "在背景新開"
+  },
+  "action_open_background_tab": {
+    "message": "在背景開啟"
   },
   "action_go_current_tab": {
     "message": "前往"
@@ -1426,6 +1438,54 @@
   },
   "shortcut_reference_document_pip_child_desc": {
     "message": "選擇網頁剪裁目標時切到更小的子層元素"
+  },
+  "newtab_shortcuts_section_label": {
+    "message": "快捷方式"
+  },
+  "newtab_shortcuts_add": {
+    "message": "新增快捷方式"
+  },
+  "newtab_shortcuts_dialog_title": {
+    "message": "新增快捷方式"
+  },
+  "newtab_shortcuts_name_label": {
+    "message": "名稱"
+  },
+  "newtab_shortcuts_name_placeholder": {
+    "message": "Lumno"
+  },
+  "newtab_shortcuts_url_label": {
+    "message": "網址"
+  },
+  "newtab_shortcuts_url_placeholder": {
+    "message": "https://example.com"
+  },
+  "newtab_shortcuts_cancel": {
+    "message": "取消"
+  },
+  "newtab_shortcuts_done": {
+    "message": "完成"
+  },
+  "newtab_shortcuts_save": {
+    "message": "儲存"
+  },
+  "newtab_shortcuts_invalid_url": {
+    "message": "請輸入有效的 http 或 https 網址"
+  },
+  "newtab_shortcuts_added": {
+    "message": "已新增快捷方式"
+  },
+  "newtab_shortcuts_edited": {
+    "message": "已更新快捷方式"
+  },
+  "newtab_shortcuts_removed": {
+    "message": "已移除快捷方式"
+  },
+  "newtab_shortcuts_edit_dialog_title": {
+    "message": "編輯快捷方式"
+  },
+  "newtab_shortcuts_context_menu_label": {
+    "message": "快捷方式操作"
   },
   "settings_tab_switcher_title": {
     "message": "AltQ 分頁切換器"

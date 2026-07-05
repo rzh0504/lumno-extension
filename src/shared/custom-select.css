@@ -202,6 +202,13 @@ body[data-theme="dark"] ._x_extension_select_wrap_2024_unique_[data-open="true"]
   color: var(--panel-text, #111827);
 }
 
+@supports (corner-shape: superellipse(1.25)) {
+  ._x_extension_select_menu_2024_unique_,
+  ._x_extension_select_option_2024_unique_ {
+    corner-shape: superellipse(1.25);
+  }
+}
+
 ._x_extension_select_icon_2024_unique_ {
   position: absolute;
   right: 10px;

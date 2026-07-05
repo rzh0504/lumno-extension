@@ -45,6 +45,22 @@ function getCssZIndex(source, selector) {
   return Number.parseInt(match[1], 10);
 }
 
+function getCssNumericDeclaration(source, selector, propertyName) {
+  const body = getCssRuleBody(source, selector);
+  const escapedProperty = String(propertyName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = body.match(new RegExp(`${escapedProperty}:\\s*(-?\\d+)`));
+  assert.ok(match, `${selector} should define ${propertyName} as a numeric value`);
+  return Number.parseInt(match[1], 10);
+}
+
+function assertBookmarkCursorTooltipAboveCascade(source, label) {
+  assert.ok(
+    getCssNumericDeclaration(source, '.x-nt-bookmark-cursor-tooltip', '--x-extension-tooltip-z-index') >
+      getCssZIndex(source, '.x-nt-bookmark-cascade-menu'),
+    `${label} bookmark cursor tooltip should render above the bookmark cascade menu`
+  );
+}
+
 function getJsConstNumber(source, name) {
   const match = source.match(new RegExp(`const\\s+${name}\\s*=\\s*(\\d+)\\s*;`));
   assert.ok(match, `${name} should be defined as a numeric constant`);
@@ -489,6 +505,16 @@ assertContains(
 );
 assertContains(
   cascadeMenuJs,
+  "const shouldSuppressHover = getFunction(config, 'shouldSuppressHover'",
+  'bookmark cascade should accept a shared hover suppression hook for drag reorder'
+);
+assertContains(
+  cascadeMenuJs,
+  'isBookmarkCascadeHoverSuppressed(task.triggerElement',
+  'bookmark cascade hover intent should re-check suppression before opening a delayed target'
+);
+assertContains(
+  cascadeMenuJs,
   'shouldProtectBookmarkCascadeLevel',
   'bookmark cascade switching should consult the safe triangle before replacing a submenu'
 );
@@ -554,6 +580,12 @@ assert.ok(
     getCssZIndex(newtabHtml, '.x-nt-bookmark-cascade-level'),
   'safe-triangle debug SVG should render above menu panels so it is not hidden by cascade levels'
 );
+assertContains(
+  newtabJs,
+  "className: 'x-nt-bookmark-cursor-tooltip'",
+  'newtab bookmark cursor tooltip should use a scoped class for layer control'
+);
+assertBookmarkCursorTooltipAboveCascade(newtabHtml, 'standard newtab');
 {
   assert.ok(
     !newtabHtml.includes('.x-nt-bookmark-cascade-item:focus-visible {\n        outline: 2px solid'),
@@ -561,15 +593,18 @@ assert.ok(
   );
 }
 
-function createCascadeRuntimeFixture() {
+function createCascadeRuntimeFixture(overrides) {
+  const configOverrides = overrides || {};
   const documentObj = createFakeDocument();
   const clock = createFakeClock();
   const openedLevels = [];
+  const openedUrls = [];
+  const tooltipBindings = [];
   const anchor = documentObj.createElement('button');
   anchor.setRect({ left: 20, top: 20, width: 120, height: 40 });
   documentObj.body.appendChild(anchor);
 
-  const itemsByFolder = {
+  const itemsByFolder = configOverrides.itemsByFolder || {
     root: [
       { id: 'research', title: 'Research', type: 'folder' },
       { id: 'archive', title: 'Archive', url: 'https://example.com/archive' }
@@ -617,14 +652,25 @@ function createCascadeRuntimeFixture() {
     attachFaviconWithFallbacks() {},
     ensureReady: () => Promise.resolve(true),
     getItems: (folderId) => itemsByFolder[String(folderId || '')] || [],
-    navigateToUrl() {}
+    navigateToUrl: configOverrides.navigateToUrl || ((url) => {
+      openedUrls.push({ url, via: 'navigate' });
+    }),
+    openUrl: configOverrides.openUrl || ((url, options) => {
+      openedUrls.push({ url, background: Boolean(options && options.openInBackgroundTab) });
+    }),
+    bindCursorTooltip: configOverrides.bindCursorTooltip || ((target, getText, options) => {
+      tooltipBindings.push({ target, getText, options });
+      return target;
+    }),
+    hideCursorTooltip: configOverrides.hideCursorTooltip || (() => {}),
+    shouldSuppressHover: configOverrides.shouldSuppressHover || (() => false)
   });
 
-  return { anchor, clock, documentObj, openedLevels, runtime };
+  return { anchor, clock, documentObj, openedLevels, openedUrls, runtime, tooltipBindings };
 }
 
-async function openCascadeWithSubmenu() {
-  const fixture = createCascadeRuntimeFixture();
+async function openCascadeWithSubmenu(overrides) {
+  const fixture = createCascadeRuntimeFixture(overrides);
   fixture.runtime.open({ id: 'root', title: 'Root' }, fixture.anchor);
   await flushPromises();
 
@@ -642,6 +688,39 @@ async function openCascadeWithSubmenu() {
 }
 
 (async () => {
+  {
+    let suppressHover = false;
+    const { anchor, clock, documentObj, runtime } = createCascadeRuntimeFixture({
+      shouldSuppressHover: () => suppressHover
+    });
+    runtime.open({ id: 'root', title: 'Root' }, anchor);
+    await flushPromises();
+    let levels = getMenuLevels(documentObj);
+    setLevelLayout(levels[0], { left: 40, top: 70, width: 210, height: 140 });
+    let rootItems = getMenuItems(levels[0]);
+    suppressHover = true;
+    rootItems[0].dispatchEvent(createFakeEvent('pointerenter', {
+      clientX: 80,
+      clientY: 104,
+      pointerType: 'mouse',
+      target: rootItems[0]
+    }));
+    clock.advance(getJsConstNumber(cascadeMenuJs, 'BOOKMARK_CASCADE_HOVER_DELAY_MS'));
+
+    levels = getMenuLevels(documentObj);
+    rootItems = getMenuItems(levels[0]);
+    assert.strictEqual(
+      levels.length,
+      1,
+      'drag hover suppression should prevent folder rows from opening a delayed cascade submenu'
+    );
+    assert.strictEqual(
+      rootItems[0].getAttribute('data-hover-suppressed'),
+      'true',
+      'drag hover suppression should suppress native hover styling on the crossed cascade row'
+    );
+  }
+
   {
     const { clock, documentObj } = await openCascadeWithSubmenu();
     let levels = getMenuLevels(documentObj);
@@ -836,6 +915,67 @@ async function openCascadeWithSubmenu() {
       getActiveLabel(levels[0]),
       'Research',
       'reusing an already expanded folder submenu should restore the parent folder active state'
+    );
+  }
+
+  {
+    const hiddenTooltips = [];
+    const { documentObj, openedUrls, tooltipBindings } = await openCascadeWithSubmenu({
+      hideCursorTooltip: () => {
+        hiddenTooltips.push(true);
+      }
+    });
+    const levels = getMenuLevels(documentObj);
+    const submenuItems = getMenuItems(levels[1]);
+    const nestedUrlItem = submenuItems[0];
+    const tooltipBinding = tooltipBindings.find((entry) => entry.target === nestedUrlItem);
+
+    assert.ok(
+      tooltipBinding,
+      'bookmark cascade URL items inside folders should bind a cursor-following tooltip'
+    );
+    assert.strictEqual(
+      tooltipBinding.getText(nestedUrlItem),
+      'Amazon Menu Aim',
+      'bookmark cascade URL tooltip text should use the nested bookmark title'
+    );
+    assert.strictEqual(
+      Object.prototype.hasOwnProperty.call(tooltipBinding.options, 'getTagText'),
+      false,
+      'bookmark cascade URL cursor tooltip should not render an extra background-open badge'
+    );
+
+    nestedUrlItem.dispatchEvent(createFakeEvent('click', {
+      metaKey: true,
+      target: nestedUrlItem
+    }));
+
+    assert.deepStrictEqual(
+      openedUrls,
+      [{ url: 'https://example.com/amazon', background: true }],
+      'bookmark cascade URL clicks inside folders should open in the background while Command is held'
+    );
+    assert.ok(
+      hiddenTooltips.length > 0,
+      'bookmark cascade URL activation should hide the cursor-following tooltip'
+    );
+  }
+
+  {
+    const { documentObj, openedUrls } = await openCascadeWithSubmenu();
+    const levels = getMenuLevels(documentObj);
+    const nestedUrlItem = getMenuItems(levels[1])[0];
+
+    nestedUrlItem.dispatchEvent(createFakeEvent('keydown', {
+      key: 'Enter',
+      ctrlKey: true,
+      target: nestedUrlItem
+    }));
+
+    assert.deepStrictEqual(
+      openedUrls,
+      [{ url: 'https://example.com/amazon', background: true }],
+      'bookmark cascade URL keyboard activation inside folders should open in the background while Ctrl is held'
     );
   }
 

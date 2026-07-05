@@ -42,6 +42,30 @@ assert.strictEqual(
   true,
   'short ASCII terms should still match title tokens'
 );
+assert.strictEqual(
+  search.matchesSearchQueryText(
+    { title: 'Final Cut Camera', url: 'https://apps.apple.com/final-cut-camera' },
+    search.buildSearchQueryContext('fcc')
+  ),
+  true,
+  'short ASCII terms should match multi-word title initials'
+);
+assert.strictEqual(
+  search.matchesSearchQueryText(
+    { title: 'SwitchBot', url: 'https://switchbot.example.com/' },
+    search.buildSearchQueryContext('sb')
+  ),
+  true,
+  'short ASCII terms should match camel-case title initials'
+);
+assert.strictEqual(
+  search.matchesSearchQueryText(
+    { title: 'Final Cut Camera', url: 'https://apps.apple.com/final-cut-camera' },
+    search.buildSearchQueryContext('fcx')
+  ),
+  false,
+  'title initials should not match unrelated letter combinations'
+);
 
 const releaseContext = search.buildSearchQueryContext('lumno release');
 const releaseCoverage = search.getSearchTermCoverageStats(releaseContext, {

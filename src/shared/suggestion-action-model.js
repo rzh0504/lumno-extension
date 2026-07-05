@@ -69,10 +69,16 @@
     const rawAction = String(action || '');
     const config = options || {};
     if (config.openSwitchInNewTab && rawAction === 'switch') {
-      return 'openNewTab';
+      return config.openInBackgroundTab && !config.openInCurrentTab
+        ? 'openBackgroundTab'
+        : 'openNewTab';
     }
     if (config.openInCurrentTab && rawAction === 'openNewTab') {
       return 'go';
+    }
+    if (config.openInBackgroundTab && !config.openInCurrentTab &&
+        (rawAction === 'openNewTab' || rawAction === 'go' || rawAction === 'switch')) {
+      return 'openBackgroundTab';
     }
     return rawAction;
   }
@@ -93,6 +99,17 @@
     }
     const action = config.action || getVisitButtonAction(suggestion, config);
     return action === 'switch';
+  }
+
+  function getSearchResultOpenDisposition(options) {
+    const config = options || {};
+    if (config.openInCurrentTab) {
+      return 'currentTab';
+    }
+    if (config.openInBackgroundTab) {
+      return 'backgroundTab';
+    }
+    return 'newTab';
   }
 
   function createSearchActionModel(options) {
@@ -173,6 +190,7 @@
     createSearchActionModel,
     getVisitButtonAction,
     getModifierAdjustedAction,
+    getSearchResultOpenDisposition,
     shouldOpenSwitchActionInNewTab,
     shouldOpenNewTabActionInCurrentTab,
     shouldShowVisitButton,

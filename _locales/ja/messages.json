@@ -110,6 +110,12 @@
   "settings_search_result_sources_title": {
     "message": "表示する結果タイプ"
   },
+  "settings_favicon_enhanced_fetch_title": {
+    "message": "アイコンとテーマカラーの拡張取得"
+  },
+  "settings_favicon_enhanced_fetch_desc": {
+    "message": "社内ネットワークや VPN ページでローカルネットワークアクセスの確認が出る場合はオフにできます。"
+  },
   "search_result_priority_autocomplete": {
     "message": "補完を優先"
   },
@@ -288,10 +294,10 @@
     "message": "制限ページ（chrome://、拡張機能ストア、一部のfile://ページなど）ではLumnoを開けません。キーを押したときはこの設定に従います。"
   },
   "restricted_action_default": {
-    "message": "新しいタブへ移動"
+    "message": "Lumno の新しいタブへ移動"
   },
   "restricted_action_none": {
-    "message": "何もしない"
+    "message": "ブラウザ設定に従う"
   },
   "newtab_file_access_notice_title": {
     "message": "ローカルのPDF/HTMLでLumnoを使うには、「ファイルのURLへのアクセスを許可する」をオンにしてください"
@@ -387,7 +393,10 @@
     "message": "ダーク"
   },
   "settings_newtab_wordmark_title": {
-    "message": "新しいタブの検索ボックス上にロゴを表示"
+    "message": "新しいタブの検索ボックス上にブランドマークを表示"
+  },
+  "settings_newtab_shortcuts_title": {
+    "message": "ショートカット"
   },
   "settings_wallpaper_title": {
     "message": "新しいタブの壁紙"
@@ -444,7 +453,22 @@
     "message": "壁紙"
   },
   "newtab_logo_title": {
-    "message": "ロゴ"
+    "message": "ブランドマーク"
+  },
+  "newtab_favicon_title": {
+    "message": "新しいタブの favicon"
+  },
+  "newtab_favicon_name_default": {
+    "message": "デフォルト"
+  },
+  "newtab_favicon_name_alternate": {
+    "message": "予備"
+  },
+  "newtab_favicon_select_label": {
+    "message": "{name} favicon を選択"
+  },
+  "newtab_favicon_save_error": {
+    "message": "favicon を保存できませんでした"
   },
   "newtab_wallpaper_builtin_section": {
     "message": "内蔵"
@@ -720,10 +744,10 @@
     "message": "検索結果と最近使ったサイトの非表示リスト"
   },
   "blacklist_section_desc": {
-    "message": "検索結果や「最近のアクセス」「よくアクセス」に出したくないURLがあれば、ここに追加してください。"
+    "message": "Lumnoの検索結果と新しいタブページに表示したくないURLを、ここに追加してください。"
   },
   "blacklist_group_custom": {
-    "message": "隠すURL"
+    "message": "全体で無効化"
   },
   "blacklist_label_url": {
     "message": "URLルール"
@@ -789,7 +813,7 @@
     "message": "baidu.com"
   },
   "blacklist_add": {
-    "message": "隠すルールを追加"
+    "message": "追加"
   },
   "blacklist_empty": {
     "message": "非表示URLはまだありません"
@@ -814,18 +838,6 @@
   },
   "blacklist_removed_toast": {
     "message": "非表示リストから削除しました"
-  },
-  "favicon_blacklist_section_title": {
-    "message": "アイコン取得だけ止める"
-  },
-  "favicon_blacklist_section_desc": {
-    "message": "LAN や VPN 内のサイトでローカルネットワーク権限の確認が出る場合は、ここに URL を追加してください。表示・検索・起動には影響しません。"
-  },
-  "favicon_blacklist_add": {
-    "message": "除外ルールを追加"
-  },
-  "favicon_blacklist_removed_toast": {
-    "message": "アイコン取得の除外から削除しました"
   },
   "shortcuts_group_builtin": {
     "message": "内蔵"
@@ -920,9 +932,6 @@
   "blacklist_clear": {
     "message": "隠すルールを空にする"
   },
-  "favicon_blacklist_clear": {
-    "message": "除外ルールを空にする"
-  },
   "toast_cleared": {
     "message": "空にしました"
   },
@@ -931,9 +940,6 @@
   },
   "confirm_clear_blacklist": {
     "message": "隠すルールを空にしますか？"
-  },
-  "confirm_clear_favicon_blacklist": {
-    "message": "除外ルールを空にしますか？"
   },
   "confirm_reset_builtin": {
     "message": "内蔵リストをリセットしますか？"
@@ -1024,6 +1030,12 @@
   },
   "action_open_new_tab": {
     "message": "新規"
+  },
+  "action_open_background_new_tab": {
+    "message": "バックグラウンドで新規"
+  },
+  "action_open_background_tab": {
+    "message": "バックグラウンドで開く"
   },
   "action_go_current_tab": {
     "message": "移動"
@@ -1426,6 +1438,54 @@
   },
   "shortcut_reference_document_pip_child_desc": {
     "message": "Webクリップ選択中に小さい子要素へ移動します"
+  },
+  "newtab_shortcuts_section_label": {
+    "message": "ショートカット"
+  },
+  "newtab_shortcuts_add": {
+    "message": "ショートカットを追加"
+  },
+  "newtab_shortcuts_dialog_title": {
+    "message": "ショートカットを追加"
+  },
+  "newtab_shortcuts_name_label": {
+    "message": "名前"
+  },
+  "newtab_shortcuts_name_placeholder": {
+    "message": "Lumno"
+  },
+  "newtab_shortcuts_url_label": {
+    "message": "URL"
+  },
+  "newtab_shortcuts_url_placeholder": {
+    "message": "https://example.com"
+  },
+  "newtab_shortcuts_cancel": {
+    "message": "キャンセル"
+  },
+  "newtab_shortcuts_done": {
+    "message": "完了"
+  },
+  "newtab_shortcuts_save": {
+    "message": "保存"
+  },
+  "newtab_shortcuts_invalid_url": {
+    "message": "有効な http または https のURLを入力してください"
+  },
+  "newtab_shortcuts_added": {
+    "message": "ショートカットを追加しました"
+  },
+  "newtab_shortcuts_edited": {
+    "message": "ショートカットを更新しました"
+  },
+  "newtab_shortcuts_removed": {
+    "message": "ショートカットを削除しました"
+  },
+  "newtab_shortcuts_edit_dialog_title": {
+    "message": "ショートカットを編集"
+  },
+  "newtab_shortcuts_context_menu_label": {
+    "message": "ショートカット操作"
   },
   "settings_tab_switcher_title": {
     "message": "AltQ タブ切り替え"

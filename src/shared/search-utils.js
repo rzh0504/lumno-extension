@@ -393,6 +393,42 @@
     ));
   }
 
+  function splitSearchInitialWords(value) {
+    const words = [];
+    const asciiRuns = String(value || '').match(/[a-z]+/gi) || [];
+    asciiRuns.forEach((run) => {
+      const parts = String(run).match(/[A-Z]+(?=[A-Z][a-z]|$)|[A-Z]?[a-z]+/g) || [run];
+      parts.forEach((part) => {
+        const normalized = String(part || '').toLowerCase().replace(/[^a-z]+/g, '');
+        if (normalized) {
+          words.push(normalized);
+        }
+      });
+    });
+    return words;
+  }
+
+  function buildSearchTitleInitials(value) {
+    return splitSearchInitialWords(value)
+      .map((word) => word.charAt(0))
+      .join('');
+  }
+
+  function getSearchTitleInitialsMatchType(title, term) {
+    const query = String(term || '').toLowerCase().replace(/[^a-z]+/g, '');
+    if (!query || query.length < 2) {
+      return '';
+    }
+    const initials = buildSearchTitleInitials(title);
+    if (!initials || initials.length < query.length) {
+      return '';
+    }
+    if (initials === query) {
+      return 'exact';
+    }
+    return initials.startsWith(query) ? 'prefix' : '';
+  }
+
   function buildSearchQueryContext(query, options) {
     const settings = options && typeof options === 'object' ? options : {};
     const lookupQuery = String(query || '');
@@ -1118,7 +1154,8 @@
     if (!item || !item.url) {
       return false;
     }
-    const titleLower = item.title ? item.title.toLowerCase() : '';
+    const title = item.title ? String(item.title) : '';
+    const titleLower = title.toLowerCase();
     const urlLower = item.url.toLowerCase();
     const titleTokens = splitSearchTerms(titleLower);
     let hostname = '';
@@ -1138,7 +1175,8 @@
         titleLower === term ||
         titleLower.startsWith(term) ||
         titleTokens.includes(term) ||
-        titleTokens.some((token) => token.startsWith(term))
+        titleTokens.some((token) => token.startsWith(term)) ||
+        getSearchTitleInitialsMatchType(title, term)
       ) {
         return true;
       }
@@ -1340,7 +1378,8 @@
 
   function calculateSearchRelevanceScore(item, sourceType, context, options) {
     const settings = options && typeof options === 'object' ? options : {};
-    const titleLower = item.title ? item.title.toLowerCase() : '';
+    const title = item.title ? String(item.title) : '';
+    const titleLower = title.toLowerCase();
     const urlLower = item.url.toLowerCase();
     let hostname = '';
     let hostLabels = [];
@@ -1360,6 +1399,13 @@
       textScore += 45;
     }
 
+    const fullInitialsMatch = getSearchTitleInitialsMatchType(title, context.queryLower);
+    if (fullInitialsMatch === 'exact') {
+      textScore += 42;
+    } else if (fullInitialsMatch === 'prefix') {
+      textScore += 28;
+    }
+
     context.queryTerms.forEach((word) => {
       if (!word) {
         return;
@@ -1370,6 +1416,15 @@
       }
       if (titleTokens.some((token) => token.startsWith(word))) {
         textScore += 14;
+        return;
+      }
+      const initialsMatch = getSearchTitleInitialsMatchType(title, word);
+      if (initialsMatch === 'exact') {
+        textScore += 24;
+        return;
+      }
+      if (initialsMatch === 'prefix') {
+        textScore += 16;
         return;
       }
       if (shouldAllowLooseTextContains(word) && titleLower.includes(word)) textScore += 8;

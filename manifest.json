@@ -104,5 +104,5 @@
    "name": "__MSG_ext_name__",
    "author": "Kubai087",
    "permissions": [ "scripting", "tabs", "history", "topSites", "bookmarks", "storage", "search", "favicon" ],
-   "version": "0.9.14"
+   "version": "0.9.15"
 }

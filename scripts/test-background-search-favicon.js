@@ -37,6 +37,12 @@ assert.match(
   'bookmark/history/top-site search results for browser pages should use browser-page favicon candidates'
 );
 
+assert.doesNotMatch(
+  suggestionFaviconBlock,
+  /isUrlBlockedByFaviconRequestBlacklist\(url\)[\s\S]*?return '';/,
+  'favicon request exclusions should not hide safe virtual favicon candidates in search suggestions'
+);
+
 const browserPageBranch = suggestionFaviconBlock.indexOf('isBrowserInternalPageUrl(url)');
 const genericUrlParsing = suggestionFaviconBlock.indexOf('new URL(url)');
 assert.ok(
