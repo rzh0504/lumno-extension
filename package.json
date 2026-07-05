@@ -9,6 +9,7 @@
     "audit:style": "node scripts/audit-style-debt.js",
     "audit:i18n": "node scripts/audit-i18n.js",
     "package:store": "node scripts/package-store.js",
+    "test:package-store": "node scripts/test-package-store.js",
     "test:blacklist": "node scripts/test-blacklist.js",
     "test:url-guards": "node scripts/test-url-guards.js",
     "test:settings": "node scripts/test-settings.js",

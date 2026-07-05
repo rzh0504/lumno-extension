@@ -12,6 +12,10 @@ const packageRoots = [
   '_locales',
   'assets'
 ];
+const packageExcludePatterns = [
+  '*.DS_Store',
+  'assets/images/readme/*'
+];
 const injectedScriptFiles = [
   'src/background/extension-pages.js',
   'src/background/message-router.js',
@@ -42,14 +46,14 @@ const injectedScriptFiles = [
   'src/overlay/search-panel.js',
   'src/content/document-pip-picker.js'
 ];
-const forbiddenPattern = /(^|\/)(\.git|\.github|\.vscode|node_modules)(\/|$)|(^|\/)(README\.md|AGENTS\.md|\.DS_Store|package-lock\.json|package\.json)$/;
+const forbiddenPattern = /(^|\/)(\.git|\.github|\.vscode|node_modules)(\/|$)|(^|\/)(README\.md|AGENTS\.md|\.DS_Store|package-lock\.json|package\.json)$|^assets\/images\/readme\//;
 
 fs.mkdirSync(distDir, { recursive: true });
 if (fs.existsSync(zipPath)) {
   fs.rmSync(zipPath);
 }
 
-const zipArgs = ['-r', '-D', zipPath, ...packageRoots, '-x', '*.DS_Store'];
+const zipArgs = ['-r', '-D', zipPath, ...packageRoots, '-x', ...packageExcludePatterns];
 const zipResult = spawnSync('zip', zipArgs, {
   cwd: process.cwd(),
   stdio: 'inherit'
