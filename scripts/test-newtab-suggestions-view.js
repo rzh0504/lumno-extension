@@ -8,6 +8,12 @@ require('../src/newtab/suggestions-view.js');
 const suggestionsView = globalThis.LumnoNewtabSuggestionsView;
 const repoRoot = path.resolve(__dirname, '..');
 
+function getRuleBlock(source, pattern, message) {
+  const match = source.match(pattern);
+  assert.ok(match, message);
+  return match[0];
+}
+
 class FakeStyle {
   constructor() {
     this.props = new Map();
@@ -217,6 +223,99 @@ function testSiteSearchTabHintRequiresExplicitTrigger() {
   assert.ok(
     !/const resolvedProvider = mergedProvider \|\| siteSearchTrigger;/.test(overlayJs),
     'overlay should not infer the Tab site-search hint from the highlighted result provider'
+  );
+}
+
+function testSuggestionActionColumnAlignmentContract() {
+  const overlayCss = fs.readFileSync(path.join(repoRoot, 'src/overlay/suggestions-view.css'), 'utf8');
+  const newtabHtml = fs.readFileSync(path.join(repoRoot, 'src/newtab/newtab.html'), 'utf8');
+  const overlayJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/search-panel.js'), 'utf8');
+  const newtabSuggestionsJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/suggestions-view.js'), 'utf8');
+  const onboardingJs = fs.readFileSync(path.join(repoRoot, 'src/onboarding/onboarding.js'), 'utf8');
+
+  assert.match(
+    overlayCss,
+    /--x-ov-suggestion-action-column-width:\s*168px;/,
+    'overlay suggestions should define a stable right-side action column width'
+  );
+  const overlayActionColumnRule = getRuleBlock(
+    overlayCss,
+    /\.x-ov-suggestion-right\[data-action-column="true"\]\s*\{[\s\S]*?\}/,
+    'overlay suggestions should reserve the action column only on marked right-side containers'
+  );
+  assert.match(
+    overlayActionColumnRule,
+    /flex:\s*0 0 min\(44%,\s*var\(--x-ov-suggestion-action-column-width,\s*168px\)\);/,
+    'overlay action column should use a fixed responsive flex basis'
+  );
+  assert.match(
+    overlayActionColumnRule,
+    /width:\s*min\(44%,\s*var\(--x-ov-suggestion-action-column-width,\s*168px\)\);/,
+    'overlay action column should keep a matching width for consistent left edges'
+  );
+  assert.match(
+    overlayCss,
+    /\.x-ov-suggestion-action-button\s*\{[\s\S]*?justify-content:\s*flex-start;[\s\S]*?max-width:\s*100%;[\s\S]*?min-width:\s*0;[\s\S]*?white-space:\s*nowrap;/,
+    'overlay action buttons should stay inside the fixed action column'
+  );
+  assert.match(
+    overlayCss,
+    /\.x-ov-suggestion-action-button \.x-ov-inline-label\s*\{[\s\S]*?overflow:\s*hidden;[\s\S]*?text-overflow:\s*ellipsis;[\s\S]*?white-space:\s*nowrap;/,
+    'overlay action button labels should ellipsize instead of pushing the column left'
+  );
+
+  assert.match(
+    newtabHtml,
+    /--x-nt-suggestion-action-column-width:\s*168px;/,
+    'newtab suggestions should define the same stable right-side action column width'
+  );
+  const newtabActionColumnRule = getRuleBlock(
+    newtabHtml,
+    /\.x-nt-suggestion-right\[data-action-column="true"\]\s*\{[\s\S]*?\}/,
+    'newtab suggestions should reserve the action column only on marked right-side containers'
+  );
+  assert.match(
+    newtabActionColumnRule,
+    /flex:\s*0 0 min\(44%,\s*var\(--x-nt-suggestion-action-column-width,\s*168px\)\);/,
+    'newtab action column should use a fixed responsive flex basis'
+  );
+  assert.match(
+    newtabActionColumnRule,
+    /width:\s*min\(44%,\s*var\(--x-nt-suggestion-action-column-width,\s*168px\)\);/,
+    'newtab action column should keep a matching width for consistent left edges'
+  );
+  assert.match(
+    newtabHtml,
+    /\.x-nt-suggestion-action-button\s*\{[\s\S]*?justify-content:\s*flex-start;[\s\S]*?max-width:\s*100%;[\s\S]*?min-width:\s*0;[\s\S]*?white-space:\s*nowrap;/,
+    'newtab action buttons should stay inside the fixed action column'
+  );
+  assert.match(
+    newtabHtml,
+    /\.x-nt-suggestion-action-button__label\s*\{[\s\S]*?overflow:\s*hidden;[\s\S]*?text-overflow:\s*ellipsis;[\s\S]*?white-space:\s*nowrap;/,
+    'newtab action button labels should ellipsize instead of pushing the column left'
+  );
+
+  assert.ok(
+    (overlayJs.match(/setAttribute\('data-action-column', 'true'\)/g) || []).length >= 3,
+    'overlay render paths with actions should mark their right-side action column'
+  );
+  assert.match(
+    overlayJs,
+    /if \(!itemActionModel\.alwaysHideVisitButton \|\| itemActionModel\.hasActionTags\) \{\s*rightSide\.setAttribute\('data-action-column', 'true'\);/,
+    'overlay search results should not reserve action-column space for rows with no actions'
+  );
+  assert.ok(
+    (newtabSuggestionsJs.match(/setAttribute\('data-action-column', 'true'\)/g) || []).length >= 2,
+    'newtab render paths with actions should mark their right-side action column'
+  );
+  assert.match(
+    newtabSuggestionsJs,
+    /if \(!itemActionModel\.alwaysHideVisitButton \|\| itemActionModel\.hasActionTags\) \{\s*rightSide\.setAttribute\('data-action-column', 'true'\);/,
+    'newtab search results should not reserve action-column space for rows with no actions'
+  );
+  assert.ok(
+    (onboardingJs.match(/setAttribute\('data-action-column', 'true'\)/g) || []).length >= 3,
+    'onboarding previews should use the same marked action column as production suggestions'
   );
 }
 
@@ -953,6 +1052,11 @@ async function testVisitButtonAndEnterTagShareOverlayVisibilityRules() {
 
   const [primaryItem, secondaryItem] = view.getItems();
   assert.ok(primaryItem._xVisitButton, 'primary suggestion should render a visit button');
+  assert.strictEqual(
+    primaryItem.childNodes[1].getAttribute('data-action-column'),
+    'true',
+    'primary suggestion should mark the right-side action column for aligned action labels'
+  );
   assert.ok(primaryItem._xTagContainer, 'primary suggestion should render an action tag container');
   assert.strictEqual(
     primaryItem._xTagContainer.getAttribute('data-visible'),
@@ -965,6 +1069,11 @@ async function testVisitButtonAndEnterTagShareOverlayVisibilityRules() {
     'primary suggestion should hide the visit button while the Enter tag is visible'
   );
   assert.ok(secondaryItem._xVisitButton, 'secondary suggestion should render a visit button');
+  assert.strictEqual(
+    secondaryItem.childNodes[1].getAttribute('data-action-column'),
+    'true',
+    'secondary suggestion should mark the right-side action column for aligned action labels'
+  );
   assert.strictEqual(
     secondaryItem._xVisitButton.getAttribute('data-visible'),
     'true',
@@ -1441,6 +1550,7 @@ function testOverlayCommandEnterOpensFocusedResultInBackgroundTab() {
 
 testSiteSearchProviderIconsUsePageFaviconCandidates();
 testSiteSearchTabHintRequiresExplicitTrigger();
+testSuggestionActionColumnAlignmentContract();
 testNewtabShiftEnterOpensMatchedTabInNewTab();
 testNewtabCommandEnterOpensFocusedResultInBackgroundTab();
 testOverlayCommandEnterOpensFocusedResultInBackgroundTab();

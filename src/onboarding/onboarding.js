@@ -1470,6 +1470,7 @@
 
     const rightSide = document.createElement('div');
     rightSide.className = 'x-ov-suggestion-right';
+    rightSide.setAttribute('data-action-column', 'true');
 
     const actionTags = document.createElement('div');
     actionTags.className = 'x-ov-suggestion-action-tags';
@@ -2096,6 +2097,7 @@
 
     const rightSide = document.createElement('div');
     rightSide.className = 'x-ov-suggestion-right';
+    rightSide.setAttribute('data-action-column', 'true');
     const visitButton = document.createElement('button');
     visitButton.type = 'button';
     visitButton.className = 'x-ov-suggestion-action-button x-ov-suggestion-visit-button';
@@ -2483,6 +2485,7 @@
 
     const rightSide = document.createElement('div');
     rightSide.className = 'x-nt-suggestion-right';
+    rightSide.setAttribute('data-action-column', 'true');
 
     const actionTags = document.createElement('div');
     actionTags.className = 'x-nt-suggestion-action-tags';

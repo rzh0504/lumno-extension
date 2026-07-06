@@ -819,6 +819,7 @@
         suggestionItem._xSwitchButton = switchButton;
         const rightSide = documentRef.createElement('div');
         rightSide.className = 'x-nt-suggestion-right';
+        rightSide.setAttribute('data-action-column', 'true');
 
         suggestionItem.addEventListener('mouseenter', function() {
           if (items.indexOf(this) !== getSelectedIndex()) {
@@ -1139,6 +1140,9 @@
           shouldSwitchMatchedTab,
           enterAction: 'go'
         });
+        if (!itemActionModel.alwaysHideVisitButton || itemActionModel.hasActionTags) {
+          rightSide.setAttribute('data-action-column', 'true');
+        }
         const actionTagNodes = [];
         itemActionModel.actionTags.forEach((tag) => {
           const actionTag = createActionTag(

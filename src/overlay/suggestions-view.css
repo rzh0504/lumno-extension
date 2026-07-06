@@ -5,6 +5,7 @@
   --x-ov-suggestion-row-height: 52px;
   --x-ov-suggestion-row-gap: 4px;
   --x-ov-suggestions-max-height: 580px;
+  --x-ov-suggestion-action-column-width: 168px;
   width: 100%;
   flex: 1 1 auto;
   min-height: 0;
@@ -217,6 +218,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 12px 16px;
   min-height: var(--x-ov-suggestion-row-height, 52px);
   background: var(--x-ov-suggestion-row-bg, transparent);
@@ -433,6 +435,7 @@
   all: unset;
   display: inline-flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 6px;
   flex-shrink: 0;
   min-height: var(--x-ov-suggestion-action-height, 26px);
@@ -448,6 +451,11 @@
   font-size: 100%;
   font: inherit;
   vertical-align: baseline;
+}
+
+:is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-right[data-action-column="true"] {
+  flex: 0 0 min(44%, var(--x-ov-suggestion-action-column-width, 168px));
+  width: min(44%, var(--x-ov-suggestion-action-column-width, 168px));
 }
 
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-action-tags {
@@ -541,12 +549,27 @@
   outline: none;
   display: none;
   align-items: center;
+  justify-content: flex-start;
   gap: 4px;
   vertical-align: baseline;
+  max-width: 100%;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-action-button[data-visible="true"] {
   display: inline-flex;
+}
+
+:is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-action-button .x-ov-inline-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-action-button .x-ov-inline-icon {
+  flex: 0 0 auto;
 }
 
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-visit-button {

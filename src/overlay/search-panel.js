@@ -5588,6 +5588,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         entryLeft.appendChild(entryTitle);
         const entryRight = document.createElement('div');
         entryRight.className = 'x-ov-suggestion-right';
+        entryRight.setAttribute('data-action-column', 'true');
         entryRight.appendChild(entryActionTags);
         entryRight.appendChild(entryVisitButton);
         entryItem.appendChild(entryLeft);
@@ -5745,6 +5746,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         }
         const rightSide = document.createElement('div');
         rightSide.className = 'x-ov-suggestion-right';
+        rightSide.setAttribute('data-action-column', 'true');
         rightSide.appendChild(actionTags);
         rightSide.appendChild(switchButton);
         suggestionItem.appendChild(leftSide);
@@ -6572,6 +6574,9 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             shouldSwitchMatchedTab,
             enterAction: 'openNewTab'
           });
+          if (!itemActionModel.alwaysHideVisitButton || itemActionModel.hasActionTags) {
+            rightSide.setAttribute('data-action-column', 'true');
+          }
           const actionTagNodes = [];
           itemActionModel.actionTags.forEach((tag) => {
             const actionTag = createActionTag(

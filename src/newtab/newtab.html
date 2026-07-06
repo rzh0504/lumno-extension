@@ -2369,6 +2369,7 @@
         --x-nt-suggestion-row-height: 52px;
         --x-nt-suggestion-row-gap: 6px;
         --x-nt-suggestions-max-height: 594px;
+        --x-nt-suggestion-action-column-width: 168px;
         width: min(90vw, var(--x-nt-search-max-width, 720px));
         margin-top: 0;
         position: fixed;
@@ -4599,6 +4600,7 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: 12px;
         padding: 12px 16px;
         min-height: var(--x-nt-suggestion-row-height, 52px);
         background: transparent;
@@ -4777,6 +4779,7 @@
         all: unset;
         display: inline-flex;
         align-items: center;
+        justify-content: flex-start;
         gap: 6px;
         flex-shrink: 0;
         min-height: var(--x-nt-suggestion-action-height, 26px);
@@ -4792,6 +4795,10 @@
         font-size: 100%;
         font: inherit;
         vertical-align: baseline;
+      }
+      .x-nt-suggestion-right[data-action-column="true"] {
+        flex: 0 0 min(44%, var(--x-nt-suggestion-action-column-width, 168px));
+        width: min(44%, var(--x-nt-suggestion-action-column-width, 168px));
       }
       .x-nt-suggestion-inline-icon {
         all: unset;
@@ -4933,8 +4940,11 @@
         outline: none;
         display: none;
         align-items: center;
+        justify-content: flex-start;
         gap: 4px;
         vertical-align: baseline;
+        max-width: 100%;
+        min-width: 0;
         white-space: nowrap;
       }
       .x-nt-suggestion-action-button[data-visible="true"] {
@@ -4955,6 +4965,15 @@
         display: inline-flex;
         align-items: center;
         line-height: 1;
+      }
+      .x-nt-suggestion-action-button__label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .x-nt-suggestion-action-button__icon {
+        flex: 0 0 auto;
       }
       .x-nt-suggestion-action-button .ri-icon {
         flex-shrink: 0;
@@ -5079,8 +5098,12 @@
         outline: none;
         display: inline-flex;
         align-items: center;
+        justify-content: flex-start;
         gap: 4px;
         vertical-align: baseline;
+        max-width: 100%;
+        min-width: 0;
+        white-space: nowrap;
       }
       .x-nt-suggestion-item[data-row-state="active"] .x-nt-tab-switch-button {
         color: var(--x-nt-text, #111827);
