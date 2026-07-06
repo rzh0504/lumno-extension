@@ -2369,7 +2369,7 @@
         --x-nt-suggestion-row-height: 52px;
         --x-nt-suggestion-row-gap: 6px;
         --x-nt-suggestions-max-height: 594px;
-        --x-nt-suggestion-action-column-width: 168px;
+        --x-nt-suggestion-action-column-width: 120px;
         width: min(90vw, var(--x-nt-search-max-width, 720px));
         margin-top: 0;
         position: fixed;
@@ -4797,8 +4797,8 @@
         vertical-align: baseline;
       }
       .x-nt-suggestion-right[data-action-column="true"] {
-        flex: 0 0 min(44%, var(--x-nt-suggestion-action-column-width, 168px));
-        width: min(44%, var(--x-nt-suggestion-action-column-width, 168px));
+        flex: 0 0 min(34%, var(--x-nt-suggestion-action-column-width, 120px));
+        width: min(34%, var(--x-nt-suggestion-action-column-width, 120px));
       }
       .x-nt-suggestion-inline-icon {
         all: unset;
@@ -4885,6 +4885,7 @@
         all: unset;
         display: inline-flex;
         align-items: center;
+        justify-content: space-between;
         gap: 6px;
         background: var(--x-ext-tag-bg, #EEF6FF);
         color: var(--x-ext-tag-text, #1E3A8A);
@@ -4906,6 +4907,20 @@
         all: unset;
         font-weight: 500;
         line-height: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .x-nt-suggestion-right[data-action-column="true"] .x-nt-suggestion-action-tags[data-visible="true"],
+      .x-nt-suggestion-right[data-action-column="true"] .x-nt-suggestion-action-tags[data-visible="true"] .x-nt-suggestion-action-tag,
+      .x-nt-suggestion-right[data-action-column="true"] .x-nt-suggestion-action-button[data-visible="true"],
+      .x-nt-suggestion-right[data-action-column="true"] .x-nt-tab-switch-button {
+        width: 100%;
+      }
+      .x-nt-suggestion-right[data-action-column="true"] .x-nt-suggestion-action-button,
+      .x-nt-suggestion-right[data-action-column="true"] .x-nt-tab-switch-button {
+        justify-content: space-between;
       }
       .x-nt-suggestion-action-tag__key {
         all: unset;

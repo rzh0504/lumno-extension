@@ -5,7 +5,7 @@
   --x-ov-suggestion-row-height: 52px;
   --x-ov-suggestion-row-gap: 4px;
   --x-ov-suggestions-max-height: 580px;
-  --x-ov-suggestion-action-column-width: 168px;
+  --x-ov-suggestion-action-column-width: 120px;
   width: 100%;
   flex: 1 1 auto;
   min-height: 0;
@@ -454,8 +454,8 @@
 }
 
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-right[data-action-column="true"] {
-  flex: 0 0 min(44%, var(--x-ov-suggestion-action-column-width, 168px));
-  width: min(44%, var(--x-ov-suggestion-action-column-width, 168px));
+  flex: 0 0 min(34%, var(--x-ov-suggestion-action-column-width, 120px));
+  width: min(34%, var(--x-ov-suggestion-action-column-width, 120px));
 }
 
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-action-tags {
@@ -487,6 +487,7 @@
   all: unset;
   display: inline-flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
   background: var(--x-ext-tag-bg, #EEF6FF);
   color: var(--x-ext-tag-text, #1E3A8A);
@@ -505,6 +506,16 @@
   white-space: nowrap;
 }
 
+:is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-right[data-action-column="true"] .x-ov-suggestion-action-tags[data-visible="true"],
+:is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-right[data-action-column="true"] .x-ov-suggestion-action-tags[data-visible="true"] .x-ov-action-tag,
+:is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-right[data-action-column="true"] .x-ov-suggestion-action-button[data-visible="true"] {
+  width: 100%;
+}
+
+:is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-right[data-action-column="true"] .x-ov-suggestion-action-button {
+  justify-content: space-between;
+}
+
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-action-tag[data-clickable="true"] {
   cursor: pointer;
 }
@@ -513,6 +524,10 @@
   all: unset;
   font-weight: 500;
   line-height: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-action-tag__key {
