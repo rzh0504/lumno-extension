@@ -15,6 +15,42 @@
       : null;
   }
 
+  function getTabGroupsApi() {
+    return typeof globalThis !== 'undefined' && globalThis.LumnoBackgroundTabGroups
+      ? globalThis.LumnoBackgroundTabGroups
+      : null;
+  }
+
+  function createTab(options, callback) {
+    const chromeApi = getChromeApi();
+    const done = typeof callback === 'function' ? callback : () => {};
+    if (!chromeApi || !chromeApi.tabs || typeof chromeApi.tabs.create !== 'function') {
+      done(null, { ok: false, reason: 'tabs-api-unavailable', grouped: false });
+      return;
+    }
+    const openOptions = options && typeof options === 'object' ? options : {};
+    const createProperties = openOptions.createProperties && typeof openOptions.createProperties === 'object'
+      ? openOptions.createProperties
+      : {};
+    const sourceTab = openOptions.sourceTab && typeof openOptions.sourceTab === 'object'
+      ? openOptions.sourceTab
+      : null;
+    const tabGroups = getTabGroupsApi();
+    if (tabGroups && typeof tabGroups.createTabInSourceGroup === 'function') {
+      tabGroups.createTabInSourceGroup(chromeApi, createProperties, sourceTab, done);
+      return;
+    }
+    chromeApi.tabs.create(createProperties, (tab) => {
+      done(tab || null, {
+        ok: !(chromeApi.runtime && chromeApi.runtime.lastError),
+        reason: chromeApi.runtime && chromeApi.runtime.lastError
+          ? chromeApi.runtime.lastError.message || 'tab-create-failed'
+          : '',
+        grouped: false
+      });
+    });
+  }
+
   function isLocalFileLikeTargetUrl(url) {
     if (!url) {
       return false;
@@ -108,31 +144,37 @@
   }
 
   function openNewtabFallback(options) {
-    const chromeApi = getChromeApi();
+    const openOptions = options && typeof options === 'object' ? options : {};
     const newtabUrl = buildNewtabFallbackUrl(options);
-    if (chromeApi && chromeApi.tabs && typeof chromeApi.tabs.create === 'function') {
-      chromeApi.tabs.create({ url: newtabUrl });
-    }
+    createTab({
+      sourceTab: openOptions.sourceTab || null,
+      createProperties: { url: newtabUrl }
+    });
   }
 
-  function openBrowserNewtabFallback() {
-    const chromeApi = getChromeApi();
-    if (chromeApi && chromeApi.tabs && typeof chromeApi.tabs.create === 'function') {
-      chromeApi.tabs.create({});
-    }
+  function openBrowserNewtabFallback(options) {
+    const openOptions = options && typeof options === 'object' ? options : {};
+    createTab({
+      sourceTab: openOptions.sourceTab || null,
+      createProperties: {}
+    });
   }
 
-  function openNewtabFallbackForUrl(url) {
+  function openNewtabFallbackForUrl(url, options) {
+    const openOptions = options && typeof options === 'object' ? options : {};
     if (!isLocalFileLikeTargetUrl(url)) {
-      openNewtabFallback();
+      openNewtabFallback(openOptions);
       return;
     }
     checkFileSchemeAccess((isAllowed) => {
       if (isAllowed === false) {
-        openNewtabFallback({ notice: 'file-access' });
+        openNewtabFallback({
+          ...openOptions,
+          notice: 'file-access'
+        });
         return;
       }
-      openNewtabFallback();
+      openNewtabFallback(openOptions);
     });
   }
 

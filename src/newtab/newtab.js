@@ -2810,6 +2810,9 @@
     if (didResolvedThemeChange) {
       refreshThemeAwareFavicons();
       scheduleThemeAwareFaviconRescue();
+      if (wallpaperRuntime && typeof wallpaperRuntime.handleThemeModeChange === 'function') {
+        wallpaperRuntime.handleThemeModeChange();
+      }
     }
     if (!initialThemeApplied) {
       initialThemeApplied = true;

@@ -3524,6 +3524,30 @@
         opacity: 0;
         transform: translateY(-4px);
       }
+      .x-nt-wallpaper-mode-sync {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--x-nt-panel-header-gap);
+        padding: 0 2px;
+        box-sizing: border-box;
+      }
+      .x-nt-wallpaper-mode-sync-title {
+        min-width: 0;
+        color: var(--x-nt-text, #111827);
+        font-size: 13px;
+        font-weight: 500;
+        line-height: 1.25;
+        font-family: "Open Sans", "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "Helvetica Neue", Arial, sans-serif;
+      }
+      .x-nt-wallpaper-tab-group {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
       .x-nt-wallpaper-tabs {
         min-width: 0;
         display: flex;
@@ -3592,6 +3616,39 @@
         color: var(--x-nt-text, #111827);
         font-weight: 500;
       }
+      .x-nt-wallpaper-mode-tabs,
+      .x-nt-wallpaper-mode-hint {
+        opacity: 1;
+        transform: translateY(0);
+        visibility: visible;
+        transition: opacity var(--x-nt-wallpaper-transition-short) ease,
+          transform var(--x-nt-wallpaper-transition-medium) var(--x-nt-wallpaper-transition-ease);
+        will-change: opacity, transform;
+      }
+      .x-nt-wallpaper-mode-tabs[data-visible="false"],
+      .x-nt-wallpaper-mode-hint[data-visible="false"] {
+        display: none;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-5px);
+        visibility: hidden;
+      }
+      .x-nt-wallpaper-mode-tabs[data-motion="enter"],
+      .x-nt-wallpaper-mode-hint[data-motion="enter"] {
+        opacity: 0;
+        transform: translateY(-5px);
+      }
+      .x-nt-wallpaper-mode-hint {
+        min-width: 0;
+        margin-top: 24px;
+        padding: 0 2px;
+        color: var(--x-nt-subtext, #6b7280);
+        font-size: 11px;
+        line-height: 1.25;
+        font-weight: 500;
+        font-family: "Open Sans", "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "Helvetica Neue", Arial, sans-serif;
+      }
       .x-nt-wallpaper-body[data-active-tab="built-in"] .x-nt-wallpaper-grid--local,
       .x-nt-wallpaper-body[data-active-tab="local"] .x-nt-wallpaper-grid--built-in {
         display: none;
@@ -3618,6 +3675,8 @@
       }
       @media (prefers-reduced-motion: reduce) {
         .x-nt-wallpaper-tabs-indicator,
+        .x-nt-wallpaper-mode-tabs,
+        .x-nt-wallpaper-mode-hint,
         .x-nt-wallpaper-body,
         .x-nt-wallpaper-grid {
           transition: none;
@@ -4027,6 +4086,9 @@
         background: #f4f4f4;
         border-color: #b9b9b9;
       }
+      body[data-theme="dark"] .x-nt-wallpaper-mode-sync-title {
+        color: var(--x-nt-text, #e5e7eb);
+      }
       body[data-theme="dark"] .x-nt-wallpaper-tabs {
         background: rgba(255, 255, 255, 0.06);
         border-color: rgba(255, 255, 255, 0.12);
@@ -4044,6 +4106,9 @@
       }
       body[data-theme="dark"] .x-nt-wallpaper-tab[data-active="true"] {
         color: #f8fafc;
+      }
+      body[data-theme="dark"] .x-nt-wallpaper-mode-hint {
+        color: #a3a3a3;
       }
       body[data-theme="dark"] .x-nt-effect-options {
         background: rgba(255, 255, 255, 0.06);

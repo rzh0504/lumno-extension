@@ -78,6 +78,12 @@ try {
 }
 
 try {
+  importScripts(chrome.runtime.getURL('src/background/tab-groups.js'));
+} catch (error) {
+  console.warn('Lumno: failed to load tab group helpers.', error);
+}
+
+try {
   importScripts(chrome.runtime.getURL('src/background/message-router.js'));
 } catch (error) {
   console.warn('Lumno: failed to load background message router.', error);
@@ -136,6 +142,7 @@ const FAVICON_UTILS = globalThis.LumnoFaviconUtils || {};
 const FAVICON_CACHE = globalThis.LumnoFaviconCache || {};
 const NEWTAB_FAVICON_THEME = globalThis.LumnoNewtabFaviconTheme || {};
 const BACKGROUND_NEWTAB_FALLBACK = globalThis.LumnoBackgroundNewtabFallback || {};
+const BACKGROUND_TAB_GROUPS = globalThis.LumnoBackgroundTabGroups || {};
 const isLocalFileLikeTargetUrl = BACKGROUND_NEWTAB_FALLBACK.isLocalFileLikeTargetUrl;
 const checkFileSchemeAccess = BACKGROUND_NEWTAB_FALLBACK.checkFileSchemeAccess;
 const openBrowserNewtabFallback = BACKGROUND_NEWTAB_FALLBACK.openBrowserNewtabFallback;
@@ -295,6 +302,45 @@ function getResolvedTabUrl(tab) {
   }
   const pendingUrl = typeof tab.pendingUrl === 'string' ? String(tab.pendingUrl).trim() : '';
   return pendingUrl;
+}
+
+function getSourceTabGroupContext(tab) {
+  if (BACKGROUND_TAB_GROUPS && typeof BACKGROUND_TAB_GROUPS.getSourceTabGroupContext === 'function') {
+    return BACKGROUND_TAB_GROUPS.getSourceTabGroupContext(tab, chrome);
+  }
+  return null;
+}
+
+function createTabWithSourceGroup(createProperties, sourceTab, callback) {
+  const done = typeof callback === 'function' ? callback : () => {};
+  if (BACKGROUND_TAB_GROUPS && typeof BACKGROUND_TAB_GROUPS.createTabInSourceGroup === 'function') {
+    BACKGROUND_TAB_GROUPS.createTabInSourceGroup(chrome, createProperties, sourceTab, done);
+    return;
+  }
+  if (!chrome || !chrome.tabs || typeof chrome.tabs.create !== 'function') {
+    done(null, { ok: false, reason: 'tabs-api-unavailable', grouped: false });
+    return;
+  }
+  chrome.tabs.create(createProperties || {}, (tab) => {
+    const error = chrome.runtime && chrome.runtime.lastError
+      ? chrome.runtime.lastError.message || 'tab-create-failed'
+      : '';
+    done(tab || null, {
+      ok: !error,
+      reason: error,
+      grouped: false
+    });
+  });
+}
+
+function moveTabToSourceGroupContext(tab, sourceContext, callback, createProperties) {
+  if (BACKGROUND_TAB_GROUPS && typeof BACKGROUND_TAB_GROUPS.moveTabToSourceGroupContext === 'function') {
+    BACKGROUND_TAB_GROUPS.moveTabToSourceGroupContext(chrome, tab, sourceContext, callback, createProperties);
+    return;
+  }
+  if (typeof callback === 'function') {
+    callback(false, '');
+  }
 }
 
 function hasTabSwitcherExtensionPagePort(tab) {
@@ -1726,23 +1772,26 @@ function setPinnedSnapshotToStorage(snapshot) {
 function createPinnedTabForRestore(url, windowId) {
   return new Promise((resolve) => {
     if (!chrome || !chrome.tabs || typeof chrome.tabs.create !== 'function') {
-      resolve(false);
+      resolve({ ok: false, tab: null });
       return;
     }
     const createWithWindow = (typeof windowId === 'number')
       ? { windowId, url, pinned: true, active: false }
       : { url, pinned: true, active: false };
-    chrome.tabs.create(createWithWindow, () => {
+    chrome.tabs.create(createWithWindow, (tab) => {
       if (!(chrome.runtime && chrome.runtime.lastError)) {
-        resolve(true);
+        resolve({ ok: true, tab: tab || null });
         return;
       }
       if (typeof windowId !== 'number') {
-        resolve(false);
+        resolve({ ok: false, tab: null });
         return;
       }
-      chrome.tabs.create({ url, pinned: true, active: false }, () => {
-        resolve(!(chrome.runtime && chrome.runtime.lastError));
+      chrome.tabs.create({ url, pinned: true, active: false }, (fallbackTab) => {
+        resolve({
+          ok: !(chrome.runtime && chrome.runtime.lastError),
+          tab: fallbackTab || null
+        });
       });
     });
   });
@@ -1791,27 +1840,87 @@ function getNormalWindowCountForPinnedSnapshot() {
   });
 }
 
-function normalizePinnedTabSnapshot(rawValue) {
-  const urls = [];
-  if (Array.isArray(rawValue)) {
-    rawValue.forEach((item) => {
-      const url = String(item || '').trim();
-      if (url && !isRestrictedUrl(url)) {
-        urls.push(url);
-      }
-    });
-    return urls.slice(0, PINNED_TAB_RESTORE_MAX_TABS);
+function getPinnedTabUngroupedId() {
+  return chrome &&
+    chrome.tabGroups &&
+    typeof chrome.tabGroups.TAB_GROUP_ID_NONE === 'number'
+    ? chrome.tabGroups.TAB_GROUP_ID_NONE
+    : -1;
+}
+
+function isTabInGroup(tab) {
+  return Boolean(
+    tab &&
+    typeof tab.groupId === 'number' &&
+    tab.groupId !== getPinnedTabUngroupedId()
+  );
+}
+
+function normalizePinnedTabGroupSnapshot(rawValue) {
+  if (!rawValue || typeof rawValue !== 'object') {
+    return null;
   }
-  if (!rawValue || typeof rawValue !== 'object' || !Array.isArray(rawValue.urls)) {
+  const key = String(rawValue.key || '').trim();
+  const title = String(rawValue.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const color = String(rawValue.color || '').trim();
+  if (!key && !title && !color) {
+    return null;
+  }
+  const snapshot = {};
+  if (key) {
+    snapshot.key = key;
+  }
+  if (title) {
+    snapshot.title = title;
+  }
+  if (color) {
+    snapshot.color = color;
+  }
+  return snapshot;
+}
+
+function normalizePinnedTabSnapshotEntry(rawValue) {
+  const raw = typeof rawValue === 'string'
+    ? { url: rawValue }
+    : (rawValue && typeof rawValue === 'object' ? rawValue : null);
+  if (!raw) {
+    return null;
+  }
+  const url = String(raw.url || '').trim();
+  if (!url || isRestrictedUrl(url)) {
+    return null;
+  }
+  const entry = { url };
+  const group = normalizePinnedTabGroupSnapshot(raw.group);
+  if (group) {
+    entry.group = group;
+  }
+  return entry;
+}
+
+function normalizePinnedTabSnapshot(rawValue) {
+  const entries = [];
+  const appendEntry = (item) => {
+    const entry = normalizePinnedTabSnapshotEntry(item);
+    if (entry) {
+      entries.push(entry);
+    }
+  };
+  if (Array.isArray(rawValue)) {
+    rawValue.forEach(appendEntry);
+    return entries.slice(0, PINNED_TAB_RESTORE_MAX_TABS);
+  }
+  if (!rawValue || typeof rawValue !== 'object') {
     return [];
   }
-  rawValue.urls.forEach((item) => {
-    const url = String(item || '').trim();
-    if (url && !isRestrictedUrl(url)) {
-      urls.push(url);
-    }
-  });
-  return urls.slice(0, PINNED_TAB_RESTORE_MAX_TABS);
+  if (Array.isArray(rawValue.entries)) {
+    rawValue.entries.forEach(appendEntry);
+    return entries.slice(0, PINNED_TAB_RESTORE_MAX_TABS);
+  }
+  if (Array.isArray(rawValue.urls)) {
+    rawValue.urls.forEach(appendEntry);
+  }
+  return entries.slice(0, PINNED_TAB_RESTORE_MAX_TABS);
 }
 
 function countUrls(urls) {
@@ -1823,13 +1932,144 @@ function countUrls(urls) {
   return map;
 }
 
+function getMissingPinnedTabEntries(savedEntries, existingPinnedUrls) {
+  const existing = countUrls(existingPinnedUrls);
+  const missingEntries = [];
+  (Array.isArray(savedEntries) ? savedEntries : []).forEach((entry) => {
+    const url = entry && entry.url ? String(entry.url) : '';
+    if (!url) {
+      return;
+    }
+    const remaining = existing.get(url) || 0;
+    if (remaining > 0) {
+      existing.set(url, remaining - 1);
+      return;
+    }
+    missingEntries.push(entry);
+  });
+  return missingEntries;
+}
+
+function getTabGroupById(groupId) {
+  return new Promise((resolve) => {
+    if (!chrome ||
+        !chrome.tabGroups ||
+        typeof chrome.tabGroups.get !== 'function' ||
+        typeof groupId !== 'number') {
+      resolve(null);
+      return;
+    }
+    try {
+      chrome.tabGroups.get(groupId, (group) => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          resolve(null);
+          return;
+        }
+        resolve(group || null);
+      });
+    } catch (error) {
+      resolve(null);
+    }
+  });
+}
+
+async function getPinnedTabGroupSnapshot(tab) {
+  if (!isTabInGroup(tab)) {
+    return null;
+  }
+  const group = await getTabGroupById(tab.groupId);
+  const snapshot = normalizePinnedTabGroupSnapshot({
+    key: `${typeof tab.windowId === 'number' ? tab.windowId : 'window'}:${tab.groupId}`,
+    title: group && typeof group.title === 'string' ? group.title : '',
+    color: group && typeof group.color === 'string' ? group.color : ''
+  });
+  return snapshot;
+}
+
+function getPinnedRestoreGroupKey(group) {
+  const snapshot = normalizePinnedTabGroupSnapshot(group);
+  if (!snapshot) {
+    return '';
+  }
+  return snapshot.key || `${snapshot.title || ''}::${snapshot.color || ''}`;
+}
+
+function updateRestoredTabGroup(groupId, group) {
+  return new Promise((resolve) => {
+    const snapshot = normalizePinnedTabGroupSnapshot(group);
+    if (!snapshot ||
+        typeof groupId !== 'number' ||
+        !chrome ||
+        !chrome.tabGroups ||
+        typeof chrome.tabGroups.update !== 'function') {
+      resolve(false);
+      return;
+    }
+    const updates = {};
+    if (snapshot.title) {
+      updates.title = snapshot.title;
+    }
+    if (snapshot.color) {
+      updates.color = snapshot.color;
+    }
+    if (Object.keys(updates).length === 0) {
+      resolve(false);
+      return;
+    }
+    try {
+      chrome.tabGroups.update(groupId, updates, () => {
+        resolve(!(chrome.runtime && chrome.runtime.lastError));
+      });
+    } catch (error) {
+      resolve(false);
+    }
+  });
+}
+
+function groupRestoredPinnedTab(tab, group, existingGroupId) {
+  return new Promise((resolve) => {
+    const snapshot = normalizePinnedTabGroupSnapshot(group);
+    if (!snapshot ||
+        !tab ||
+        typeof tab.id !== 'number' ||
+        !chrome ||
+        !chrome.tabs ||
+        typeof chrome.tabs.group !== 'function') {
+      resolve(null);
+      return;
+    }
+    const groupOptions = { tabIds: tab.id };
+    if (typeof existingGroupId === 'number') {
+      groupOptions.groupId = existingGroupId;
+    }
+    try {
+      chrome.tabs.group(groupOptions, (groupId) => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          resolve(null);
+          return;
+        }
+        const resolvedGroupId = typeof groupId === 'number' ? groupId : existingGroupId;
+        if (typeof resolvedGroupId !== 'number') {
+          resolve(null);
+          return;
+        }
+        updateRestoredTabGroup(resolvedGroupId, snapshot)
+          .catch(() => false)
+          .finally(() => resolve(resolvedGroupId));
+      });
+    } catch (error) {
+      resolve(null);
+    }
+  });
+}
+
 async function persistPinnedTabSnapshotNow(options) {
   if (!pinnedTabRecoveryEnabledCache) {
     return;
   }
   const opts = options && typeof options === 'object' ? options : {};
   const tabs = await queryTabsForPinnedSnapshot({ pinned: true });
-  const urls = tabs
+  const snapshotTabs = tabs
     .filter((tab) => tab && tab.incognito !== true)
     .sort((a, b) => {
       const winA = typeof a.windowId === 'number' ? a.windowId : 0;
@@ -1840,18 +2080,34 @@ async function persistPinnedTabSnapshotNow(options) {
       const indexA = typeof a.index === 'number' ? a.index : 0;
       const indexB = typeof b.index === 'number' ? b.index : 0;
       return indexA - indexB;
-    })
-    .map((tab) => getResolvedTabUrl(tab))
-    .filter((url) => Boolean(url) && !isRestrictedUrl(url))
-    .slice(0, PINNED_TAB_RESTORE_MAX_TABS);
-  if (!urls.length && opts.skipEmptyWhenNoNormalWindows === true) {
+    });
+  const entries = [];
+  for (let i = 0; i < snapshotTabs.length; i += 1) {
+    if (entries.length >= PINNED_TAB_RESTORE_MAX_TABS) {
+      break;
+    }
+    const tab = snapshotTabs[i];
+    const url = getResolvedTabUrl(tab);
+    if (!url || isRestrictedUrl(url)) {
+      continue;
+    }
+    const entry = { url };
+    const group = await getPinnedTabGroupSnapshot(tab);
+    if (group) {
+      entry.group = group;
+    }
+    entries.push(entry);
+  }
+  if (!entries.length && opts.skipEmptyWhenNoNormalWindows === true) {
     const normalWindowCount = await getNormalWindowCountForPinnedSnapshot();
     if (normalWindowCount <= 0) {
       return;
     }
   }
   await setPinnedSnapshotToStorage({
-    urls,
+    version: 2,
+    urls: entries.map((entry) => entry.url),
+    entries,
     capturedAt: Date.now()
   });
 }
@@ -1895,8 +2151,8 @@ async function restorePinnedTabsFromSnapshotNow() {
     return;
   }
   const savedRaw = await getPinnedSnapshotFromStorage();
-  const savedUrls = normalizePinnedTabSnapshot(savedRaw);
-  if (!savedUrls.length) {
+  const savedEntries = normalizePinnedTabSnapshot(savedRaw);
+  if (!savedEntries.length) {
     return;
   }
   const currentTabs = await queryTabsForPinnedSnapshot({});
@@ -1904,21 +2160,24 @@ async function restorePinnedTabsFromSnapshotNow() {
     .filter((tab) => tab && tab.pinned && tab.incognito !== true)
     .map((tab) => getResolvedTabUrl(tab))
     .filter((url) => Boolean(url) && !isRestrictedUrl(url));
-  const required = countUrls(savedUrls);
-  const existing = countUrls(existingPinnedUrls);
-  const missingUrls = [];
-  required.forEach((needCount, url) => {
-    const existingCount = existing.get(url) || 0;
-    for (let i = existingCount; i < needCount; i += 1) {
-      missingUrls.push(url);
-    }
-  });
-  if (!missingUrls.length) {
+  const missingEntries = getMissingPinnedTabEntries(savedEntries, existingPinnedUrls);
+  if (!missingEntries.length) {
     return;
   }
   const targetWindowId = await getLastFocusedWindowIdForRestore();
-  for (let i = 0; i < missingUrls.length && i < PINNED_TAB_RESTORE_MAX_TABS; i += 1) {
-    await createPinnedTabForRestore(missingUrls[i], targetWindowId);
+  const restoredGroupIds = new Map();
+  for (let i = 0; i < missingEntries.length && i < PINNED_TAB_RESTORE_MAX_TABS; i += 1) {
+    const entry = missingEntries[i];
+    const result = await createPinnedTabForRestore(entry.url, targetWindowId);
+    if (!result || !result.ok || !entry.group) {
+      continue;
+    }
+    const groupKey = getPinnedRestoreGroupKey(entry.group);
+    const existingGroupId = groupKey ? restoredGroupIds.get(groupKey) : null;
+    const groupId = await groupRestoredPinnedTab(result.tab, entry.group, existingGroupId);
+    if (groupKey && typeof groupId === 'number') {
+      restoredGroupIds.set(groupKey, groupId);
+    }
   }
   setTimeout(() => {
     schedulePersistPinnedTabSnapshot();
@@ -3324,16 +3583,16 @@ function openOverlayOnTab(activeTab, tabs, source) {
     });
     if (action === 'none') {
       logHotkeyDebug('fallback-open-browser-newtab', { reason: 'restricted_url', source: source || '' });
-      openBrowserNewtabFallback();
+      openBrowserNewtabFallback({ sourceTab: activeTab });
       return;
     }
     if (action === 'default') {
       logHotkeyDebug('fallback-open-create-newtab', { reason: 'restricted_url', source: source || '' });
-      openNewtabFallbackForUrl(activeUrl);
+      openNewtabFallbackForUrl(activeUrl, { sourceTab: activeTab });
       return;
     }
     logHotkeyDebug('fallback-open-lumno-newtab', { reason: 'restricted_url', source: source || '' });
-    openNewtabFallbackForUrl(activeUrl);
+    openNewtabFallbackForUrl(activeUrl, { sourceTab: activeTab });
     return;
   }
   const overlayInjectionFiles = [
@@ -3371,7 +3630,7 @@ function openOverlayOnTab(activeTab, tabs, source) {
         error: chrome.runtime.lastError.message || 'unknown',
         source: source || ''
       });
-      openNewtabFallbackForUrl(activeUrl);
+      openNewtabFallbackForUrl(activeUrl, { sourceTab: activeTab });
       return;
     }
     const runOverlayScript = (tabZoomFactor) => {
@@ -3408,7 +3667,7 @@ function openOverlayOnTab(activeTab, tabs, source) {
                 error: chrome.runtime.lastError.message || 'unknown',
                 source: source || ''
               });
-              openNewtabFallback();
+              openNewtabFallback({ sourceTab: activeTab });
               return;
             }
             const result = Array.isArray(results) && results[0] ? results[0].result : null;
@@ -3419,7 +3678,7 @@ function openOverlayOnTab(activeTab, tabs, source) {
                 error: result.reason || 'unknown',
                 source: source || ''
               });
-              openNewtabFallback();
+              openNewtabFallback({ sourceTab: activeTab });
               return;
             }
             logHotkeyDebug('overlay-opened', {
@@ -3501,7 +3760,7 @@ function injectTabSwitcherOnTab(hostTab, items, context) {
           reason: reason || '',
           source: context && context.source ? context.source : ''
         });
-        openNewtabFallbackForUrl(getResolvedTabUrl(hostTab));
+        openNewtabFallbackForUrl(getResolvedTabUrl(hostTab), { sourceTab: hostTab });
         finishOpen(false, reason || 'extension-page-open-failed');
         return;
       }
@@ -3527,7 +3786,7 @@ function injectTabSwitcherOnTab(hostTab, items, context) {
           error: errorMessage,
           source: context && context.source ? context.source : ''
         });
-        openNewtabFallbackForUrl(getResolvedTabUrl(hostTab));
+        openNewtabFallbackForUrl(getResolvedTabUrl(hostTab), { sourceTab: hostTab });
         finishOpen(false, errorMessage);
         return;
       }
@@ -3730,7 +3989,7 @@ function triggerTabSwitcherForTab(tab, source) {
             : (hostItem ? tabList.find((item) => item && item.id === hostItem.id) : null);
           const selectedIndex = getDefaultSwitcherSelectedIndex(items, activeTab.id);
           if (!hostTab || typeof hostTab.id !== 'number') {
-            openNewtabFallbackForUrl(activeUrl);
+            openNewtabFallbackForUrl(activeUrl, { sourceTab: activeTab });
             finishOpening();
             return;
           }
@@ -4397,9 +4656,10 @@ function runInteractiveSiteSearchProvider(provider, query, sender, disposition) 
       });
       return;
     }
-    chrome.tabs.create({ url: entryUrl, active: targetDisposition !== 'backgroundTab' }, (tab) => {
-      if (chrome.runtime && chrome.runtime.lastError) {
-        finish({ ok: false, reason: chrome.runtime.lastError.message || 'tab-create-failed' });
+    const sourceTab = sender && sender.tab ? sender.tab : null;
+    createTabWithSourceGroup({ url: entryUrl, active: targetDisposition !== 'backgroundTab' }, sourceTab, (tab, info) => {
+      if (!info || info.ok === false) {
+        finish({ ok: false, reason: (info && info.reason) || 'tab-create-failed' });
         return;
       }
       handleReadyTab(tab);
@@ -4571,7 +4831,7 @@ function handleTabMessage(request, sender, sendResponse) {
     }
     case 'trackSearchTab': {
       if (typeof request.tabId === 'number') {
-        markPendingSearchTab(request.tabId);
+        markPendingSearchTab(request.tabId, sender && sender.tab ? sender.tab : null);
         sendResponse({ ok: true });
       } else {
         sendResponse({ ok: false });
@@ -4769,11 +5029,12 @@ function handleSearchMessage(request, sender, sendResponse) {
       const query = request.query ? String(request.query) : '';
       const forceSearch = Boolean(request.forceSearch);
       const openInBackgroundTab = request.disposition === 'backgroundTab';
+      const sourceTab = sender && sender.tab ? sender.tab : null;
       const createResolvedTab = (url, callback) => {
-        chrome.tabs.create({
+        createTabWithSourceGroup({
           url: url,
           active: !openInBackgroundTab
-        }, callback);
+        }, sourceTab, callback);
       };
       loadShortcutRules().then((rules) => {
         const shortcutUrl = getShortcutUrl(query, rules);
@@ -4798,12 +5059,13 @@ function handleSearchMessage(request, sender, sendResponse) {
             return;
           }
           if (chrome && chrome.search && typeof chrome.search.query === 'function') {
-            markPendingSearchTab(null);
+            markPendingSearchTab(null, sourceTab);
             try {
               chrome.search.query({ text: query, disposition: 'NEW_TAB' }, () => {
                 if (chrome.runtime && chrome.runtime.lastError) {
                   pendingSearchAt = 0;
                   pendingSearchTabId = null;
+                  pendingSearchGroupContext = null;
                   createResolvedTab(fallbackUrl, () => {
                     sendResponse({ ok: true, url: fallbackUrl });
                   });
@@ -4815,6 +5077,7 @@ function handleSearchMessage(request, sender, sendResponse) {
             } catch (e) {
               pendingSearchAt = 0;
               pendingSearchTabId = null;
+              pendingSearchGroupContext = null;
             }
           }
           createResolvedTab(fallbackUrl, () => {
@@ -4978,6 +5241,7 @@ function handleExtensionPageMessage(request, sender, sendResponse) {
     }
     case 'createTab': {
       const targetUrl = typeof request.url === 'string' ? request.url : '';
+      const sourceTab = sender && sender.tab ? sender.tab : null;
       if (!targetUrl) {
         sendResponse({ ok: false });
         return;
@@ -5005,8 +5269,8 @@ function handleExtensionPageMessage(request, sender, sendResponse) {
         });
         return true;
       }
-      chrome.tabs.create({ url: targetUrl, active: request.disposition !== 'backgroundTab' }, () => {
-        sendResponse({ ok: !(chrome.runtime && chrome.runtime.lastError) });
+      createTabWithSourceGroup({ url: targetUrl, active: request.disposition !== 'backgroundTab' }, sourceTab, (_tab, info) => {
+        sendResponse({ ok: Boolean(info && info.ok) });
       });
       return true;
     }
@@ -5014,15 +5278,15 @@ function handleExtensionPageMessage(request, sender, sendResponse) {
       const newtabUrl = typeof EXTENSION_ROUTES.buildLumnoNewtabUrl === 'function'
         ? EXTENSION_ROUTES.buildLumnoNewtabUrl(chrome, { focus: true })
         : chrome.runtime.getURL('src/newtab/lumno-newtab.html?focus=1');
-      chrome.tabs.create({ url: newtabUrl }, () => {
-        sendResponse({ ok: !(chrome.runtime && chrome.runtime.lastError) });
+      createTabWithSourceGroup({ url: newtabUrl }, sender && sender.tab ? sender.tab : null, (_tab, info) => {
+        sendResponse({ ok: Boolean(info && info.ok) });
       });
       return true;
     }
     case 'openExtensionDetailsPage': {
       const detailsUrl = getExtensionDetailsUrl();
-      chrome.tabs.create({ url: detailsUrl }, () => {
-        sendResponse({ ok: !(chrome.runtime && chrome.runtime.lastError), url: detailsUrl });
+      createTabWithSourceGroup({ url: detailsUrl }, sender && sender.tab ? sender.tab : null, (_tab, info) => {
+        sendResponse({ ok: Boolean(info && info.ok), url: detailsUrl });
       });
       return true;
     }
@@ -5309,6 +5573,7 @@ let defaultSearchEngineState = {
 
 let pendingSearchAt = 0;
 let pendingSearchTabId = null;
+let pendingSearchGroupContext = null;
 
 function arrayBufferToBase64(buffer) {
   let binary = '';
@@ -5710,9 +5975,10 @@ async function fetchSearchSuggestionsForEngine(query) {
   }
 }
 
-function markPendingSearchTab(tabId) {
+function markPendingSearchTab(tabId, sourceTab) {
   pendingSearchAt = Date.now();
   pendingSearchTabId = typeof tabId === 'number' ? tabId : null;
+  pendingSearchGroupContext = getSourceTabGroupContext(sourceTab);
 }
 
 loadDefaultSearchEngineState();
@@ -5723,9 +5989,13 @@ if (chrome && chrome.tabs) {
       return;
     }
     if (Date.now() - pendingSearchAt > 5000) {
+      pendingSearchAt = 0;
+      pendingSearchTabId = null;
+      pendingSearchGroupContext = null;
       return;
     }
     pendingSearchTabId = tab.id;
+    moveTabToSourceGroupContext(tab, pendingSearchGroupContext, () => {});
   });
 
   chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
@@ -5733,6 +6003,9 @@ if (chrome && chrome.tabs) {
       return;
     }
     if (!pendingSearchAt || (Date.now() - pendingSearchAt > 10000)) {
+      pendingSearchAt = 0;
+      pendingSearchTabId = null;
+      pendingSearchGroupContext = null;
       return;
     }
     if (pendingSearchTabId !== null && tabId !== pendingSearchTabId) {
@@ -5742,6 +6015,7 @@ if (chrome && chrome.tabs) {
     if (updated) {
       pendingSearchTabId = null;
       pendingSearchAt = 0;
+      pendingSearchGroupContext = null;
     }
   });
 }

@@ -40,6 +40,28 @@ assert.match(
   /ensurePinnedTabRecoverySettingLoaded\(\)/,
   'pinned tab startup restore should wait for the stored setting before checking the enabled cache'
 );
+assert.match(
+  restoreFunction,
+  /const savedEntries = normalizePinnedTabSnapshot\(savedRaw\)/,
+  'pinned tab restore should read URL plus tab-group snapshot entries'
+);
+assert.match(
+  restoreFunction,
+  /groupRestoredPinnedTab\(result\.tab, entry\.group, existingGroupId\)/,
+  'pinned tab restore should attempt to rebuild saved tab groups without blocking URL recovery'
+);
+
+const persistFunction = getFunctionBlock('persistPinnedTabSnapshotNow');
+assert.match(
+  persistFunction,
+  /entries\.push\(entry\)/,
+  'pinned tab snapshot persistence should store structured entries'
+);
+assert.match(
+  persistFunction,
+  /getPinnedTabGroupSnapshot\(tab\)/,
+  'pinned tab snapshot persistence should capture tab group metadata when present'
+);
 
 const installedListener = getListenerBlock(
   'chrome.runtime.onInstalled.addListener',

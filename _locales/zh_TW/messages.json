@@ -485,6 +485,30 @@
   "newtab_wallpaper_add_local": {
     "message": "新增本機壁紙"
   },
+  "newtab_wallpaper_mode_sync_title": {
+    "message": "深淺模式一致"
+  },
+  "newtab_wallpaper_mode_sync_toggle_label": {
+    "message": "深淺模式使用同一張壁紙"
+  },
+  "newtab_wallpaper_mode_tabs_label": {
+    "message": "壁紙深淺模式"
+  },
+  "newtab_wallpaper_light_mode_tab": {
+    "message": "淺色"
+  },
+  "newtab_wallpaper_dark_mode_tab": {
+    "message": "深色"
+  },
+  "newtab_wallpaper_mode_select_label": {
+    "message": "設定{mode}模式壁紙"
+  },
+  "newtab_wallpaper_mode_hint_light": {
+    "message": "淺色模式壁紙"
+  },
+  "newtab_wallpaper_mode_hint_dark": {
+    "message": "深色模式壁紙"
+  },
   "newtab_wallpaper_feature_hint_badge": {
     "message": "新功能"
   },

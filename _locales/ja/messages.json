@@ -485,6 +485,30 @@
   "newtab_wallpaper_add_local": {
     "message": "この端末から壁紙を追加"
   },
+  "newtab_wallpaper_mode_sync_title": {
+    "message": "ライト/ダークで同じ"
+  },
+  "newtab_wallpaper_mode_sync_toggle_label": {
+    "message": "ライト/ダークで同じ壁紙を使う"
+  },
+  "newtab_wallpaper_mode_tabs_label": {
+    "message": "壁紙のカラーモード"
+  },
+  "newtab_wallpaper_light_mode_tab": {
+    "message": "ライト"
+  },
+  "newtab_wallpaper_dark_mode_tab": {
+    "message": "ダーク"
+  },
+  "newtab_wallpaper_mode_select_label": {
+    "message": "{mode}モードの壁紙を編集"
+  },
+  "newtab_wallpaper_mode_hint_light": {
+    "message": "ライトモードの壁紙"
+  },
+  "newtab_wallpaper_mode_hint_dark": {
+    "message": "ダークモードの壁紙"
+  },
   "newtab_wallpaper_feature_hint_badge": {
     "message": "新機能"
   },

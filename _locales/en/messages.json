@@ -485,6 +485,30 @@
   "newtab_wallpaper_add_local": {
     "message": "Add local wallpaper"
   },
+  "newtab_wallpaper_mode_sync_title": {
+    "message": "Match light and dark mode"
+  },
+  "newtab_wallpaper_mode_sync_toggle_label": {
+    "message": "Use the same wallpaper for light and dark mode"
+  },
+  "newtab_wallpaper_mode_tabs_label": {
+    "message": "Wallpaper color mode"
+  },
+  "newtab_wallpaper_light_mode_tab": {
+    "message": "Light"
+  },
+  "newtab_wallpaper_dark_mode_tab": {
+    "message": "Dark"
+  },
+  "newtab_wallpaper_mode_select_label": {
+    "message": "Edit {mode} wallpaper"
+  },
+  "newtab_wallpaper_mode_hint_light": {
+    "message": "Light mode wallpaper"
+  },
+  "newtab_wallpaper_mode_hint_dark": {
+    "message": "Dark mode wallpaper"
+  },
   "newtab_wallpaper_feature_hint_badge": {
     "message": "New"
   },

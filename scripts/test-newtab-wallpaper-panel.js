@@ -7,7 +7,9 @@ const LOCAL_WALLPAPER_STORAGE_KEY = '_x_extension_newtab_local_wallpaper_2026_un
 const NEWTAB_FAVICON_STORAGE_KEY = '_x_extension_newtab_favicon_2026_unique_';
 const NEWTAB_FAVICON_PRELOAD_STORAGE_KEY = '_x_extension_newtab_favicon_preload_2026_unique_';
 const DEFAULT_WALLPAPER_ID = 'monet-coastal-white';
+const WALLPAPER_PREFS_STORAGE_VERSION = 2;
 const CUSTOM_WALLPAPER_ID_PREFIX = 'custom-wallpaper-';
+const LOCAL_WALLPAPER_DISABLED_VALUE = '__lumno_local_wallpaper_disabled__';
 
 function createFakeStyle() {
   const values = new Map();
@@ -95,6 +97,16 @@ function createFakeElement(tagName, documentObj) {
     },
     appendChild(child) {
       this.children.push(child);
+      child.parentNode = this;
+      child.parentElement = this;
+      return child;
+    },
+    insertBefore(child, referenceChild) {
+      const index = this.children.indexOf(referenceChild);
+      if (index === -1) {
+        return this.appendChild(child);
+      }
+      this.children.splice(index, 0, child);
       child.parentNode = this;
       child.parentElement = this;
       return child;
@@ -317,6 +329,38 @@ function createFakeBroadcastChannelClass() {
   };
 }
 
+function createFakeImageClass() {
+  return class FakeImage {
+    constructor() {
+      this.onload = null;
+      this.onerror = null;
+      this.decoding = '';
+      this._src = '';
+    }
+
+    set src(value) {
+      this._src = String(value || '');
+      setTimeout(() => {
+        if (typeof this.onload === 'function') {
+          this.onload();
+        }
+      }, 0);
+    }
+
+    get src() {
+      return this._src;
+    }
+
+    decode() {
+      return Promise.resolve();
+    }
+  };
+}
+
+function waitForAsyncWallpaperApply() {
+  return new Promise((resolve) => setTimeout(resolve, 20));
+}
+
 function getChildByClassName(element, className) {
   return (element.children || []).find((child) => {
     const classes = String(child.className || '').split(/\s+/);
@@ -361,10 +405,34 @@ function getDescendantByTagName(element, tagName) {
   return match;
 }
 
+function getDescendantByAttribute(element, name, value) {
+  let match = null;
+  (function visit(node) {
+    if (!node || match) {
+      return;
+    }
+    (node.children || []).forEach((child) => {
+      if (match) {
+        return;
+      }
+      if (child.getAttribute && child.getAttribute(name) === value) {
+        match = child;
+        return;
+      }
+      visit(child);
+    });
+  })(element);
+  return match;
+}
+
 function decodeSvgDataUrl(url) {
   const prefix = 'data:image/svg+xml;charset=UTF-8,';
   assert.ok(String(url || '').startsWith(prefix), 'the alternate favicon should be rendered as an SVG data URL');
   return decodeURIComponent(String(url).slice(prefix.length));
+}
+
+function clonePlain(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 function assertSquareFaviconOptionCss(filePath) {
@@ -543,8 +611,19 @@ function testNewtabFaviconPreloadAppliesCachedAlternateBeforeMainRuntime() {
   });
 
   const fallbackHtml = fs.readFileSync('src/newtab/lumno-newtab.html', 'utf8');
+  const fallbackRedirectJs = fs.readFileSync('src/newtab/lumno-newtab.js', 'utf8');
   assert.match(
     fallbackHtml,
+    /<script src="lumno-newtab\.js"><\/script>/,
+    'lumno-newtab fallback should load the redirect through an external script allowed by extension CSP'
+  );
+  assert.doesNotMatch(
+    fallbackHtml,
+    /<script\b(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/script>/,
+    'lumno-newtab fallback should not use inline scripts because extension pages disallow them by CSP'
+  );
+  assert.match(
+    fallbackRedirectJs,
     /new URL\('newtab\.html', window\.location\.href\)/,
     'lumno-newtab fallback should redirect into the maintained primary newtab document'
   );
@@ -631,6 +710,7 @@ function createWallpaperSandbox(options) {
     requestAnimationFrame: testWindow.requestAnimationFrame,
     cancelAnimationFrame: testWindow.cancelAnimationFrame,
     URL,
+    Image: createFakeImageClass(),
     globalThis: null,
     document: testDocument,
     window: testWindow,
@@ -661,6 +741,7 @@ const sandbox = {
   requestAnimationFrame: windowObj.requestAnimationFrame,
   cancelAnimationFrame: windowObj.cancelAnimationFrame,
   URL,
+  Image: createFakeImageClass(),
   globalThis: null,
   document: documentObj,
   window: windowObj,
@@ -855,6 +936,258 @@ async function testLegacySyncedCustomWallpaperMigratesToLocalOnlySelection() {
   );
 }
 
+async function testWallpaperModeConsistencyDefaultsOnAndCopiesLegacySelectionWhenDisabled() {
+  const syncStorage = createMemoryStorage({
+    [WALLPAPER_STORAGE_KEY]: 'white-shanshui'
+  });
+  const { documentObj: testDocument, windowObj: testWindow, sandbox: testSandbox } = createWallpaperSandbox();
+  const testRuntime = testSandbox.LumnoNewtabWallpaper.createWallpaperRuntime({
+    documentObj: testDocument,
+    windowObj: testWindow,
+    storageArea: syncStorage,
+    storageKeys: {
+      wallpaper: WALLPAPER_STORAGE_KEY,
+      localWallpaper: LOCAL_WALLPAPER_STORAGE_KEY
+    },
+    t: (_key, fallback) => fallback || '',
+    getRiSvg: () => ''
+  });
+
+  await testRuntime.bootstrapInitialWallpaper();
+  testRuntime.createControls();
+  const testControl = testRuntime.getControlElement();
+  testControl.children[1].click();
+  const testPanel = testControl.children[0];
+  const modeSyncControl = getDescendantByClassName(testPanel, 'x-nt-wallpaper-mode-sync');
+  const modeSyncToggle = getDescendantByTagName(modeSyncControl, 'input');
+  const modeTabs = getDescendantByClassName(testPanel, 'x-nt-wallpaper-mode-tabs');
+  const modeHint = getDescendantByClassName(testPanel, 'x-nt-wallpaper-mode-hint');
+
+  assert.ok(modeSyncControl, 'wallpaper panel should render a light/dark consistency switch below the main toggle');
+  assert.strictEqual(modeSyncToggle.checked, true, 'light/dark consistency should default on for legacy wallpaper values');
+  assert.strictEqual(modeTabs.getAttribute('data-visible'), 'false', 'mode tabs should stay hidden while consistency is on');
+  assert.strictEqual(modeHint.getAttribute('data-visible'), 'false', 'mode hint should stay hidden while consistency is on');
+
+  modeSyncToggle.checked = false;
+  modeSyncToggle._listeners.change[0]();
+
+  assert.deepStrictEqual(clonePlain(syncStorage.data[WALLPAPER_STORAGE_KEY]), {
+    version: WALLPAPER_PREFS_STORAGE_VERSION,
+    sameForModes: false,
+    light: 'white-shanshui',
+    dark: 'white-shanshui'
+  });
+  assert.strictEqual(
+    testDocument.body.getAttribute('data-wallpaper-active'),
+    'true',
+    'disabling light/dark consistency should not disable the current wallpaper'
+  );
+  assert.ok(
+    testDocument.documentElement.style
+      .getPropertyValue('--x-nt-wallpaper-image')
+      .includes('lumno-newtab-white-shanshui.webp'),
+    'disabling light/dark consistency should keep the current wallpaper image applied'
+  );
+  assert.strictEqual(modeTabs.getAttribute('data-visible'), 'true', 'mode tabs should appear after consistency is disabled');
+  assert.strictEqual(modeHint.getAttribute('data-visible'), 'true', 'mode hint should appear between the two tab rows');
+  assert.strictEqual(modeHint.textContent, 'Light mode wallpaper');
+}
+
+async function testDisablingWallpaperModeConsistencyIgnoresStaleLocalDisabledOverride() {
+  const syncStorage = createMemoryStorage({
+    [WALLPAPER_STORAGE_KEY]: 'white-shanshui'
+  });
+  const localStorageArea = createMemoryStorage({
+    [LOCAL_WALLPAPER_STORAGE_KEY]: {
+      version: WALLPAPER_PREFS_STORAGE_VERSION,
+      light: '',
+      dark: LOCAL_WALLPAPER_DISABLED_VALUE
+    }
+  });
+  const { documentObj: testDocument, windowObj: testWindow, sandbox: testSandbox } = createWallpaperSandbox();
+  testDocument.body.setAttribute('data-theme', 'dark');
+  const testRuntime = testSandbox.LumnoNewtabWallpaper.createWallpaperRuntime({
+    documentObj: testDocument,
+    windowObj: testWindow,
+    storageArea: syncStorage,
+    localWallpaperStorageArea: localStorageArea,
+    storageKeys: {
+      wallpaper: WALLPAPER_STORAGE_KEY,
+      localWallpaper: LOCAL_WALLPAPER_STORAGE_KEY
+    },
+    t: (_key, fallback) => fallback || '',
+    getRiSvg: () => ''
+  });
+
+  await testRuntime.bootstrapInitialWallpaper();
+  testRuntime.createControls();
+  const testControl = testRuntime.getControlElement();
+  testControl.children[1].click();
+  const testPanel = testControl.children[0];
+  const modeSyncToggle = getDescendantByTagName(
+    getDescendantByClassName(testPanel, 'x-nt-wallpaper-mode-sync'),
+    'input'
+  );
+
+  modeSyncToggle.checked = false;
+  modeSyncToggle._listeners.change[0]();
+
+  assert.deepStrictEqual(clonePlain(syncStorage.data[WALLPAPER_STORAGE_KEY]), {
+    version: WALLPAPER_PREFS_STORAGE_VERSION,
+    sameForModes: false,
+    light: 'white-shanshui',
+    dark: 'white-shanshui'
+  }, 'stale local disabled markers should not replace the synced wallpaper when consistency is disabled');
+  assert.strictEqual(
+    localStorageArea.data[LOCAL_WALLPAPER_STORAGE_KEY],
+    '',
+    'stale local disabled markers should be cleared after consistency is disabled'
+  );
+  await waitForAsyncWallpaperApply();
+  assert.strictEqual(
+    testDocument.body.getAttribute('data-wallpaper-active'),
+    'true',
+    'disabling light/dark consistency should keep wallpaper enabled when a synced wallpaper exists'
+  );
+}
+
+async function testSplitBuiltInWallpaperSelectionFollowsResolvedTheme() {
+  const syncStorage = createMemoryStorage({
+    [WALLPAPER_STORAGE_KEY]: {
+      version: WALLPAPER_PREFS_STORAGE_VERSION,
+      sameForModes: false,
+      light: 'monet-coastal-white',
+      dark: 'dark-shanshui-moonlit'
+    }
+  });
+  const { documentObj: testDocument, windowObj: testWindow, sandbox: testSandbox } = createWallpaperSandbox();
+  testDocument.body.setAttribute('data-theme', 'light');
+  const testRuntime = testSandbox.LumnoNewtabWallpaper.createWallpaperRuntime({
+    documentObj: testDocument,
+    windowObj: testWindow,
+    storageArea: syncStorage,
+    storageKeys: {
+      wallpaper: WALLPAPER_STORAGE_KEY,
+      localWallpaper: LOCAL_WALLPAPER_STORAGE_KEY
+    },
+    t: (_key, fallback) => fallback || '',
+    getRiSvg: () => ''
+  });
+
+  await testRuntime.bootstrapInitialWallpaper();
+  assert.ok(
+    testDocument.documentElement.style
+      .getPropertyValue('--x-nt-wallpaper-image')
+      .includes('lumno-newtab-monet-coastal-white.webp'),
+    'light theme should initially render the light wallpaper from split prefs'
+  );
+
+  testRuntime.createControls();
+  const testControl = testRuntime.getControlElement();
+  testControl.children[1].click();
+  const darkModeTab = getDescendantByAttribute(testControl.children[0], 'data-wallpaper-mode', 'dark');
+  darkModeTab.click();
+  const targetTile = getDescendantByAttribute(testControl.children[0], 'data-wallpaper-id', 'dark-monet-lily-nocturne');
+  targetTile.click();
+
+  assert.deepStrictEqual(clonePlain(syncStorage.data[WALLPAPER_STORAGE_KEY]), {
+    version: WALLPAPER_PREFS_STORAGE_VERSION,
+    sameForModes: false,
+    light: 'monet-coastal-white',
+    dark: 'dark-monet-lily-nocturne'
+  });
+  assert.ok(
+    testDocument.documentElement.style
+      .getPropertyValue('--x-nt-wallpaper-image')
+      .includes('lumno-newtab-monet-coastal-white.webp'),
+    'editing the dark wallpaper should not replace the currently resolved light wallpaper'
+  );
+
+  testDocument.body.setAttribute('data-theme', 'dark');
+  testRuntime.handleThemeModeChange();
+  await waitForAsyncWallpaperApply();
+
+  assert.ok(
+    testDocument.documentElement.style
+      .getPropertyValue('--x-nt-wallpaper-image')
+      .includes('lumno-newtab-dark-monet-lily-nocturne.webp'),
+    'switching to dark theme should apply the separately configured dark wallpaper'
+  );
+}
+
+async function testSplitLocalWallpaperSelectionStaysLocalOnly() {
+  const customWallpaperId = `${CUSTOM_WALLPAPER_ID_PREFIX}dark-local`;
+  const syncStorage = createMemoryStorage({
+    [WALLPAPER_STORAGE_KEY]: {
+      version: WALLPAPER_PREFS_STORAGE_VERSION,
+      sameForModes: false,
+      light: 'monet-coastal-white',
+      dark: DEFAULT_WALLPAPER_ID
+    }
+  });
+  const localStorageArea = createMemoryStorage();
+  const localStoreApi = createLocalWallpaperStoreApi([{
+    id: customWallpaperId,
+    imageDataUrl: 'data:image/webp;base64,dark-wallpaper',
+    thumbnailDataUrl: 'data:image/webp;base64,dark-thumb',
+    updatedAt: 1
+  }]);
+  const { documentObj: testDocument, windowObj: testWindow, sandbox: testSandbox } = createWallpaperSandbox({
+    localStoreApi
+  });
+  testDocument.body.setAttribute('data-theme', 'light');
+  const testRuntime = testSandbox.LumnoNewtabWallpaper.createWallpaperRuntime({
+    documentObj: testDocument,
+    windowObj: testWindow,
+    storageArea: syncStorage,
+    localWallpaperStorageArea: localStorageArea,
+    storageKeys: {
+      wallpaper: WALLPAPER_STORAGE_KEY,
+      localWallpaper: LOCAL_WALLPAPER_STORAGE_KEY
+    },
+    t: (_key, fallback) => fallback || '',
+    getRiSvg: () => ''
+  });
+
+  await testRuntime.bootstrapInitialWallpaper();
+  testRuntime.createControls();
+  const testControl = testRuntime.getControlElement();
+  testControl.children[1].click();
+  getDescendantByAttribute(testControl.children[0], 'data-wallpaper-mode', 'dark').click();
+  getDescendantByAttribute(testControl.children[0], 'data-wallpaper-tab', 'local').click();
+  getDescendantByAttribute(testControl.children[0], 'data-wallpaper-id', customWallpaperId).click();
+
+  assert.deepStrictEqual(clonePlain(syncStorage.data[WALLPAPER_STORAGE_KEY]), {
+    version: WALLPAPER_PREFS_STORAGE_VERSION,
+    sameForModes: false,
+    light: 'monet-coastal-white',
+    dark: DEFAULT_WALLPAPER_ID
+  }, 'selecting a local dark wallpaper should not write the custom id to sync storage');
+  assert.deepStrictEqual(clonePlain(localStorageArea.data[LOCAL_WALLPAPER_STORAGE_KEY]), {
+    version: WALLPAPER_PREFS_STORAGE_VERSION,
+    light: '',
+    dark: customWallpaperId
+  }, 'the split local wallpaper override should be kept in local storage only');
+
+  assert.ok(
+    testDocument.documentElement.style
+      .getPropertyValue('--x-nt-wallpaper-image')
+      .includes('lumno-newtab-monet-coastal-white.webp'),
+    'choosing a dark local wallpaper should not replace the current light wallpaper'
+  );
+
+  testDocument.body.setAttribute('data-theme', 'dark');
+  testRuntime.handleThemeModeChange();
+  await waitForAsyncWallpaperApply();
+
+  assert.ok(
+    testDocument.documentElement.style
+      .getPropertyValue('--x-nt-wallpaper-image')
+      .includes('data:image/webp;base64,dark-wallpaper'),
+    'dark theme should use the local-only dark wallpaper on the same device'
+  );
+}
+
 async function testNewtabFaviconOptionsRenderBelowLogoAndPersistSelection() {
   const syncStorage = createMemoryStorage({
     [NEWTAB_FAVICON_STORAGE_KEY]: 'default'
@@ -1031,6 +1364,10 @@ Promise.resolve()
   .then(testNewtabFaviconPreloadAppliesCachedAlternateBeforeMainRuntime)
   .then(testSyncedCustomWallpaperWithoutLocalRecordFallsBackToDefault)
   .then(testLegacySyncedCustomWallpaperMigratesToLocalOnlySelection)
+  .then(testWallpaperModeConsistencyDefaultsOnAndCopiesLegacySelectionWhenDisabled)
+  .then(testDisablingWallpaperModeConsistencyIgnoresStaleLocalDisabledOverride)
+  .then(testSplitBuiltInWallpaperSelectionFollowsResolvedTheme)
+  .then(testSplitLocalWallpaperSelectionStaysLocalOnly)
   .then(testNewtabFaviconOptionsRenderBelowLogoAndPersistSelection)
   .then(testNewtabFaviconThemeBroadcastRefreshesBackgroundTabs)
   .then(() => {

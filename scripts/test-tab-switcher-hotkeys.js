@@ -191,7 +191,7 @@ assert.match(
 );
 assert.match(
   openOverlayBlock,
-  /if \(action === 'none'\)[\s\S]*fallback-open-browser-newtab[\s\S]*openBrowserNewtabFallback\(\)[\s\S]*return;/,
+  /if \(action === 'none'\)[\s\S]*fallback-open-browser-newtab[\s\S]*openBrowserNewtabFallback\(\{ sourceTab: activeTab \}\)[\s\S]*return;/,
   'restricted browser-setting action should open the browser-selected newtab provider instead of suppressing the shortcut'
 );
 assert.strictEqual(
