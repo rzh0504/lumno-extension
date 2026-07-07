@@ -5,7 +5,7 @@
   --x-ov-suggestion-row-height: 52px;
   --x-ov-suggestion-row-gap: 4px;
   --x-ov-suggestions-max-height: 580px;
-  --x-ov-suggestion-action-column-width: 120px;
+  --x-ov-suggestion-action-column-width: 160px;
   width: 100%;
   flex: 1 1 auto;
   min-height: 0;
@@ -454,8 +454,9 @@
 }
 
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-right[data-action-column="true"] {
-  flex: 0 0 min(34%, var(--x-ov-suggestion-action-column-width, 120px));
-  width: min(34%, var(--x-ov-suggestion-action-column-width, 120px));
+  flex: 0 0 min(48%, var(--x-ov-suggestion-action-column-width, 160px));
+  width: min(48%, var(--x-ov-suggestion-action-column-width, 160px));
+  justify-content: flex-end;
 }
 
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-action-tags {
@@ -507,13 +508,18 @@
 }
 
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-right[data-action-column="true"] .x-ov-suggestion-action-tags[data-visible="true"],
-:is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-right[data-action-column="true"] .x-ov-suggestion-action-tags[data-visible="true"] .x-ov-action-tag,
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-right[data-action-column="true"] .x-ov-suggestion-action-button[data-visible="true"] {
-  width: 100%;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+:is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-right[data-action-column="true"] .x-ov-suggestion-action-tags[data-visible="true"] .x-ov-action-tag {
+  max-width: 100%;
 }
 
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-right[data-action-column="true"] .x-ov-suggestion-action-button {
-  justify-content: space-between;
+  justify-content: flex-end;
 }
 
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-action-tag[data-clickable="true"] {

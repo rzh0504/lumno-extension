@@ -235,8 +235,8 @@ function testSuggestionActionColumnAlignmentContract() {
 
   assert.match(
     overlayCss,
-    /--x-ov-suggestion-action-column-width:\s*120px;/,
-    'overlay suggestions should define a compact stable right-side action column width'
+    /--x-ov-suggestion-action-column-width:\s*160px;/,
+    'overlay suggestions should reserve enough action-column width for the default search-engine action'
   );
   const overlayActionColumnRule = getRuleBlock(
     overlayCss,
@@ -245,13 +245,18 @@ function testSuggestionActionColumnAlignmentContract() {
   );
   assert.match(
     overlayActionColumnRule,
-    /flex:\s*0 0 min\(34%,\s*var\(--x-ov-suggestion-action-column-width,\s*120px\)\);/,
-    'overlay action column should use a compact responsive flex basis'
+    /flex:\s*0 0 min\(48%,\s*var\(--x-ov-suggestion-action-column-width,\s*160px\)\);/,
+    'overlay action column should use a responsive basis wide enough for search-engine labels'
   );
   assert.match(
     overlayActionColumnRule,
-    /width:\s*min\(34%,\s*var\(--x-ov-suggestion-action-column-width,\s*120px\)\);/,
+    /width:\s*min\(48%,\s*var\(--x-ov-suggestion-action-column-width,\s*160px\)\);/,
     'overlay action column should keep a matching width for consistent left edges'
+  );
+  assert.match(
+    overlayActionColumnRule,
+    /justify-content:\s*flex-end;/,
+    'overlay action column should right-align compact action groups'
   );
   assert.match(
     overlayCss,
@@ -265,19 +270,29 @@ function testSuggestionActionColumnAlignmentContract() {
   );
   assert.match(
     overlayCss,
-    /\.x-ov-suggestion-right\[data-action-column="true"\] \.x-ov-suggestion-action-button\[data-visible="true"\]\s*\{[\s\S]*?width:\s*100%;/,
-    'overlay visible action buttons should fill the compact column so arrows do not leave a right-side gutter'
+    /\.x-ov-suggestion-right\[data-action-column="true"\] \.x-ov-suggestion-action-button\[data-visible="true"\]\s*\{[\s\S]*?max-width:\s*100%;/,
+    'overlay visible action buttons should cap at the compact column instead of forcing a full-width label/arrow gap'
   );
   assert.match(
     overlayCss,
-    /\.x-ov-suggestion-right\[data-action-column="true"\] \.x-ov-suggestion-action-button\s*\{[\s\S]*?justify-content:\s*space-between;/,
-    'overlay action buttons should keep labels left-aligned and arrows at the column edge'
+    /\.x-ov-suggestion-right\[data-action-column="true"\] \.x-ov-suggestion-action-tags\[data-visible="true"\],\s*[\s\S]*?\.x-ov-suggestion-right\[data-action-column="true"\] \.x-ov-suggestion-action-button\[data-visible="true"\]\s*\{[\s\S]*?flex:\s*0 1 auto;[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/,
+    'overlay action tags and buttons should shrink inside the fixed action column without stretching away from the right edge'
+  );
+  assert.match(
+    overlayCss,
+    /\.x-ov-suggestion-right\[data-action-column="true"\] \.x-ov-suggestion-action-tags\[data-visible="true"\] \.x-ov-action-tag\s*\{[\s\S]*?max-width:\s*100%;/,
+    'overlay action tags should ellipsize within the remaining right-aligned space'
+  );
+  assert.doesNotMatch(
+    overlayCss,
+    /\.x-ov-suggestion-right\[data-action-column="true"\][^{]+\.x-ov-suggestion-action-button[^{]*\{[\s\S]*?justify-content:\s*space-between;/,
+    'overlay action buttons should not split label and arrow across the full action column'
   );
 
   assert.match(
     newtabHtml,
-    /--x-nt-suggestion-action-column-width:\s*120px;/,
-    'newtab suggestions should define the same compact stable right-side action column width'
+    /--x-nt-suggestion-action-column-width:\s*160px;/,
+    'newtab suggestions should reserve enough action-column width for the default search-engine action'
   );
   const newtabActionColumnRule = getRuleBlock(
     newtabHtml,
@@ -286,13 +301,18 @@ function testSuggestionActionColumnAlignmentContract() {
   );
   assert.match(
     newtabActionColumnRule,
-    /flex:\s*0 0 min\(34%,\s*var\(--x-nt-suggestion-action-column-width,\s*120px\)\);/,
-    'newtab action column should use a compact responsive flex basis'
+    /flex:\s*0 0 min\(48%,\s*var\(--x-nt-suggestion-action-column-width,\s*160px\)\);/,
+    'newtab action column should use a responsive basis wide enough for search-engine labels'
   );
   assert.match(
     newtabActionColumnRule,
-    /width:\s*min\(34%,\s*var\(--x-nt-suggestion-action-column-width,\s*120px\)\);/,
+    /width:\s*min\(48%,\s*var\(--x-nt-suggestion-action-column-width,\s*160px\)\);/,
     'newtab action column should keep a matching width for consistent left edges'
+  );
+  assert.match(
+    newtabActionColumnRule,
+    /justify-content:\s*flex-end;/,
+    'newtab action column should right-align compact action groups'
   );
   assert.match(
     newtabHtml,
@@ -306,13 +326,23 @@ function testSuggestionActionColumnAlignmentContract() {
   );
   assert.match(
     newtabHtml,
-    /\.x-nt-suggestion-right\[data-action-column="true"\] \.x-nt-suggestion-action-button\[data-visible="true"\][\s\S]*?\{[\s\S]*?width:\s*100%;/,
-    'newtab visible action buttons should fill the compact column so arrows do not leave a right-side gutter'
+    /\.x-nt-suggestion-right\[data-action-column="true"\] \.x-nt-suggestion-action-button\[data-visible="true"\][\s\S]*?\{[\s\S]*?max-width:\s*100%;/,
+    'newtab visible action buttons should cap at the compact column instead of forcing a full-width label/arrow gap'
   );
   assert.match(
     newtabHtml,
-    /\.x-nt-suggestion-right\[data-action-column="true"\] \.x-nt-suggestion-action-button,\s*[\s\S]*?\.x-nt-suggestion-right\[data-action-column="true"\] \.x-nt-tab-switch-button\s*\{[\s\S]*?justify-content:\s*space-between;/,
-    'newtab action buttons should keep labels left-aligned and arrows at the column edge'
+    /\.x-nt-suggestion-right\[data-action-column="true"\] \.x-nt-suggestion-action-tags\[data-visible="true"\],\s*[\s\S]*?\.x-nt-suggestion-right\[data-action-column="true"\] \.x-nt-suggestion-action-button\[data-visible="true"\]\s*\{[\s\S]*?flex:\s*0 1 auto;[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/,
+    'newtab action tags and buttons should shrink inside the fixed action column without stretching away from the right edge'
+  );
+  assert.match(
+    newtabHtml,
+    /\.x-nt-suggestion-right\[data-action-column="true"\] \.x-nt-suggestion-action-tags\[data-visible="true"\] \.x-nt-suggestion-action-tag\s*\{[\s\S]*?max-width:\s*100%;/,
+    'newtab action tags should ellipsize within the remaining right-aligned space'
+  );
+  assert.doesNotMatch(
+    newtabHtml,
+    /\.x-nt-suggestion-right\[data-action-column="true"\][^{]+(?:\.x-nt-suggestion-action-button|\.x-nt-tab-switch-button)[^{]*\{[\s\S]*?justify-content:\s*space-between;/,
+    'newtab action buttons should not split label and arrow across the full action column'
   );
 
   assert.ok(

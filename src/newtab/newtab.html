@@ -2369,7 +2369,7 @@
         --x-nt-suggestion-row-height: 52px;
         --x-nt-suggestion-row-gap: 6px;
         --x-nt-suggestions-max-height: 594px;
-        --x-nt-suggestion-action-column-width: 120px;
+        --x-nt-suggestion-action-column-width: 160px;
         width: min(90vw, var(--x-nt-search-max-width, 720px));
         margin-top: 0;
         position: fixed;
@@ -4797,8 +4797,9 @@
         vertical-align: baseline;
       }
       .x-nt-suggestion-right[data-action-column="true"] {
-        flex: 0 0 min(34%, var(--x-nt-suggestion-action-column-width, 120px));
-        width: min(34%, var(--x-nt-suggestion-action-column-width, 120px));
+        flex: 0 0 min(48%, var(--x-nt-suggestion-action-column-width, 160px));
+        width: min(48%, var(--x-nt-suggestion-action-column-width, 160px));
+        justify-content: flex-end;
       }
       .x-nt-suggestion-inline-icon {
         all: unset;
@@ -4913,14 +4914,17 @@
         white-space: nowrap;
       }
       .x-nt-suggestion-right[data-action-column="true"] .x-nt-suggestion-action-tags[data-visible="true"],
-      .x-nt-suggestion-right[data-action-column="true"] .x-nt-suggestion-action-tags[data-visible="true"] .x-nt-suggestion-action-tag,
-      .x-nt-suggestion-right[data-action-column="true"] .x-nt-suggestion-action-button[data-visible="true"],
-      .x-nt-suggestion-right[data-action-column="true"] .x-nt-tab-switch-button {
-        width: 100%;
+      .x-nt-suggestion-right[data-action-column="true"] .x-nt-suggestion-action-button[data-visible="true"] {
+        flex: 0 1 auto;
+        min-width: 0;
+        max-width: 100%;
+      }
+      .x-nt-suggestion-right[data-action-column="true"] .x-nt-suggestion-action-tags[data-visible="true"] .x-nt-suggestion-action-tag {
+        max-width: 100%;
       }
       .x-nt-suggestion-right[data-action-column="true"] .x-nt-suggestion-action-button,
       .x-nt-suggestion-right[data-action-column="true"] .x-nt-tab-switch-button {
-        justify-content: space-between;
+        justify-content: flex-end;
       }
       .x-nt-suggestion-action-tag__key {
         all: unset;
