@@ -110,6 +110,9 @@ function createChromeStub() {
       lastVisitTime: now - 20_000
     }]
   );
+  const topSiteItems = [
+    { title: 'GitHub', url: 'https://github.com/' }
+  ];
 
   const chromeApi = {
     runtime: {
@@ -160,7 +163,18 @@ function createChromeStub() {
           .slice(0, maxResults);
         setTimeout(() => callback(items), 0);
       },
-      deleteUrl(_options, callback) {
+      deleteUrl(options, callback) {
+        const targetUrl = String(options && options.url || '');
+        for (let index = historyItems.length - 1; index >= 0; index -= 1) {
+          if (historyItems[index] && historyItems[index].url === targetUrl) {
+            historyItems.splice(index, 1);
+          }
+        }
+        for (let index = topSiteItems.length - 1; index >= 0; index -= 1) {
+          if (topSiteItems[index] && topSiteItems[index].url === targetUrl) {
+            topSiteItems.splice(index, 1);
+          }
+        }
         if (callback) {
           callback();
         }
@@ -170,9 +184,7 @@ function createChromeStub() {
     },
     topSites: {
       get(callback) {
-        setTimeout(() => callback([
-          { title: 'GitHub', url: 'https://github.com/' }
-        ]), 0);
+        setTimeout(() => callback(topSiteItems.slice()), 0);
       }
     },
     bookmarks: {
@@ -358,8 +370,25 @@ function loadBackgroundForTest() {
   return { context, messageListeners };
 }
 
+function sendBackgroundMessage(messageListeners, request) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (response) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve(response);
+    };
+    messageListeners.forEach((listener) => {
+      listener(request, {}, finish);
+    });
+    setTimeout(() => finish(null), 20);
+  });
+}
+
 async function run() {
-  const { context } = loadBackgroundForTest();
+  const { context, messageListeners } = loadBackgroundForTest();
   assert.strictEqual(
     typeof context.__testGetSearchSuggestions,
     'function',
@@ -374,6 +403,26 @@ async function run() {
   assert.ok(
     suggestions.some((item) => item && (item.type === 'bookmark' || item.type === 'history' || item.type === 'topSite')),
     'background search suggestions should include at least one enabled local source type'
+  );
+
+  const deleteResponse = await sendBackgroundMessage(messageListeners, {
+    action: 'deleteHistoryUrl',
+    url: 'https://github.com/'
+  });
+  assert.strictEqual(
+    deleteResponse && deleteResponse.ok,
+    true,
+    'deleteHistoryUrl should report a successful deletion'
+  );
+  assert.strictEqual(
+    deleteResponse && deleteResponse.url,
+    'https://github.com/',
+    'deleteHistoryUrl should echo the removed URL'
+  );
+  const suggestionsAfterDelete = await context.__testGetSearchSuggestions('github');
+  assert.ok(
+    !suggestionsAfterDelete.some((item) => item && item.url === 'https://github.com/'),
+    'deleted history/top-site URLs should not be returned from stale local search caches'
   );
 
   const camelInitialSuggestions = await context.__testGetSearchSuggestions('fcc');

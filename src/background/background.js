@@ -4848,26 +4848,31 @@ function handleSearchMessage(request, sender, sendResponse) {
     }
     case 'deleteHistoryUrl': {
       const targetUrl = typeof request.url === 'string' ? request.url : '';
-      if (!targetUrl) {
-        sendResponse({ ok: false, reason: 'invalid-url' });
-        return;
-      }
-      if (!chrome.history || typeof chrome.history.deleteUrl !== 'function') {
-        sendResponse({ ok: false, reason: 'history-api-unavailable' });
-        return;
-      }
-      chrome.history.deleteUrl({ url: targetUrl }, () => {
-        if (chrome.runtime && chrome.runtime.lastError) {
-          sendResponse({ ok: false, reason: chrome.runtime.lastError.message || 'delete-history-failed' });
-          return;
-        }
-        sendResponse({ ok: true, url: targetUrl });
-      });
-      return true;
+      return deleteHistoryUrlFromSearch(targetUrl, sendResponse);
     }
     default:
       return sendUnknownBackgroundMessageResponse(sendResponse);
   }
+}
+
+function deleteHistoryUrlFromSearch(targetUrl, sendResponse) {
+  if (!targetUrl) {
+    sendResponse({ ok: false, reason: 'invalid-url' });
+    return;
+  }
+  if (!chrome.history || typeof chrome.history.deleteUrl !== 'function') {
+    sendResponse({ ok: false, reason: 'history-api-unavailable' });
+    return;
+  }
+  chrome.history.deleteUrl({ url: targetUrl }, () => {
+    if (chrome.runtime && chrome.runtime.lastError) {
+      sendResponse({ ok: false, reason: chrome.runtime.lastError.message || 'delete-history-failed' });
+      return;
+    }
+    invalidateLocalSearchSourceCaches();
+    sendResponse({ ok: true, url: targetUrl });
+  });
+  return true;
 }
 
 function handleSiteSearchMessage(request, sender, sendResponse) {
@@ -5116,6 +5121,7 @@ let topSitesCache = {
   expiresAt: 0,
   items: []
 };
+let localSearchSourceCacheListenersBound = false;
 let bookmarkTreeIndexCache = {
   expiresAt: 0,
   map: null
@@ -6825,6 +6831,32 @@ function invalidateBookmarkTreeCache() {
   bookmarkItemsPromise = null;
 }
 
+function invalidateLocalSearchSourceCaches() {
+  historyFallbackCache = {
+    expiresAt: 0,
+    items: []
+  };
+  topSitesCache = {
+    expiresAt: 0,
+    items: []
+  };
+}
+
+function ensureLocalSearchSourceCacheListeners() {
+  if (localSearchSourceCacheListenersBound || !chrome || !chrome.history) {
+    return;
+  }
+  [
+    chrome.history.onVisited,
+    chrome.history.onVisitRemoved
+  ].forEach((eventTarget) => {
+    if (eventTarget && typeof eventTarget.addListener === 'function') {
+      eventTarget.addListener(invalidateLocalSearchSourceCaches);
+    }
+  });
+  localSearchSourceCacheListenersBound = true;
+}
+
 function ensureBookmarkTreeCacheListeners() {
   if (bookmarkTreeCacheListenersBound || !chrome || !chrome.bookmarks) {
     return;
@@ -7157,6 +7189,7 @@ function mergeItemsByUrl(itemGroups) {
 // Function to get search suggestions from history and top sites
 async function getSearchSuggestions(query) {
   const suggestions = [];
+  ensureLocalSearchSourceCacheListeners();
   const searchUtils = SEARCH_UTILS;
   const searchPolicy = searchUtils.SEARCH_POLICY || {
     lookupWindowDays: 180,

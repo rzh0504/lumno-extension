@@ -268,6 +268,16 @@ function testSuggestionActionColumnAlignmentContract() {
     /\.x-ov-suggestion-action-button \.x-ov-inline-label\s*\{[\s\S]*?overflow:\s*hidden;[\s\S]*?text-overflow:\s*ellipsis;[\s\S]*?white-space:\s*nowrap;/,
     'overlay action button labels should ellipsize instead of pushing the column left'
   );
+  const overlayActionButtonLabelRule = getRuleBlock(
+    overlayCss,
+    /\.x-ov-suggestion-action-button \.x-ov-inline-label\s*\{[\s\S]*?\}/,
+    'overlay action button labels should have a dedicated line-height rule'
+  );
+  assert.match(
+    overlayActionButtonLabelRule,
+    /line-height:\s*1\.35;/,
+    'overlay action button labels should reserve enough vertical glyph space'
+  );
   assert.match(
     overlayCss,
     /\.x-ov-suggestion-right\[data-action-column="true"\] \.x-ov-suggestion-action-button\[data-visible="true"\]\s*\{[\s\S]*?max-width:\s*100%;/,
@@ -324,6 +334,16 @@ function testSuggestionActionColumnAlignmentContract() {
     /\.x-nt-suggestion-action-button__label\s*\{[\s\S]*?overflow:\s*hidden;[\s\S]*?text-overflow:\s*ellipsis;[\s\S]*?white-space:\s*nowrap;/,
     'newtab action button labels should ellipsize instead of pushing the column left'
   );
+  const newtabActionButtonLabelRule = getRuleBlock(
+    newtabHtml,
+    /\.x-nt-suggestion-action-button__label\s*\{[\s\S]*?\}/,
+    'newtab action button labels should have a dedicated line-height rule'
+  );
+  assert.match(
+    newtabActionButtonLabelRule,
+    /line-height:\s*1\.35;/,
+    'newtab action button labels should reserve enough vertical glyph space'
+  );
   assert.match(
     newtabHtml,
     /\.x-nt-suggestion-right\[data-action-column="true"\] \.x-nt-suggestion-action-button\[data-visible="true"\][\s\S]*?\{[\s\S]*?max-width:\s*100%;/,
@@ -366,6 +386,32 @@ function testSuggestionActionColumnAlignmentContract() {
   assert.ok(
     (onboardingJs.match(/setAttribute\('data-action-column', 'true'\)/g) || []).length >= 3,
     'onboarding previews should use the same marked action column as production suggestions'
+  );
+}
+
+function testHistoryDeleteEntrypointsUseNonBubblingDeleteAction() {
+  const overlayJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/search-panel.js'), 'utf8');
+  const newtabSuggestionsJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/suggestions-view.js'), 'utf8');
+
+  assert.match(
+    newtabSuggestionsJs,
+    /function bindHistoryDeleteButtonEvents\(button,\s*item,\s*suggestion,\s*query,\s*tooltipText\)[\s\S]*?button\.addEventListener\('click', function\(event\) \{[\s\S]*?event\.preventDefault\(\);[\s\S]*?event\.stopPropagation\(\);[\s\S]*?onDeleteHistory\(suggestion,\s*query\);/,
+    'newtab history delete should prevent row activation and call the shared delete callback'
+  );
+  assert.match(
+    newtabSuggestionsJs,
+    /function createHistoryDeleteControl\(suggestion,\s*item,\s*query\)[\s\S]*?bindHistoryDeleteButtonEvents\(button,\s*item,\s*suggestion,\s*query,\s*tooltipText\);/,
+    'newtab history delete control creation should route events through the shared binder'
+  );
+  assert.match(
+    overlayJs,
+    /function bindHistoryDeleteButtonEvents\(button,\s*item,\s*suggestion,\s*tooltipText\)[\s\S]*?button\.addEventListener\('click', function\(event\) \{[\s\S]*?event\.preventDefault\(\);[\s\S]*?event\.stopPropagation\(\);[\s\S]*?deleteHistorySuggestionUrl\(suggestion\);/,
+    'overlay history delete should prevent row activation, delete the URL, and refresh suggestions'
+  );
+  assert.match(
+    overlayJs,
+    /function deleteHistorySuggestionUrl\(suggestion\)[\s\S]*?action:\s*'deleteHistoryUrl'[\s\S]*?refreshOverlaySuggestionsAfterHistoryDelete\(\);/,
+    'overlay history delete should refresh suggestions after the background confirms deletion'
   );
 }
 
@@ -1131,7 +1177,7 @@ async function testVisitButtonAndEnterTagShareOverlayVisibilityRules() {
   );
 }
 
-async function testTopSiteSuggestionCanUseHoverDeleteAction() {
+async function testRemovableSearchSuggestionsUseHoverDeleteAction() {
   const document = createFakeDocument();
   const container = document.createElement('div');
   container.setConnected(true);
@@ -1230,6 +1276,60 @@ async function testTopSiteSuggestionCanUseHoverDeleteAction() {
   assert.strictEqual(deleted.length, 1, 'top-site delete click should request URL removal');
   assert.strictEqual(deleted[0].suggestion, topSiteSuggestion, 'top-site delete should pass the clicked suggestion');
   assert.strictEqual(deleted[0].query, 'lumno', 'top-site delete should preserve the current query');
+
+  deleted.length = 0;
+  activateCount = 0;
+  eventState.preventDefaultCount = 0;
+  eventState.stopPropagationCount = 0;
+
+  const historySuggestion = {
+    type: 'history',
+    title: '阿鼎控制台',
+    url: 'https://example.com/history-a-ding',
+    favicon: ''
+  };
+  view.render({
+    query: '阿鼎',
+    primaryHighlightIndex: -1,
+    primaryHighlightReason: 'none',
+    suggestions: [historySuggestion]
+  });
+
+  const historyItem = view.getItems()[0];
+  assert.ok(historyItem, 'history suggestion should render');
+  assert.strictEqual(
+    historyItem._xHasHistoryDeleteButton,
+    true,
+    'history suggestions should render the hover delete control'
+  );
+  assert.strictEqual(
+    historyItem._xHistoryDeleteButton.getAttribute('aria-label'),
+    '移除该历史',
+    'history delete control should describe removing a history result'
+  );
+
+  triggerEvent(historyItem, 'mouseenter');
+  assert.strictEqual(
+    historyItem.getAttribute('data-history-delete-visible'),
+    'true',
+    'hovering a history suggestion should reveal the delete control'
+  );
+
+  triggerEvent(historyItem._xHistoryDeleteButton, 'click', {
+    preventDefault() {
+      eventState.preventDefaultCount += 1;
+    },
+    stopPropagation() {
+      eventState.stopPropagationCount += 1;
+    }
+  });
+
+  assert.strictEqual(eventState.preventDefaultCount, 1, 'history delete click should prevent row activation');
+  assert.strictEqual(eventState.stopPropagationCount, 1, 'history delete click should not bubble to the result row');
+  assert.strictEqual(activateCount, 0, 'history delete click should not open the result');
+  assert.strictEqual(deleted.length, 1, 'history delete click should request URL removal');
+  assert.strictEqual(deleted[0].suggestion, historySuggestion, 'history delete should pass the clicked suggestion');
+  assert.strictEqual(deleted[0].query, '阿鼎', 'history delete should preserve the current query');
 }
 
 async function testAiProviderVisitButtonUsesWebAppLabel() {
@@ -1601,6 +1701,7 @@ function testOverlayCommandEnterOpensFocusedResultInBackgroundTab() {
 testSiteSearchProviderIconsUsePageFaviconCandidates();
 testSiteSearchTabHintRequiresExplicitTrigger();
 testSuggestionActionColumnAlignmentContract();
+testHistoryDeleteEntrypointsUseNonBubblingDeleteAction();
 testNewtabShiftEnterOpensMatchedTabInNewTab();
 testNewtabCommandEnterOpensFocusedResultInBackgroundTab();
 testOverlayCommandEnterOpensFocusedResultInBackgroundTab();
@@ -1616,7 +1717,7 @@ testLocalUrlSuggestionUsesFallbackTheme()
   .then(testModeSwitchImageFallbackUsesLinkIcon)
   .then(testProxyFallbackFaviconUsesFallbackTheme)
   .then(testVisitButtonAndEnterTagShareOverlayVisibilityRules)
-  .then(testTopSiteSuggestionCanUseHoverDeleteAction)
+  .then(testRemovableSearchSuggestionsUseHoverDeleteAction)
   .then(testAiProviderVisitButtonUsesWebAppLabel)
   .then(testOpenNewTabVisitButtonReflectsCurrentTabModifier)
   .then(testMatchedOpenTabActionReflectsShiftModifier)

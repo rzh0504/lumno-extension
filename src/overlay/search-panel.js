@@ -5275,6 +5275,132 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       return t('search_remove_history_tooltip', '移除该历史');
     }
 
+    function getOverlaySuggestionRefreshQuery() {
+      return latestOverlayQuery || (searchInput ? String(searchInput.value || '').trim() : '');
+    }
+
+    function refreshOverlaySuggestionsAfterHistoryDelete() {
+      const queryToRefresh = getOverlaySuggestionRefreshQuery();
+      if (!queryToRefresh) {
+        updateSearchSuggestions([], '');
+        return;
+      }
+      chrome.runtime.sendMessage({
+        action: 'getSearchSuggestions',
+        query: queryToRefresh,
+        context: 'overlay'
+      }, function(nextResponse) {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          return;
+        }
+        updateSearchSuggestions(
+          nextResponse && Array.isArray(nextResponse.suggestions) ? nextResponse.suggestions : [],
+          queryToRefresh
+        );
+      });
+    }
+
+    function deleteHistorySuggestionUrl(suggestion) {
+      const targetUrl = suggestion && suggestion.url ? String(suggestion.url) : '';
+      if (!targetUrl) {
+        return;
+      }
+      chrome.runtime.sendMessage({
+        action: 'deleteHistoryUrl',
+        url: targetUrl
+      }, function(response) {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          return;
+        }
+        if (!response || response.ok !== true) {
+          return;
+        }
+        refreshOverlaySuggestionsAfterHistoryDelete();
+      });
+    }
+
+    function resetHistoryDeleteButtonInteraction(button) {
+      hideTopActionTooltip();
+      setHistoryDeleteButtonSurface(button, 'transparent', 'transparent');
+      setHistoryDeleteButtonHover(button, false);
+    }
+
+    function applyHistoryDeleteButtonHover(button, item, tooltipText) {
+      if (!button || !item) {
+        return;
+      }
+      const itemIndex = suggestionItems.indexOf(item);
+      const isSelected = itemIndex === selectedIndex;
+      const shouldAutoHighlight = selectedIndex === -1 && item._xIsAutocompleteTop;
+      const shouldUseThemeHover = Boolean(isSelected || shouldAutoHighlight);
+      const buttonThemeSource = item._xTheme || defaultTheme;
+      const resolvedTheme = getThemeForMode(buttonThemeSource);
+      const hoverColors = shouldUseThemeHover
+        ? getHoverColors(buttonThemeSource)
+        : getNeutralHoverActionColors();
+      showTopActionTooltip(button, tooltipText);
+      setHistoryDeleteButtonPalette(
+        button,
+        shouldUseThemeHover ? resolvedTheme.buttonText : hoverColors.text,
+        hoverColors.bg,
+        hoverColors.border
+      );
+      setHistoryDeleteButtonHover(button, true);
+    }
+
+    function bindHistoryDeleteButtonEvents(button, item, suggestion, tooltipText) {
+      if (!button) {
+        return;
+      }
+      button.addEventListener('mouseenter', () => {
+        applyHistoryDeleteButtonHover(button, item, tooltipText);
+      });
+      button.addEventListener('mouseleave', () => {
+        resetHistoryDeleteButtonInteraction(button);
+      });
+      button.addEventListener('blur', () => {
+        resetHistoryDeleteButtonInteraction(button);
+      });
+      button.addEventListener('pointerup', () => {
+        setHistoryDeleteButtonHover(button, false);
+      });
+      button.addEventListener('pointercancel', () => {
+        setHistoryDeleteButtonHover(button, false);
+      });
+      button.addEventListener('click', function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        deleteHistorySuggestionUrl(suggestion);
+      });
+    }
+
+    function createHistoryDeleteControl(suggestion, item) {
+      if (!canRemoveSuggestionFromHistory(suggestion)) {
+        return null;
+      }
+      const slot = document.createElement('div');
+      applyNoTranslate(slot);
+      slot.className = 'x-ov-history-delete-slot';
+      const button = document.createElement('button');
+      applyNoTranslate(button);
+      button.type = 'button';
+      button.className = 'x-ov-history-delete-button';
+      const tooltipText = getRemoveSuggestionTooltipText(suggestion);
+      button.innerHTML = getRiSvg('ri-delete-bin-6-line', 'ri-size-14');
+      button.setAttribute('aria-label', tooltipText);
+      setHistoryDeleteVisible(slot, button, false);
+      setHistoryDeleteButtonHover(button, false);
+      setHistoryDeleteButtonPalette(
+        button,
+        'var(--x-ext-input-icon, #9CA3AF)',
+        'transparent',
+        'transparent'
+      );
+      bindHistoryDeleteButtonEvents(button, item, suggestion, tooltipText);
+      slot.appendChild(button);
+      return { slot, button };
+    }
+
     function applyHistoryDeleteState(item, active, resolvedTheme) {
       if (!item || !item._xHistoryDeleteButton) {
         return;
@@ -6602,95 +6728,9 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           }
           setSuggestionVisitButtonContent(visitButton, itemActionModel.visitButtonAction, suggestion);
 
-          let historyDeleteButton = null;
-          let historyDeleteSlot = null;
-          if (canRemoveSuggestionFromHistory(suggestion)) {
-            historyDeleteSlot = document.createElement('div');
-            applyNoTranslate(historyDeleteSlot);
-            historyDeleteSlot.className = 'x-ov-history-delete-slot';
-            setHistoryDeleteVisible(historyDeleteSlot, null, false);
-            historyDeleteButton = document.createElement('button');
-            applyNoTranslate(historyDeleteButton);
-            historyDeleteButton.type = 'button';
-            const removeHistoryTooltipText = getRemoveSuggestionTooltipText(suggestion);
-            historyDeleteButton.innerHTML = getRiSvg('ri-delete-bin-6-line', 'ri-size-14');
-            historyDeleteButton.setAttribute('aria-label', removeHistoryTooltipText);
-            historyDeleteButton.className = 'x-ov-history-delete-button';
-            setHistoryDeleteVisible(null, historyDeleteButton, false);
-            setHistoryDeleteButtonHover(historyDeleteButton, false);
-            setHistoryDeleteButtonPalette(
-              historyDeleteButton,
-              'var(--x-ext-input-icon, #9CA3AF)',
-              'transparent',
-              'transparent'
-            );
-            historyDeleteButton.addEventListener('mouseenter', () => {
-              const itemIndex = suggestionItems.indexOf(suggestionItem);
-              const isSelected = itemIndex === selectedIndex;
-              const shouldAutoHighlight = selectedIndex === -1 && suggestionItem._xIsAutocompleteTop;
-              const shouldUseThemeHover = Boolean(isSelected || shouldAutoHighlight);
-              const buttonThemeSource = suggestionItem._xTheme || defaultTheme;
-              const resolvedTheme = getThemeForMode(buttonThemeSource);
-              const hoverColors = shouldUseThemeHover
-                ? getHoverColors(buttonThemeSource)
-                : getNeutralHoverActionColors();
-              showTopActionTooltip(historyDeleteButton, removeHistoryTooltipText);
-              setHistoryDeleteButtonPalette(
-                historyDeleteButton,
-                shouldUseThemeHover ? resolvedTheme.buttonText : hoverColors.text,
-                hoverColors.bg,
-                hoverColors.border
-              );
-              setHistoryDeleteButtonHover(historyDeleteButton, true);
-            });
-            historyDeleteButton.addEventListener('mouseleave', () => {
-              hideTopActionTooltip();
-              setHistoryDeleteButtonSurface(historyDeleteButton, 'transparent', 'transparent');
-              setHistoryDeleteButtonHover(historyDeleteButton, false);
-            });
-            historyDeleteButton.addEventListener('blur', () => {
-              hideTopActionTooltip();
-              setHistoryDeleteButtonSurface(historyDeleteButton, 'transparent', 'transparent');
-              setHistoryDeleteButtonHover(historyDeleteButton, false);
-            });
-            historyDeleteButton.addEventListener('pointerup', () => {
-              setHistoryDeleteButtonHover(historyDeleteButton, false);
-            });
-            historyDeleteButton.addEventListener('pointercancel', () => {
-              setHistoryDeleteButtonHover(historyDeleteButton, false);
-            });
-            historyDeleteButton.addEventListener('click', function(e) {
-              e.preventDefault();
-              e.stopPropagation();
-              chrome.runtime.sendMessage({
-                action: 'deleteHistoryUrl',
-                url: suggestion.url
-              }, function(response) {
-                if (!response || response.ok !== true) {
-                  return;
-                }
-                const queryToRefresh = latestOverlayQuery || (searchInput ? String(searchInput.value || '').trim() : '');
-                if (!queryToRefresh) {
-                  updateSearchSuggestions([], '');
-                  return;
-                }
-                chrome.runtime.sendMessage({
-                  action: 'getSearchSuggestions',
-                  query: queryToRefresh,
-                  context: 'overlay'
-                }, function(nextResponse) {
-                  if (chrome.runtime && chrome.runtime.lastError) {
-                    return;
-                  }
-                  updateSearchSuggestions(
-                    nextResponse && Array.isArray(nextResponse.suggestions) ? nextResponse.suggestions : [],
-                    queryToRefresh
-                  );
-                });
-              });
-            });
-            historyDeleteSlot.appendChild(historyDeleteButton);
-          }
+          const historyDeleteControl = createHistoryDeleteControl(suggestion, suggestionItem);
+          const historyDeleteSlot = historyDeleteControl ? historyDeleteControl.slot : null;
+          const historyDeleteButton = historyDeleteControl ? historyDeleteControl.button : null;
 
           // Add hover effects
           suggestionItem.addEventListener('mouseenter', function() {

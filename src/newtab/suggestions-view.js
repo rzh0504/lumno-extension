@@ -297,6 +297,86 @@
       return t('search_remove_history_tooltip', '移除该历史');
     }
 
+    function resetHistoryDeleteButtonInteraction(button) {
+      hideTopActionTooltip();
+      if (!button) {
+        return;
+      }
+      button.removeAttribute('data-hover');
+      button.style.removeProperty('transform');
+    }
+
+    function applyHistoryDeleteButtonHover(button, item, tooltipText) {
+      if (!button || !item) {
+        return;
+      }
+      const itemIndex = items.indexOf(item);
+      const selectedIndex = getSelectedIndex();
+      const isSelected = itemIndex === selectedIndex;
+      const shouldAutoHighlight = selectedIndex === -1 && item._xIsAutocompleteTop;
+      const shouldUseThemeHover = Boolean(isSelected || shouldAutoHighlight);
+      const buttonThemeSource = item._xTheme || getDefaultTheme();
+      const resolvedTheme = getThemeForMode(buttonThemeSource);
+      const hoverColors = shouldUseThemeHover
+        ? getHoverColors(buttonThemeSource)
+        : getNeutralHoverActionColors();
+      showTopActionTooltip(button, tooltipText);
+      button.style.removeProperty('transform');
+      button.style.setProperty('--x-nt-history-delete-hover-bg', hoverColors.bg);
+      button.style.setProperty('--x-nt-history-delete-hover-border', hoverColors.border);
+      button.style.setProperty(
+        '--x-nt-history-delete-hover-color',
+        shouldUseThemeHover ? resolvedTheme.buttonText : hoverColors.text
+      );
+      button.setAttribute('data-hover', 'true');
+    }
+
+    function bindHistoryDeleteButtonEvents(button, item, suggestion, query, tooltipText) {
+      if (!button) {
+        return;
+      }
+      button.addEventListener('mouseenter', function() {
+        applyHistoryDeleteButtonHover(button, item, tooltipText);
+      });
+      button.addEventListener('mouseleave', function() {
+        resetHistoryDeleteButtonInteraction(button);
+      });
+      button.addEventListener('focus', function() {
+        showTopActionTooltip(button, tooltipText);
+      });
+      button.addEventListener('blur', function() {
+        resetHistoryDeleteButtonInteraction(button);
+      });
+      button.addEventListener('pointerup', function() {
+        button.style.setProperty('transform', 'none');
+      });
+      button.addEventListener('pointercancel', function() {
+        button.style.setProperty('transform', 'none');
+      });
+      button.addEventListener('click', function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        onDeleteHistory(suggestion, query);
+      });
+    }
+
+    function createHistoryDeleteControl(suggestion, item, query) {
+      if (!canRemoveSuggestionFromHistory(suggestion)) {
+        return null;
+      }
+      const slot = documentRef.createElement('div');
+      slot.className = 'x-nt-history-delete-slot';
+      const button = documentRef.createElement('button');
+      button.type = 'button';
+      button.className = 'x-nt-history-delete-button';
+      const tooltipText = getRemoveSuggestionTooltipText(suggestion);
+      button.innerHTML = getRiSvg('ri-delete-bin-6-line', 'ri-size-14');
+      button.setAttribute('aria-label', tooltipText);
+      bindHistoryDeleteButtonEvents(button, item, suggestion, query, tooltipText);
+      slot.appendChild(button);
+      return { slot, button };
+    }
+
     function createSuggestionInlineIcon(iconName, tone) {
       const icon = documentRef.createElement('span');
       icon.innerHTML = getRiSvg(iconName, 'ri-size-16');
@@ -1203,63 +1283,9 @@
         rightSide.appendChild(actionTags);
         rightSide.appendChild(visitButton);
 
-        let historyDeleteButton = null;
-        let historyDeleteSlot = null;
-        if (canRemoveSuggestionFromHistory(suggestion)) {
-          historyDeleteSlot = documentRef.createElement('div');
-          historyDeleteSlot.className = 'x-nt-history-delete-slot';
-          historyDeleteButton = documentRef.createElement('button');
-          historyDeleteButton.type = 'button';
-          historyDeleteButton.className = 'x-nt-history-delete-button';
-          const removeHistoryTooltipText = getRemoveSuggestionTooltipText(suggestion);
-          historyDeleteButton.innerHTML = getRiSvg('ri-delete-bin-6-line', 'ri-size-14');
-          historyDeleteButton.setAttribute('aria-label', removeHistoryTooltipText);
-          historyDeleteButton.addEventListener('mouseenter', function() {
-            const itemIndex = items.indexOf(suggestionItem);
-            const isSelected = itemIndex === getSelectedIndex();
-            const shouldAutoHighlight = getSelectedIndex() === -1 && suggestionItem._xIsAutocompleteTop;
-            const shouldUseThemeHover = Boolean(isSelected || shouldAutoHighlight);
-            const buttonThemeSource = suggestionItem._xTheme || getDefaultTheme();
-            const resolvedTheme = getThemeForMode(buttonThemeSource);
-            const hoverColors = shouldUseThemeHover
-              ? getHoverColors(buttonThemeSource)
-              : getNeutralHoverActionColors();
-            showTopActionTooltip(historyDeleteButton, removeHistoryTooltipText);
-            historyDeleteButton.style.removeProperty('transform');
-            historyDeleteButton.style.setProperty('--x-nt-history-delete-hover-bg', hoverColors.bg);
-            historyDeleteButton.style.setProperty('--x-nt-history-delete-hover-border', hoverColors.border);
-            historyDeleteButton.style.setProperty(
-              '--x-nt-history-delete-hover-color',
-              shouldUseThemeHover ? resolvedTheme.buttonText : hoverColors.text
-            );
-            historyDeleteButton.setAttribute('data-hover', 'true');
-          });
-          historyDeleteButton.addEventListener('mouseleave', function() {
-            hideTopActionTooltip();
-            historyDeleteButton.removeAttribute('data-hover');
-            historyDeleteButton.style.removeProperty('transform');
-          });
-          historyDeleteButton.addEventListener('focus', function() {
-            showTopActionTooltip(historyDeleteButton, removeHistoryTooltipText);
-          });
-          historyDeleteButton.addEventListener('blur', function() {
-            hideTopActionTooltip();
-            historyDeleteButton.removeAttribute('data-hover');
-            historyDeleteButton.style.removeProperty('transform');
-          });
-          historyDeleteButton.addEventListener('pointerup', function() {
-            historyDeleteButton.style.setProperty('transform', 'none');
-          });
-          historyDeleteButton.addEventListener('pointercancel', function() {
-            historyDeleteButton.style.setProperty('transform', 'none');
-          });
-          historyDeleteButton.addEventListener('click', function(event) {
-            event.preventDefault();
-            event.stopPropagation();
-            onDeleteHistory(suggestion, query);
-          });
-          historyDeleteSlot.appendChild(historyDeleteButton);
-        }
+        const historyDeleteControl = createHistoryDeleteControl(suggestion, suggestionItem, query);
+        const historyDeleteSlot = historyDeleteControl ? historyDeleteControl.slot : null;
+        const historyDeleteButton = historyDeleteControl ? historyDeleteControl.button : null;
         if (historyDeleteSlot) {
           rightSide.appendChild(historyDeleteSlot);
         }

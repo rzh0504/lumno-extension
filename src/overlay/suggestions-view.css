@@ -583,6 +583,7 @@
 }
 
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-action-button .x-ov-inline-label {
+  line-height: 1.35;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
