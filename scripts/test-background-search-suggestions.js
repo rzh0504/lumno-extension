@@ -53,9 +53,10 @@ function createStorageArea(initialData) {
   };
 }
 
-function createChromeStub() {
+function createChromeStub(options) {
+  const config = options || {};
   const messageListeners = [];
-  const storageArea = createStorageArea({});
+  const storageArea = createStorageArea(config.initialSyncData || {});
   const now = Date.now();
   const openTabs = [
     {
@@ -338,8 +339,9 @@ function createChromeStub() {
   return { chromeApi, messageListeners };
 }
 
-function loadBackgroundForTest() {
-  const { chromeApi, messageListeners } = createChromeStub();
+function loadBackgroundForTest(options) {
+  const config = options || {};
+  const { chromeApi, messageListeners } = createChromeStub(config);
   const context = vm.createContext({
     console,
     chrome: chromeApi,
@@ -349,9 +351,9 @@ function loadBackgroundForTest() {
     URLSearchParams,
     Blob,
     navigator: { userAgent: 'Fake Chrome' },
-    fetch: async () => {
+    fetch: config.fetch || (async () => {
       throw new Error('network disabled in background search test');
-    }
+    })
   });
   context.globalThis = context;
   context.importScripts = (...urls) => {
@@ -363,7 +365,8 @@ function loadBackgroundForTest() {
   };
 
   const backgroundSource = fs.readFileSync(path.join(repoRoot, 'src/background/background.js'), 'utf8') +
-    '\nglobalThis.__testGetSearchSuggestions = getSearchSuggestions;\n';
+    '\nglobalThis.__testGetSearchSuggestions = getSearchSuggestions;\n' +
+    'globalThis.__testSetDefaultSearchEngineState = setDefaultSearchEngineState;\n';
   vm.runInContext(backgroundSource, context, {
     filename: 'src/background/background.js'
   });
@@ -388,11 +391,61 @@ function sendBackgroundMessage(messageListeners, request) {
 }
 
 async function run() {
-  const { context, messageListeners } = loadBackgroundForTest();
+  const { context, messageListeners } = loadBackgroundForTest({
+    fetch: async (url) => {
+      const parsedUrl = new URL(String(url));
+      if (
+        parsedUrl.hostname === 'suggestqueries.google.com' &&
+        parsedUrl.searchParams.get('q') === '什么东西'
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 240));
+        return {
+          ok: true,
+          json: async () => [
+            '什么东西',
+            [
+              '什么东西',
+              '什么东西补血',
+              '什么东西解酒',
+              '什么东西补钙',
+              '什么东西补铁',
+              '什么东西越剪越大',
+              '什么东西养胃',
+              '什么东西化痰'
+            ]
+          ]
+        };
+      }
+      if (
+        parsedUrl.hostname === 'suggestqueries.google.com' &&
+        parsedUrl.searchParams.get('q') === 'github'
+      ) {
+        return {
+          ok: true,
+          json: async () => [
+            'github',
+            [
+              'github',
+              'github login',
+              'github desktop',
+              'github copilot',
+              'github actions'
+            ]
+          ]
+        };
+      }
+      throw new Error('network disabled in background search test');
+    }
+  });
   assert.strictEqual(
     typeof context.__testGetSearchSuggestions,
     'function',
     'background search function should be exposed in the test harness'
+  );
+  assert.strictEqual(
+    typeof context.__testSetDefaultSearchEngineState,
+    'function',
+    'background search engine state setter should be exposed in the test harness'
   );
 
   const suggestions = await context.__testGetSearchSuggestions('github');
@@ -403,6 +456,48 @@ async function run() {
   assert.ok(
     suggestions.some((item) => item && (item.type === 'bookmark' || item.type === 'history' || item.type === 'topSite')),
     'background search suggestions should include at least one enabled local source type'
+  );
+
+  const noMatchSuggestions = await context.__testGetSearchSuggestions('definitely-no-local-match-xyz');
+  assert.strictEqual(
+    noMatchSuggestions.length,
+    0,
+    'background search suggestions should not backfill unrelated top sites when nothing matches'
+  );
+
+  context.__testSetDefaultSearchEngineState({
+    id: 'google',
+    name: 'Google',
+    host: 'www.google.com',
+    searchTemplate: 'https://www.google.com/search?q={query}'
+  }, false);
+  const mixedLocalAndEngineSuggestions = await context.__testGetSearchSuggestions('github');
+  const mixedEngineSuggestions = mixedLocalAndEngineSuggestions
+    .filter((item) => item && item.type === 'googleSuggest');
+  assert.strictEqual(
+    mixedEngineSuggestions.length,
+    1,
+    'background search suggestions should only keep one search-engine suggestion when local results exist'
+  );
+  const firstEngineSuggestionIndex = mixedLocalAndEngineSuggestions.findIndex((item) => item && item.type === 'googleSuggest');
+  const firstLocalSuggestionIndex = mixedLocalAndEngineSuggestions.findIndex((item) => item && item.type !== 'googleSuggest');
+  assert.ok(
+    firstLocalSuggestionIndex >= 0 &&
+      firstEngineSuggestionIndex > firstLocalSuggestionIndex,
+    'local search results should stay ahead of supplemental search-engine suggestions'
+  );
+  const engineKeywordSuggestions = await context.__testGetSearchSuggestions('什么东西');
+  const engineKeywordTitles = engineKeywordSuggestions
+    .filter((item) => item && item.type === 'googleSuggest')
+    .map((item) => item.title);
+  assert.ok(
+    engineKeywordTitles.length > 1 && engineKeywordTitles.length <= 5,
+    'background search suggestions should keep several delayed search-engine keyword suggestions within the visible cap'
+  );
+  assert.deepStrictEqual(
+    Array.from(engineKeywordTitles),
+    ['什么东西补血', '什么东西解酒', '什么东西补钙', '什么东西补铁', '什么东西越剪越大'],
+    'background search suggestions should preserve search-engine keyword suggestion ordering after removing the exact query'
   );
 
   const deleteResponse = await sendBackgroundMessage(messageListeners, {

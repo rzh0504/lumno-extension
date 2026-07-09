@@ -5,7 +5,7 @@
   --x-ov-suggestion-row-height: 52px;
   --x-ov-suggestion-row-gap: 4px;
   --x-ov-suggestions-max-height: 580px;
-  --x-ov-suggestion-action-column-width: 160px;
+  --x-ov-suggestion-action-column-width: 200px;
   width: 100%;
   flex: 1 1 auto;
   min-height: 0;
@@ -454,8 +454,9 @@
 }
 
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-right[data-action-column="true"] {
-  flex: 0 0 min(48%, var(--x-ov-suggestion-action-column-width, 160px));
-  width: min(48%, var(--x-ov-suggestion-action-column-width, 160px));
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: min(56%, var(--x-ov-suggestion-action-column-width, 200px));
   justify-content: flex-end;
 }
 
@@ -529,7 +530,7 @@
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-action-tag__label {
   all: unset;
   font-weight: 500;
-  line-height: 1;
+  line-height: 1.35;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -541,6 +542,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
   height: var(--x-ov-suggestion-key-height, 18px);
   padding: 0 7px;
   border-radius: 6px;

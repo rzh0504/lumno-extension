@@ -110,6 +110,9 @@
   "settings_search_result_sources_title": {
     "message": "表示する結果タイプ"
   },
+  "settings_overlay_open_tabs_default_visible_title": {
+    "message": "Web ページで Lumno を開いたとき、開いているすべてのタブを既定で表示"
+  },
   "settings_favicon_enhanced_fetch_title": {
     "message": "アイコンとテーマカラーの拡張取得"
   },

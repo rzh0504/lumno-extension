@@ -110,6 +110,9 @@
   "settings_search_result_sources_title": {
     "message": "顯示結果類型"
   },
+  "settings_overlay_open_tabs_default_visible_title": {
+    "message": "在網頁喚起時，預設展示所有已開啟分頁"
+  },
   "settings_favicon_enhanced_fetch_title": {
     "message": "增強圖示與主題色取得"
   },

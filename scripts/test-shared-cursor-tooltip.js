@@ -69,13 +69,16 @@ function createFakeElement(tagName) {
   const classes = new Set();
   const properties = new Map();
   const listeners = new Map();
-  return {
+  const setAttributeLog = [];
+  const element = {
     tagName,
     children,
+    parentNode: null,
     isConnected: true,
     ownerDocument: null,
     className: '',
     textContent: '',
+    setAttributeLog,
     classList: {
       add: (...names) => names.forEach((name) => {
         classes.add(name);
@@ -87,16 +90,29 @@ function createFakeElement(tagName) {
       getPropertyValue: (name) => properties.get(name) || ''
     },
     appendChild: (child) => {
+      if (child && typeof child === 'object') {
+        child.parentNode = element;
+      }
       children.push(child);
       return child;
     },
     replaceChildren: (...nodes) => {
       children.length = 0;
-      nodes.forEach((node) => children.push(node));
+      nodes.forEach((node) => {
+        if (node && typeof node === 'object') {
+          node.parentNode = element;
+        }
+        children.push(node);
+      });
     },
-    setAttribute: (name, value) => attributes.set(name, String(value)),
+    setAttribute: (name, value) => {
+      const entry = { name, value: String(value) };
+      setAttributeLog.push(entry);
+      attributes.set(name, entry.value);
+    },
     getAttribute: (name) => attributes.get(name) || '',
     removeAttribute: (name) => attributes.delete(name),
+    contains: (node) => node === element || children.includes(node),
     addEventListener: (type, listener) => {
       const current = listeners.get(type) || [];
       current.push(listener);
@@ -108,6 +124,7 @@ function createFakeElement(tagName) {
     matches: () => true,
     getBoundingClientRect: () => ({ top: 80, left: 120, right: 152, bottom: 112, width: 32, height: 32 })
   };
+  return element;
 }
 
 const fakeDocument = {
@@ -220,6 +237,25 @@ assert.strictEqual(element.getAttribute('data-tooltip-kind'), 'cursor', 'cursor 
 assert.strictEqual(element.getAttribute('data-visible'), 'true', 'cursor show() should mark tooltip visible');
 assert.strictEqual(element.style.getPropertyValue('left'), '114px', 'cursor tooltip should offset from pointer x');
 assert.strictEqual(element.style.getPropertyValue('top'), '136px', 'cursor tooltip should offset from pointer y');
+let customRenderCalls = 0;
+controller.show(target, '我觉得完整标题', { clientX: 100, clientY: 120 }, {
+  checkActive: false,
+  renderContent: (tooltipElement, text) => {
+    customRenderCalls += 1;
+    tooltipElement.replaceChildren();
+    const prefix = fakeDocument.createElement('span');
+    prefix.textContent = String(text || '').replace('我觉得', '');
+    const mark = fakeDocument.createElement('mark');
+    mark.textContent = '我觉得';
+    tooltipElement.appendChild(mark);
+    tooltipElement.appendChild(prefix);
+  }
+});
+assert.strictEqual(customRenderCalls, 1, 'cursor tooltip should call custom content renderers');
+assert.ok(
+  element.children.some((child) => child.tagName === 'mark' && child.textContent === '我觉得'),
+  'cursor tooltip custom content should support highlighted mark nodes'
+);
 controller.show(target, 'A very long bookmark title', { clientX: 100, clientY: 120 }, {
   checkActive: false,
   tagText: '后台打开'
@@ -307,6 +343,163 @@ assert.strictEqual(
   'bound cursor tooltip should keep modifier tags outside the main tooltip bubble'
 );
 modifierTarget.dispatchFakeEvent('pointerleave');
+
+const deferredTimers = [];
+const switchWindow = Object.assign({}, fakeWindow, {
+  setTimeout: (callback) => {
+    deferredTimers.push(callback);
+    return deferredTimers.length;
+  },
+  clearTimeout: () => {}
+});
+const switchController = cursorTooltip.createController({
+  documentObj: fakeDocument,
+  windowObj: switchWindow,
+  id: '_x_extension_test_cursor_switch_tooltip_2026_unique_'
+});
+const switchRoot = createFakeElement('div');
+switchRoot.ownerDocument = fakeDocument;
+const switchTitleTarget = createFakeElement('span');
+switchTitleTarget.ownerDocument = fakeDocument;
+const switchUrlTarget = createFakeElement('span');
+switchUrlTarget.ownerDocument = fakeDocument;
+const unrelatedTarget = createFakeElement('span');
+unrelatedTarget.ownerDocument = fakeDocument;
+switchRoot.appendChild(switchTitleTarget);
+switchRoot.appendChild(switchUrlTarget);
+switchController.bind(switchTitleTarget, () => '完整标题', {
+  checkActive: false,
+  deferHideVisibility: true,
+  preserveVisibleOnTargetSwitch: true
+});
+switchController.bind(switchUrlTarget, () => 'https://x.com/example/status/1', {
+  checkActive: false,
+  deferHideVisibility: true,
+  preserveVisibleOnTargetSwitch: true
+});
+switchTitleTarget.dispatchFakeEvent('pointerenter', { clientX: 120, clientY: 100 });
+const switchElement = switchController.element;
+assert.strictEqual(
+  switchElement.getAttribute('data-visible'),
+  'true',
+  'switching cursor tooltip should appear on the first truncated text target'
+);
+switchTitleTarget.dispatchFakeEvent('pointerleave', { relatedTarget: switchUrlTarget });
+assert.strictEqual(
+  switchElement.getAttribute('data-visible'),
+  'true',
+  'switching cursor tooltip should stay visible during a same-row title-to-URL handoff'
+);
+switchElement.setAttributeLog.length = 0;
+switchUrlTarget.dispatchFakeEvent('pointerenter', { clientX: 180, clientY: 100 });
+assert.strictEqual(
+  switchElement.getAttribute('data-visible'),
+  'true',
+  'switching cursor tooltip should stay visible after moving to the next text target'
+);
+assert.strictEqual(
+  switchElement.setAttributeLog.some((entry) => entry.name === 'data-visible' && entry.value === 'false'),
+  false,
+  'switching cursor tooltip should not replay the hidden state when moving between adjacent text targets'
+);
+assert.strictEqual(
+  switchElement.children.map((child) => child.textContent || '').join(''),
+  'https://x.com/example/status/1',
+  'switching cursor tooltip should replace the bubble content directly'
+);
+switchTitleTarget.dispatchFakeEvent('pointermove', { clientX: 121, clientY: 100 });
+assert.strictEqual(
+  switchElement.children.map((child) => child.textContent || '').join(''),
+  'https://x.com/example/status/1',
+  'switching cursor tooltip should ignore stale move events from the previous text target'
+);
+
+const reversedTimers = [];
+const reversedWindow = Object.assign({}, fakeWindow, {
+  setTimeout: (callback) => {
+    reversedTimers.push(callback);
+    return reversedTimers.length;
+  },
+  clearTimeout: () => {}
+});
+const reversedController = cursorTooltip.createController({
+  documentObj: fakeDocument,
+  windowObj: reversedWindow,
+  id: '_x_extension_test_cursor_reversed_switch_tooltip_2026_unique_'
+});
+const reversedRoot = createFakeElement('div');
+reversedRoot.ownerDocument = fakeDocument;
+const reversedTitleTarget = createFakeElement('span');
+reversedTitleTarget.ownerDocument = fakeDocument;
+const reversedUrlTarget = createFakeElement('span');
+reversedUrlTarget.ownerDocument = fakeDocument;
+reversedTitleTarget.getBoundingClientRect = () => ({ top: 80, left: 120, right: 170, bottom: 112, width: 50, height: 32 });
+reversedUrlTarget.getBoundingClientRect = () => ({ top: 80, left: 176, right: 260, bottom: 112, width: 84, height: 32 });
+reversedRoot.appendChild(reversedTitleTarget);
+reversedRoot.appendChild(reversedUrlTarget);
+reversedController.bind(reversedTitleTarget, () => '迟到标题', {
+  checkActive: false,
+  deferHideVisibility: true,
+  preserveVisibleOnTargetSwitch: true
+});
+reversedController.bind(reversedUrlTarget, () => 'https://x.com/reversed/status/1', {
+  checkActive: false,
+  deferHideVisibility: true,
+  preserveVisibleOnTargetSwitch: true
+});
+reversedTitleTarget.dispatchFakeEvent('pointerenter', { clientX: 120, clientY: 100 });
+reversedUrlTarget.dispatchFakeEvent('pointerenter', { clientX: 180, clientY: 100, relatedTarget: reversedTitleTarget });
+const reversedElement = reversedController.element;
+assert.strictEqual(
+  reversedElement.children.map((child) => child.textContent || '').join(''),
+  'https://x.com/reversed/status/1',
+  'switching cursor tooltip should show URL after URL pointerenter'
+);
+reversedTitleTarget.dispatchFakeEvent('pointerleave', { relatedTarget: reversedUrlTarget });
+assert.strictEqual(
+  reversedElement.children.map((child) => child.textContent || '').join(''),
+  'https://x.com/reversed/status/1',
+  'switching cursor tooltip should ignore a late title leave after URL entered'
+);
+reversedTitleTarget.dispatchFakeEvent('pointermove', { clientX: 121, clientY: 100 });
+assert.strictEqual(
+  reversedElement.children.map((child) => child.textContent || '').join(''),
+  'https://x.com/reversed/status/1',
+  'switching cursor tooltip should keep URL after stale title movement following a late leave'
+);
+reversedTitleTarget.dispatchFakeEvent('pointerenter', { clientX: 190, clientY: 100, relatedTarget: reversedUrlTarget });
+assert.strictEqual(
+  reversedElement.children.map((child) => child.textContent || '').join(''),
+  'https://x.com/reversed/status/1',
+  'switching cursor tooltip should ignore stale title enter events while the pointer is still over URL'
+);
+reversedTitleTarget.getBoundingClientRect = () => ({ top: 80, left: 120, right: 210, bottom: 112, width: 90, height: 32 });
+reversedUrlTarget.getBoundingClientRect = () => ({ top: 80, left: 220, right: 304, bottom: 112, width: 84, height: 32 });
+reversedUrlTarget.dispatchFakeEvent('pointerleave', { clientX: 180, clientY: 100, relatedTarget: reversedTitleTarget });
+assert.strictEqual(
+  reversedElement.children.map((child) => child.textContent || '').join(''),
+  'https://x.com/reversed/status/1',
+  'switching cursor tooltip should keep URL content during deferred layout-shift leave'
+);
+reversedTitleTarget.dispatchFakeEvent('pointerenter', { clientX: 180, clientY: 100, relatedTarget: reversedUrlTarget });
+assert.strictEqual(
+  reversedElement.children.map((child) => child.textContent || '').join(''),
+  'https://x.com/reversed/status/1',
+  'switching cursor tooltip should ignore layout-shift title enter events at the unchanged pointer point'
+);
+reversedTimers.forEach((callback) => callback());
+assert.strictEqual(
+  reversedElement.getAttribute('data-visible'),
+  'true',
+  'switching cursor tooltip should not schedule a delayed hide from a late previous-target leave'
+);
+
+switchUrlTarget.dispatchFakeEvent('pointerleave', { relatedTarget: unrelatedTarget });
+assert.strictEqual(
+  switchElement.getAttribute('data-visible'),
+  'false',
+  'switching cursor tooltip should hide immediately when leaving the row text handoff pair'
+);
 
 const liveTagTarget = createFakeElement('button');
 liveTagTarget.ownerDocument = fakeDocument;
@@ -420,11 +613,25 @@ assert.strictEqual(
 );
 
 const newtabHtml = fs.readFileSync(newtabHtmlPath, 'utf8');
+const background = fs.readFileSync(path.join(repoRoot, 'src/background/background.js'), 'utf8');
+const overlayPanel = fs.readFileSync(path.join(repoRoot, 'src/overlay/search-panel.js'), 'utf8');
 assert.ok(newtabHtml.includes('../shared/cursor-tooltip.css'), 'newtab should load cursor tooltip stylesheet');
 assert.ok(newtabHtml.includes('../shared/cursor-tooltip.js'), 'newtab should load cursor tooltip component');
 assert.ok(
   newtabHtml.indexOf('../shared/tooltip.js') < newtabHtml.indexOf('../shared/cursor-tooltip.js'),
   'newtab should load shared tooltip before cursor tooltip'
+);
+assert.ok(
+  background.includes("'src/shared/cursor-tooltip.js'"),
+  'overlay injection should load cursor tooltip behavior before search-panel'
+);
+assert.ok(
+  overlayPanel.includes("overlayRuntime.getRuntimeUrl(chrome, 'src/shared/cursor-tooltip.css')"),
+  'overlay should resolve cursor tooltip stylesheet URL'
+);
+assert.ok(
+  overlayPanel.includes('LumnoCursorTooltip.createController'),
+  'overlay should use the cursor tooltip controller'
 );
 
 console.log('shared cursor tooltip tests passed');

@@ -14,7 +14,35 @@ assert.strictEqual(
 );
 
 const optionsSource = fs.readFileSync('src/options/options.js', 'utf8');
+const optionsHtml = fs.readFileSync('src/options/options.html', 'utf8');
 const backgroundSource = fs.readFileSync('src/background/background.js', 'utf8');
+const localeNames = ['en', 'ja', 'zh_CN', 'zh_TW'];
+const localeMessages = Object.fromEntries(localeNames.map((locale) => [
+  locale,
+  JSON.parse(fs.readFileSync(`_locales/${locale}/messages.json`, 'utf8'))
+]));
+
+assert(
+  /data-i18n="settings_overlay_open_tabs_default_visible_title"/.test(optionsHtml),
+  'overlay open-tabs setting label should be wired through data-i18n'
+);
+assert(
+  !/settings_overlay_open_tabs_default_visible_desc/.test(optionsHtml),
+  'overlay open-tabs setting should not keep a secondary description in options HTML'
+);
+localeNames.forEach((locale) => {
+  assert(
+    localeMessages[locale].settings_overlay_open_tabs_default_visible_title &&
+      String(localeMessages[locale].settings_overlay_open_tabs_default_visible_title.message || '').trim(),
+    `${locale} should localize the overlay open-tabs setting label`
+  );
+  assert.strictEqual(
+    Object.prototype.hasOwnProperty.call(localeMessages[locale], 'settings_overlay_open_tabs_default_visible_desc'),
+    false,
+    `${locale} should not keep unused overlay open-tabs setting description copy`
+  );
+});
+
 assert(
   /BOOKMARK_VIEW_MODE_STORAGE_KEY\s*=\s*['_"]_x_extension_bookmark_view_mode_2026_unique_['_"]/.test(optionsSource),
   'options sync should define the bookmark view mode storage key'

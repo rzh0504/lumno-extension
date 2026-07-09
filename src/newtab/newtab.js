@@ -9432,8 +9432,9 @@
       return;
     }
     if (!candidate) {
-      candidate = getDomainPrefixCandidate(allSuggestions, rawQuery) ||
-        getAutocompleteCandidate(allSuggestions, rawQuery);
+      const autocompleteSuggestions = getKeywordSearchSuggestionState(allSuggestions).autocompleteSuggestions;
+      candidate = getDomainPrefixCandidate(autocompleteSuggestions, rawQuery) ||
+        getAutocompleteCandidate(autocompleteSuggestions, rawQuery);
     }
     if (!candidate || !candidate.completion) {
       clearAutocomplete();
@@ -9570,6 +9571,42 @@
     }
   }
 
+  function getProviderIconAttachPageUrl(provider, iconUrl, iconHost) {
+    const providerPageUrl = getProviderFaviconPageUrl(provider);
+    if (providerPageUrl) {
+      return providerPageUrl;
+    }
+    const canonicalIconPageUrl = getCanonicalPageUrlForFavicon(iconUrl);
+    if (canonicalIconPageUrl && canonicalIconPageUrl !== iconUrl) {
+      return canonicalIconPageUrl;
+    }
+    const host = String(iconHost || '').trim();
+    return host ? `https://${host}/` : '';
+  }
+
+  function attachInputModeProviderIcon(icon, context) {
+    const iconUrl = context && context.iconUrl ? String(context.iconUrl).trim() : '';
+    if (!icon || !iconUrl || iconUrl.startsWith('data:')) {
+      return false;
+    }
+    const iconHost = context && context.iconHost ? String(context.iconHost).trim() : '';
+    const pageUrl = getProviderIconAttachPageUrl(
+      context && context.provider ? context.provider : null,
+      iconUrl,
+      iconHost
+    );
+    if (!pageUrl) {
+      return false;
+    }
+    const hostKey = iconHost || getHostFromUrl(pageUrl);
+    const candidates = getPageFaviconRenderCandidates(pageUrl, iconUrl) || {};
+    attachFaviconWithFallbacks(icon, pageUrl, hostKey, {
+      primaryUrl: candidates.primaryUrl || iconUrl,
+      browserUrl: candidates.browserUrl || ''
+    });
+    return true;
+  }
+
   function getSiteSearchProviders() {
     if (siteSearchProvidersCache) {
       return Promise.resolve(siteSearchProvidersCache);
@@ -9644,6 +9681,10 @@
       getDirectNavigationUrl,
       getUrlDisplay
     });
+  }
+
+  function getKeywordSearchSuggestionState(list) {
+    return SEARCH_UTILS.getKeywordSearchSuggestionState(list);
   }
 
   function matchesTopSitePrefix(suggestion, input) {
@@ -10140,6 +10181,7 @@
     onDeleteHistory: deleteRenderedHistorySuggestion,
     showTopActionTooltip,
     hideTopActionTooltip,
+    bindCursorTooltip,
     getSearchActionLabel,
     getSiteSearchDisplayName,
     isAiSiteSearchProvider,
@@ -10481,8 +10523,8 @@
       });
       allSuggestions = filterBlacklistedSuggestions(allSuggestions, query);
 
-      const onlyKeywordSuggestions = allSuggestions.length > 0 &&
-        allSuggestions.every((item) => item && (item.type === 'googleSuggest' || item.type === 'newtab'));
+      const keywordSuggestionState = getKeywordSearchSuggestionState(allSuggestions);
+      const onlyKeywordSuggestions = keywordSuggestionState.onlyKeywordSuggestions;
 
       let autocompleteCandidate = null;
       let primaryHighlightIndex = -1;
@@ -10506,8 +10548,8 @@
         siteSearchTrigger = (!siteSearchState && !inlineEnabled)
           ? getSiteSearchTriggerCandidate(rawTagInput, providersForTags, topSiteMatch)
           : null;
-        if (!siteSearchState && !inlineEnabled && !strongNavigationMatch && preferAutocompleteFirst) {
-          autocompleteCandidate = getAutocompleteCandidate(allSuggestions, latestRawQuery);
+        if (!siteSearchState && !inlineEnabled && !strongNavigationMatch && preferAutocompleteFirst && !onlyKeywordSuggestions) {
+          autocompleteCandidate = getAutocompleteCandidate(keywordSuggestionState.autocompleteSuggestions, latestRawQuery);
           if (autocompleteCandidate) {
             const candidateIndex = allSuggestions.findIndex((suggestion) => {
               if (!suggestion || suggestion.type === 'newtab') {
@@ -10542,7 +10584,7 @@
           primaryHighlightIndex = 0;
           primaryHighlightReason = 'topSite';
         }
-        if (!siteSearchState && query && openTabQuickSwitchEnabled) {
+        if (!siteSearchState && query && !onlyKeywordSuggestions && openTabQuickSwitchEnabled) {
           const openTabMatch = typeof SEARCH_UTILS.findSearchOpenTabMatchIndex === 'function'
             ? SEARCH_UTILS.findSearchOpenTabMatchIndex(allSuggestions, {
               rawQuery: latestRawQuery.trim(),
@@ -10569,7 +10611,11 @@
           primarySuggestion = allSuggestions[primaryHighlightIndex] || null;
           mergedProvider = findProviderForSuggestionMatch(primarySuggestion, providersForTags);
         }
-        applyAutocomplete(allSuggestions, primarySuggestion, primaryHighlightReason);
+        if (onlyKeywordSuggestions) {
+          clearAutocomplete();
+        } else {
+          applyAutocomplete(allSuggestions, primarySuggestion, primaryHighlightReason);
+        }
         const inlineAutoHighlight = Boolean(inlineSuggestion && primaryHighlightIndex === 0);
         inlineSearchState = inlineSuggestion
           ? {
@@ -10664,7 +10710,7 @@
           return;
         }
         renderSuggestions([], requestQuery);
-      }, immediate ? 900 : 1300);
+      }, immediate ? 1200 : 1300);
       chrome.runtime.sendMessage({
         action: 'getSearchSuggestions',
         query: requestQuery,
@@ -11555,6 +11601,7 @@
     getSiteSearchDisplayName,
     isAiSiteSearchProvider,
     attachFaviconData,
+    attachProviderIcon: attachInputModeProviderIcon,
     formatMessage,
     isTabHintSuppressed: () => Boolean(siteSearchState)
   });

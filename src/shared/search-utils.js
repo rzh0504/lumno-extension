@@ -945,6 +945,91 @@
     return 160;
   }
 
+  function getSearchEngineSuggestionLimit(value) {
+    const rawLimit = Number(value);
+    return Number.isFinite(rawLimit) && rawLimit > 0
+      ? Math.floor(rawLimit)
+      : SEARCH_POLICY.maxEngineSuggestions;
+  }
+
+  function normalizeSearchEngineSuggestionText(value) {
+    return String(value || '').trim();
+  }
+
+  function normalizeSearchEngineSuggestions(items, query, options) {
+    const suggestions = Array.isArray(items) ? items : [];
+    const settings = options && typeof options === 'object' ? options : {};
+    const limit = getSearchEngineSuggestionLimit(settings.limit);
+    const queryText = normalizeSearchEngineSuggestionText(query);
+    const queryKey = queryText.toLowerCase();
+    const seen = new Set();
+    const normalized = [];
+    for (let i = 0; i < suggestions.length && normalized.length < limit; i += 1) {
+      const suggestion = normalizeSearchEngineSuggestionText(suggestions[i]);
+      if (!suggestion) {
+        continue;
+      }
+      const suggestionKey = suggestion.toLowerCase();
+      if (suggestionKey === queryKey || seen.has(suggestionKey)) {
+        continue;
+      }
+      seen.add(suggestionKey);
+      normalized.push(suggestion);
+    }
+    return normalized;
+  }
+
+  function isSearchEngineSuggestion(suggestion) {
+    return Boolean(suggestion && suggestion.type === 'googleSuggest');
+  }
+
+  function isSearchActionSuggestion(suggestion) {
+    return Boolean(suggestion && suggestion.type === 'newtab');
+  }
+
+  function isKeywordSearchSuggestion(suggestion) {
+    return isSearchEngineSuggestion(suggestion) || isSearchActionSuggestion(suggestion);
+  }
+
+  function hasLocalResultSuggestion(list) {
+    return (Array.isArray(list) ? list : []).some((suggestion) => (
+      suggestion && !isKeywordSearchSuggestion(suggestion)
+    ));
+  }
+
+  function areOnlyKeywordSearchSuggestions(list) {
+    const suggestions = Array.isArray(list) ? list : [];
+    return suggestions.length > 0 && suggestions.every(isKeywordSearchSuggestion);
+  }
+
+  function getAutocompleteSearchSuggestionPool(list) {
+    const suggestions = Array.isArray(list) ? list : [];
+    if (!hasLocalResultSuggestion(suggestions)) {
+      return suggestions.slice();
+    }
+    return suggestions.filter((suggestion) => !isSearchEngineSuggestion(suggestion));
+  }
+
+  function getKeywordSearchSuggestionState(list) {
+    const suggestions = Array.isArray(list) ? list : [];
+    return {
+      onlyKeywordSuggestions: areOnlyKeywordSearchSuggestions(suggestions),
+      hasLocalResults: hasLocalResultSuggestion(suggestions),
+      autocompleteSuggestions: getAutocompleteSearchSuggestionPool(suggestions)
+    };
+  }
+
+  function getSearchEngineSuggestionPolicy(context, localSuggestions, policy) {
+    const settings = policy && typeof policy === 'object' ? policy : {};
+    const hasLocalResults = hasLocalResultSuggestion(localSuggestions);
+    const baseScore = getSearchEngineSuggestionScore(context, localSuggestions);
+    return {
+      hasLocalResults,
+      limit: hasLocalResults ? 1 : getSearchEngineSuggestionLimit(settings.maxEngineSuggestions),
+      score: hasLocalResults ? Math.min(baseScore, 1) : baseScore
+    };
+  }
+
   function looksLikeVersionSegment(segment) {
     const value = String(segment || '').trim().toLowerCase();
     if (!value) {
@@ -1790,8 +1875,9 @@
         return false;
       }
       const info = getSearchSuggestionClusterInfo(suggestion.url);
-      const hostKey = info.host || '__nohost__';
-      const clusterKey = info.clusterKey || dedupKey;
+      const isEngineSuggestion = suggestion.type === 'googleSuggest';
+      const hostKey = isEngineSuggestion ? dedupKey : (info.host || '__nohost__');
+      const clusterKey = isEngineSuggestion ? dedupKey : (info.clusterKey || dedupKey);
       const currentHostCount = hostCounts.get(hostKey) || 0;
       const currentClusterCount = clusterCounts.get(clusterKey) || 0;
       if (currentHostCount >= hostLimit || currentClusterCount >= clusterLimit) {
@@ -2666,7 +2752,11 @@
     collectSearchMatches,
     compareSearchSuggestions,
     createSearchSuggestion,
+    areOnlyKeywordSearchSuggestions,
+    getAutocompleteSearchSuggestionPool,
+    getKeywordSearchSuggestionState,
     getSearchEngineSuggestionScore,
+    getSearchEngineSuggestionPolicy,
     getSearchNavigationRepresentativeSignal,
     getSearchSuggestionCategoryAdjustment,
     getSearchSuggestionClusterInfo,
@@ -2689,8 +2779,10 @@
     isAiSiteSearchProvider,
     isInteractiveSiteSearchProvider,
     isInteractiveSiteSearchSubmitStrategy,
+    isKeywordSearchSuggestion,
     isSearchLikelyBrandProductQuery,
     isSearchLikelyDirectNavigationQuery,
+    isSearchEngineSuggestion,
     isShortAsciiSearchTerm,
     isSiteSearchProviderTokenEligible,
     limitSearchSuggestionsForDisplay,
@@ -2703,6 +2795,7 @@
     mergeItemsByUrl,
     matchesSearchQueryText,
     matchesSearchTitlePinyin,
+    normalizeSearchEngineSuggestions,
     normalizeSearchSelectionQuery,
     normalizeSearchSelectionStats,
     normalizeHost,

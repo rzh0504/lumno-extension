@@ -150,6 +150,23 @@ function triggerEvent(element, name, event) {
   handlers.forEach((handler) => handler.call(element, event || {}));
 }
 
+function findDescendantByClass(root, className) {
+  if (!root) {
+    return null;
+  }
+  if (root.className === className) {
+    return root;
+  }
+  const children = Array.isArray(root.childNodes) ? root.childNodes : [];
+  for (const child of children) {
+    const match = findDescendantByClass(child, className);
+    if (match) {
+      return match;
+    }
+  }
+  return null;
+}
+
 function getHostFromUrl(url) {
   try {
     return new URL(url).hostname.toLowerCase();
@@ -235,8 +252,8 @@ function testSuggestionActionColumnAlignmentContract() {
 
   assert.match(
     overlayCss,
-    /--x-ov-suggestion-action-column-width:\s*160px;/,
-    'overlay suggestions should reserve enough action-column width for the default search-engine action'
+    /--x-ov-suggestion-action-column-width:\s*200px;/,
+    'overlay suggestions should define enough max action-column width for search-engine action tags with Enter keycaps'
   );
   const overlayActionColumnRule = getRuleBlock(
     overlayCss,
@@ -245,13 +262,18 @@ function testSuggestionActionColumnAlignmentContract() {
   );
   assert.match(
     overlayActionColumnRule,
-    /flex:\s*0 0 min\(48%,\s*var\(--x-ov-suggestion-action-column-width,\s*160px\)\);/,
-    'overlay action column should use a responsive basis wide enough for search-engine labels'
+    /flex:\s*0 1 auto;/,
+    'overlay action column should shrink to compact actions instead of reserving empty space'
   );
   assert.match(
     overlayActionColumnRule,
-    /width:\s*min\(48%,\s*var\(--x-ov-suggestion-action-column-width,\s*160px\)\);/,
-    'overlay action column should keep a matching width for consistent left edges'
+    /max-width:\s*min\(56%,\s*var\(--x-ov-suggestion-action-column-width,\s*200px\)\);/,
+    'overlay action column should cap long action tags without forcing short actions to reserve a blank column'
+  );
+  assert.doesNotMatch(
+    overlayActionColumnRule,
+    /(^|\n)\s*width:\s*min\(56%,\s*var\(--x-ov-suggestion-action-column-width,\s*200px\)\);/,
+    'overlay action column should not reserve the full capped width when compact actions are visible'
   );
   assert.match(
     overlayActionColumnRule,
@@ -261,7 +283,7 @@ function testSuggestionActionColumnAlignmentContract() {
   assert.match(
     overlayCss,
     /\.x-ov-suggestion-action-button\s*\{[\s\S]*?justify-content:\s*flex-start;[\s\S]*?max-width:\s*100%;[\s\S]*?min-width:\s*0;[\s\S]*?white-space:\s*nowrap;/,
-    'overlay action buttons should stay inside the fixed action column'
+    'overlay action buttons should stay inside the capped action column'
   );
   assert.match(
     overlayCss,
@@ -286,12 +308,27 @@ function testSuggestionActionColumnAlignmentContract() {
   assert.match(
     overlayCss,
     /\.x-ov-suggestion-right\[data-action-column="true"\] \.x-ov-suggestion-action-tags\[data-visible="true"\],\s*[\s\S]*?\.x-ov-suggestion-right\[data-action-column="true"\] \.x-ov-suggestion-action-button\[data-visible="true"\]\s*\{[\s\S]*?flex:\s*0 1 auto;[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/,
-    'overlay action tags and buttons should shrink inside the fixed action column without stretching away from the right edge'
+    'overlay action tags and buttons should shrink inside the capped action column without stretching away from the right edge'
   );
   assert.match(
     overlayCss,
     /\.x-ov-suggestion-right\[data-action-column="true"\] \.x-ov-suggestion-action-tags\[data-visible="true"\] \.x-ov-action-tag\s*\{[\s\S]*?max-width:\s*100%;/,
     'overlay action tags should ellipsize within the remaining right-aligned space'
+  );
+  const overlayActionTagLabelRule = getRuleBlock(
+    overlayCss,
+    /\.x-ov-action-tag__label\s*\{[\s\S]*?\}/,
+    'overlay action tag labels should have a dedicated line-height rule'
+  );
+  assert.match(
+    overlayActionTagLabelRule,
+    /line-height:\s*1\.35;/,
+    'overlay action tag labels should reserve enough vertical glyph space'
+  );
+  assert.match(
+    overlayCss,
+    /\.x-ov-action-tag__key\s*\{[\s\S]*?flex:\s*0 0 auto;/,
+    'overlay action tag keycaps should not shrink when the action label is long'
   );
   assert.doesNotMatch(
     overlayCss,
@@ -301,8 +338,8 @@ function testSuggestionActionColumnAlignmentContract() {
 
   assert.match(
     newtabHtml,
-    /--x-nt-suggestion-action-column-width:\s*160px;/,
-    'newtab suggestions should reserve enough action-column width for the default search-engine action'
+    /--x-nt-suggestion-action-column-width:\s*200px;/,
+    'newtab suggestions should define enough max action-column width for search-engine action tags with Enter keycaps'
   );
   const newtabActionColumnRule = getRuleBlock(
     newtabHtml,
@@ -311,13 +348,18 @@ function testSuggestionActionColumnAlignmentContract() {
   );
   assert.match(
     newtabActionColumnRule,
-    /flex:\s*0 0 min\(48%,\s*var\(--x-nt-suggestion-action-column-width,\s*160px\)\);/,
-    'newtab action column should use a responsive basis wide enough for search-engine labels'
+    /flex:\s*0 1 auto;/,
+    'newtab action column should shrink to compact actions instead of reserving empty space'
   );
   assert.match(
     newtabActionColumnRule,
-    /width:\s*min\(48%,\s*var\(--x-nt-suggestion-action-column-width,\s*160px\)\);/,
-    'newtab action column should keep a matching width for consistent left edges'
+    /max-width:\s*min\(56%,\s*var\(--x-nt-suggestion-action-column-width,\s*200px\)\);/,
+    'newtab action column should cap long action tags without forcing short actions to reserve a blank column'
+  );
+  assert.doesNotMatch(
+    newtabActionColumnRule,
+    /(^|\n)\s*width:\s*min\(56%,\s*var\(--x-nt-suggestion-action-column-width,\s*200px\)\);/,
+    'newtab action column should not reserve the full capped width when compact actions are visible'
   );
   assert.match(
     newtabActionColumnRule,
@@ -327,7 +369,7 @@ function testSuggestionActionColumnAlignmentContract() {
   assert.match(
     newtabHtml,
     /\.x-nt-suggestion-action-button\s*\{[\s\S]*?justify-content:\s*flex-start;[\s\S]*?max-width:\s*100%;[\s\S]*?min-width:\s*0;[\s\S]*?white-space:\s*nowrap;/,
-    'newtab action buttons should stay inside the fixed action column'
+    'newtab action buttons should stay inside the capped action column'
   );
   assert.match(
     newtabHtml,
@@ -352,12 +394,27 @@ function testSuggestionActionColumnAlignmentContract() {
   assert.match(
     newtabHtml,
     /\.x-nt-suggestion-right\[data-action-column="true"\] \.x-nt-suggestion-action-tags\[data-visible="true"\],\s*[\s\S]*?\.x-nt-suggestion-right\[data-action-column="true"\] \.x-nt-suggestion-action-button\[data-visible="true"\]\s*\{[\s\S]*?flex:\s*0 1 auto;[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/,
-    'newtab action tags and buttons should shrink inside the fixed action column without stretching away from the right edge'
+    'newtab action tags and buttons should shrink inside the capped action column without stretching away from the right edge'
   );
   assert.match(
     newtabHtml,
     /\.x-nt-suggestion-right\[data-action-column="true"\] \.x-nt-suggestion-action-tags\[data-visible="true"\] \.x-nt-suggestion-action-tag\s*\{[\s\S]*?max-width:\s*100%;/,
     'newtab action tags should ellipsize within the remaining right-aligned space'
+  );
+  const newtabActionTagLabelRule = getRuleBlock(
+    newtabHtml,
+    /\.x-nt-suggestion-action-tag__label\s*\{[\s\S]*?\}/,
+    'newtab action tag labels should have a dedicated line-height rule'
+  );
+  assert.match(
+    newtabActionTagLabelRule,
+    /line-height:\s*1\.35;/,
+    'newtab action tag labels should reserve enough vertical glyph space'
+  );
+  assert.match(
+    newtabHtml,
+    /\.x-nt-suggestion-action-tag__key\s*\{[\s\S]*?flex:\s*0 0 auto;/,
+    'newtab action tag keycaps should not shrink when the action label is long'
   );
   assert.doesNotMatch(
     newtabHtml,
@@ -412,6 +469,45 @@ function testHistoryDeleteEntrypointsUseNonBubblingDeleteAction() {
     overlayJs,
     /function deleteHistorySuggestionUrl\(suggestion\)[\s\S]*?action:\s*'deleteHistoryUrl'[\s\S]*?refreshOverlaySuggestionsAfterHistoryDelete\(\);/,
     'overlay history delete should refresh suggestions after the background confirms deletion'
+  );
+}
+
+function testOverlayTruncatedTitleCursorTooltipContract() {
+  const overlayJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/search-panel.js'), 'utf8');
+  assert.match(
+    overlayJs,
+    /const suggestionTitleCursorTooltipController = window\.LumnoCursorTooltip[\s\S]*?LumnoCursorTooltip\.createController/,
+    'overlay should create a cursor tooltip controller for truncated suggestion titles'
+  );
+  assert.match(
+    overlayJs,
+    /function isSuggestionTitleOverflowing\(title\)[\s\S]*?scrollWidth[\s\S]*?clientWidth/,
+    'overlay should check actual rendered overflow before showing title detail tooltip'
+  );
+  assert.match(
+    overlayJs,
+    /function renderSuggestionTitleTooltipContent\(element,\s*text,\s*query\)[\s\S]*?setProtectedHighlightedText\(element,\s*text,\s*query/,
+    'overlay title tooltip content should reuse matched-query highlighting'
+  );
+  assert.match(
+    overlayJs,
+    /bindSuggestionTitleCursorTooltip\(title,\s*suggestion,\s*query\);/,
+    'overlay should bind cursor tooltip behavior to rendered suggestion titles'
+  );
+  assert.match(
+    overlayJs,
+    /function getSuggestionTextCursorTooltipOptions\(extraOptions\)[\s\S]*?shouldShow:\s*isSuggestionTitleOverflowing[\s\S]*?preserveVisibleOnTargetSwitch:\s*true/,
+    'overlay shared text tooltip options should show only for overflow and switch without replaying the reveal animation'
+  );
+  assert.match(
+    overlayJs,
+    /function bindSuggestionUrlCursorTooltip\(urlLine,\s*url\)[\s\S]*?getSuggestionTextCursorTooltipOptions\(\)/,
+    'overlay should bind URL cursor tooltips that show only for truncated URL text and switch without replaying the reveal animation'
+  );
+  assert.match(
+    overlayJs,
+    /function buildUrlLine\(url\)[\s\S]*?bindSuggestionUrlCursorTooltip\(urlLine,\s*url\);/,
+    'overlay URL rows should bind their own cursor tooltip'
   );
 }
 
@@ -549,6 +645,120 @@ async function testDirectUrlSuggestionUsesFaviconWhenAvailable() {
   assert.strictEqual(
     attached[0].browserUrl,
     'chrome://favicon2/?pageUrl=http%3A%2F%2F192.168.1.8%2F&size=128'
+  );
+}
+
+async function testTruncatedSuggestionTitleUsesCursorTooltipWithHighlight() {
+  const document = createFakeDocument();
+  const container = document.createElement('div');
+  container.setConnected(true);
+  const items = [];
+  const defaultTheme = faviconTheme.createDefaultTheme();
+  const tooltipBindings = [];
+
+  const view = suggestionsView.createSuggestionsView({
+    document,
+    container,
+    items,
+    t: (key, fallback) => fallback || key,
+    formatMessage: (key, fallback, params) => String(fallback || key).replace('{name}', params && params.name ? params.name : ''),
+    getRiSvg: () => '',
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl,
+    getThemeHostForSuggestion: (suggestion) => getHostFromUrl(suggestion && suggestion.url),
+    shouldBlockFaviconForHost: () => false,
+    isLocalNetworkHost,
+    getImmediateThemeForSuggestion: () => defaultTheme,
+    getThemeForSuggestion: () => Promise.resolve(defaultTheme),
+    getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    getHoverColors: (theme) => faviconTheme.getHoverColors(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
+    applyMarkVariables: () => {},
+    bindCursorTooltip: (target, getText, options) => {
+      tooltipBindings.push({ target, getText, options });
+      return target;
+    },
+    defaultTheme
+  });
+
+  view.render({
+    query: '我觉得',
+    primaryHighlightIndex: 0,
+    primaryHighlightReason: 'topSite',
+    suggestions: [{
+      type: 'history',
+      title: 'X 上的 TenSteps：“肥水不流外人田，我觉得可以稍微再抽象一点”',
+      url: 'https://x.com/example/status/1',
+      favicon: ''
+    }]
+  });
+
+  const item = view.getItems()[0];
+  assert.ok(item && item._xTitle, 'history suggestion title should render');
+  assert.strictEqual(tooltipBindings.length, 2, 'search suggestion title and URL should bind separate cursor tooltips');
+  const binding = tooltipBindings.find((entry) => entry.target === item._xTitle);
+  assert.ok(binding, 'cursor tooltip should bind to the title text node');
+  assert.strictEqual(binding.options.deferHideVisibility, true, 'title tooltip should defer hide so adjacent URL handoff does not animate');
+  assert.strictEqual(binding.options.preserveVisibleOnTargetSwitch, true, 'title tooltip should preserve visibility during text-target switching');
+  assert.strictEqual(
+    binding.getText(item._xTitle),
+    'X 上的 TenSteps：“肥水不流外人田，我觉得可以稍微再抽象一点”',
+    'cursor tooltip should expose the full untruncated title'
+  );
+  item._xTitle.clientWidth = 160;
+  item._xTitle.scrollWidth = 320;
+  assert.strictEqual(
+    binding.options.shouldShow(item._xTitle),
+    true,
+    'cursor tooltip should show only when the rendered title is truncated'
+  );
+  item._xTitle.scrollWidth = 160;
+  assert.strictEqual(
+    binding.options.shouldShow(item._xTitle),
+    false,
+    'cursor tooltip should stay hidden when the full title fits'
+  );
+
+  const tooltipContent = document.createElement('div');
+  binding.options.renderContent(tooltipContent, binding.getText(item._xTitle));
+  const mark = tooltipContent.childNodes.find((child) => child.tagName === 'MARK');
+  assert.ok(mark, 'cursor tooltip detail should include a mark for the matched query');
+  assert.strictEqual(mark.textContent, '我觉得', 'cursor tooltip mark should preserve the matched query text');
+  assert.strictEqual(
+    tooltipContent.textContent,
+    'X 上的 TenSteps：“肥水不流外人田，我觉得可以稍微再抽象一点”',
+    'cursor tooltip detail should render the complete title text'
+  );
+
+  const urlLine = findDescendantByClass(item, 'x-nt-suggestion-url-line');
+  assert.ok(urlLine, 'history suggestion URL line should render');
+  const urlBinding = tooltipBindings.find((entry) => entry.target === urlLine);
+  assert.ok(urlBinding, 'cursor tooltip should bind to the URL text node');
+  assert.strictEqual(urlBinding.options.deferHideVisibility, true, 'URL tooltip should defer hide so adjacent title handoff does not animate');
+  assert.strictEqual(urlBinding.options.preserveVisibleOnTargetSwitch, true, 'URL tooltip should preserve visibility during text-target switching');
+  assert.strictEqual(
+    urlBinding.getText(urlLine),
+    'https://x.com/example/status/1',
+    'URL cursor tooltip should expose the full URL'
+  );
+  urlLine.clientWidth = 96;
+  urlLine.scrollWidth = 220;
+  assert.strictEqual(
+    urlBinding.options.shouldShow(urlLine),
+    true,
+    'URL cursor tooltip should show only when the rendered URL is truncated'
+  );
+  urlLine.scrollWidth = 96;
+  assert.strictEqual(
+    urlBinding.options.shouldShow(urlLine),
+    false,
+    'URL cursor tooltip should stay hidden when the full URL fits'
   );
 }
 
@@ -1654,7 +1864,7 @@ function testNewtabCommandEnterOpensFocusedResultInBackgroundTab() {
     'newtab matched open-tab results should use the same foreground/background tab disposition helper'
   );
   assert.ok(
-    /chrome\.tabs\.create\(\{\s*url:\s*targetUrl,\s*active:\s*request\.disposition !== 'backgroundTab'\s*\}/.test(backgroundJs),
+    /(?:chrome\.tabs\.create|createTabWithSourceGroup)\(\{\s*url:\s*targetUrl,\s*active:\s*request\.disposition !== 'backgroundTab'/.test(backgroundJs),
     'background createTab should support backgroundTab by creating an inactive tab'
   );
   assert.ok(
@@ -1698,16 +1908,43 @@ function testOverlayCommandEnterOpensFocusedResultInBackgroundTab() {
   );
 }
 
+function testOverlayDirectOpenTabsUseShiftAwareSwitchAction() {
+  const overlayJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/search-panel.js'), 'utf8');
+  assert.ok(
+    /suggestionItem\._xIsRenderedTabSuggestion = true;[\s\S]*suggestionItem\._xSuggestion = \{[\s\S]*type:\s*'openTab'[\s\S]*_xMatchedTabId:\s*tab && typeof tab\.id === 'number' \? tab\.id : null/.test(overlayJs),
+    'overlay directly rendered open-tab rows should carry matched-tab suggestion metadata'
+  );
+  assert.ok(
+    /function updateModifierActionLabels\(\)[\s\S]*!item\._xIsSearchSuggestion && !item\._xIsRenderedTabSuggestion[\s\S]*const actionButton = item\._xVisitButton \|\| item\._xSwitchButton/.test(overlayJs),
+    'overlay should refresh modifier labels for directly rendered open-tab rows'
+  );
+  assert.ok(
+    /const switchActionTag = createActionTag\(t\('action_switch', '切换'\), 'Enter'\);[\s\S]*switchActionTag\._xAction = 'switch';[\s\S]*suggestionItem\._xActionTags = \[switchActionTag\];/.test(overlayJs),
+    'overlay directly rendered open-tab rows should expose switch action tags for Shift label updates'
+  );
+  assert.ok(
+    /const activateRenderedTabSuggestion = function\(event\) \{[\s\S]*openMatchedTabSuggestion\(suggestionItem\._xSuggestion,\s*event,\s*suggestionItem,\s*searchInput\.value\.trim\(\)\)/.test(overlayJs),
+    'overlay clicks on directly rendered open-tab rows should use the Shift-aware matched-tab opener'
+  );
+  assert.ok(
+    /activeItem && activeItem\._xIsRenderedTabSuggestion && activeItem\._xSuggestion[\s\S]*openMatchedTabSuggestion\(activeItem\._xSuggestion,\s*e,\s*activeItem,\s*query\)/.test(overlayJs),
+    'overlay Enter on directly rendered open-tab rows should use the Shift-aware matched-tab opener'
+  );
+}
+
 testSiteSearchProviderIconsUsePageFaviconCandidates();
 testSiteSearchTabHintRequiresExplicitTrigger();
 testSuggestionActionColumnAlignmentContract();
 testHistoryDeleteEntrypointsUseNonBubblingDeleteAction();
+testOverlayTruncatedTitleCursorTooltipContract();
 testNewtabShiftEnterOpensMatchedTabInNewTab();
 testNewtabCommandEnterOpensFocusedResultInBackgroundTab();
 testOverlayCommandEnterOpensFocusedResultInBackgroundTab();
+testOverlayDirectOpenTabsUseShiftAwareSwitchAction();
 
 testLocalUrlSuggestionUsesFallbackTheme()
   .then(testDirectUrlSuggestionUsesFaviconWhenAvailable)
+  .then(testTruncatedSuggestionTitleUsesCursorTooltipWithHighlight)
   .then(testAppendRenderKeepsOnlyFinalSuggestionMarkedLast)
   .then(testBrowserNewtabSuggestionUsesFallbackIconWhenFaviconMissing)
   .then(testBrowserPageTabUsesBrowserPageFaviconPrimaryCandidate)

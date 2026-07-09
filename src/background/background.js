@@ -3607,6 +3607,7 @@ function openOverlayOnTab(activeTab, tabs, source) {
     'src/shared/feature-hints.js',
     'src/shared/update-notice.js',
     'src/shared/tooltip.js',
+    'src/shared/cursor-tooltip.js',
     'src/overlay/runtime.js',
     'src/shared/favicon-utils.js',
     'src/shared/favicon-cache.js',
@@ -5372,7 +5373,7 @@ let searchResultSourceTypesCache = null;
 let searchResultSourceTypesPromise = null;
 let searchSelectionStatsCache = null;
 let searchSelectionStatsPromise = null;
-const SEARCH_ENGINE_SUGGEST_TIMEOUT_MS = 180;
+const SEARCH_ENGINE_SUGGEST_TIMEOUT_MS = 900;
 const LOCAL_SUGGEST_SOURCE_TIMEOUT_MS = 800;
 const HISTORY_FALLBACK_CACHE_TTL_MS = 45 * 1000;
 const TOP_SITES_CACHE_TTL_MS = 30 * 1000;
@@ -5402,6 +5403,7 @@ const SITE_SEARCH_DISABLED_STORAGE_KEY = '_x_extension_site_search_disabled_2024
 const SEARCH_BLACKLIST_STORAGE_KEY = '_x_extension_search_blacklist_2026_unique_';
 const FAVICON_REQUEST_BLACKLIST_STORAGE_KEY = '_x_extension_favicon_request_blacklist_2026_unique_';
 const FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY = '_x_extension_favicon_enhanced_fetch_enabled_2026_unique_';
+const OVERLAY_OPEN_TABS_DEFAULT_VISIBLE_STORAGE_KEY = '_x_extension_overlay_open_tabs_default_visible_2026_unique_';
 const BLACKLIST_UTILS = globalThis.LumnoBlacklistUtils || {};
 const SEARCH_UTILS = globalThis.LumnoSearchUtils || {};
 const AI_PROVIDER_SUBMIT = globalThis.LumnoAiProviderSubmit || {};
@@ -5441,7 +5443,8 @@ migrateStorageIfNeeded([
   SITE_SEARCH_DISABLED_STORAGE_KEY,
   SEARCH_BLACKLIST_STORAGE_KEY,
   FAVICON_REQUEST_BLACKLIST_STORAGE_KEY,
-  FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY
+  FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY,
+  OVERLAY_OPEN_TABS_DEFAULT_VISIBLE_STORAGE_KEY
 ]);
 const FAVICON_PROXY_SIZE = 128;
 let backgroundFaviconUrlResolver = null;
@@ -7524,7 +7527,11 @@ async function getSearchSuggestions(query) {
     ] = await Promise.all([
       withTimeout(
         fetchSearchSuggestionsForEngine(query)
-        .then((items) => (Array.isArray(items) ? items.slice(0, searchPolicy.maxEngineSuggestions || 5) : []))
+        .then((items) => searchUtils.normalizeSearchEngineSuggestions(
+          items,
+          context.lookupQuery,
+          { limit: searchPolicy.maxEngineSuggestions }
+        ))
         .catch(() => []),
         SEARCH_ENGINE_SUGGEST_TIMEOUT_MS,
         []
@@ -7691,7 +7698,6 @@ async function getSearchSuggestions(query) {
     }
 
     const suggestionIndexByKey = new Map();
-    const fallbackTopSites = [];
 
     function getSuggestionKey(item) {
       return typeof searchUtils.buildSearchDedupEntryKey === 'function'
@@ -7785,10 +7791,7 @@ async function getSearchSuggestions(query) {
       if (titleLower.startsWith(context.queryLower)) {
         scoreAdjustment += 6;
       }
-      const suggestion = upsertSuggestion(site, 'topSite', { isTopSite: true, scoreAdjustment });
-      if (!suggestion) {
-        fallbackTopSites.push(site);
-      }
+      upsertSuggestion(site, 'topSite', { isTopSite: true, scoreAdjustment });
     });
 
     bookmarks.forEach((bookmark) => {
@@ -7824,17 +7827,19 @@ async function getSearchSuggestions(query) {
       }
     }
 
-    const engineSuggestionScore = typeof searchUtils.getSearchEngineSuggestionScore === 'function'
-      ? searchUtils.getSearchEngineSuggestionScore(context, suggestions)
-      : 160;
-    engineSuggestions.forEach((suggestion) => {
-      if (suggestion && suggestion !== context.lookupQuery) {
+    const engineSuggestionPolicy = searchUtils.getSearchEngineSuggestionPolicy(
+      context,
+      suggestions,
+      searchPolicy
+    );
+    engineSuggestions.slice(0, engineSuggestionPolicy.limit).forEach((suggestion) => {
+      if (suggestion) {
         const suggestionItem = {
           type: 'googleSuggest',
           title: suggestion,
           url: buildDefaultSearchUrl(suggestion),
           favicon: getDefaultSearchEngineFaviconUrl(),
-          score: engineSuggestionScore,
+          score: engineSuggestionPolicy.score,
           searchQuery: suggestion,
           forceSearch: true,
           reasons: ['来源：搜索建议']
@@ -7872,16 +7877,6 @@ async function getSearchSuggestions(query) {
       finalSuggestions = searchUtils.applySearchSuggestionHostDiversity(finalSuggestions);
     } else {
       finalSuggestions = finalSuggestions.slice(0, searchPolicy.finalSuggestionLimit || 12);
-    }
-
-    if (finalSuggestions.length === 0 && fallbackTopSites.length > 0) {
-      const fallbackResults = fallbackTopSites
-        .slice(0, searchPolicy.fallbackTopSiteLimit || 5)
-        .map((site, index) => createSearchSuggestion(site, 'topSite', 1 - index, {
-          favicon: buildSearchSuggestionFavicon(site.url),
-          reasons: ['来源：常用站点']
-        }));
-      finalSuggestions = filterBlacklistedSuggestions(fallbackResults, searchBlacklistItems, context.lookupQuery);
     }
 
     return finalSuggestions;

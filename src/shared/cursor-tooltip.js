@@ -149,6 +149,35 @@
     };
   }
 
+  function getExplicitPointFromInput(input) {
+    const source = input || {};
+    const x = Number(source.clientX !== undefined ? source.clientX : source.x);
+    const y = Number(source.clientY !== undefined ? source.clientY : source.y);
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+      return { clientX: x, clientY: y };
+    }
+    return null;
+  }
+
+  function isPointInsideElement(point, element) {
+    if (!point || !element) {
+      return false;
+    }
+    const rect = getElementRect(element);
+    return point.clientX >= rect.left &&
+      point.clientX <= rect.right &&
+      point.clientY >= rect.top &&
+      point.clientY <= rect.bottom;
+  }
+
+  function isSamePoint(point, referencePoint) {
+    if (!point || !referencePoint) {
+      return false;
+    }
+    return Math.abs(point.clientX - referencePoint.clientX) <= 1 &&
+      Math.abs(point.clientY - referencePoint.clientY) <= 1;
+  }
+
   function isTargetActive(target, doc, options) {
     const config = options || {};
     if (config.checkActive === false) {
@@ -213,6 +242,15 @@
       element.textContent = String(text || '');
     }
     return element;
+  }
+
+  function renderContent(element, text, options) {
+    const config = options || {};
+    if (typeof config.renderContent === 'function') {
+      const rendered = config.renderContent(element, text, config);
+      return rendered || element;
+    }
+    return renderText(element, text);
   }
 
   function clearElement(element) {
@@ -472,6 +510,83 @@
       }
     }
 
+    function getNodeParent(node) {
+      return (node && (node.parentElement || node.parentNode)) || null;
+    }
+
+    function isNodeContainedBy(container, node) {
+      if (!container || !node) {
+        return false;
+      }
+      if (container === node) {
+        return true;
+      }
+      if (typeof container.contains === 'function') {
+        try {
+          return container.contains(node);
+        } catch (error) {
+          return false;
+        }
+      }
+      let current = node;
+      while (current) {
+        if (current === container) {
+          return true;
+        }
+        current = getNodeParent(current);
+      }
+      return false;
+    }
+
+    function getBoundHandoffTarget(node, boundAttribute, rootNode) {
+      let current = node;
+      while (current && current !== rootNode) {
+        if (
+          typeof current.getAttribute === 'function' &&
+          current.getAttribute(boundAttribute) === 'true'
+        ) {
+          return current;
+        }
+        current = getNodeParent(current);
+      }
+      return null;
+    }
+
+    function shouldDeferBoundTooltipHide(event, target, settings, boundAttribute) {
+      if (!settings || settings.deferHideVisibility !== true || !event) {
+        return false;
+      }
+      const relatedTarget = event.relatedTarget || null;
+      if (!relatedTarget || relatedTarget === target) {
+        return false;
+      }
+      const handoffRoot = settings.handoffRoot || settings.handoffElement || getNodeParent(target);
+      if (!handoffRoot || !isNodeContainedBy(handoffRoot, relatedTarget)) {
+        return false;
+      }
+      const relatedBoundTarget = getBoundHandoffTarget(relatedTarget, boundAttribute, handoffRoot);
+      return Boolean(relatedBoundTarget && relatedBoundTarget !== target);
+    }
+
+    function shouldIgnoreStaleEnter(event, target, settings) {
+      if (
+        !settings ||
+        settings.preserveVisibleOnTargetSwitch !== true ||
+        !currentTarget ||
+        currentTarget === target
+      ) {
+        return false;
+      }
+      const point = getExplicitPointFromInput(event);
+      const staleEnter = isSamePoint(point, lastPoint) || isPointInsideElement(point, currentTarget);
+      if (staleEnter && hideTimer) {
+        clearTimer(hideTimer);
+        hideTimer = null;
+        token += 1;
+      }
+      return staleEnter;
+    }
+
     function getModifierRefreshInput(event, binding) {
       const source = event || {};
       const point = (binding && binding.lastPoint) || lastPoint || getPointFromInput(null, binding && binding.target);
@@ -506,6 +621,7 @@
 
     function hideWithOptions(hideOptions) {
       const preserveActiveBinding = Boolean(hideOptions && hideOptions.preserveActiveBinding);
+      const deferVisibility = Boolean(hideOptions && hideOptions.deferVisibility);
       if (!preserveActiveBinding) {
         activeBinding = null;
       }
@@ -515,13 +631,25 @@
       }
       token += 1;
       const hideToken = token;
-      currentTarget = null;
-      setAttribute(element, DEFAULT_VISIBLE_ATTRIBUTE, 'false');
-      setAttribute(element, 'aria-hidden', 'true');
       hideCursorTooltipTag();
       if (hideTimer) {
         clearTimer(hideTimer);
       }
+      if (deferVisibility) {
+        hideTimer = setTimer(() => {
+          if (hideToken !== token || !element) {
+            return;
+          }
+          currentTarget = null;
+          setAttribute(element, DEFAULT_VISIBLE_ATTRIBUTE, 'false');
+          setAttribute(element, 'aria-hidden', 'true');
+          hideTimer = null;
+        }, getNumber(config.hideDelay, 120));
+        return element;
+      }
+      currentTarget = null;
+      setAttribute(element, DEFAULT_VISIBLE_ATTRIBUTE, 'false');
+      setAttribute(element, 'aria-hidden', 'true');
       hideTimer = setTimer(() => {
         if (hideToken !== token || !element) {
           return;
@@ -601,10 +729,20 @@
       const showToken = token;
       currentTarget = target;
       lastPoint = getPointFromInput(pointInput, target);
-      renderText(tooltip, content);
+      renderContent(tooltip, content, mergedOptions);
       const tag = renderCursorTooltipTag(getCursorTooltipTagText(target, pointInput, mergedOptions), mergedOptions);
-      setAttribute(tooltip, DEFAULT_VISIBLE_ATTRIBUTE, 'false');
-      setAttribute(tooltip, 'aria-hidden', 'true');
+      const preserveVisible = Boolean(
+        mergedOptions.preserveVisibleOnTargetSwitch &&
+        typeof tooltip.getAttribute === 'function' &&
+        tooltip.getAttribute(DEFAULT_VISIBLE_ATTRIBUTE) === 'true'
+      );
+      if (!preserveVisible) {
+        setAttribute(tooltip, DEFAULT_VISIBLE_ATTRIBUTE, 'false');
+        setAttribute(tooltip, 'aria-hidden', 'true');
+      } else {
+        setAttribute(tooltip, DEFAULT_VISIBLE_ATTRIBUTE, 'true');
+        setAttribute(tooltip, 'aria-hidden', 'false');
+      }
       const tooltipPosition = positionAtPoint(tooltip, lastPoint, mergedOptions);
       positionCursorTooltipTag(tag, tooltipPosition, mergedOptions);
       requestFrame(() => {
@@ -679,6 +817,9 @@
         inputEvent: event || null
       });
       const showBoundTooltip = (event) => {
+        if (shouldIgnoreStaleEnter(event, target, settings)) {
+          return;
+        }
         setActiveBinding(target, resolveText, settings, event);
         const eventOptions = getEventOptions(event);
         if (!shouldShowTarget(target, eventOptions)) {
@@ -688,13 +829,16 @@
         show(target, resolveText(target), event, eventOptions);
       };
       const moveBoundTooltip = (event) => {
-        setActiveBinding(target, resolveText, settings, event);
         const eventOptions = getEventOptions(event);
+        if (currentTarget && currentTarget !== target) {
+          return;
+        }
+        setActiveBinding(target, resolveText, settings, event);
         if (!shouldShowTarget(target, eventOptions)) {
           hideWithOptions({ preserveActiveBinding: true });
           return;
         }
-        if (!currentTarget || currentTarget !== target) {
+        if (!currentTarget) {
           show(target, resolveText(target), event, eventOptions);
           return;
         }
@@ -709,9 +853,15 @@
         }
         show(target, resolveText(target), getPointFromInput(null, target), eventOptions);
       };
-      const hideBoundTooltip = () => {
+      const hideBoundTooltip = (event) => {
+        if (currentTarget && currentTarget !== target) {
+          clearActiveBinding(target);
+          return;
+        }
         clearActiveBinding(target);
-        hide();
+        hide({
+          deferVisibility: shouldDeferBoundTooltipHide(event, target, settings, boundAttribute)
+        });
       };
       target.addEventListener('pointerenter', showBoundTooltip, true);
       target.addEventListener('pointermove', moveBoundTooltip);

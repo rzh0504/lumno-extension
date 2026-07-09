@@ -22,6 +22,45 @@ function assertDirectNavigationDelegatesToShared(relativePath) {
   );
 }
 
+function assertKeywordOnlySuggestionsKeepSearchActionFirst(relativePath) {
+  const source = readSource(relativePath);
+  assert.match(
+    source,
+    /function getKeywordSearchSuggestionState\(list\)\s*\{[\s\S]*?SEARCH_UTILS\.getKeywordSearchSuggestionState\(list\)/,
+    `${relativePath} should delegate keyword-search suggestion state to shared search utils`
+  );
+  assert.match(
+    source,
+    /const keywordSuggestionState = getKeywordSearchSuggestionState\(allSuggestions\);\s*const onlyKeywordSuggestions = keywordSuggestionState\.onlyKeywordSuggestions;/,
+    `${relativePath} should use the shared keyword-only suggestion state`
+  );
+  assert.match(
+    source,
+    /!strongNavigationMatch && preferAutocompleteFirst && !onlyKeywordSuggestions/,
+    `${relativePath} should not promote search-engine suggestions ahead of the explicit search action`
+  );
+  assert.match(
+    source,
+    /if \(onlyKeywordSuggestions\) \{\s*clearAutocomplete\(\);\s*\} else \{\s*applyAutocomplete\(allSuggestions,\s*primarySuggestion,\s*primaryHighlightReason\);\s*\}/,
+    `${relativePath} should disable autocomplete when the only available results are keyword search suggestions`
+  );
+  assert.match(
+    source,
+    /if \(!siteSearchState && query && !onlyKeywordSuggestions &&/,
+    `${relativePath} should not promote matched search-suggestion URLs through open-tab quick switch`
+  );
+  assert.match(
+    source,
+    /const autocompleteSuggestions = getKeywordSearchSuggestionState\(allSuggestions\)\.autocompleteSuggestions;[\s\S]*?getDomainPrefixCandidate\(autocompleteSuggestions,/,
+    `${relativePath} should use shared autocomplete filtering for inline autocomplete`
+  );
+  assert.match(
+    source,
+    /getAutocompleteCandidate\(keywordSuggestionState\.autocompleteSuggestions,/,
+    `${relativePath} should use shared autocomplete filtering before primary highlight promotion`
+  );
+}
+
 function score(item, query, sourceType = 'history') {
   const context = search.buildSearchQueryContext(query);
   return search.calculateSearchRelevanceScore(item, sourceType, context, {
@@ -172,6 +211,85 @@ assert.deepStrictEqual(
   ['bookmark', 'googleSuggest', 'newtab', 'directUrl'],
   'source filtering should only remove disabled local result types'
 );
+assert.deepStrictEqual(
+  search.normalizeSearchEngineSuggestions([
+    'foo',
+    'foo bar',
+    'Foo Bar',
+    'foo baz',
+    'foo qux'
+  ], 'foo', { limit: 2 }),
+  ['foo bar', 'foo baz'],
+  'search engine suggestions should drop exact-query and duplicate items before applying the cap'
+);
+const keywordOnlySuggestionState = search.getKeywordSearchSuggestionState([
+  { type: 'newtab', title: 'Search', url: 'https://www.google.com/search?q=foo' },
+  { type: 'googleSuggest', title: 'foo bar', url: 'https://www.google.com/search?q=foo%20bar' }
+]);
+assert.strictEqual(
+  keywordOnlySuggestionState.onlyKeywordSuggestions,
+  true,
+  'keyword-only state should cover the explicit search action plus engine suggestions'
+);
+assert.deepStrictEqual(
+  keywordOnlySuggestionState.autocompleteSuggestions.map((item) => item.type),
+  ['newtab', 'googleSuggest'],
+  'keyword-only autocomplete pool can keep engine suggestions because there are no local results to outrank'
+);
+const mixedKeywordSuggestionState = search.getKeywordSearchSuggestionState([
+  { type: 'newtab', title: 'Search', url: 'https://www.google.com/search?q=foo' },
+  { type: 'googleSuggest', title: 'foo bar', url: 'https://www.google.com/search?q=foo%20bar' },
+  { type: 'history', title: 'Foo Local', url: 'https://foo.example.com/' }
+]);
+assert.strictEqual(
+  mixedKeywordSuggestionState.onlyKeywordSuggestions,
+  false,
+  'mixed local result state should not be treated as keyword-only'
+);
+assert.deepStrictEqual(
+  mixedKeywordSuggestionState.autocompleteSuggestions.map((item) => item.type),
+  ['newtab', 'history'],
+  'engine suggestions should be removed from autocomplete candidates when local results exist'
+);
+const enginePolicyWithLocalResults = search.getSearchEngineSuggestionPolicy(
+  search.buildSearchQueryContext('github'),
+  [{ type: 'history', title: 'GitHub', url: 'https://github.com/' }],
+  { maxEngineSuggestions: 5 }
+);
+assert.strictEqual(
+  enginePolicyWithLocalResults.limit,
+  1,
+  'engine suggestion policy should keep only one supplemental item when local results exist'
+);
+assert.ok(
+  enginePolicyWithLocalResults.score <= 1,
+  'engine suggestion policy should keep supplemental items below local result scores'
+);
+assert.strictEqual(
+  search.getSearchEngineSuggestionPolicy(
+    search.buildSearchQueryContext('什么东西'),
+    [],
+    { maxEngineSuggestions: 5 }
+  ).limit,
+  5,
+  'engine suggestion policy should allow the full cap when no local results exist'
+);
+const engineSuggestionItems = [
+  '什么东西补血',
+  '什么东西解酒',
+  '什么东西补钙',
+  '什么东西补铁',
+  '什么东西化痰'
+].map((query) => ({
+  type: 'googleSuggest',
+  title: query,
+  url: `https://www.google.com/search?q=${encodeURIComponent(query)}`
+}));
+assert.deepStrictEqual(
+  search.applySearchSuggestionHostDiversity(engineSuggestionItems).map((item) => item.title),
+  engineSuggestionItems.map((item) => item.title),
+  'search engine keyword suggestions should not be collapsed by same-host diversity limits'
+);
 
 const navList = [
   { type: 'history', title: 'Example Blog Detail', url: 'https://example.com/blog/detail' },
@@ -226,6 +344,8 @@ assert.strictEqual(
 assertDirectNavigationDelegatesToShared('src/newtab/newtab.js');
 assertDirectNavigationDelegatesToShared('src/overlay/search-panel.js');
 assertDirectNavigationDelegatesToShared('src/background/background.js');
+assertKeywordOnlySuggestionsKeepSearchActionFirst('src/newtab/newtab.js');
+assertKeywordOnlySuggestionsKeepSearchActionFirst('src/overlay/search-panel.js');
 
 function testDirectNavigationUrl(input) {
   const raw = String(input || '').trim();

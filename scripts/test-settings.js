@@ -43,6 +43,11 @@ assert.strictEqual(settings.normalizeFaviconEnhancedFetchEnabled(true), true);
 assert.strictEqual(settings.normalizeFaviconEnhancedFetchEnabled(undefined), true);
 assert.strictEqual(settings.normalizeFaviconEnhancedFetchEnabled('false'), true);
 
+assert.strictEqual(settings.normalizeOverlayOpenTabsDefaultVisible(false), false);
+assert.strictEqual(settings.normalizeOverlayOpenTabsDefaultVisible(true), true);
+assert.strictEqual(settings.normalizeOverlayOpenTabsDefaultVisible(undefined), true);
+assert.strictEqual(settings.normalizeOverlayOpenTabsDefaultVisible('false'), true);
+
 assert.strictEqual(settings.normalizeOverlaySizeMode('compact'), 'compact');
 assert.strictEqual(settings.normalizeOverlaySizeMode('large'), 'large');
 assert.strictEqual(settings.normalizeOverlaySizeMode('standard'), 'standard');

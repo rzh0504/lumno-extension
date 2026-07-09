@@ -171,3 +171,10 @@
 .x-lumno-search-input-mode__badge[data-visible="true"] {
   display: inline-flex;
 }
+
+.x-lumno-search-input-mode__prefix .x-nt-favicon-fallback,
+.x-lumno-search-input-mode__prefix .x-ov-suggestion-favicon-fallback,
+.x-lumno-search-input-mode__prefix img[data-fallback-icon="true"],
+.x-lumno-search-input-mode__prefix img[data-favicon-placeholder="true"] {
+  display: none !important;
+}

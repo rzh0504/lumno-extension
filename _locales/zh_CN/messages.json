@@ -110,6 +110,9 @@
   "settings_search_result_sources_title": {
     "message": "显示结果类型"
   },
+  "settings_overlay_open_tabs_default_visible_title": {
+    "message": "在网页唤起时，默认展示所有已打开标签页"
+  },
   "settings_favicon_enhanced_fetch_title": {
     "message": "增强图标与主题色获取"
   },

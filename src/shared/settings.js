@@ -11,6 +11,7 @@
   const NEWTAB_SHORTCUTS_VISIBLE_STORAGE_KEY = '_x_extension_newtab_shortcuts_visible_2026_unique_';
   const UPDATE_NOTICE_ENABLED_STORAGE_KEY = '_x_extension_update_notice_enabled_2026_unique_';
   const FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY = '_x_extension_favicon_enhanced_fetch_enabled_2026_unique_';
+  const OVERLAY_OPEN_TABS_DEFAULT_VISIBLE_STORAGE_KEY = '_x_extension_overlay_open_tabs_default_visible_2026_unique_';
 
   function normalizeLocale(locale) {
     const raw = String(locale || '').trim();
@@ -74,6 +75,10 @@
   }
 
   function normalizeFaviconEnhancedFetchEnabled(value) {
+    return value !== false;
+  }
+
+  function normalizeOverlayOpenTabsDefaultVisible(value) {
     return value !== false;
   }
 
@@ -170,6 +175,7 @@
     NEWTAB_SHORTCUTS_VISIBLE_STORAGE_KEY,
     UPDATE_NOTICE_ENABLED_STORAGE_KEY,
     FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY,
+    OVERLAY_OPEN_TABS_DEFAULT_VISIBLE_STORAGE_KEY,
     normalizeLocale,
     localeToHtmlLang,
     normalizeNewtabWidthMode,
@@ -178,6 +184,7 @@
     normalizeNewtabShortcutsVisible,
     normalizeUpdateNoticeEnabled,
     normalizeFaviconEnhancedFetchEnabled,
+    normalizeOverlayOpenTabsDefaultVisible,
     normalizeOverlaySizeMode,
     normalizeOverlayTabPriorityMode,
     normalizeSearchResultPriority,

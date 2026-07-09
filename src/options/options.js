@@ -47,6 +47,7 @@
   const restrictedActionSelect = document.getElementById('_x_extension_restricted_action_select_2024_unique_');
   const searchResultPrioritySelect = document.getElementById('_x_extension_search_result_priority_select_2026_unique_');
   const searchResultSourceTypeInputs = Array.from(document.querySelectorAll('input[data-search-result-source-type]'));
+  const overlayOpenTabsDefaultVisibleToggle = document.getElementById('_x_extension_overlay_open_tabs_default_visible_toggle_2026_unique_');
   const faviconEnhancedFetchToggle = document.getElementById('_x_extension_favicon_enhanced_fetch_toggle_2026_unique_');
   const syncStatus = document.getElementById('_x_extension_sync_status_2024_unique_');
   const syncStatusText = document.getElementById('_x_extension_sync_status_text_2024_unique_');
@@ -162,6 +163,7 @@
   const RESTRICTED_ACTION_AUTO_BROWSER_SETTING_DONE_STORAGE_KEY = '_x_extension_restricted_action_auto_browser_setting_done_2026_unique_';
   const SEARCH_RESULT_PRIORITY_STORAGE_KEY = '_x_extension_search_result_priority_2026_unique_';
   const SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY = '_x_extension_search_result_source_types_2026_unique_';
+  const OVERLAY_OPEN_TABS_DEFAULT_VISIBLE_STORAGE_KEY = '_x_extension_overlay_open_tabs_default_visible_2026_unique_';
   const FALLBACK_SHORTCUT_STORAGE_KEY = '_x_extension_fallback_hotkey_2024_unique_';
   const SITE_SEARCH_STORAGE_KEY = '_x_extension_site_search_custom_2024_unique_';
   const SITE_SEARCH_DISABLED_STORAGE_KEY = '_x_extension_site_search_disabled_2024_unique_';
@@ -207,6 +209,7 @@
     RESTRICTED_ACTION_STORAGE_KEY,
     SEARCH_RESULT_PRIORITY_STORAGE_KEY,
     SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY,
+    OVERLAY_OPEN_TABS_DEFAULT_VISIBLE_STORAGE_KEY,
     FALLBACK_SHORTCUT_STORAGE_KEY,
     SITE_SEARCH_STORAGE_KEY,
     SITE_SEARCH_DISABLED_STORAGE_KEY,
@@ -795,6 +798,12 @@
       }
     });
     return selected.length > 0 ? selected : ['topSite', 'bookmark', 'history'];
+  }
+
+  function normalizeOverlayOpenTabsDefaultVisible(value) {
+    return typeof SETTINGS.normalizeOverlayOpenTabsDefaultVisible === 'function'
+      ? SETTINGS.normalizeOverlayOpenTabsDefaultVisible(value)
+      : value !== false;
   }
 
   function collectCheckedSearchResultSourceTypes() {
@@ -2609,6 +2618,7 @@
     SITE_SEARCH_STORAGE_KEY,
     SITE_SEARCH_DISABLED_STORAGE_KEY,
     SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY,
+    OVERLAY_OPEN_TABS_DEFAULT_VISIBLE_STORAGE_KEY,
     SEARCH_BLACKLIST_STORAGE_KEY,
     FAVICON_REQUEST_BLACKLIST_STORAGE_KEY,
     FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY,
@@ -2896,6 +2906,16 @@
       input.addEventListener('change', () => {
         persistSearchResultSourceTypes(collectCheckedSearchResultSourceTypes());
       });
+    });
+  }
+  if (overlayOpenTabsDefaultVisibleToggle) {
+    overlayOpenTabsDefaultVisibleToggle.addEventListener('change', () => {
+      const next = normalizeOverlayOpenTabsDefaultVisible(overlayOpenTabsDefaultVisibleToggle.checked);
+      overlayOpenTabsDefaultVisibleToggle.checked = next;
+      if (!storageArea) {
+        return;
+      }
+      storageArea.set({ [OVERLAY_OPEN_TABS_DEFAULT_VISIBLE_STORAGE_KEY]: next });
     });
   }
   if (faviconEnhancedFetchToggle) {
@@ -3496,6 +3516,16 @@
       setSearchResultSourceTypeState(sourceTypes);
       if (!Array.isArray(stored) || JSON.stringify(stored) !== JSON.stringify(sourceTypes)) {
         storageArea.set({ [SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY]: sourceTypes });
+      }
+    });
+    storageArea.get([OVERLAY_OPEN_TABS_DEFAULT_VISIBLE_STORAGE_KEY], (result) => {
+      const rawValue = result[OVERLAY_OPEN_TABS_DEFAULT_VISIBLE_STORAGE_KEY];
+      const stored = normalizeOverlayOpenTabsDefaultVisible(rawValue);
+      if (overlayOpenTabsDefaultVisibleToggle) {
+        overlayOpenTabsDefaultVisibleToggle.checked = stored;
+      }
+      if (rawValue !== stored) {
+        storageArea.set({ [OVERLAY_OPEN_TABS_DEFAULT_VISIBLE_STORAGE_KEY]: stored });
       }
     });
     storageArea.get([FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY], (result) => {
@@ -4803,6 +4833,7 @@
         changes[RESTRICTED_ACTION_STORAGE_KEY] ||
         changes[SEARCH_RESULT_PRIORITY_STORAGE_KEY] ||
         changes[SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY] ||
+        changes[OVERLAY_OPEN_TABS_DEFAULT_VISIBLE_STORAGE_KEY] ||
         changes[FALLBACK_SHORTCUT_STORAGE_KEY] ||
         changes[SITE_SEARCH_STORAGE_KEY] ||
         changes[SITE_SEARCH_DISABLED_STORAGE_KEY] ||
@@ -4847,6 +4878,14 @@
     }
     if (changes[SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY]) {
       setSearchResultSourceTypeState(changes[SEARCH_RESULT_SOURCE_TYPES_STORAGE_KEY].newValue);
+    }
+    if (changes[OVERLAY_OPEN_TABS_DEFAULT_VISIBLE_STORAGE_KEY] && overlayOpenTabsDefaultVisibleToggle) {
+      const raw = changes[OVERLAY_OPEN_TABS_DEFAULT_VISIBLE_STORAGE_KEY].newValue;
+      const next = normalizeOverlayOpenTabsDefaultVisible(raw);
+      overlayOpenTabsDefaultVisibleToggle.checked = next;
+      if (raw !== next && storageArea) {
+        storageArea.set({ [OVERLAY_OPEN_TABS_DEFAULT_VISIBLE_STORAGE_KEY]: next });
+      }
     }
     if (changes[FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY] && faviconEnhancedFetchToggle) {
       const raw = changes[FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY].newValue;

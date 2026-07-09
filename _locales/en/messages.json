@@ -110,6 +110,9 @@
   "settings_search_result_sources_title": {
     "message": "Visible Result Types"
   },
+  "settings_overlay_open_tabs_default_visible_title": {
+    "message": "Show all open tabs by default when Lumno opens on a webpage"
+  },
   "settings_favicon_enhanced_fetch_title": {
     "message": "Enhanced Icon and Theme Color Fetching"
   },

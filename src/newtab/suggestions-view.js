@@ -188,6 +188,9 @@
     const hideTopActionTooltip = typeof config.hideTopActionTooltip === 'function'
       ? config.hideTopActionTooltip
       : noop;
+    const bindCursorTooltip = typeof config.bindCursorTooltip === 'function'
+      ? config.bindCursorTooltip
+      : null;
     const getSearchActionLabel = typeof config.getSearchActionLabel === 'function'
       ? config.getSearchActionLabel
       : function() {
@@ -680,6 +683,60 @@
       });
     }
 
+    function isSuggestionTitleOverflowing(title) {
+      if (!title) {
+        return false;
+      }
+      const scrollWidth = Number(title.scrollWidth);
+      const clientWidth = Number(title.clientWidth);
+      return Number.isFinite(scrollWidth) &&
+        Number.isFinite(clientWidth) &&
+        clientWidth > 0 &&
+        scrollWidth > clientWidth + 1;
+    }
+
+    function renderSuggestionTitleTooltipContent(element, text, query) {
+      renderHighlightedText(element, text, query);
+      return element;
+    }
+
+    function getSuggestionTextCursorTooltipOptions(extraOptions) {
+      return Object.assign({
+        maxWidth: 520,
+        shouldShow: isSuggestionTitleOverflowing,
+        deferHideVisibility: true,
+        preserveVisibleOnTargetSwitch: true
+      }, extraOptions || {});
+    }
+
+    function bindSuggestionTitleCursorTooltip(title, titleText, query) {
+      if (!bindCursorTooltip || !title || !titleText) {
+        return;
+      }
+      bindCursorTooltip(
+        title,
+        () => sanitizeDisplayText(titleText),
+        getSuggestionTextCursorTooltipOptions({
+          renderContent: (element, text) => renderSuggestionTitleTooltipContent(element, text, query)
+        })
+      );
+    }
+
+    function bindSuggestionUrlCursorTooltip(urlLine, url) {
+      if (!bindCursorTooltip || !urlLine || !url) {
+        return;
+      }
+      const urlText = sanitizeDisplayText(url);
+      if (!urlText) {
+        return;
+      }
+      bindCursorTooltip(
+        urlLine,
+        () => urlText,
+        getSuggestionTextCursorTooltipOptions()
+      );
+    }
+
     function createUrlLine(url) {
       if (!url) {
         return null;
@@ -687,6 +744,7 @@
       const urlLine = documentRef.createElement('span');
       urlLine.className = 'x-nt-suggestion-url-line';
       urlLine.textContent = url;
+      bindSuggestionUrlCursorTooltip(urlLine, url);
       return urlLine;
     }
 
@@ -881,9 +939,11 @@
 
         const title = documentRef.createElement('span');
         title.className = 'x-nt-suggestion-title';
-        title.textContent = sanitizeDisplayText(tab.title || t('untitled', '无标题'));
+        const titleText = sanitizeDisplayText(tab.title || t('untitled', '无标题'));
+        title.textContent = titleText;
         suggestionItem._xTitle = title;
         leftSide.appendChild(title);
+        bindSuggestionTitleCursorTooltip(title, titleText, '');
 
         if (isTabRankScoreDebugEnabled()) {
           const rankDebug = documentRef.createElement('span');
@@ -1134,9 +1194,11 @@
 
         const title = documentRef.createElement('span');
         title.textContent = '';
-        renderHighlightedText(title, suggestion.title || '', query);
+        const titleText = sanitizeDisplayText(suggestion.title || '');
+        renderHighlightedText(title, titleText, query);
         title.className = 'x-nt-suggestion-title';
         suggestionItem._xTitle = title;
+        bindSuggestionTitleCursorTooltip(title, titleText, query);
 
         textWrapper.appendChild(title);
         const reasonText = Array.isArray(suggestion.reasons)

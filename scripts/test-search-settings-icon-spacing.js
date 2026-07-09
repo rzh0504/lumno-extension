@@ -5,6 +5,7 @@ const path = require('path');
 const repoRoot = path.resolve(__dirname, '..');
 const searchInputCss = fs.readFileSync(path.join(repoRoot, 'src/shared/search-input.css'), 'utf8');
 const searchInputUi = fs.readFileSync(path.join(repoRoot, 'src/shared/search-input-ui.js'), 'utf8');
+const searchInputMode = fs.readFileSync(path.join(repoRoot, 'src/shared/search-input-mode.js'), 'utf8');
 const newtabJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/newtab.js'), 'utf8');
 const overlayJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/search-panel.js'), 'utf8');
 const overlayCss = fs.readFileSync(path.join(repoRoot, 'src/overlay/suggestions-view.css'), 'utf8');
@@ -92,6 +93,32 @@ assert.doesNotMatch(
   onboardingHtml,
   /(?:newtab-preview-viewport|lumno-overlay-panel|site-search-demo-card)[\s\S]*?\.x-lumno-search-input__right-icon\s*\{[^}]*right:\s*14px;/,
   'onboarding previews should not override equal top/right settings icon spacing with a one-sided right value'
+);
+
+assert.match(
+  searchInputMode,
+  /const attachProviderIcon = typeof config\.attachProviderIcon === 'function'[\s\S]*handledByProviderIconRuntime = attachProviderIcon\(icon,\s*\{[\s\S]*iconUrl[\s\S]*provider: contentOptions/,
+  'shared input mode should allow provider icons to use the full favicon fallback chain'
+);
+assert.match(
+  newtabJs,
+  /function attachInputModeProviderIcon\(icon,\s*context\)[\s\S]*attachFaviconWithFallbacks\(icon,\s*pageUrl,\s*hostKey[\s\S]*attachProviderIcon:\s*attachInputModeProviderIcon/,
+  'newtab input mode provider icons should use the same fallback chain as suggestion rows'
+);
+assert.match(
+  overlayJs,
+  /function attachInputModeProviderIcon\(icon,\s*context\)[\s\S]*attachResolvedFaviconWithFallbacks\(icon,\s*pageUrl,\s*hostKey/,
+  'overlay input mode provider icons should use the overlay favicon fallback chain'
+);
+assert.match(
+  overlayJs,
+  /attachProviderIcon:\s*attachInputModeProviderIcon/,
+  'overlay input mode should wire the provider icon fallback helper'
+);
+assert.match(
+  searchInputCss,
+  /\.x-lumno-search-input-mode__prefix \.x-nt-favicon-fallback[\s\S]*\.x-lumno-search-input-mode__prefix \.x-ov-suggestion-favicon-fallback[\s\S]*display:\s*none !important;/,
+  'input mode prefix should hide suggestion-row fallback placeholders inside the compact provider pill'
 );
 
 const closeOtherRule = getRuleBlock(

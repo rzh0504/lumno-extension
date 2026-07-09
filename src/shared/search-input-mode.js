@@ -137,6 +137,9 @@
     const attachFaviconData = typeof config.attachFaviconData === 'function'
       ? config.attachFaviconData
       : null;
+    const attachProviderIcon = typeof config.attachProviderIcon === 'function'
+      ? config.attachProviderIcon
+      : null;
     const isDarkMode = typeof config.isDarkMode === 'function'
       ? config.isDarkMode
       : () => false;
@@ -382,16 +385,31 @@
           ['flex', '0 0 auto'],
           ['display', 'block']
         ], useImportantStyles);
-        icon.addEventListener('error', () => {
+        const removeUnavailableIcon = () => {
           icon.remove();
           updatePrefixLayout();
-        }, { once: true });
+        };
         const iconHost = contentOptions && contentOptions.iconHost ? String(contentOptions.iconHost || '').trim() : '';
-        if (attachFaviconData) {
+        let handledByProviderIconRuntime = false;
+        if (attachProviderIcon) {
+          try {
+            handledByProviderIconRuntime = attachProviderIcon(icon, {
+              iconHost,
+              iconUrl,
+              onIconUnavailable: removeUnavailableIcon,
+              prefixText,
+              provider: contentOptions && contentOptions.provider ? contentOptions.provider : null
+            }) === true;
+          } catch (e) {
+            handledByProviderIconRuntime = false;
+          }
+        }
+        if (!handledByProviderIconRuntime) {
+          icon.addEventListener('error', removeUnavailableIcon, { once: true });
           icon.src = iconUrl;
-          attachFaviconData(icon, iconUrl, iconHost);
-        } else {
-          icon.src = iconUrl;
+          if (attachFaviconData) {
+            attachFaviconData(icon, iconUrl, iconHost);
+          }
         }
         siteSearchPrefix.appendChild(icon);
       }
@@ -468,6 +486,7 @@
         ...(providerOptions || {}),
         iconUrl: isAi ? getProviderIcon(provider) : '',
         iconHost: isAi ? getProviderThemeHost(provider) : '',
+        provider,
         isAi
       };
       setPrefixText(getSiteSearchPrefixText(provider), theme, nextOptions);
