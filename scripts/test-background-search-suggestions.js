@@ -350,6 +350,7 @@ function loadBackgroundForTest(options) {
     URL,
     URLSearchParams,
     Blob,
+    AbortController,
     navigator: { userAgent: 'Fake Chrome' },
     fetch: config.fetch || (async () => {
       throw new Error('network disabled in background search test');
@@ -366,14 +367,15 @@ function loadBackgroundForTest(options) {
 
   const backgroundSource = fs.readFileSync(path.join(repoRoot, 'src/background/background.js'), 'utf8') +
     '\nglobalThis.__testGetSearchSuggestions = getSearchSuggestions;\n' +
-    'globalThis.__testSetDefaultSearchEngineState = setDefaultSearchEngineState;\n';
+    'globalThis.__testSetDefaultSearchEngineState = setDefaultSearchEngineState;\n' +
+    'globalThis.__testGetSearchEngineSuggestions = typeof getSearchEngineSuggestions === "function" ? getSearchEngineSuggestions : null;\n';
   vm.runInContext(backgroundSource, context, {
     filename: 'src/background/background.js'
   });
   return { context, messageListeners };
 }
 
-function sendBackgroundMessage(messageListeners, request) {
+function sendBackgroundMessage(messageListeners, request, timeoutMs) {
   return new Promise((resolve) => {
     let settled = false;
     const finish = (response) => {
@@ -386,18 +388,69 @@ function sendBackgroundMessage(messageListeners, request) {
     messageListeners.forEach((listener) => {
       listener(request, {}, finish);
     });
-    setTimeout(() => finish(null), 20);
+    setTimeout(() => finish(null), Number(timeoutMs) > 0 ? Number(timeoutMs) : 20);
   });
 }
 
 async function run() {
+  let abortedRemoteRequestCount = 0;
+  let timedOutRemoteRequestCount = 0;
+  let delayedKeywordFetchCount = 0;
   const { context, messageListeners } = loadBackgroundForTest({
-    fetch: async (url) => {
+    fetch: async (url, fetchOptions) => {
       const parsedUrl = new URL(String(url));
+      if (
+        parsedUrl.hostname === 'suggestqueries.google.com' &&
+        parsedUrl.searchParams.get('q') === 'slow-abort'
+      ) {
+        return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => resolve({
+            ok: true,
+            json: async () => ['slow-abort', ['slow-abort result']]
+          }), 500);
+          const signal = fetchOptions && fetchOptions.signal;
+          if (signal) {
+            signal.addEventListener('abort', () => {
+              clearTimeout(timer);
+              abortedRemoteRequestCount += 1;
+              reject(new Error('aborted'));
+            }, { once: true });
+          }
+        });
+      }
+      if (
+        parsedUrl.hostname === 'suggestqueries.google.com' &&
+        parsedUrl.searchParams.get('q') === 'fast-replacement'
+      ) {
+        return {
+          ok: true,
+          json: async () => ['fast-replacement', ['fast replacement result']]
+        };
+      }
+      if (
+        parsedUrl.hostname === 'suggestqueries.google.com' &&
+        parsedUrl.searchParams.get('q') === 'timeout-abort'
+      ) {
+        return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => resolve({
+            ok: true,
+            json: async () => ['timeout-abort', ['late result']]
+          }), 1100);
+          const signal = fetchOptions && fetchOptions.signal;
+          if (signal) {
+            signal.addEventListener('abort', () => {
+              clearTimeout(timer);
+              timedOutRemoteRequestCount += 1;
+              reject(new Error('timed out'));
+            }, { once: true });
+          }
+        });
+      }
       if (
         parsedUrl.hostname === 'suggestqueries.google.com' &&
         parsedUrl.searchParams.get('q') === '什么东西'
       ) {
+        delayedKeywordFetchCount += 1;
         await new Promise((resolve) => setTimeout(resolve, 240));
         return {
           ok: true,
@@ -471,23 +524,54 @@ async function run() {
     host: 'www.google.com',
     searchTemplate: 'https://www.google.com/search?q={query}'
   }, false);
-  const mixedLocalAndEngineSuggestions = await context.__testGetSearchSuggestions('github');
-  const mixedEngineSuggestions = mixedLocalAndEngineSuggestions
-    .filter((item) => item && item.type === 'googleSuggest');
+  const mixedLocalSuggestions = await context.__testGetSearchSuggestions('github');
   assert.strictEqual(
-    mixedEngineSuggestions.length,
+    mixedLocalSuggestions.filter((item) => item && item.type === 'googleSuggest').length,
+    0,
+    'the local background request should not include search-engine suggestions'
+  );
+  const mergedMixedSuggestions = await context.__testGetSearchEngineSuggestions(
+    'github',
+    mixedLocalSuggestions,
+    { context: 'newtab' }
+  );
+  const firstMixedEngineSuggestionIndex = mergedMixedSuggestions.findIndex((item) => item && item.type === 'googleSuggest');
+  const firstMixedLocalSuggestionIndex = mergedMixedSuggestions.findIndex((item) => item && item.type !== 'googleSuggest');
+  assert.strictEqual(
+    mergedMixedSuggestions.filter((item) => item && item.type === 'googleSuggest').length,
     1,
-    'background search suggestions should only keep one search-engine suggestion when local results exist'
+    'the remote merge should keep only one search-engine suggestion when local results exist'
   );
-  const firstEngineSuggestionIndex = mixedLocalAndEngineSuggestions.findIndex((item) => item && item.type === 'googleSuggest');
-  const firstLocalSuggestionIndex = mixedLocalAndEngineSuggestions.findIndex((item) => item && item.type !== 'googleSuggest');
   assert.ok(
-    firstLocalSuggestionIndex >= 0 &&
-      firstEngineSuggestionIndex > firstLocalSuggestionIndex,
-    'local search results should stay ahead of supplemental search-engine suggestions'
+    firstMixedLocalSuggestionIndex >= 0 && firstMixedEngineSuggestionIndex > firstMixedLocalSuggestionIndex,
+    'the remote merge should keep local results ahead of a supplemental search-engine suggestion'
   );
-  const engineKeywordSuggestions = await context.__testGetSearchSuggestions('什么东西');
-  const engineKeywordTitles = engineKeywordSuggestions
+  const localKeywordSuggestions = await context.__testGetSearchSuggestions('什么东西');
+  assert.strictEqual(
+    delayedKeywordFetchCount,
+    0,
+    'the local background request should not start the delayed search-engine fetch'
+  );
+  assert.ok(
+    localKeywordSuggestions.every((item) => item && item.type !== 'googleSuggest'),
+    'the local background request should stay browser-local even when a search engine is configured'
+  );
+  assert.strictEqual(
+    typeof context.__testGetSearchEngineSuggestions,
+    'function',
+    'background search should expose a separate remote suggestion function'
+  );
+  const mergedKeywordSuggestions = await context.__testGetSearchEngineSuggestions(
+    '什么东西',
+    localKeywordSuggestions,
+    { context: 'newtab' }
+  );
+  assert.strictEqual(
+    delayedKeywordFetchCount,
+    1,
+    'the separate remote request should start the delayed search-engine fetch exactly once'
+  );
+  const engineKeywordTitles = mergedKeywordSuggestions
     .filter((item) => item && item.type === 'googleSuggest')
     .map((item) => item.title);
   assert.ok(
@@ -498,6 +582,65 @@ async function run() {
     Array.from(engineKeywordTitles),
     ['什么东西补血', '什么东西解酒', '什么东西补钙', '什么东西补铁', '什么东西越剪越大'],
     'background search suggestions should preserve search-engine keyword suggestion ordering after removing the exact query'
+  );
+
+  const slowRemoteResponsePromise = sendBackgroundMessage(messageListeners, {
+    action: 'getSearchEngineSuggestions',
+    query: 'slow-abort',
+    context: 'overlay',
+    localSuggestions: []
+  }, 1200);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const replacementRemoteResponse = await sendBackgroundMessage(messageListeners, {
+    action: 'getSearchEngineSuggestions',
+    query: 'fast-replacement',
+    context: 'overlay',
+    localSuggestions: []
+  }, 1200);
+  const slowRemoteResponse = await slowRemoteResponsePromise;
+  assert.strictEqual(
+    abortedRemoteRequestCount,
+    1,
+    'a newer remote suggestion request should abort the previous fetch for the same client context'
+  );
+  assert.strictEqual(
+    slowRemoteResponse && slowRemoteResponse.aborted,
+    true,
+    'the superseded remote suggestion response should be marked aborted'
+  );
+  assert.ok(
+    replacementRemoteResponse &&
+      replacementRemoteResponse.aborted === false &&
+      replacementRemoteResponse.hasRemoteSuggestions === true &&
+      replacementRemoteResponse.suggestions.some((item) => item && item.type === 'googleSuggest'),
+    'the replacement remote suggestion request should complete normally'
+  );
+  const emptyRemoteResponse = await sendBackgroundMessage(messageListeners, {
+    action: 'getSearchEngineSuggestions',
+    query: 'no-remote-results',
+    context: 'newtab',
+    localSuggestions: mixedLocalSuggestions
+  }, 1200);
+  assert.strictEqual(
+    emptyRemoteResponse && emptyRemoteResponse.hasRemoteSuggestions,
+    false,
+    'an empty remote response should tell clients to preserve the current local render'
+  );
+  const timedOutRemoteResponse = await sendBackgroundMessage(messageListeners, {
+    action: 'getSearchEngineSuggestions',
+    query: 'timeout-abort',
+    context: 'newtab',
+    localSuggestions: mixedLocalSuggestions
+  }, 1500);
+  assert.strictEqual(
+    timedOutRemoteRequestCount,
+    1,
+    'the remote timeout should abort the underlying fetch instead of only ignoring its eventual response'
+  );
+  assert.strictEqual(
+    timedOutRemoteResponse && timedOutRemoteResponse.hasRemoteSuggestions,
+    false,
+    'a timed-out remote request should leave the local response unchanged'
   );
 
   const deleteResponse = await sendBackgroundMessage(messageListeners, {

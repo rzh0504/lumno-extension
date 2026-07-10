@@ -1932,6 +1932,36 @@ function testOverlayDirectOpenTabsUseShiftAwareSwitchAction() {
   );
 }
 
+function testNewtabIncrementalSearchSuggestionContract() {
+  const newtabJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/newtab.js'), 'utf8');
+  assert.ok(
+    /let remoteSuggestionDebounceTimer = null;/.test(newtabJs),
+    'newtab should keep remote suggestion debounce state separate from the local request'
+  );
+  assert.ok(
+    /function requestSuggestions\(query, options\)[\s\S]*action: 'getSearchSuggestions'[\s\S]*renderSuggestions\(localSuggestions, requestQuery\)[\s\S]*action: 'getSearchEngineSuggestions'[\s\S]*localSuggestions:/.test(newtabJs),
+    'newtab should render local suggestions before requesting the remote incremental merge'
+  );
+  assert.ok(
+    /requestSeq !== suggestionRequestSeq \|\| requestQuery !== latestQuery/.test(newtabJs),
+    'newtab should ignore remote callbacks from an older query generation'
+  );
+  assert.ok(
+    /remoteResponse\.hasRemoteSuggestions !== true/.test(newtabJs),
+    'newtab should keep the existing local render when the remote request adds no suggestions'
+  );
+  assert.doesNotMatch(
+    newtabJs,
+    /refreshTabsForSearchContext\(\(\) => \{[\s\S]{0,500}renderSuggestions\(localSuggestions, requestQuery\)/,
+    'newtab should not wait for a second tab refresh before showing the local background response'
+  );
+  assert.match(
+    newtabJs,
+    /addEventListener\('compositionstart'[\s\S]*suggestionRequestSeq \+= 1;[\s\S]*clearTimeout\(remoteSuggestionDebounceTimer\)/,
+    'newtab should invalidate pending incremental responses when IME composition starts'
+  );
+}
+
 testSiteSearchProviderIconsUsePageFaviconCandidates();
 testSiteSearchTabHintRequiresExplicitTrigger();
 testSuggestionActionColumnAlignmentContract();
@@ -1941,6 +1971,7 @@ testNewtabShiftEnterOpensMatchedTabInNewTab();
 testNewtabCommandEnterOpensFocusedResultInBackgroundTab();
 testOverlayCommandEnterOpensFocusedResultInBackgroundTab();
 testOverlayDirectOpenTabsUseShiftAwareSwitchAction();
+testNewtabIncrementalSearchSuggestionContract();
 
 testLocalUrlSuggestionUsesFallbackTheme()
   .then(testDirectUrlSuggestionUsesFaviconWhenAvailable)

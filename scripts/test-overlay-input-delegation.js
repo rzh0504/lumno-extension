@@ -71,4 +71,28 @@ assert.match(
   'overlay tab suggestions should not overwrite search results after the user has typed a query'
 );
 
+assert.match(
+  overlayJs,
+  /let overlaySuggestionRequestSeq = 0;[\s\S]*let overlayRemoteSuggestionDebounceTimer = null;/,
+  'overlay should track a request generation and a separate remote debounce timer'
+);
+
+assert.match(
+  overlayJs,
+  /function requestOverlaySearchSuggestions\(query[\s\S]*action: 'getSearchSuggestions'[\s\S]*updateSearchSuggestions\(localSuggestions, requestQuery\)[\s\S]*action: 'getSearchEngineSuggestions'[\s\S]*localSuggestions:/,
+  'overlay should render browser-local suggestions before requesting the remote incremental merge'
+);
+
+assert.match(
+  overlayJs,
+  /requestSeq !== overlaySuggestionRequestSeq \|\| requestQuery !== latestOverlayQuery/,
+  'overlay should ignore local or remote callbacks from an older query generation'
+);
+
+assert.match(
+  overlayJs,
+  /remoteResponse\.hasRemoteSuggestions !== true/,
+  'overlay should keep the existing local render when the remote request adds no suggestions'
+);
+
 console.log('overlay input delegation tests passed');

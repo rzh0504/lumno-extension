@@ -30,9 +30,18 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   let overlayUpdateNoticeFrameListener = null;
   let overlayUpdateNoticeFrameVisualViewport = null;
   let overlayUpdateNoticeMountTimer = null;
+  let overlaySuggestionRequestSeq = 0;
+  let overlayRemoteSuggestionDebounceTimer = null;
   let openInCurrentTabModifierActive = false;
   let openSwitchInNewTabModifierActive = false;
   let openInBackgroundTabModifierActive = false;
+  function cancelPendingOverlaySuggestionRequests() {
+    overlaySuggestionRequestSeq += 1;
+    if (overlayRemoteSuggestionDebounceTimer) {
+      clearTimeout(overlayRemoteSuggestionDebounceTimer);
+      overlayRemoteSuggestionDebounceTimer = null;
+    }
+  }
   const OVERLAY_HOST_ID = '_x_extension_overlay_host_2026_unique_';
   const OVERLAY_PANEL_ID = '_x_extension_overlay_2024_unique_';
   const OVERLAY_CONTEXT_TOKEN_KEY = '__lumnoOverlayContextToken2026';
@@ -1036,6 +1045,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   // Helper function to remove overlay and clean up styles
   function removeOverlay(overlayElement) {
     clearOverlayEnterAnimationFrames();
+    cancelPendingOverlaySuggestionRequests();
     if (overlayRevealGate && typeof overlayRevealGate.cancel === 'function') {
       overlayRevealGate.cancel();
       overlayRevealGate = null;
@@ -1913,16 +1923,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             return;
           }
           if (latestOverlayQuery) {
-            chrome.runtime.sendMessage({
-              action: 'getSearchSuggestions',
-              query: latestOverlayQuery,
-              context: 'overlay'
-            }, (refreshResponse) => {
-              const suggestions = refreshResponse && Array.isArray(refreshResponse.suggestions)
-                ? refreshResponse.suggestions
-                : [];
-              updateSearchSuggestions(suggestions, latestOverlayQuery);
-            });
+            requestOverlaySearchSuggestions(latestOverlayQuery);
             return;
           }
           requestTabsAndRender();
@@ -2681,16 +2682,53 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       if (!requestQuery || !chrome || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') {
         return;
       }
+      const requestSeq = ++overlaySuggestionRequestSeq;
+      const requestStartedAt = Date.now();
+      if (overlayRemoteSuggestionDebounceTimer) {
+        clearTimeout(overlayRemoteSuggestionDebounceTimer);
+        overlayRemoteSuggestionDebounceTimer = null;
+      }
       chrome.runtime.sendMessage({
         action: 'getSearchSuggestions',
         query: requestQuery,
         context: 'overlay'
       }, function(response) {
-        if (response && response.suggestions) {
-          updateSearchSuggestions(response.suggestions, requestQuery);
-        } else {
-          updateSearchSuggestions([], requestQuery);
+        if (requestSeq !== overlaySuggestionRequestSeq || requestQuery !== latestOverlayQuery) {
+          return;
         }
+        if (chrome.runtime && chrome.runtime.lastError) {
+          updateSearchSuggestions([], requestQuery);
+          return;
+        }
+        const localSuggestions = response && Array.isArray(response.suggestions) ? response.suggestions : [];
+        updateSearchSuggestions(localSuggestions, requestQuery);
+        const remoteDelay = Math.max(0, 120 - (Date.now() - requestStartedAt));
+        overlayRemoteSuggestionDebounceTimer = setTimeout(function() {
+          overlayRemoteSuggestionDebounceTimer = null;
+          if (requestSeq !== overlaySuggestionRequestSeq || requestQuery !== latestOverlayQuery) {
+            return;
+          }
+          chrome.runtime.sendMessage({
+            action: 'getSearchEngineSuggestions',
+            query: requestQuery,
+            context: 'overlay',
+            localSuggestions: localSuggestions
+          }, function(remoteResponse) {
+            if (requestSeq !== overlaySuggestionRequestSeq || requestQuery !== latestOverlayQuery) {
+              return;
+            }
+            if (chrome.runtime && chrome.runtime.lastError) {
+              return;
+            }
+            if (!remoteResponse ||
+                remoteResponse.aborted === true ||
+                remoteResponse.hasRemoteSuggestions !== true ||
+                !Array.isArray(remoteResponse.suggestions)) {
+              return;
+            }
+            updateSearchSuggestions(remoteResponse.suggestions, requestQuery);
+          });
+        }, remoteDelay);
       });
     }
     if (storageArea) {
@@ -4485,17 +4523,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           SEARCH_UTILS.mergeCustomProviders
         );
         if (latestOverlayQuery) {
-          chrome.runtime.sendMessage({
-            action: 'getSearchSuggestions',
-            query: latestOverlayQuery,
-            context: 'overlay'
-          }, function(response) {
-            if (response && response.suggestions) {
-              updateSearchSuggestions(response.suggestions, latestOverlayQuery);
-            } else {
-              updateSearchSuggestions([], latestOverlayQuery);
-            }
-          });
+          requestOverlaySearchSuggestions(latestOverlayQuery);
         }
       });
     };
@@ -4699,15 +4727,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         updateSearchSuggestions([], query);
         return;
       }
-      chrome.runtime.sendMessage({
-        action: 'getSearchSuggestions',
-        query: query,
-        context: 'overlay'
-      }, function(response) {
-        if (response && response.suggestions) {
-          updateSearchSuggestions(response.suggestions, query);
-        }
-      });
+      requestOverlaySearchSuggestions(query);
     }
 
     function openDocumentPipPickerFromOverlay() {
@@ -4757,6 +4777,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     // Add input event for search suggestions
     function handleSearchInputCompositionStart(event) {
       runSearchInputEventOnce(event, () => {
+        cancelPendingOverlaySuggestionRequests();
         syncLiveSearchInputFromEvent(event);
         imeKeyGuard.markCompositionStart(event);
         clearAutocomplete();
@@ -4786,15 +4807,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             updateSearchSuggestions([], query);
             return;
           }
-          chrome.runtime.sendMessage({
-            action: 'getSearchSuggestions',
-            query: query,
-            context: 'overlay'
-          }, function(response) {
-            if (response && response.suggestions) {
-              updateSearchSuggestions(response.suggestions, query);
-            }
-          });
+          requestOverlaySearchSuggestions(query);
         } else {
           if (openTabsSearchModeActive) {
             requestTabsAndRender('');
@@ -4848,16 +4861,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             updateSearchSuggestions([], query);
             return;
           }
-          // Get search suggestions
-          chrome.runtime.sendMessage({
-            action: 'getSearchSuggestions',
-            query: query,
-            context: 'overlay'
-          }, function(response) {
-            if (response && response.suggestions) {
-              updateSearchSuggestions(response.suggestions, query);
-            }
-          });
+          requestOverlaySearchSuggestions(query);
         } else {
           if (openTabsSearchModeActive) {
             requestTabsAndRender('');
@@ -5520,19 +5524,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         updateSearchSuggestions([], '');
         return;
       }
-      chrome.runtime.sendMessage({
-        action: 'getSearchSuggestions',
-        query: queryToRefresh,
-        context: 'overlay'
-      }, function(nextResponse) {
-        if (chrome.runtime && chrome.runtime.lastError) {
-          return;
-        }
-        updateSearchSuggestions(
-          nextResponse && Array.isArray(nextResponse.suggestions) ? nextResponse.suggestions : [],
-          queryToRefresh
-        );
-      });
+      requestOverlaySearchSuggestions(queryToRefresh);
     }
 
     function deleteHistorySuggestionUrl(suggestion) {
@@ -7213,6 +7205,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     }
 
     function clearSearchSuggestions() {
+      cancelPendingOverlaySuggestionRequests();
       inlineSearchState = null;
       siteSearchTriggerState = null;
       clearSiteSearchTabHint();

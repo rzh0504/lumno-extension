@@ -4706,6 +4706,7 @@ const BACKGROUND_MESSAGE_ROUTE_GROUPS = Object.freeze({
     actions: [
       'searchOrNavigate',
       'getSearchSuggestions',
+      'getSearchEngineSuggestions',
       'recordSearchSuggestionSelection',
       'deleteHistoryUrl'
     ],
@@ -4956,6 +4957,15 @@ function sendPipMainWorldResponse(methodName, sender, sendResponse) {
     });
 }
 
+function getSearchEngineSuggestionRequestKey(request, sender) {
+  const senderTabId = sender && sender.tab && typeof sender.tab.id === 'number'
+    ? sender.tab.id
+    : 'extension';
+  const senderFrameId = sender && typeof sender.frameId === 'number' ? sender.frameId : 0;
+  const context = request && request.context ? String(request.context) : 'unknown';
+  return `${senderTabId}:${senderFrameId}:${context}`;
+}
+
 function handlePipMessage(request, sender, sendResponse) {
   switch (request.action) {
     case 'pipRequestOwnership': {
@@ -5096,6 +5106,36 @@ function handleSearchMessage(request, sender, sendResponse) {
         sendResponse({ suggestions: [] });
       });
       return true; // Keep the message channel open for async response
+    }
+    case 'getSearchEngineSuggestions': {
+      const query = request.query;
+      const requestKey = getSearchEngineSuggestionRequestKey(request, sender);
+      const previousController = searchEngineSuggestionAbortControllers.get(requestKey);
+      if (previousController) {
+        previousController.abort();
+      }
+      const controller = new AbortController();
+      searchEngineSuggestionAbortControllers.set(requestKey, controller);
+      getSearchEngineSuggestions(query, request.localSuggestions, {
+        signal: controller.signal
+      }).then((suggestions) => {
+        const isCurrent = searchEngineSuggestionAbortControllers.get(requestKey) === controller;
+        const hasRemoteSuggestions = isCurrent && !controller.signal.aborted && suggestions.some((suggestion) => (
+          suggestion && suggestion.type === 'googleSuggest'
+        ));
+        sendResponse({
+          suggestions: isCurrent && !controller.signal.aborted ? suggestions : [],
+          aborted: !isCurrent || controller.signal.aborted,
+          hasRemoteSuggestions
+        });
+      }).catch(() => {
+        sendResponse({ suggestions: [], aborted: controller.signal.aborted, hasRemoteSuggestions: false });
+      }).finally(() => {
+        if (searchEngineSuggestionAbortControllers.get(requestKey) === controller) {
+          searchEngineSuggestionAbortControllers.delete(requestKey);
+        }
+      });
+      return true;
     }
     case 'recordSearchSuggestionSelection': {
       recordSearchSuggestionSelection(request)
@@ -5398,6 +5438,7 @@ let bookmarkItemsCache = {
 let bookmarkTreeIndexPromise = null;
 let bookmarkItemsPromise = null;
 let bookmarkTreeCacheListenersBound = false;
+const searchEngineSuggestionAbortControllers = new Map();
 const SITE_SEARCH_STORAGE_KEY = '_x_extension_site_search_custom_2024_unique_';
 const SITE_SEARCH_DISABLED_STORAGE_KEY = '_x_extension_site_search_disabled_2024_unique_';
 const SEARCH_BLACKLIST_STORAGE_KEY = '_x_extension_search_blacklist_2026_unique_';
@@ -5849,37 +5890,40 @@ function extractJsonArray(text) {
   }
 }
 
-async function fetchJson(url) {
+async function fetchJson(url, options) {
   if (!url) {
     return null;
   }
-  const response = await fetch(url);
+  const settings = options && typeof options === 'object' ? options : {};
+  const response = await fetch(url, settings.signal ? { signal: settings.signal } : undefined);
   if (!response || !response.ok) {
     return null;
   }
   return response.json();
 }
 
-async function fetchText(url) {
+async function fetchText(url, options) {
   if (!url) {
     return '';
   }
-  const response = await fetch(url);
+  const settings = options && typeof options === 'object' ? options : {};
+  const response = await fetch(url, settings.signal ? { signal: settings.signal } : undefined);
   if (!response || !response.ok) {
     return '';
   }
   return response.text();
 }
 
-async function fetchSearchSuggestionsForEngine(query) {
+async function fetchSearchSuggestionsForEngine(query, options) {
   const engineId = defaultSearchEngineState.id;
+  const settings = options && typeof options === 'object' ? options : {};
   if (!query || !engineId) {
     return [];
   }
   try {
     if (engineId === 'google') {
       const url = `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(query)}`;
-      const data = await fetchJson(url);
+      const data = await fetchJson(url, settings);
       if (Array.isArray(data) && Array.isArray(data[1])) {
         return data[1];
       }
@@ -5887,7 +5931,7 @@ async function fetchSearchSuggestionsForEngine(query) {
     }
     if (engineId === 'bing') {
       const url = `https://api.bing.com/osjson.aspx?query=${encodeURIComponent(query)}`;
-      const data = await fetchJson(url);
+      const data = await fetchJson(url, settings);
       if (Array.isArray(data) && Array.isArray(data[1])) {
         return data[1];
       }
@@ -5895,7 +5939,7 @@ async function fetchSearchSuggestionsForEngine(query) {
     }
     if (engineId === 'baidu') {
       const url = `https://www.baidu.com/sugrec?ie=utf-8&json=1&prod=pc&wd=${encodeURIComponent(query)}`;
-      const data = await fetchJson(url);
+      const data = await fetchJson(url, settings);
       if (data && Array.isArray(data.g)) {
         return data.g.map((item) => item && item.q).filter(Boolean);
       }
@@ -5903,7 +5947,7 @@ async function fetchSearchSuggestionsForEngine(query) {
     }
     if (engineId === 'sogou') {
       const url = `https://sor.html5.qq.com/api/getsug?m=searxng&key=${encodeURIComponent(query)}`;
-      const text = await fetchText(url);
+      const text = await fetchText(url, settings);
       const data = extractJsonArray(text);
       if (Array.isArray(data) && Array.isArray(data[1])) {
         return data[1];
@@ -5912,7 +5956,7 @@ async function fetchSearchSuggestionsForEngine(query) {
     }
     if (engineId === 'so') {
       const url = `https://sug.so.360.cn/suggest?format=json&word=${encodeURIComponent(query)}`;
-      const data = await fetchJson(url);
+      const data = await fetchJson(url, settings);
       if (data && Array.isArray(data.result)) {
         return data.result
           .map((item) => (item && (item.word || item.w)) || '')
@@ -5922,7 +5966,7 @@ async function fetchSearchSuggestionsForEngine(query) {
     }
     if (engineId === 'duckduckgo') {
       const url = `https://duckduckgo.com/ac/?type=list&q=${encodeURIComponent(query)}`;
-      const data = await fetchJson(url);
+      const data = await fetchJson(url, settings);
       if (Array.isArray(data)) {
         if (Array.isArray(data[1])) {
           return data[1];
@@ -5933,7 +5977,7 @@ async function fetchSearchSuggestionsForEngine(query) {
     }
     if (engineId === 'yandex') {
       const url = `https://suggest.yandex.com/suggest-ff.cgi?part=${encodeURIComponent(query)}`;
-      const data = await fetchJson(url);
+      const data = await fetchJson(url, settings);
       if (Array.isArray(data) && Array.isArray(data[1])) {
         return data[1];
       }
@@ -5941,7 +5985,7 @@ async function fetchSearchSuggestionsForEngine(query) {
     }
     if (engineId === 'quark') {
       const url = `https://sugs.m.sm.cn/web?q=${encodeURIComponent(query)}`;
-      const data = await fetchJson(url);
+      const data = await fetchJson(url, settings);
       if (data && Array.isArray(data.r)) {
         return data.r.map((item) => item && item.w).filter(Boolean);
       }
@@ -5949,7 +5993,7 @@ async function fetchSearchSuggestionsForEngine(query) {
     }
     if (engineId === 'shenma') {
       const url = `https://sugs.m.sm.cn/web?q=${encodeURIComponent(query)}`;
-      const data = await fetchJson(url);
+      const data = await fetchJson(url, settings);
       if (data && Array.isArray(data.r)) {
         return data.r.map((item) => item && item.w).filter(Boolean);
       }
@@ -5957,7 +6001,7 @@ async function fetchSearchSuggestionsForEngine(query) {
     }
     if (engineId === 'yahoo') {
       const url = `https://search.yahoo.com/sugg/gossip/gossip-us-ura/?output=sd1&command=${encodeURIComponent(query)}`;
-      const text = await fetchText(url);
+      const text = await fetchText(url, settings);
       const data = parseJsonpPayload(text) || extractJsonArray(text);
       if (Array.isArray(data)) {
         if (Array.isArray(data[1])) {
@@ -7077,6 +7121,37 @@ function withTimeout(promise, timeoutMs, fallbackValue) {
   ]);
 }
 
+async function fetchSearchEngineSuggestionsWithTimeout(query, externalSignal) {
+  if (externalSignal && externalSignal.aborted) {
+    return [];
+  }
+  const requestController = new AbortController();
+  const forwardExternalAbort = () => requestController.abort();
+  if (externalSignal) {
+    externalSignal.addEventListener('abort', forwardExternalAbort, { once: true });
+  }
+  let timeoutId = null;
+  try {
+    const timeoutPromise = new Promise((resolve) => {
+      timeoutId = setTimeout(() => {
+        requestController.abort();
+        resolve([]);
+      }, SEARCH_ENGINE_SUGGEST_TIMEOUT_MS);
+    });
+    return await Promise.race([
+      fetchSearchSuggestionsForEngine(query, { signal: requestController.signal }).catch(() => []),
+      timeoutPromise
+    ]);
+  } finally {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+    }
+    if (externalSignal) {
+      externalSignal.removeEventListener('abort', forwardExternalAbort);
+    }
+  }
+}
+
 function callChromeApiWithTimeout(invoke, fallbackValue, timeoutMs) {
   return withTimeout(new Promise((resolve) => {
     let settled = false;
@@ -7463,12 +7538,8 @@ function mergeItemsByUrl(itemGroups) {
   return merged;
 }
 
-// Function to get search suggestions from history and top sites
-async function getSearchSuggestions(query) {
-  const suggestions = [];
-  ensureLocalSearchSourceCacheListeners();
-  const searchUtils = SEARCH_UTILS;
-  const searchPolicy = searchUtils.SEARCH_POLICY || {
+function getBackgroundSearchPolicy(searchUtils) {
+  return (searchUtils && searchUtils.SEARCH_POLICY) || {
     lookupWindowDays: 180,
     lookupMaxResults: 120,
     maxEngineSuggestions: 5,
@@ -7476,25 +7547,37 @@ async function getSearchSuggestions(query) {
     finalSuggestionLimit: 12,
     fallbackTopSiteLimit: 5
   };
-  const context = typeof searchUtils.buildSearchQueryContext === 'function'
-    ? searchUtils.buildSearchQueryContext(query, {
-      normalizedPinyinQuery: shouldUseTitlePinyinMatch(query)
-        ? normalizeAsciiQueryForPinyin(query)
-        : ''
-    })
-    : {
-      lookupQuery: String(query || ''),
-      queryLower: String(query || '').trim().toLowerCase(),
-      normalizedPinyinQuery: shouldUseTitlePinyinMatch(query)
-        ? normalizeAsciiQueryForPinyin(query)
-        : '',
-      useTitlePinyinMatch: shouldUseTitlePinyinMatch(query),
-      queryTerms: String(query || '').trim().toLowerCase().split(/\s+/).filter(Boolean),
-      coreQueryTerms: String(query || '').trim().toLowerCase().split(/\s+/).filter(Boolean),
-      intentType: 'object',
-      hasSettingsIntent: false,
-      hasInformationalIntent: false
-    };
+}
+
+function buildBackgroundSearchQueryContext(query, searchUtils) {
+  const normalizedPinyinQuery = shouldUseTitlePinyinMatch(query)
+    ? normalizeAsciiQueryForPinyin(query)
+    : '';
+  if (searchUtils && typeof searchUtils.buildSearchQueryContext === 'function') {
+    return searchUtils.buildSearchQueryContext(query, { normalizedPinyinQuery });
+  }
+  const queryLower = String(query || '').trim().toLowerCase();
+  const queryTerms = queryLower.split(/\s+/).filter(Boolean);
+  return {
+    lookupQuery: String(query || ''),
+    queryLower,
+    normalizedPinyinQuery,
+    useTitlePinyinMatch: Boolean(normalizedPinyinQuery),
+    queryTerms,
+    coreQueryTerms: queryTerms.slice(),
+    intentType: 'object',
+    hasSettingsIntent: false,
+    hasInformationalIntent: false
+  };
+}
+
+// Function to get search suggestions from history and top sites
+async function getSearchSuggestions(query) {
+  const suggestions = [];
+  ensureLocalSearchSourceCacheListeners();
+  const searchUtils = SEARCH_UTILS;
+  const searchPolicy = getBackgroundSearchPolicy(searchUtils);
+  const context = buildBackgroundSearchQueryContext(query, searchUtils);
   if (!context.queryLower) {
     return [];
   }
@@ -7515,7 +7598,6 @@ async function getSearchSuggestions(query) {
   try {
     const openTabsPromise = getOpenTabSearchItems();
     const [
-      engineSuggestions,
       historyItemsRaw,
       topSites,
       bookmarksRaw,
@@ -7525,17 +7607,6 @@ async function getSearchSuggestions(query) {
       faviconRequestBlacklistItems,
       searchSelectionStats
     ] = await Promise.all([
-      withTimeout(
-        fetchSearchSuggestionsForEngine(query)
-        .then((items) => searchUtils.normalizeSearchEngineSuggestions(
-          items,
-          context.lookupQuery,
-          { limit: searchPolicy.maxEngineSuggestions }
-        ))
-        .catch(() => []),
-        SEARCH_ENGINE_SUGGEST_TIMEOUT_MS,
-        []
-      ),
       allowHistory
         ? callChromeApiWithTimeout((done) => {
           chrome.history.search({
@@ -7827,29 +7898,6 @@ async function getSearchSuggestions(query) {
       }
     }
 
-    const engineSuggestionPolicy = searchUtils.getSearchEngineSuggestionPolicy(
-      context,
-      suggestions,
-      searchPolicy
-    );
-    engineSuggestions.slice(0, engineSuggestionPolicy.limit).forEach((suggestion) => {
-      if (suggestion) {
-        const suggestionItem = {
-          type: 'googleSuggest',
-          title: suggestion,
-          url: buildDefaultSearchUrl(suggestion),
-          favicon: getDefaultSearchEngineFaviconUrl(),
-          score: engineSuggestionPolicy.score,
-          searchQuery: suggestion,
-          forceSearch: true,
-          reasons: ['来源：搜索建议']
-        };
-        if (!isSuggestionBlockedBySearchBlacklist(suggestionItem, searchBlacklistItems, suggestion)) {
-          suggestions.push(suggestionItem);
-        }
-      }
-    });
-
     suggestions.sort((a, b) => {
       if (typeof searchUtils.compareSearchSuggestions === 'function') {
         return searchUtils.compareSearchSuggestions(a, b);
@@ -7885,4 +7933,91 @@ async function getSearchSuggestions(query) {
     console.error('Error getting search suggestions:', error);
     return [];
   }
+}
+
+async function getSearchEngineSuggestions(query, localSuggestions, options) {
+  const searchUtils = SEARCH_UTILS;
+  const searchPolicy = getBackgroundSearchPolicy(searchUtils);
+  const context = buildBackgroundSearchQueryContext(query, searchUtils);
+  const settings = options && typeof options === 'object' ? options : {};
+  const signal = settings.signal || null;
+  const normalizedLocalSuggestions = (Array.isArray(localSuggestions) ? localSuggestions : [])
+    .filter((suggestion) => suggestion && typeof suggestion === 'object')
+    .slice(0, searchPolicy.candidatePoolLimit || 20);
+  if (!context.queryLower || (signal && signal.aborted)) {
+    return normalizedLocalSuggestions;
+  }
+
+  const [rawEngineSuggestions, searchBlacklistItems, sourceTypes] = await Promise.all([
+    fetchSearchEngineSuggestionsWithTimeout(query, signal),
+    loadSearchBlacklistItems(),
+    loadSearchResultSourceTypes()
+  ]);
+  if (signal && signal.aborted) {
+    return normalizedLocalSuggestions;
+  }
+
+  const engineSuggestions = typeof searchUtils.normalizeSearchEngineSuggestions === 'function'
+    ? searchUtils.normalizeSearchEngineSuggestions(
+      rawEngineSuggestions,
+      context.lookupQuery,
+      { limit: searchPolicy.maxEngineSuggestions }
+    )
+    : (Array.isArray(rawEngineSuggestions) ? rawEngineSuggestions : [])
+      .map((item) => String(item || '').trim())
+      .filter((item) => item && item.toLowerCase() !== context.queryLower)
+      .slice(0, searchPolicy.maxEngineSuggestions || 5);
+  const engineSuggestionPolicy = typeof searchUtils.getSearchEngineSuggestionPolicy === 'function'
+    ? searchUtils.getSearchEngineSuggestionPolicy(context, normalizedLocalSuggestions, searchPolicy)
+    : {
+      limit: normalizedLocalSuggestions.length > 0 ? 1 : (searchPolicy.maxEngineSuggestions || 5),
+      score: normalizedLocalSuggestions.length > 0 ? 1 : 160
+    };
+  const mergedSuggestions = normalizedLocalSuggestions.slice();
+  engineSuggestions.slice(0, engineSuggestionPolicy.limit).forEach((suggestion) => {
+    const suggestionItem = {
+      type: 'googleSuggest',
+      title: suggestion,
+      url: buildDefaultSearchUrl(suggestion),
+      favicon: getDefaultSearchEngineFaviconUrl(),
+      score: engineSuggestionPolicy.score,
+      searchQuery: suggestion,
+      forceSearch: true,
+      reasons: ['来源：搜索建议']
+    };
+    if (!isSuggestionBlockedBySearchBlacklist(suggestionItem, searchBlacklistItems, suggestion)) {
+      mergedSuggestions.push(suggestionItem);
+    }
+  });
+
+  mergedSuggestions.sort((a, b) => {
+    if (typeof searchUtils.compareSearchSuggestions === 'function') {
+      return searchUtils.compareSearchSuggestions(a, b);
+    }
+    return (b.score || 0) - (a.score || 0);
+  });
+  const uniqueSuggestions = [];
+  const seenSuggestionKeys = new Set();
+  for (let i = 0; i < mergedSuggestions.length && uniqueSuggestions.length < (searchPolicy.candidatePoolLimit || 20); i += 1) {
+    const suggestion = mergedSuggestions[i];
+    const suggestionKey = typeof searchUtils.buildSearchDedupEntryKey === 'function'
+      ? searchUtils.buildSearchDedupEntryKey(suggestion)
+      : String((suggestion && (suggestion.url || suggestion.title)) || '').trim().toLowerCase();
+    if (!suggestionKey || seenSuggestionKeys.has(suggestionKey)) {
+      continue;
+    }
+    seenSuggestionKeys.add(suggestionKey);
+    uniqueSuggestions.push(suggestion);
+  }
+
+  let finalSuggestions = filterBlacklistedSuggestions(uniqueSuggestions, searchBlacklistItems, context.lookupQuery);
+  if (typeof searchUtils.filterSearchSuggestionsBySourceTypes === 'function') {
+    finalSuggestions = searchUtils.filterSearchSuggestionsBySourceTypes(finalSuggestions, sourceTypes);
+  }
+  if (typeof searchUtils.applySearchSuggestionHostDiversity === 'function') {
+    finalSuggestions = searchUtils.applySearchSuggestionHostDiversity(finalSuggestions);
+  } else {
+    finalSuggestions = finalSuggestions.slice(0, searchPolicy.finalSuggestionLimit || 12);
+  }
+  return finalSuggestions;
 }

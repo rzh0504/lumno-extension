@@ -3552,7 +3552,7 @@
     return imeKeyGuard.shouldIgnoreKeydown(event);
   }
   let siteSearchState = null;
-  let debounceTimer = null;
+  let remoteSuggestionDebounceTimer = null;
   let tabs = [];
   let currentNewtabTabId = null;
   let siteSearchProvidersCache = null;
@@ -10691,57 +10691,74 @@
     latestQuery = query;
     const immediate = options && options.immediate;
     const retryCount = options && Number(options.retryCount) > 0 ? Number(options.retryCount) : 0;
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
+    const requestStartedAt = Date.now();
+    const requestQuery = latestQuery;
+    const requestSeq = ++suggestionRequestSeq;
+    if (remoteSuggestionDebounceTimer) {
+      clearTimeout(remoteSuggestionDebounceTimer);
+      remoteSuggestionDebounceTimer = null;
     }
-    debounceTimer = setTimeout(function() {
-      const requestQuery = latestQuery;
-      const requestSeq = ++suggestionRequestSeq;
+    if (suggestionRequestWatchdogTimer) {
+      clearTimeout(suggestionRequestWatchdogTimer);
+      suggestionRequestWatchdogTimer = null;
+    }
+    suggestionRequestWatchdogTimer = setTimeout(function() {
+      if (requestSeq !== suggestionRequestSeq || requestQuery !== latestQuery) {
+        return;
+      }
+      if (retryCount < 1) {
+        requestSuggestions(requestQuery, { immediate: true, retryCount: retryCount + 1 });
+        return;
+      }
+      renderSuggestions([], requestQuery);
+    }, immediate ? 1200 : 1300);
+    chrome.runtime.sendMessage({
+      action: 'getSearchSuggestions',
+      query: requestQuery,
+      context: 'newtab'
+    }, function(response) {
       if (suggestionRequestWatchdogTimer) {
         clearTimeout(suggestionRequestWatchdogTimer);
         suggestionRequestWatchdogTimer = null;
       }
-      suggestionRequestWatchdogTimer = setTimeout(function() {
+      if (requestSeq !== suggestionRequestSeq || requestQuery !== latestQuery) {
+        return;
+      }
+      if (chrome.runtime && chrome.runtime.lastError) {
+        renderSuggestions([], requestQuery);
+        return;
+      }
+      const localSuggestions = response && Array.isArray(response.suggestions) ? response.suggestions : [];
+      renderSuggestions(localSuggestions, requestQuery);
+      refreshTabsForSearchContext(() => {});
+      const remoteDelay = immediate ? 0 : Math.max(0, 120 - (Date.now() - requestStartedAt));
+      remoteSuggestionDebounceTimer = setTimeout(function() {
+        remoteSuggestionDebounceTimer = null;
         if (requestSeq !== suggestionRequestSeq || requestQuery !== latestQuery) {
           return;
         }
-        if (retryCount < 1) {
-          requestSuggestions(requestQuery, { immediate: true, retryCount: retryCount + 1 });
-          return;
-        }
-        renderSuggestions([], requestQuery);
-      }, immediate ? 1200 : 1300);
-      chrome.runtime.sendMessage({
-        action: 'getSearchSuggestions',
-        query: requestQuery,
-        context: 'newtab'
-      }, function(response) {
-        if (suggestionRequestWatchdogTimer) {
-          clearTimeout(suggestionRequestWatchdogTimer);
-          suggestionRequestWatchdogTimer = null;
-        }
-        if (requestSeq !== suggestionRequestSeq) {
-          return;
-        }
-        if (requestQuery !== latestQuery) {
-          return;
-        }
-        if (chrome.runtime && chrome.runtime.lastError) {
-          renderSuggestions([], requestQuery);
-          return;
-        }
-        const responseSuggestions = response && response.suggestions ? response.suggestions : [];
-        refreshTabsForSearchContext(() => {
-          if (requestSeq !== suggestionRequestSeq) {
+        chrome.runtime.sendMessage({
+          action: 'getSearchEngineSuggestions',
+          query: requestQuery,
+          context: 'newtab',
+          localSuggestions: localSuggestions
+        }, function(remoteResponse) {
+          if (requestSeq !== suggestionRequestSeq || requestQuery !== latestQuery) {
             return;
           }
-          if (requestQuery !== latestQuery) {
+          if (chrome.runtime && chrome.runtime.lastError) {
             return;
           }
-          renderSuggestions(responseSuggestions, requestQuery);
+          if (!remoteResponse ||
+              remoteResponse.aborted === true ||
+              remoteResponse.hasRemoteSuggestions !== true ||
+              !Array.isArray(remoteResponse.suggestions)) {
+            return;
+          }
+          renderSuggestions(remoteResponse.suggestions, requestQuery);
         });
-      });
-    }, immediate ? 0 : 120);
+      }, remoteDelay);
+    });
   }
 
   inputParts = createSearchInput({
@@ -10798,8 +10815,9 @@
         latestQuery = '';
         latestRawQuery = '';
         clearAutocomplete();
-        if (debounceTimer) {
-          clearTimeout(debounceTimer);
+        if (remoteSuggestionDebounceTimer) {
+          clearTimeout(remoteSuggestionDebounceTimer);
+          remoteSuggestionDebounceTimer = null;
         }
         if (suggestionRequestWatchdogTimer) {
           clearTimeout(suggestionRequestWatchdogTimer);
@@ -11759,6 +11777,15 @@
   });
 
   inputParts.input.addEventListener('compositionstart', function(event) {
+    suggestionRequestSeq += 1;
+    if (remoteSuggestionDebounceTimer) {
+      clearTimeout(remoteSuggestionDebounceTimer);
+      remoteSuggestionDebounceTimer = null;
+    }
+    if (suggestionRequestWatchdogTimer) {
+      clearTimeout(suggestionRequestWatchdogTimer);
+      suggestionRequestWatchdogTimer = null;
+    }
     imeKeyGuard.markCompositionStart(event);
     clearAutocomplete();
   });
@@ -11771,8 +11798,9 @@
     latestRawQuery = rawValue;
     clearAutocomplete();
     if (!query) {
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
+      if (remoteSuggestionDebounceTimer) {
+        clearTimeout(remoteSuggestionDebounceTimer);
+        remoteSuggestionDebounceTimer = null;
       }
       clearSearchSuggestions();
       return;
