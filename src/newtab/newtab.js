@@ -10455,7 +10455,7 @@
             return;
           }
           siteSearchProvidersCache = items;
-          renderSuggestions(suggestions, query);
+          renderSuggestions(lastSuggestionResponse, query);
         });
       }
       const inlineCandidate = (!siteSearchQueryModeActive && !modeCommandActive && !hasCommand)

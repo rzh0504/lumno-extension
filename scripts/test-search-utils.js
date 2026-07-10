@@ -258,8 +258,8 @@ const enginePolicyWithLocalResults = search.getSearchEngineSuggestionPolicy(
 );
 assert.strictEqual(
   enginePolicyWithLocalResults.limit,
-  1,
-  'engine suggestion policy should keep only one supplemental item when local results exist'
+  3,
+  'engine suggestion policy should allow up to three supplemental items when local results exist'
 );
 assert.ok(
   enginePolicyWithLocalResults.score <= 1,

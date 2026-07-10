@@ -1950,6 +1950,11 @@ function testNewtabIncrementalSearchSuggestionContract() {
     /remoteResponse\.hasRemoteSuggestions !== true/.test(newtabJs),
     'newtab should keep the existing local render when the remote request adds no suggestions'
   );
+  assert.match(
+    newtabJs,
+    /siteSearchProvidersCache = items;\s*renderSuggestions\(lastSuggestionResponse, query\);/,
+    'newtab provider reload should re-render the latest incremental response instead of the captured local response'
+  );
   assert.doesNotMatch(
     newtabJs,
     /refreshTabsForSearchContext\(\(\) => \{[\s\S]{0,500}renderSuggestions\(localSuggestions, requestQuery\)/,

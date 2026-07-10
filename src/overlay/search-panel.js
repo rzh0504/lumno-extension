@@ -6505,7 +6505,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
               return;
             }
             siteSearchProvidersCache = items;
-            updateSearchSuggestions(suggestions, query);
+            updateSearchSuggestions(lastSuggestionResponse, query);
           });
         }
         const rawTagInputForInline = (latestRawInputValue || searchInput.value || '').trim();

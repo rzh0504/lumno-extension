@@ -11,6 +11,7 @@
     lookupMaxResults: 120,
     fallbackHistoryMaxResults: 600,
     maxEngineSuggestions: 5,
+    maxEngineSuggestionsWithLocalResults: 3,
     candidatePoolLimit: 20,
     finalSuggestionLimit: 12,
     displaySuggestionLimit: 10,
@@ -1023,9 +1024,14 @@
     const settings = policy && typeof policy === 'object' ? policy : {};
     const hasLocalResults = hasLocalResultSuggestion(localSuggestions);
     const baseScore = getSearchEngineSuggestionScore(context, localSuggestions);
+    const maxEngineSuggestions = getSearchEngineSuggestionLimit(settings.maxEngineSuggestions);
+    const rawLocalResultLimit = Number(settings.maxEngineSuggestionsWithLocalResults);
+    const localResultLimit = Number.isFinite(rawLocalResultLimit) && rawLocalResultLimit > 0
+      ? Math.floor(rawLocalResultLimit)
+      : SEARCH_POLICY.maxEngineSuggestionsWithLocalResults;
     return {
       hasLocalResults,
-      limit: hasLocalResults ? 1 : getSearchEngineSuggestionLimit(settings.maxEngineSuggestions),
+      limit: hasLocalResults ? Math.min(localResultLimit, maxEngineSuggestions) : maxEngineSuggestions,
       score: hasLocalResults ? Math.min(baseScore, 1) : baseScore
     };
   }

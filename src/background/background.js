@@ -5415,6 +5415,7 @@ let searchSelectionStatsCache = null;
 let searchSelectionStatsPromise = null;
 const SEARCH_ENGINE_SUGGEST_TIMEOUT_MS = 900;
 const LOCAL_SUGGEST_SOURCE_TIMEOUT_MS = 800;
+const LOCAL_SEARCH_INDEX_WARMUP_TIMEOUT_MS = 80;
 const HISTORY_FALLBACK_CACHE_TTL_MS = 45 * 1000;
 const TOP_SITES_CACHE_TTL_MS = 30 * 1000;
 const BOOKMARK_TREE_CACHE_TTL_MS = 2 * 60 * 1000;
@@ -5608,12 +5609,13 @@ const SEARCH_ENGINE_DEFS = [
 ];
 
 let defaultSearchEngineState = {
-  id: '',
-  name: '',
-  host: '',
-  searchTemplate: '',
+  id: 'google',
+  name: 'Google',
+  host: 'www.google.com',
+  searchTemplate: 'https://www.google.com/search?q={query}',
   updatedAt: 0
 };
+let defaultSearchEngineStateReady = Promise.resolve(defaultSearchEngineState);
 
 let pendingSearchAt = 0;
 let pendingSearchTabId = null;
@@ -5729,13 +5731,16 @@ function setDefaultSearchEngineState(nextState, shouldPersist) {
 
 function loadDefaultSearchEngineState() {
   if (!storageArea) {
-    return;
+    return Promise.resolve(defaultSearchEngineState);
   }
-  storageArea.get([DEFAULT_SEARCH_ENGINE_STORAGE_KEY], (result) => {
-    const stored = result ? result[DEFAULT_SEARCH_ENGINE_STORAGE_KEY] : null;
-    if (stored && stored.id) {
-      setDefaultSearchEngineState(stored, false);
-    }
+  return new Promise((resolve) => {
+    storageArea.get([DEFAULT_SEARCH_ENGINE_STORAGE_KEY], (result) => {
+      const stored = result ? result[DEFAULT_SEARCH_ENGINE_STORAGE_KEY] : null;
+      if (stored && stored.id) {
+        setDefaultSearchEngineState(stored, false);
+      }
+      resolve(defaultSearchEngineState);
+    });
   });
 }
 
@@ -6028,7 +6033,7 @@ function markPendingSearchTab(tabId, sourceTab) {
   pendingSearchGroupContext = getSourceTabGroupContext(sourceTab);
 }
 
-loadDefaultSearchEngineState();
+defaultSearchEngineStateReady = loadDefaultSearchEngineState();
 
 if (chrome && chrome.tabs) {
   chrome.tabs.onCreated.addListener((tab) => {
@@ -7279,6 +7284,9 @@ function getBookmarkNodeMapCached() {
   if (bookmarkTreeIndexCache.map && bookmarkTreeIndexCache.expiresAt > now) {
     return Promise.resolve(bookmarkTreeIndexCache.map);
   }
+  if (bookmarkItemsPromise) {
+    return bookmarkItemsPromise.then(() => bookmarkTreeIndexCache.map || new Map());
+  }
   if (bookmarkTreeIndexPromise) {
     return bookmarkTreeIndexPromise;
   }
@@ -7318,9 +7326,15 @@ function getAllBookmarksCached() {
   bookmarkItemsPromise = callChromeApiWithTimeout((done) => {
     chrome.bookmarks.getTree((tree) => {
       const items = buildBookmarkItems(tree);
+      const nodeMap = buildBookmarkNodeMap(tree);
+      const expiresAt = Date.now() + BOOKMARK_TREE_CACHE_TTL_MS;
       bookmarkItemsCache = {
         items: items,
-        expiresAt: Date.now() + BOOKMARK_TREE_CACHE_TTL_MS
+        expiresAt
+      };
+      bookmarkTreeIndexCache = {
+        map: nodeMap,
+        expiresAt
       };
       bookmarkItemsPromise = null;
       done(items);
@@ -7381,6 +7395,38 @@ function getFallbackHistoryItemsCached(policy) {
       done(list);
     });
   }, [], LOCAL_SUGGEST_SOURCE_TIMEOUT_MS).catch(() => []);
+}
+
+function getCachedFallbackHistoryItemsOrWarm(policy) {
+  const now = Date.now();
+  if (historyFallbackCache.expiresAt > now && Array.isArray(historyFallbackCache.items)) {
+    return Promise.resolve(historyFallbackCache.items);
+  }
+  return withTimeout(
+    getFallbackHistoryItemsCached(policy),
+    LOCAL_SEARCH_INDEX_WARMUP_TIMEOUT_MS,
+    []
+  );
+}
+
+function getCachedBookmarkItemsOrWarm() {
+  const now = Date.now();
+  if (Array.isArray(bookmarkItemsCache.items) && bookmarkItemsCache.expiresAt > now) {
+    return Promise.resolve(bookmarkItemsCache.items);
+  }
+  return withTimeout(
+    getAllBookmarksCached(),
+    LOCAL_SEARCH_INDEX_WARMUP_TIMEOUT_MS,
+    []
+  );
+}
+
+function getCachedBookmarkNodeMap() {
+  const now = Date.now();
+  if (bookmarkTreeIndexCache.map && bookmarkTreeIndexCache.expiresAt > now) {
+    return bookmarkTreeIndexCache.map;
+  }
+  return new Map();
 }
 
 function getOpenTabSearchItems() {
@@ -7543,6 +7589,7 @@ function getBackgroundSearchPolicy(searchUtils) {
     lookupWindowDays: 180,
     lookupMaxResults: 120,
     maxEngineSuggestions: 5,
+    maxEngineSuggestionsWithLocalResults: 3,
     candidatePoolLimit: 20,
     finalSuggestionLimit: 12,
     fallbackTopSiteLimit: 5
@@ -7623,8 +7670,8 @@ async function getSearchSuggestions(query) {
           chrome.bookmarks.search({ query: context.lookupQuery }, done);
         }, [], LOCAL_SUGGEST_SOURCE_TIMEOUT_MS)
         : Promise.resolve([]),
-      allowHistory ? getFallbackHistoryItemsCached(searchPolicy) : Promise.resolve([]),
-      allowBookmarks ? getAllBookmarksCached() : Promise.resolve([]),
+      allowHistory ? getCachedFallbackHistoryItemsOrWarm(searchPolicy) : Promise.resolve([]),
+      allowBookmarks ? getCachedBookmarkItemsOrWarm() : Promise.resolve([]),
       loadSearchBlacklistItems(),
       loadFaviconRequestBlacklistItems(),
       loadSearchSelectionStats()
@@ -7663,7 +7710,7 @@ async function getSearchSuggestions(query) {
     ]));
 
     const bookmarkNodeMap = (Array.isArray(bookmarks) && bookmarks.length > 0)
-      ? await getBookmarkNodeMapCached()
+      ? getCachedBookmarkNodeMap()
       : new Map();
 
     const rootFolderTitles = new Set([
@@ -7936,6 +7983,7 @@ async function getSearchSuggestions(query) {
 }
 
 async function getSearchEngineSuggestions(query, localSuggestions, options) {
+  await defaultSearchEngineStateReady;
   const searchUtils = SEARCH_UTILS;
   const searchPolicy = getBackgroundSearchPolicy(searchUtils);
   const context = buildBackgroundSearchQueryContext(query, searchUtils);
@@ -7970,7 +8018,12 @@ async function getSearchEngineSuggestions(query, localSuggestions, options) {
   const engineSuggestionPolicy = typeof searchUtils.getSearchEngineSuggestionPolicy === 'function'
     ? searchUtils.getSearchEngineSuggestionPolicy(context, normalizedLocalSuggestions, searchPolicy)
     : {
-      limit: normalizedLocalSuggestions.length > 0 ? 1 : (searchPolicy.maxEngineSuggestions || 5),
+      limit: normalizedLocalSuggestions.length > 0
+        ? Math.min(
+          searchPolicy.maxEngineSuggestionsWithLocalResults || 3,
+          searchPolicy.maxEngineSuggestions || 5
+        )
+        : (searchPolicy.maxEngineSuggestions || 5),
       score: normalizedLocalSuggestions.length > 0 ? 1 : 160
     };
   const mergedSuggestions = normalizedLocalSuggestions.slice();

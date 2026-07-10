@@ -21,8 +21,9 @@ function createEvent() {
   };
 }
 
-function createStorageArea(initialData) {
+function createStorageArea(initialData, options) {
   const data = initialData || {};
+  const config = options || {};
   return {
     get(keys, callback) {
       const result = {};
@@ -34,7 +35,10 @@ function createStorageArea(initialData) {
           result[key] = data[key];
         }
       });
-      setTimeout(() => callback(result), 0);
+      const delay = keyList.includes('_x_extension_default_search_engine_2024_unique_')
+        ? Number(config.defaultSearchEngineLoadDelayMs) || 0
+        : 0;
+      setTimeout(() => callback(result), delay);
     },
     set(items, callback) {
       Object.assign(data, items || {});
@@ -56,7 +60,9 @@ function createStorageArea(initialData) {
 function createChromeStub(options) {
   const config = options || {};
   const messageListeners = [];
-  const storageArea = createStorageArea(config.initialSyncData || {});
+  const storageArea = createStorageArea(config.initialSyncData || {}, {
+    defaultSearchEngineLoadDelayMs: config.defaultSearchEngineLoadDelayMs
+  });
   const now = Date.now();
   const openTabs = [
     {
@@ -162,7 +168,10 @@ function createChromeStub(options) {
           : historyItems)
           .filter((item) => (Number(item.lastVisitTime) || 0) >= startTime)
           .slice(0, maxResults);
-        setTimeout(() => callback(items), 0);
+        const delay = text
+          ? Number(config.historySearchDelayMs) || 0
+          : Number(config.historyFallbackSearchDelayMs) || 0;
+        setTimeout(() => callback(items), delay);
       },
       deleteUrl(options, callback) {
         const targetUrl = String(options && options.url || '');
@@ -220,7 +229,7 @@ function createChromeStub(options) {
               }
             ]
           }
-        ]), 0);
+        ]), Number(config.bookmarkTreeDelayMs) || 0);
       },
       onCreated: createEvent(),
       onRemoved: createEvent(),
@@ -539,9 +548,20 @@ async function run() {
   const firstMixedLocalSuggestionIndex = mergedMixedSuggestions.findIndex((item) => item && item.type !== 'googleSuggest');
   assert.strictEqual(
     mergedMixedSuggestions.filter((item) => item && item.type === 'googleSuggest').length,
-    1,
-    'the remote merge should keep only one search-engine suggestion when local results exist'
+    3,
+    'the remote merge should keep up to three search-engine suggestions when local results exist'
   );
+  const mergedMixedUrls = new Set(
+    mergedMixedSuggestions
+      .filter((item) => item && item.type !== 'googleSuggest')
+      .map((item) => item.url)
+  );
+  mixedLocalSuggestions.forEach((item) => {
+    assert.ok(
+      mergedMixedUrls.has(item.url),
+      `the remote merge should preserve local result ${item.url}`
+    );
+  });
   assert.ok(
     firstMixedLocalSuggestionIndex >= 0 && firstMixedEngineSuggestionIndex > firstMixedLocalSuggestionIndex,
     'the remote merge should keep local results ahead of a supplemental search-engine suggestion'
@@ -683,6 +703,99 @@ async function run() {
       item._xMatchedTabId === 25
     )),
     'background search suggestions should match initials from currently open tab titles'
+  );
+
+  const { context: coldIndexContext } = loadBackgroundForTest({
+    historyFallbackSearchDelayMs: 260,
+    bookmarkTreeDelayMs: 260
+  });
+  const coldIndexStartedAt = Date.now();
+  const coldIndexSuggestions = await coldIndexContext.__testGetSearchSuggestions('github');
+  const coldIndexElapsedMs = Date.now() - coldIndexStartedAt;
+  assert.ok(
+    coldIndexElapsedMs < 160,
+    `direct local results should not wait for cold full-history and bookmark indexes (took ${coldIndexElapsedMs}ms)`
+  );
+  assert.ok(
+    coldIndexSuggestions.some((item) => item && item.url === 'https://github.com/'),
+    'the fast local response should retain direct history matches while background indexes warm'
+  );
+  await new Promise((resolve) => setTimeout(resolve, 320));
+  const warmedFuzzySuggestions = await coldIndexContext.__testGetSearchSuggestions('fcc');
+  assert.ok(
+    warmedFuzzySuggestions.some((item) => item && item.url === 'https://apps.apple.com/final-cut-camera'),
+    'the warmed history index should continue to support fuzzy initial matching after the fast first response'
+  );
+
+  let delayedDefaultEngineFetchCount = 0;
+  const { messageListeners: delayedDefaultEngineListeners } = loadBackgroundForTest({
+    initialSyncData: {
+      _x_extension_default_search_engine_2024_unique_: {
+        id: 'google',
+        name: 'Google',
+        host: 'www.google.com',
+        searchTemplate: 'https://www.google.com/search?q={query}'
+      }
+    },
+    defaultSearchEngineLoadDelayMs: 160,
+    fetch: async (url) => {
+      const parsedUrl = new URL(String(url));
+      if (parsedUrl.hostname === 'suggestqueries.google.com') {
+        delayedDefaultEngineFetchCount += 1;
+        return {
+          ok: true,
+          json: async () => ['什么东西', ['什么东西可以解辣', '什么东西意味着']]
+        };
+      }
+      throw new Error('unexpected request');
+    }
+  });
+  const delayedDefaultEngineResponse = await sendBackgroundMessage(delayedDefaultEngineListeners, {
+    action: 'getSearchEngineSuggestions',
+    query: '什么东西',
+    context: 'newtab',
+    localSuggestions: []
+  }, 1000);
+  assert.strictEqual(
+    delayedDefaultEngineFetchCount,
+    1,
+    'remote keyword suggestions should wait for the stored default search engine instead of returning an empty list during cold start'
+  );
+  assert.ok(
+    delayedDefaultEngineResponse &&
+      delayedDefaultEngineResponse.hasRemoteSuggestions === true &&
+      delayedDefaultEngineResponse.suggestions.filter((item) => item && item.type === 'googleSuggest').length > 1,
+    'a cold-start remote request should still return the full keyword suggestion list'
+  );
+
+  let fallbackGoogleFetchCount = 0;
+  const { messageListeners: fallbackGoogleListeners } = loadBackgroundForTest({
+    fetch: async (url) => {
+      const parsedUrl = new URL(String(url));
+      if (parsedUrl.hostname === 'suggestqueries.google.com') {
+        fallbackGoogleFetchCount += 1;
+        return {
+          ok: true,
+          json: async () => ['什么东西', ['什么东西可以解辣', '什么东西意味着']]
+        };
+      }
+      throw new Error('unexpected request');
+    }
+  });
+  const fallbackGoogleResponse = await sendBackgroundMessage(fallbackGoogleListeners, {
+    action: 'getSearchEngineSuggestions',
+    query: '什么东西',
+    context: 'newtab',
+    localSuggestions: []
+  }, 1000);
+  assert.strictEqual(
+    fallbackGoogleFetchCount,
+    1,
+    'the Google UI fallback should also be the background fallback when no search engine has been stored'
+  );
+  assert.ok(
+    fallbackGoogleResponse && fallbackGoogleResponse.hasRemoteSuggestions === true,
+    'an unconfigured search engine should still provide keyword suggestions through the Google fallback'
   );
 }
 

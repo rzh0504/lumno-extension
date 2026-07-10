@@ -95,4 +95,10 @@ assert.match(
   'overlay should keep the existing local render when the remote request adds no suggestions'
 );
 
+assert.match(
+  overlayJs,
+  /siteSearchProvidersCache = items;\s*updateSearchSuggestions\(lastSuggestionResponse, query\);/,
+  'overlay provider reload should re-render the latest incremental response instead of the captured local response'
+);
+
 console.log('overlay input delegation tests passed');
