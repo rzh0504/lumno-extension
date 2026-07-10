@@ -1426,6 +1426,12 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       }
       element.style.setProperty(property, value, inputUsesIsolatedStyles ? '' : 'important');
     };
+    const setOverlayPanelScopedStyle = (element, property, value) => {
+      if (!element) {
+        return;
+      }
+      element.style.setProperty(property, value, 'important');
+    };
     applyNoTranslate(searchInput);
     applyNoTranslate(inputContainer);
     applyNoTranslate(rightIcon);
@@ -1579,10 +1585,15 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       overlay.setAttribute('data-open-tabs-default-collapsed', shouldCollapse ? 'true' : 'false');
       suggestionsContainer.setAttribute('data-collapsed', shouldCollapse ? 'true' : 'false');
       suggestionsContainer.setAttribute('aria-hidden', shouldCollapse ? 'true' : 'false');
+      setOverlayPanelScopedStyle(
+        overlay,
+        'border-radius',
+        shouldCollapse ? '32px / 28px' : '32px 32px 32px 32px / 28px 28px 32px 32px'
+      );
       setInputScopedStyle(
         inputContainer,
         'border-radius',
-        shouldCollapse ? '32px' : '32px 32px 0 0'
+        shouldCollapse ? '32px / 28px' : '32px 32px 0 0 / 28px 28px 0 0'
       );
       if (shouldCollapse) {
         suggestionsContainer.style.removeProperty('transition');

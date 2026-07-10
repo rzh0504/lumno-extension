@@ -5,6 +5,7 @@ const path = require('path');
 const repoRoot = path.resolve(__dirname, '..');
 const newtabHtml = fs.readFileSync(path.join(repoRoot, 'src/newtab/newtab.html'), 'utf8');
 const overlayShell = fs.readFileSync(path.join(repoRoot, 'src/overlay/shell.js'), 'utf8');
+const overlaySearchPanel = fs.readFileSync(path.join(repoRoot, 'src/overlay/search-panel.js'), 'utf8');
 const overlayCss = fs.readFileSync(path.join(repoRoot, 'src/overlay/suggestions-view.css'), 'utf8');
 const searchInputCss = fs.readFileSync(path.join(repoRoot, 'src/shared/search-input.css'), 'utf8');
 const searchInputUi = fs.readFileSync(path.join(repoRoot, 'src/shared/search-input-ui.js'), 'utf8');
@@ -94,6 +95,21 @@ assertRuleHasRadius(
   'overlay suggestions container'
 );
 assert.match(overlayShell, /border-radius:\s*32px !important;/, 'overlay panel should use a 32px shell radius');
+assert.match(
+  overlaySearchPanel,
+  /element\.style\.setProperty\(property,\s*value,\s*'important'\);/,
+  'overlay panel radius updates should override the initial important shell radius'
+);
+assert.match(
+  overlaySearchPanel,
+  /setOverlayPanelScopedStyle\(\s*overlay,\s*'border-radius',\s*shouldCollapse\s*\?\s*'32px \/ 28px'\s*:\s*'32px 32px 32px 32px \/ 28px 28px 32px 32px'\s*\)/,
+  'overlay panel should keep symmetric collapsed corners and a stable expanded top radius'
+);
+assert.match(
+  overlaySearchPanel,
+  /setInputScopedStyle\(\s*inputContainer,\s*'border-radius',\s*shouldCollapse\s*\?\s*'32px \/ 28px'\s*:\s*'32px 32px 0 0 \/ 28px 28px 0 0'\s*\)/,
+  'overlay input container should keep symmetric collapsed corners and a stable expanded top radius'
+);
 
 assertSupportsCompensatedCornerShape(newtabHtml, 'newtab search surfaces');
 assertRuleHasCornerShape(
