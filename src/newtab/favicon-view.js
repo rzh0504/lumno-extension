@@ -27,6 +27,7 @@
     const iconPreloadCache = config.iconPreloadCache || new Map();
     const faviconFallbackNodeMap = config.faviconFallbackNodeMap || new WeakMap();
     const missingIconCache = config.missingIconCache || new Set();
+    const missingIconDebugEnabled = config.missingIconDebugEnabled === true;
     const faviconUtils = global.LumnoFaviconUtils || {};
     const faviconUrlResolver = typeof faviconUtils.createFaviconUrlResolver === 'function'
       ? faviconUtils.createFaviconUrlResolver({
@@ -88,6 +89,9 @@
     }
 
     function reportMissingIcon(context, url, iconUrl) {
+      if (!missingIconDebugEnabled) {
+        return;
+      }
       const key = `${context || 'unknown'}::${url || ''}::${iconUrl || ''}`;
       if (missingIconCache.has(key)) {
         return;

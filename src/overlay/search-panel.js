@@ -5235,7 +5235,6 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
               }
             } else {
               // Navigate to the suggested URL
-              console.log('Opening URL from keyboard:', selectedSuggestion.url);
               recordSearchSuggestionSelectionFromSuggestion(selectedSuggestion, query, 'overlay');
               chrome.runtime.sendMessage({
                 action: 'createTab',
@@ -7105,7 +7104,6 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
                 });
               }
             } else {
-              console.log('Opening URL:', suggestion.url);
               recordSearchSuggestionSelectionFromSuggestion(suggestion, query, 'overlay');
               chrome.runtime.sendMessage({
                 action: 'createTab',
@@ -7194,7 +7192,6 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
                 });
               }
             } else {
-              console.log('Opening URL:', suggestion.url);
               chrome.runtime.sendMessage({
                 action: 'createTab',
                 url: suggestion.url,

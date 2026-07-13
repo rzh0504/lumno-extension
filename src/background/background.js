@@ -1198,7 +1198,12 @@ function requestFocusVisibleNewtabInput(source, tabId) {
   }
 }
 
+const HOTKEY_DEBUG_ENABLED = false;
+
 function logHotkeyDebug(stage, payload) {
+  if (!HOTKEY_DEBUG_ENABLED) {
+    return;
+  }
   try {
     const detail = payload && typeof payload === 'object' ? payload : {};
     console.log(`[Lumno][hotkey] ${stage}`, detail);
@@ -5503,7 +5508,6 @@ const titlePinyinCache = new Map();
 const siteThemeColorCache = new Map();
 const siteThemeColorPending = new Map();
 const switcherThemeColorWarmups = new Set();
-const blockedLocalFaviconLogCache = new Set();
 let backgroundFaviconCacheRuntime = null;
 
 function getBackgroundFaviconCacheRuntime() {
@@ -5535,18 +5539,6 @@ function getBackgroundFaviconUrlResolver() {
     });
   }
   return backgroundFaviconUrlResolver;
-}
-
-function logBlockedLocalFavicon(url, source) {
-  const key = `${source || 'unknown'}::${String(url || '')}`;
-  if (blockedLocalFaviconLogCache.has(key)) {
-    return;
-  }
-  blockedLocalFaviconLogCache.add(key);
-  console.log('[Lumno][favicon-blocked-local]', {
-    source: source || 'unknown',
-    url: String(url || '')
-  });
 }
 
 const SEARCH_ENGINE_DEFS = [

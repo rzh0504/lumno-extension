@@ -124,7 +124,12 @@
     });
   }
 
+  const HOTKEY_LISTENER_DEBUG_ENABLED = false;
+
   function logHotkeyListenerDebug(stage, payload) {
+    if (!HOTKEY_LISTENER_DEBUG_ENABLED) {
+      return;
+    }
     try {
       const detail = payload && typeof payload === 'object' ? payload : {};
       console.log(`[Lumno][hotkey-listener] ${stage}`, detail);

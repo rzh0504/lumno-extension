@@ -30,6 +30,7 @@
   const NEWTAB_WIDTH_MODE_STORAGE_KEY = '_x_extension_newtab_width_mode_2026_unique_';
   const NEWTAB_SEARCH_WIDTH_STORAGE_KEY = '_x_extension_newtab_search_width_2026_unique_';
   const NEWTAB_WORDMARK_VISIBLE_STORAGE_KEY = '_x_extension_newtab_wordmark_visible_2026_unique_';
+  const NEWTAB_ZEN_MODE_STORAGE_KEY = '_x_extension_newtab_zen_mode_2026_unique_';
   const NEWTAB_THEME_MODE_STORAGE_KEY = '_x_extension_newtab_theme_mode_2026_unique_';
   const NEWTAB_THEME_SCOPE_STORAGE_KEY = '_x_extension_newtab_theme_scope_2026_unique_';
   const NEWTAB_WALLPAPER_STORAGE_KEY = '_x_extension_newtab_wallpaper_2026_unique_';
@@ -234,6 +235,7 @@
   let updateNoticeController = null;
   let pageNoticeController = null;
   let newtabWordmarkVisible = true;
+  let zenModeEnabled = false;
   let bookmarkCurrentPage = 0;
   let bookmarkAllItems = [];
   let bookmarkCurrentFolderId = '1';
@@ -427,6 +429,10 @@
       : value !== false;
   }
 
+  function normalizeZenModeEnabled(value) {
+    return value === true;
+  }
+
   function normalizeSearchResultPriority(value) {
     return typeof SETTINGS.normalizeSearchResultPriority === 'function'
       ? SETTINGS.normalizeSearchResultPriority(value)
@@ -481,7 +487,7 @@
       return;
     }
     const body = document.body;
-    const nextVisible = Boolean(newtabWordmarkVisible);
+    const nextVisible = Boolean(newtabWordmarkVisible && !zenModeEnabled);
     const wasVisible = wordmarkContainer.getAttribute('data-visible') !== 'false';
     const stateChanged = wasVisible !== nextVisible;
     const prefersReducedMotion = window.matchMedia &&
@@ -2710,11 +2716,7 @@
         inputParts.input.placeholder = defaultPlaceholderText;
       }
     }
-    if (modeBadge) {
-      modeBadge.textContent = formatMessage('mode_badge', '模式：{mode}', {
-        mode: getThemeModeLabel(currentThemeMode)
-      });
-    }
+    updateModeBadge(inputParts && inputParts.input ? inputParts.input.value : '');
     recentCards.forEach((card) => {
       if (!card || !card._xActionText || !card._xTitleText) {
         return;
@@ -3071,6 +3073,11 @@
       }
       applyNewtabWordmarkVisibility();
     }
+    if (changes[NEWTAB_ZEN_MODE_STORAGE_KEY]) {
+      zenModeEnabled = normalizeZenModeEnabled(changes[NEWTAB_ZEN_MODE_STORAGE_KEY].newValue);
+      applyZenMode();
+      updateZenCommandSuggestions();
+    }
     if (changes[NEWTAB_SHORTCUTS_VISIBLE_STORAGE_KEY]) {
       const raw = changes[NEWTAB_SHORTCUTS_VISIBLE_STORAGE_KEY].newValue;
       const nextValue = normalizeNewtabShortcutsVisible(raw);
@@ -3413,15 +3420,21 @@
     if (!modeBadge) {
       return;
     }
-    const shouldShow = isModeCommand(rawValue || '');
+    const zenCommandActive = isZenCommand(rawValue || '');
+    const shouldShow = isModeCommand(rawValue || '') || zenCommandActive;
     if (!shouldShow) {
       modeBadge.setAttribute('data-visible', 'false');
       updateInputRightPadding();
       return;
     }
-    modeBadge.textContent = formatMessage('mode_badge', '模式：{mode}', {
-      mode: getThemeModeLabel(currentThemeMode)
-    });
+    modeBadge.textContent = zenCommandActive
+      ? t(
+        zenModeEnabled ? 'zen_badge_on' : 'zen_badge_off',
+        zenModeEnabled ? 'Zen：已开启' : 'Zen：已关闭'
+      )
+      : formatMessage('mode_badge', '模式：{mode}', {
+        mode: getThemeModeLabel(currentThemeMode)
+      });
     modeBadge.setAttribute('data-visible', 'true');
     updateInputRightPadding();
   }
@@ -3438,6 +3451,11 @@
   function isModeCommand(input) {
     const raw = String(input || '').trim().toLowerCase();
     return raw === '/mode' || raw.startsWith('/mode ');
+  }
+
+  function isZenCommand(input) {
+    const raw = String(input || '').trim().toLowerCase();
+    return raw === '/zen' || raw.startsWith('/zen ');
   }
 
   function isSlashCommandInput(input) {
@@ -3459,10 +3477,96 @@
     };
   }
 
+  function buildZenSuggestion() {
+    return {
+      type: 'zenSwitch',
+      title: zenModeEnabled
+        ? formatMessage('zen_disable_title', '{name}：退出 Zen 模式', { name: 'Lumno' })
+        : formatMessage('zen_enable_title', '{name}：进入 Zen 模式', { name: 'Lumno' }),
+      url: '',
+      favicon: chrome.runtime.getURL('assets/images/lumno.png'),
+      nextEnabled: !zenModeEnabled
+    };
+  }
+
   function updateModeCommandSuggestions() {
     if (isModeCommand(inputParts && inputParts.input ? inputParts.input.value : '')) {
       renderSuggestions([], (inputParts.input.value || '').trim());
     }
+  }
+
+  function updateZenCommandSuggestions() {
+    if (isZenCommand(inputParts && inputParts.input ? inputParts.input.value : '')) {
+      renderSuggestions([], (inputParts.input.value || '').trim());
+    }
+  }
+
+  function syncSectionZenVisibility(section) {
+    if (!section) {
+      return;
+    }
+    let configuredVisible = section.getAttribute('data-content-visible');
+    if (configuredVisible !== 'true' && configuredVisible !== 'false') {
+      configuredVisible = section.getAttribute('data-visible') === 'true' ? 'true' : 'false';
+      section.setAttribute('data-content-visible', configuredVisible);
+    }
+    section.setAttribute(
+      'data-visible',
+      configuredVisible === 'true' && !zenModeEnabled ? 'true' : 'false'
+    );
+  }
+
+  function applyZenMode() {
+    if (document.body) {
+      document.body.setAttribute('data-zen-mode', zenModeEnabled ? 'true' : 'false');
+    }
+    applyNewtabWordmarkVisibility();
+    applyNewtabShortcutsVisibility();
+    syncSectionZenVisibility(bookmarkSection);
+    syncSectionZenVisibility(recentSection);
+    if (zenModeEnabled) {
+      closeBookmarkCascadeMenu();
+      closeShortcutContextMenu();
+      closeShortcutDialog();
+      closeWallpaperPanel();
+      closeFeedbackPopover();
+      hideTopActionTooltip();
+      hideShortcutTooltip();
+      hideCursorTooltip();
+    }
+    updateBookmarkSectionPosition();
+    updateSearchEntryLayout();
+    scheduleWallpaperAdaptiveToneUpdate();
+    updateModeBadge(inputParts && inputParts.input ? inputParts.input.value : '');
+  }
+
+  function setZenModeEnabled(enabled) {
+    const nextEnabled = normalizeZenModeEnabled(enabled);
+    zenModeEnabled = nextEnabled;
+    if (!storageArea) {
+      applyZenMode();
+      updateZenCommandSuggestions();
+      return;
+    }
+    storageArea.set({ [NEWTAB_ZEN_MODE_STORAGE_KEY]: nextEnabled }, () => {
+      applyZenMode();
+      updateZenCommandSuggestions();
+    });
+  }
+
+  function loadZenMode() {
+    if (!storageArea) {
+      zenModeEnabled = false;
+      applyZenMode();
+      return Promise.resolve(zenModeEnabled);
+    }
+    return new Promise((resolve) => {
+      storageArea.get([NEWTAB_ZEN_MODE_STORAGE_KEY], (result) => {
+        zenModeEnabled = normalizeZenModeEnabled(result && result[NEWTAB_ZEN_MODE_STORAGE_KEY]);
+        applyZenMode();
+        resolve(zenModeEnabled);
+      });
+    });
   }
 
   function getThemeScope() {
@@ -4307,7 +4411,7 @@
     if (!suggestion) {
       return false;
     }
-    const neutralTypes = ['googleSuggest', 'newtab', 'modeSwitch', 'chatgpt', 'perplexity', 'commandNewTab', 'commandSettings', 'commandDocumentPip'];
+    const neutralTypes = ['googleSuggest', 'newtab', 'modeSwitch', 'zenSwitch', 'chatgpt', 'perplexity', 'commandNewTab', 'commandSettings', 'commandDocumentPip'];
     if (neutralTypes.includes(suggestion.type)) {
       return false;
     }
@@ -5166,7 +5270,8 @@
     if (!section) {
       return;
     }
-    section.setAttribute('data-visible', visible ? 'true' : 'false');
+    section.setAttribute('data-content-visible', visible ? 'true' : 'false');
+    section.setAttribute('data-visible', visible && !zenModeEnabled ? 'true' : 'false');
     scheduleWallpaperAdaptiveToneUpdate();
   }
 
@@ -5179,7 +5284,7 @@
       return;
     }
     setContentSectionVisible(shortcutSection, Boolean(newtabShortcutsVisible));
-    if (!newtabShortcutsVisible) {
+    if (!newtabShortcutsVisible || zenModeEnabled) {
       resetShortcutDockHover();
       closeShortcutContextMenu();
       closeShortcutDialog();
@@ -10506,6 +10611,8 @@
       const rawTagInput = (latestRawQuery || inputParts.input.value || '').trim();
       const siteSearchQueryModeActive = Boolean(siteSearchState && String(query || '').trim());
       const modeCommandActive = !siteSearchQueryModeActive && isModeCommand(rawTagInput);
+      const zenCommandActive = !siteSearchQueryModeActive && isZenCommand(rawTagInput);
+      const toggleCommandActive = modeCommandActive || zenCommandActive;
       if (modeCommandActive) {
         if (storageArea) {
           storageArea.get([
@@ -10524,13 +10631,15 @@
           });
         }
       }
-      const commandMatch = (!modeCommandActive && !siteSearchQueryModeActive)
+      const commandMatch = (!toggleCommandActive && !siteSearchQueryModeActive)
         ? getCommandMatch(rawTagInput)
         : null;
       const hasCommand = Boolean(commandMatch);
       const preSuggestions = [];
       if (modeCommandActive) {
         preSuggestions.push(buildModeSuggestion());
+      } else if (zenCommandActive) {
+        preSuggestions.push(buildZenSuggestion());
       } else if (!siteSearchQueryModeActive) {
         if (hasCommand) {
           preSuggestions.push(buildCommandSuggestion(commandMatch.command));
@@ -10557,7 +10666,7 @@
           renderSuggestions(lastSuggestionResponse, query);
         });
       }
-      const inlineCandidate = (!siteSearchQueryModeActive && !modeCommandActive && !hasCommand)
+      const inlineCandidate = (!siteSearchQueryModeActive && !toggleCommandActive && !hasCommand)
         ? getInlineSiteSearchCandidate(rawTagInput, providersForTags)
         : null;
       let inlineSuggestion = null;
@@ -10575,7 +10684,7 @@
         }
       }
 
-      const newTabSuggestion = (modeCommandActive || siteSearchQueryModeActive)
+      const newTabSuggestion = (toggleCommandActive || siteSearchQueryModeActive)
         ? null
         : {
           type: 'newtab',
@@ -10606,7 +10715,7 @@
 
       let allSuggestions = siteSearchQueryModeActive
         ? (siteSearchSuggestion ? [siteSearchSuggestion] : [])
-        : (modeCommandActive ? [...preSuggestions] : [...preSuggestions, newTabSuggestion, ...suggestions]);
+        : (toggleCommandActive ? [...preSuggestions] : [...preSuggestions, newTabSuggestion, ...suggestions]);
       allSuggestions.forEach((item) => {
         if (!item || !item.url) {
           return;
@@ -10635,7 +10744,7 @@
       const inlineEnabled = Boolean(inlineSuggestion);
       let siteSearchTrigger = null;
       const preferAutocompleteFirst = searchResultPriorityMode !== 'search';
-      if (!modeCommandActive && !hasCommand) {
+      if (!toggleCommandActive && !hasCommand) {
         if (!siteSearchState && !inlineEnabled && preferAutocompleteFirst) {
           strongNavigationMatch = promoteStrongNavigationMatch(allSuggestions, latestRawQuery.trim());
           if (strongNavigationMatch) {
@@ -10741,6 +10850,13 @@
         clearSiteSearchTabHint();
         primaryHighlightIndex = 0;
         primaryHighlightReason = 'modeSwitch';
+      } else if (zenCommandActive) {
+        clearAutocomplete();
+        inlineSearchState = null;
+        siteSearchTriggerState = null;
+        clearSiteSearchTabHint();
+        primaryHighlightIndex = 0;
+        primaryHighlightReason = 'zenSwitch';
       } else if (hasCommand) {
         clearAutocomplete();
         inlineSearchState = null;
