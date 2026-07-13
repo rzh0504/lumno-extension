@@ -1112,6 +1112,18 @@
   "mode_switch_title": {
     "message": "{name}: switch to {mode} mode"
   },
+  "zen_badge_on": {
+    "message": "Zen: On"
+  },
+  "zen_badge_off": {
+    "message": "Zen: Off"
+  },
+  "zen_enable_title": {
+    "message": "{name}: enter Zen mode"
+  },
+  "zen_disable_title": {
+    "message": "{name}: exit Zen mode"
+  },
   "switch_to_tab": {
     "message": "Switch"
   },

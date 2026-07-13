@@ -216,6 +216,7 @@
   let wordmarkImageEl = null;
   let wordmarkSolidEl = null;
   let wordmarkVisibilityTransitionTimer = 0;
+  let wordmarkVisibilityLayoutFrame = 0;
   let wordmarkEntryTransitionTimer = 0;
   let wallpaperControl = null;
   let wallpaperRuntime = null;
@@ -492,10 +493,14 @@
     const stateChanged = wasVisible !== nextVisible;
     const prefersReducedMotion = window.matchMedia &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const suggestionsOpen = Boolean(
+      body && body.getAttribute('data-nt-suggestions-open') === 'true'
+    );
     const shouldAnimate = Boolean(
       body &&
       body.getAttribute('data-nt-ready') === '1' &&
       stateChanged &&
+      !suggestionsOpen &&
       !prefersReducedMotion
     );
     if (stateChanged && wordmarkVisibilityTransitionTimer) {
@@ -513,7 +518,7 @@
     wordmarkContainer.style.setProperty('display', 'flex');
     wordmarkContainer.style.setProperty(
       'transition',
-      prefersReducedMotion ? 'none' : WORDMARK_VISIBILITY_TRANSITION_CSS
+      shouldAnimate ? WORDMARK_VISIBILITY_TRANSITION_CSS : 'none'
     );
     wordmarkContainer.style.setProperty('max-height', nextVisible ? '74px' : '0');
     wordmarkContainer.style.setProperty('margin-bottom', nextVisible ? '28px' : '0');
@@ -529,13 +534,37 @@
       restartWordmarkEntryAnimation();
     }
     updateSearchEntryLayout();
+    syncSearchSurfaceDuringWordmarkTransition(shouldAnimate);
     scheduleWallpaperAdaptiveToneUpdate();
     if (shouldAnimate && body) {
       wordmarkVisibilityTransitionTimer = window.setTimeout(() => {
         wordmarkVisibilityTransitionTimer = 0;
         body.removeAttribute('data-wordmark-transition');
+        updateSearchEntryLayout();
+        updateSuggestionsFloatingLayout();
       }, WORDMARK_VISIBILITY_TRANSITION_MS + 80);
     }
+  }
+
+  function syncSearchSurfaceDuringWordmarkTransition(shouldAnimate) {
+    if (wordmarkVisibilityLayoutFrame) {
+      window.cancelAnimationFrame(wordmarkVisibilityLayoutFrame);
+      wordmarkVisibilityLayoutFrame = 0;
+    }
+    updateSuggestionsFloatingLayout();
+    if (!shouldAnimate || typeof window.requestAnimationFrame !== 'function') {
+      return;
+    }
+    const syncUntil = Date.now() + WORDMARK_VISIBILITY_TRANSITION_MS + 80;
+    const syncLayout = () => {
+      updateSuggestionsFloatingLayout();
+      if (Date.now() >= syncUntil) {
+        wordmarkVisibilityLayoutFrame = 0;
+        return;
+      }
+      wordmarkVisibilityLayoutFrame = window.requestAnimationFrame(syncLayout);
+    };
+    wordmarkVisibilityLayoutFrame = window.requestAnimationFrame(syncLayout);
   }
 
   function finishWordmarkEntryAnimation() {
@@ -10509,6 +10538,11 @@
       focusSearchInputPreservingScroll();
       return;
     }
+    if (suggestion.type === 'zenSwitch') {
+      setZenModeEnabled(suggestion.nextEnabled);
+      focusSearchInputPreservingScroll();
+      return;
+    }
     if (Number.isInteger(index) && shouldSwitchMatchedTabSuggestion(suggestion, index)) {
       openMatchedTabSuggestion(suggestion, event, item, query);
       return;
@@ -11043,7 +11077,7 @@
       }
       latestRawQuery = rawValue;
       clearAutocomplete();
-      if (isModeCommand(query) || getCommandMatch(query)) {
+      if (isModeCommand(query) || isZenCommand(query) || getCommandMatch(query)) {
         latestQuery = query;
         renderSuggestions([], query);
         return;
@@ -11156,6 +11190,10 @@
         setVisibleThemeMode(getNextThemeMode(currentThemeMode));
         return;
       }
+      if (isZenCommand(query)) {
+        setZenModeEnabled(!zenModeEnabled);
+        return;
+      }
       const executeSuggestion = (selectedSuggestion, event, activeSuggestionIndex) => {
         if (!selectedSuggestion) {
           return false;
@@ -11165,6 +11203,10 @@
           : null;
         if (selectedSuggestion.type === 'modeSwitch') {
           setVisibleThemeMode(selectedSuggestion.nextMode);
+          return true;
+        }
+        if (selectedSuggestion.type === 'zenSwitch') {
+          setZenModeEnabled(selectedSuggestion.nextEnabled);
           return true;
         }
         if (selectedSuggestion.type === 'commandNewTab') {
@@ -12154,6 +12196,7 @@
     bootstrapInitialWallpaperOverlay(),
     bootstrapInitialWallpaperEffect(),
     bootstrapInitialNewtabFavicon(),
+    loadZenMode(),
     loadSearchBlacklistItems(),
     loadFaviconRequestBlacklistItems()
   ]).then(() => {

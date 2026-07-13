@@ -1112,6 +1112,18 @@
   "mode_switch_title": {
     "message": "{name}：切換為{mode}模式"
   },
+  "zen_badge_on": {
+    "message": "Zen：已開啟"
+  },
+  "zen_badge_off": {
+    "message": "Zen：已關閉"
+  },
+  "zen_enable_title": {
+    "message": "{name}：進入 Zen 模式"
+  },
+  "zen_disable_title": {
+    "message": "{name}：退出 Zen 模式"
+  },
   "switch_to_tab": {
     "message": "切換"
   },

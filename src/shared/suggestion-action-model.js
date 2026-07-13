@@ -35,7 +35,7 @@
     if (!suggestion) {
       return null;
     }
-    if (suggestion.type === 'modeSwitch') {
+    if (suggestion.type === 'modeSwitch' || suggestion.type === 'zenSwitch') {
       return null;
     }
     if (suggestion.type === 'newtab') {
@@ -145,7 +145,9 @@
     const visitButtonAction = getVisitButtonAction(suggestion, {
       shouldSwitchMatchedTab
     });
-    const alwaysHideVisitButton = !visitButtonAction || Boolean(suggestion && suggestion.type === 'modeSwitch');
+    const alwaysHideVisitButton = !visitButtonAction || Boolean(
+      suggestion && (suggestion.type === 'modeSwitch' || suggestion.type === 'zenSwitch')
+    );
 
     return {
       actionTags,

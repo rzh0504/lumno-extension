@@ -6,6 +6,11 @@ const actionModel = globalThis.LumnoSuggestionActionModel;
 
 assert.ok(actionModel, 'suggestion action model should be exported');
 assert.strictEqual(
+  actionModel.getVisitButtonAction({ type: 'zenSwitch' }),
+  null,
+  'Zen mode commands should not render a navigation action button'
+);
+assert.strictEqual(
   actionModel.getModifierAdjustedAction('openNewTab', { openInCurrentTab: true }),
   'go',
   'Alt/Option should present open-new-tab actions as current-tab navigation'

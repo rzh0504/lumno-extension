@@ -62,6 +62,7 @@
     "test:newtab-section-mode-menus": "node scripts/test-newtab-section-mode-menus.js",
     "test:newtab-shortcuts-ui": "node scripts/test-newtab-shortcuts-ui.js",
     "test:newtab-mode-command": "node scripts/test-newtab-mode-command.js",
+    "test:newtab-zen-command": "node scripts/test-newtab-zen-command.js",
     "test:newtab-suggestions": "node scripts/test-newtab-suggestions-view.js",
     "test:search-result-highlight": "node scripts/test-search-result-highlight-surface.js",
     "test:ime-composition-enter": "node scripts/test-ime-composition-enter.js",

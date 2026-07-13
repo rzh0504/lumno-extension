@@ -1112,6 +1112,18 @@
   "mode_switch_title": {
     "message": "{name}：テーマを{mode}に切り替え"
   },
+  "zen_badge_on": {
+    "message": "Zen：オン"
+  },
+  "zen_badge_off": {
+    "message": "Zen：オフ"
+  },
+  "zen_enable_title": {
+    "message": "{name}：Zen モードに切り替え"
+  },
+  "zen_disable_title": {
+    "message": "{name}：Zen モードを終了"
+  },
   "switch_to_tab": {
     "message": "切り替え"
   },

@@ -1146,7 +1146,7 @@
           iconNode = createSuggestionInlineIcon('ri-settings-3-line', 'subtext');
         } else if (suggestion.type === 'commandDocumentPip') {
           iconNode = createSuggestionInlineIcon('ri-scissors-cut-line', 'subtext');
-        } else if (suggestion.type === 'modeSwitch' && suggestion.favicon) {
+        } else if ((suggestion.type === 'modeSwitch' || suggestion.type === 'zenSwitch') && suggestion.favicon) {
           const favicon = createFaviconImage(index);
           favicon.src = suggestion.favicon || '';
           favicon.onerror = function() {
