@@ -1244,7 +1244,9 @@
         const navigateLeafItem = (event) => {
           cancelBookmarkCascadeHoverIntent();
           hideCursorTooltip();
-          close();
+          if (!shouldOpenUrlInBackground(event)) {
+            close();
+          }
           openBookmarkCascadeUrl(item.url, event);
         };
 

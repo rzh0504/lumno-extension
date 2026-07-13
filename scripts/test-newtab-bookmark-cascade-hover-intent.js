@@ -920,7 +920,7 @@ async function openCascadeWithSubmenu(overrides) {
 
   {
     const hiddenTooltips = [];
-    const { documentObj, openedUrls, tooltipBindings } = await openCascadeWithSubmenu({
+    const { documentObj, openedUrls, runtime, tooltipBindings } = await openCascadeWithSubmenu({
       hideCursorTooltip: () => {
         hiddenTooltips.push(true);
       }
@@ -949,10 +949,20 @@ async function openCascadeWithSubmenu(overrides) {
       metaKey: true,
       target: nestedUrlItem
     }));
+    assert.strictEqual(
+      runtime.isOpen(),
+      true,
+      'Command-clicking a bookmark URL should keep the cascade menu open'
+    );
     nestedUrlItem.dispatchEvent(createFakeEvent('auxclick', {
       button: 1,
       target: nestedUrlItem
     }));
+    assert.strictEqual(
+      runtime.isOpen(),
+      true,
+      'middle-clicking a bookmark URL should keep the cascade menu open'
+    );
 
     assert.deepStrictEqual(
       openedUrls,
@@ -966,10 +976,36 @@ async function openCascadeWithSubmenu(overrides) {
       hiddenTooltips.length > 0,
       'bookmark cascade URL activation should hide the cursor-following tooltip'
     );
+
+    documentObj.dispatchEvent(createFakeEvent('pointerdown', {
+      target: documentObj.body
+    }));
+    assert.strictEqual(
+      runtime.isOpen(),
+      false,
+      'clicking outside should close a cascade menu kept open after background opening'
+    );
   }
 
   {
-    const { documentObj, openedUrls } = await openCascadeWithSubmenu();
+    const { documentObj, openedUrls, runtime } = await openCascadeWithSubmenu();
+    const levels = getMenuLevels(documentObj);
+    const nestedUrlItem = getMenuItems(levels[1])[0];
+
+    nestedUrlItem.dispatchEvent(createFakeEvent('click', {
+      target: nestedUrlItem
+    }));
+
+    assert.strictEqual(runtime.isOpen(), false, 'ordinary bookmark clicks should close the cascade menu');
+    assert.deepStrictEqual(
+      openedUrls,
+      [{ url: 'https://example.com/amazon', background: false }],
+      'ordinary bookmark clicks should keep their foreground navigation behavior'
+    );
+  }
+
+  {
+    const { documentObj, openedUrls, runtime } = await openCascadeWithSubmenu();
     const levels = getMenuLevels(documentObj);
     const nestedUrlItem = getMenuItems(levels[1])[0];
 
@@ -983,6 +1019,11 @@ async function openCascadeWithSubmenu(overrides) {
       openedUrls,
       [{ url: 'https://example.com/amazon', background: true }],
       'bookmark cascade URL keyboard activation inside folders should open in the background while Ctrl is held'
+    );
+    assert.strictEqual(
+      runtime.isOpen(),
+      true,
+      'Ctrl+Enter on a bookmark URL should keep the cascade menu open'
     );
   }
 
