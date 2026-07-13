@@ -3597,6 +3597,7 @@ function openOverlayOnTab(activeTab, tabs, source) {
   }
   const overlayInjectionFiles = [
     'src/shared/settings.js',
+    'src/shared/navigation-disposition.js',
     'src/shared/search-utils.js',
     'src/shared/site-search-store.js',
     'src/shared/suggestion-action-model.js',
@@ -5242,32 +5243,32 @@ function handleLocaleAndPermissionMessage(request, sender, sendResponse) {
 function handleExtensionPageMessage(request, sender, sendResponse) {
   switch (request.action) {
     case 'openOptionsPage': {
-      openExtensionOptionsPage((ok) => {
+      openExtensionOptionsPage({ disposition: request.disposition }, (ok) => {
         sendResponse({ ok: ok !== false });
       });
       return true;
     }
     case 'openOnboardingPage': {
-      openOnboardingPage({ reason: 'manual' }, (ok) => {
+      openOnboardingPage({ reason: 'manual', disposition: request.disposition }, (ok) => {
         sendResponse({ ok: ok !== false });
       });
       return true;
     }
     case 'openReleasePage': {
       const reason = typeof request.reason === 'string' ? request.reason : 'manual';
-      openReleasePage({ reason }, (ok) => {
+      openReleasePage({ reason, disposition: request.disposition }, (ok) => {
         sendResponse({ ok: ok !== false });
       });
       return true;
     }
     case 'openExtensionShortcutsPage': {
-      openExtensionShortcutsPage((ok) => {
+      openExtensionShortcutsPage({ disposition: request.disposition }, (ok) => {
         sendResponse({ ok: ok !== false });
       });
       return true;
     }
     case 'openSiteSearchOptionsPage': {
-      openSiteSearchOptionsPage((ok) => {
+      openSiteSearchOptionsPage({ disposition: request.disposition }, (ok) => {
         sendResponse({ ok: ok !== false });
       });
       return true;
@@ -5319,14 +5320,20 @@ function handleExtensionPageMessage(request, sender, sendResponse) {
       const newtabUrl = typeof EXTENSION_ROUTES.buildLumnoNewtabUrl === 'function'
         ? EXTENSION_ROUTES.buildLumnoNewtabUrl(chrome, { focus: true })
         : chrome.runtime.getURL('src/newtab/lumno-newtab.html?focus=1');
-      createTabWithSourceGroup({ url: newtabUrl }, sender && sender.tab ? sender.tab : null, (_tab, info) => {
+      createTabWithSourceGroup({
+        url: newtabUrl,
+        active: request.disposition !== 'backgroundTab'
+      }, sender && sender.tab ? sender.tab : null, (_tab, info) => {
         sendResponse({ ok: Boolean(info && info.ok) });
       });
       return true;
     }
     case 'openExtensionDetailsPage': {
       const detailsUrl = getExtensionDetailsUrl();
-      createTabWithSourceGroup({ url: detailsUrl }, sender && sender.tab ? sender.tab : null, (_tab, info) => {
+      createTabWithSourceGroup({
+        url: detailsUrl,
+        active: request.disposition !== 'backgroundTab'
+      }, sender && sender.tab ? sender.tab : null, (_tab, info) => {
         sendResponse({ ok: Boolean(info && info.ok), url: detailsUrl });
       });
       return true;

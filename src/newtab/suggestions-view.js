@@ -985,13 +985,31 @@
           }
         });
 
+        const activateOpenTabSuggestion = function(event) {
+          onSwitchToTab(tab, event);
+        };
         switchButton.addEventListener('click', function(event) {
           event.stopPropagation();
-          onSwitchToTab(tab);
+          activateOpenTabSuggestion(event);
         });
 
-        suggestionItem.addEventListener('click', function() {
-          onSwitchToTab(tab);
+        suggestionItem.addEventListener('click', function(event) {
+          activateOpenTabSuggestion(event);
+        });
+        switchButton.addEventListener('auxclick', function(event) {
+          if (!event || Number(event.button) !== 1) {
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          activateOpenTabSuggestion(event);
+        });
+        suggestionItem.addEventListener('auxclick', function(event) {
+          if (!event || Number(event.button) !== 1) {
+            return;
+          }
+          event.preventDefault();
+          activateOpenTabSuggestion(event);
         });
 
         suggestionItem.appendChild(leftSide);
@@ -1331,12 +1349,28 @@
           updateSelection(getSelectedIndex());
         });
 
-        suggestionItem.addEventListener('click', function(event) {
+        const activateSuggestionItem = function(event) {
           onActivateSuggestion(suggestion, query, event, index, suggestionItem);
-        });
-        visitButton.addEventListener('click', function(event) {
+        };
+        const activateVisitButton = function(event) {
           event.stopPropagation();
           onActivateSuggestion(suggestion, query, event, index, suggestionItem);
+        };
+        suggestionItem.addEventListener('click', activateSuggestionItem);
+        suggestionItem.addEventListener('auxclick', function(event) {
+          if (!event || Number(event.button) !== 1) {
+            return;
+          }
+          event.preventDefault();
+          activateSuggestionItem(event);
+        });
+        visitButton.addEventListener('click', activateVisitButton);
+        visitButton.addEventListener('auxclick', function(event) {
+          if (!event || Number(event.button) !== 1) {
+            return;
+          }
+          event.preventDefault();
+          activateVisitButton(event);
         });
 
         leftSide.appendChild(iconNode);

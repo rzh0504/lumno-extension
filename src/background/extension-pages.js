@@ -36,6 +36,7 @@
       ? options
       : (typeof callback === 'function' ? callback : () => {});
     const hash = typeof openOptions.hash === 'string' ? openOptions.hash.trim() : '';
+    const active = openOptions.disposition !== 'backgroundTab';
     const fallbackOpen = () => {
       const routes = getRoutesApi();
       const optionsUrl = routes && typeof routes.buildOptionsUrl === 'function'
@@ -50,7 +51,7 @@
           }
           return url.toString();
         })();
-      chromeApi.tabs.create({ url: optionsUrl }, () => {
+      chromeApi.tabs.create({ url: optionsUrl, active }, () => {
         done(!(chromeApi.runtime && chromeApi.runtime.lastError));
       });
     };
@@ -60,7 +61,7 @@
       return;
     }
 
-    if (hash) {
+    if (hash || !active) {
       fallbackOpen();
       return;
     }
@@ -79,8 +80,10 @@
     });
   }
 
-  function openSiteSearchOptionsPage(callback) {
-    openExtensionOptionsPage({ hash: 'shortcuts' }, callback);
+  function openSiteSearchOptionsPage(options, callback) {
+    const openOptions = typeof options === 'function' ? {} : (options || {});
+    const done = typeof options === 'function' ? options : callback;
+    openExtensionOptionsPage(Object.assign({}, openOptions, { hash: 'shortcuts' }), done);
   }
 
   function buildExtensionPageUrl(path) {
@@ -128,7 +131,10 @@
       done(false);
       return;
     }
-    chromeApi.tabs.create({ url: buildOnboardingUrl(openOptions) }, () => {
+    chromeApi.tabs.create({
+      url: buildOnboardingUrl(openOptions),
+      active: openOptions.disposition !== 'backgroundTab'
+    }, () => {
       done(!(chromeApi.runtime && chromeApi.runtime.lastError));
     });
   }
@@ -219,12 +225,13 @@
       return;
     }
     const releaseUrl = buildReleaseUrl(options);
+    const active = !(options && options.disposition === 'backgroundTab');
     const oncePerVersion = Boolean(options && options.oncePerVersion);
     const version = getExtensionVersionTag();
     const storageArea = getSyncableStorageArea(chromeApi);
     const localStorageArea = getLocalStorageArea(chromeApi);
     const openTab = (afterOpen) => {
-      chromeApi.tabs.create({ url: releaseUrl }, () => {
+      chromeApi.tabs.create({ url: releaseUrl, active }, () => {
         const opened = !(chromeApi.runtime && chromeApi.runtime.lastError);
         if (opened && typeof afterOpen === 'function') {
           afterOpen();
@@ -345,14 +352,20 @@
     });
   }
 
-  function openExtensionShortcutsPage(callback) {
+  function openExtensionShortcutsPage(options, callback) {
     const chromeApi = getChromeApi();
-    const done = typeof callback === 'function' ? callback : () => {};
+    const openOptions = typeof options === 'function' ? {} : (options || {});
+    const done = typeof options === 'function'
+      ? options
+      : (typeof callback === 'function' ? callback : () => {});
     if (!chromeApi || !chromeApi.tabs) {
       done(false);
       return;
     }
-    chromeApi.tabs.create({ url: 'chrome://extensions/shortcuts' }, () => {
+    chromeApi.tabs.create({
+      url: 'chrome://extensions/shortcuts',
+      active: openOptions.disposition !== 'backgroundTab'
+    }, () => {
       done(!(chromeApi.runtime && chromeApi.runtime.lastError));
     });
   }

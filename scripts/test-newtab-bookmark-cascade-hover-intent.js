@@ -949,11 +949,18 @@ async function openCascadeWithSubmenu(overrides) {
       metaKey: true,
       target: nestedUrlItem
     }));
+    nestedUrlItem.dispatchEvent(createFakeEvent('auxclick', {
+      button: 1,
+      target: nestedUrlItem
+    }));
 
     assert.deepStrictEqual(
       openedUrls,
-      [{ url: 'https://example.com/amazon', background: true }],
-      'bookmark cascade URL clicks inside folders should open in the background while Command is held'
+      [
+        { url: 'https://example.com/amazon', background: true },
+        { url: 'https://example.com/amazon', background: true }
+      ],
+      'bookmark cascade URL items should support Command-click and middle-click background opening'
     );
     assert.ok(
       hiddenTooltips.length > 0,

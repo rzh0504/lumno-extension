@@ -1,10 +1,13 @@
 (function(root, factory) {
-  const api = factory();
+  const api = factory(root);
   if (typeof module === 'object' && module.exports) {
     module.exports = api;
   }
   root.LumnoFeatureHints = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function() {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function(root) {
+  const NAVIGATION_DISPOSITION = root && root.LumnoNavigationDisposition
+    ? root.LumnoNavigationDisposition
+    : {};
   const FEATURE_HINTS = Object.freeze({
     NEWTAB_WALLPAPER: Object.freeze({
       id: 'newtab-wallpaper',
@@ -363,7 +366,7 @@
       linkIcon.innerHTML = getRiSvg('ri-arrow-right-line', 'ri-size-12');
       linkButton.appendChild(linkText);
       linkButton.appendChild(linkIcon);
-      linkButton.addEventListener('click', (event) => {
+      const activateLink = (event) => {
         event.preventDefault();
         event.stopPropagation();
         if (typeof config.onLinkClick === 'function') {
@@ -383,6 +386,15 @@
         }
         if (windowObj.location && typeof windowObj.location.assign === 'function') {
           windowObj.location.assign(linkUrl);
+        }
+      };
+      linkButton.addEventListener('click', activateLink);
+      linkButton.addEventListener('auxclick', (event) => {
+        const isMiddleClick = typeof NAVIGATION_DISPOSITION.isMiddleClick === 'function'
+          ? NAVIGATION_DISPOSITION.isMiddleClick(event)
+          : Boolean(event && Number(event.button) === 1);
+        if (isMiddleClick) {
+          activateLink(event);
         }
       });
     }

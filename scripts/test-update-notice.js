@@ -302,6 +302,11 @@ function flushMicrotasks() {
     'newtab update notice should be appended below the input search layer and outside it'
   );
   const overlaySource = fs.readFileSync('src/overlay/search-panel.js', 'utf8');
+  assert.match(
+    overlaySource,
+    /onDetailsClick\(_notice, event\)[\s\S]*action: 'openReleasePage',[\s\S]*disposition: getOpenDisposition\(event, 'newTab'\)/,
+    'overlay update notice should forward background-opening modifiers'
+  );
   assert.strictEqual(
     overlaySource.includes('overlay.appendChild(overlayUpdateNoticeController.element)'),
     false,
@@ -439,8 +444,8 @@ function flushMicrotasks() {
     getRiSvg() {
       return '';
     },
-    onDetailsClick(notice) {
-      detailsClicks.push(notice);
+    onDetailsClick(notice, event) {
+      detailsClicks.push({ notice, event });
     }
   });
   const secondController = updateNotice.createUpdateNotice({
@@ -475,7 +480,15 @@ function flushMicrotasks() {
     stopPropagation() {}
   });
   assert.strictEqual(detailsClicks.length, 1, 'details button should call the details handler');
-  assert.strictEqual(detailsClicks[0].version, 'v0.9.10');
+  assert.strictEqual(detailsClicks[0].notice.version, 'v0.9.10');
+
+  firstController.element.children[2].listeners.auxclick({
+    button: 1,
+    preventDefault() {},
+    stopPropagation() {}
+  });
+  assert.strictEqual(detailsClicks.length, 2, 'middle-click should call the details handler once');
+  assert.strictEqual(detailsClicks[1].event.button, 1, 'middle-click event should reach the surface disposition handler');
 
   firstController.dismiss();
   await flushMicrotasks();

@@ -12,6 +12,7 @@ const injectedScriptFiles = [
   'src/background/pip-main-world.js',
   'src/background/recent-tab-switcher.js',
   'src/shared/extension-routes.js',
+  'src/shared/navigation-disposition.js',
   'src/shared/settings.js',
   'src/shared/search-utils.js',
   'src/shared/site-search-store.js',

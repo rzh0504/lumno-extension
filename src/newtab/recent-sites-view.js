@@ -122,7 +122,7 @@
     }
 
     function shouldOpenUrlInBackground(event) {
-      return Boolean(event && (event.metaKey || event.ctrlKey));
+      return Boolean(event && (event.metaKey || event.ctrlKey || Number(event.button) === 1));
     }
 
     function buildCard(item, index) {
@@ -352,6 +352,14 @@
           event.preventDefault();
           return;
         }
+        navigateFromCard(event);
+      });
+      card.addEventListener('auxclick', (event) => {
+        if (!event || Number(event.button) !== 1) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
         navigateFromCard(event);
       });
       card.addEventListener('keydown', (event) => {

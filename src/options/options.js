@@ -1,4 +1,5 @@
 (function() {
+  const NAVIGATION_DISPOSITION = globalThis.LumnoNavigationDisposition || {};
   const panel = document.getElementById('_x_extension_settings_panel_2024_unique_');
   const optionsRoot = document.getElementById('_x_extension_options_root_2024_unique_');
   const tabsRow = document.querySelector('._x_extension_settings_tabs_row_2024_unique_');
@@ -2374,17 +2375,36 @@
     if (manifest?.version) {
       settingsVersion.textContent = `v${manifest.version}`;
     }
-    settingsVersion.addEventListener('click', (event) => {
+    function getOpenDisposition(event, fallback) {
+      if (typeof NAVIGATION_DISPOSITION.getDisposition === 'function') {
+        return NAVIGATION_DISPOSITION.getDisposition(event, fallback);
+      }
+      return event && (event.metaKey || event.ctrlKey || Number(event.button) === 1)
+        ? 'backgroundTab'
+        : (fallback || 'newTab');
+    }
+    function openSettingsVersionRelease(event) {
       event.preventDefault();
       event.stopPropagation();
       if (!chrome?.runtime?.sendMessage) {
         return;
       }
-      chrome.runtime.sendMessage({ action: 'openReleasePage', reason: 'options-version' }, () => {
+      chrome.runtime.sendMessage({
+        action: 'openReleasePage',
+        reason: 'options-version',
+        disposition: getOpenDisposition(event, 'newTab')
+      }, () => {
         if (chrome.runtime && chrome.runtime.lastError) {
           return;
         }
       });
+    }
+    settingsVersion.addEventListener('click', openSettingsVersionRelease);
+    settingsVersion.addEventListener('auxclick', (event) => {
+      if (!event || Number(event.button) !== 1) {
+        return;
+      }
+      openSettingsVersionRelease(event);
     });
   }
 

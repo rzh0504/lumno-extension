@@ -24,6 +24,7 @@ const injectedScriptFiles = [
   'src/background/pip-ownership.js',
   'src/background/pip-main-world.js',
   'src/shared/extension-routes.js',
+  'src/shared/navigation-disposition.js',
   'src/shared/settings.js',
   'src/shared/search-utils.js',
   'src/shared/site-search-store.js',

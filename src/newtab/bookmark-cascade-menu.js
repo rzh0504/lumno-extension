@@ -1106,7 +1106,7 @@
     }
 
     function shouldOpenUrlInBackground(event) {
-      return Boolean(event && (event.metaKey || event.ctrlKey));
+      return Boolean(event && (event.metaKey || event.ctrlKey || Number(event.button) === 1));
     }
 
     function openBookmarkCascadeUrl(url, event) {
@@ -1321,6 +1321,14 @@
             activateLeafItem();
           });
           itemButton.addEventListener('click', (event) => {
+            navigateLeafItem(event);
+          });
+          itemButton.addEventListener('auxclick', (event) => {
+            if (!event || Number(event.button) !== 1) {
+              return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
             navigateLeafItem(event);
           });
           itemButton.addEventListener('keydown', (event) => {

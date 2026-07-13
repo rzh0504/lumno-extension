@@ -1,5 +1,14 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const pages = require('../src/background/extension-pages.js');
+
+const optionsSource = fs.readFileSync(path.join(__dirname, '..', 'src/options/options.js'), 'utf8');
+assert.match(
+  optionsSource,
+  /function openSettingsVersionRelease\(event\)[\s\S]*action: 'openReleasePage',[\s\S]*disposition: getOpenDisposition\(event, 'newTab'\)[\s\S]*settingsVersion\.addEventListener\('auxclick'/,
+  'Options version badge should support modified and middle-click background opening'
+);
 
 function createStorageArea(store) {
   return {
@@ -20,6 +29,7 @@ function createStorageArea(store) {
 }
 
 function createChromeApi(localStore, syncStore, createdTabs, version) {
+  createdTabs.options = createdTabs.options || [];
   return {
     runtime: {
       lastError: null,
@@ -38,6 +48,7 @@ function createChromeApi(localStore, syncStore, createdTabs, version) {
     tabs: {
       create(options, callback) {
         createdTabs.push(options.url);
+        createdTabs.options.push(Object.assign({}, options));
         if (typeof callback === 'function') {
           callback();
         }
@@ -61,6 +72,18 @@ function openOnboardingPage(options) {
 function openSiteSearchOptionsPage() {
   return new Promise((resolve) => {
     pages.openSiteSearchOptionsPage(resolve);
+  });
+}
+
+function openExtensionOptionsPage(options) {
+  return new Promise((resolve) => {
+    pages.openExtensionOptionsPage(options, resolve);
+  });
+}
+
+function openExtensionShortcutsPage(options) {
+  return new Promise((resolve) => {
+    pages.openExtensionShortcutsPage(options, resolve);
   });
 }
 
@@ -110,19 +133,46 @@ function openSiteSearchOptionsPage() {
   assert.strictEqual(onboardingUrl.searchParams.get('reason'), 'manual', 'onboarding should include open reason');
   assert.strictEqual(onboardingUrl.searchParams.get('version'), 'v0.9.9', 'onboarding should include extension version');
 
+  const backgroundOnboardingOpened = await openOnboardingPage({
+    reason: 'manual',
+    disposition: 'backgroundTab'
+  });
+  assert.strictEqual(backgroundOnboardingOpened, true, 'background onboarding should open a tab');
+  assert.strictEqual(
+    createdTabs.options[1].active,
+    false,
+    'background onboarding should create an inactive tab'
+  );
+
   assert.strictEqual(typeof pages.openSiteSearchOptionsPage, 'function', 'site-search options opener should be exported');
   const siteSearchOptionsOpened = await openSiteSearchOptionsPage();
   assert.strictEqual(siteSearchOptionsOpened, true, 'site-search options opener should create a tab');
-  assert.strictEqual(createdTabs.length, 2, 'site-search options opener should create one tab');
+  assert.strictEqual(createdTabs.length, 3, 'site-search options opener should create one tab');
   assert.strictEqual(
-    createdTabs[1],
+    createdTabs[2],
     'chrome-extension://lumno-test-id/src/options/options.html#shortcuts',
     'site-search options opener should deep-link to the shortcuts/site-search list'
   );
 
-  const firstOpened = await openReleasePage({ reason: 'update', oncePerVersion: true });
+  const backgroundOptionsOpened = await openExtensionOptionsPage({
+    hash: 'appearance',
+    disposition: 'backgroundTab'
+  });
+  assert.strictEqual(backgroundOptionsOpened, true, 'background options should open a tab');
+  assert.strictEqual(createdTabs.options[3].active, false, 'background options should create an inactive tab');
+
+  const backgroundShortcutsOpened = await openExtensionShortcutsPage({ disposition: 'backgroundTab' });
+  assert.strictEqual(backgroundShortcutsOpened, true, 'background shortcut settings should open a tab');
+  assert.strictEqual(createdTabs.options[4].active, false, 'background shortcut settings should create an inactive tab');
+
+  const firstOpened = await openReleasePage({
+    reason: 'update',
+    oncePerVersion: true,
+    disposition: 'backgroundTab'
+  });
   assert.strictEqual(firstOpened, true, 'first update should open the release page');
-  assert.strictEqual(createdTabs.length, 3, 'first update should create one release tab');
+  assert.strictEqual(createdTabs.length, 6, 'first update should create one release tab');
+  assert.strictEqual(createdTabs.options[5].active, false, 'background release should create an inactive tab');
   assert.strictEqual(
     syncStore[pages.RELEASE_PAGE_OPENED_STORAGE_KEY].version,
     'v0.9.9',
@@ -136,12 +186,12 @@ function openSiteSearchOptionsPage() {
 
   const secondOpened = await openReleasePage({ reason: 'update', oncePerVersion: true });
   assert.strictEqual(secondOpened, false, 'same version should not reopen the release page');
-  assert.strictEqual(createdTabs.length, 3, 'same version should not create another release tab');
+  assert.strictEqual(createdTabs.length, 6, 'same version should not create another release tab');
 
   global.chrome = createChromeApi(localStore, syncStore, createdTabs, '0.10.0');
   const nextVersionOpened = await openReleasePage({ reason: 'update', oncePerVersion: true });
   assert.strictEqual(nextVersionOpened, true, 'new version should open the release page again');
-  assert.strictEqual(createdTabs.length, 4, 'new version should create a new release tab');
+  assert.strictEqual(createdTabs.length, 7, 'new version should create a new release tab');
   assert.strictEqual(
     syncStore[pages.RELEASE_PAGE_OPENED_STORAGE_KEY].version,
     'v0.10.0',
