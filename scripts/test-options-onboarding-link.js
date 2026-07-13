@@ -107,7 +107,7 @@ assert.match(
 );
 assert.match(
   optionsJs,
-  /settingsVersion\.addEventListener\('click'[\s\S]*?chrome\.runtime\.sendMessage\(\{\s*action:\s*'openReleasePage',\s*reason:\s*'options-version'\s*\}/,
+  /function openSettingsVersionRelease\(event\)[\s\S]*?chrome\.runtime\.sendMessage\(\{\s*action:\s*'openReleasePage',\s*reason:\s*'options-version',\s*disposition:[\s\S]*?settingsVersion\.addEventListener\('click', openSettingsVersionRelease\)/,
   'clicking the version button should ask the background page to open the official release page'
 );
 

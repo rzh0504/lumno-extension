@@ -1,5 +1,6 @@
 (function() {
   const MODEL = globalThis.LumnoOnboardingContent || {};
+  const NAVIGATION_DISPOSITION = globalThis.LumnoNavigationDisposition || {};
   if (typeof MODEL.getOnboardingBlueprint !== 'function') {
     return;
   }
@@ -354,15 +355,18 @@
     }
   }
 
-  function openExtensionPageTab(path) {
+  function openExtensionPageTab(path, eventOrDisposition) {
     const url = buildRuntimePageUrl(path);
     if (!url) {
       return false;
     }
     const chromeApi = getChromeApi();
+    const disposition = typeof eventOrDisposition === 'string'
+      ? eventOrDisposition
+      : getOpenDisposition(eventOrDisposition, 'newTab');
     if (chromeApi && chromeApi.tabs && typeof chromeApi.tabs.create === 'function') {
       try {
-        chromeApi.tabs.create({ url });
+        chromeApi.tabs.create({ url, active: disposition !== 'backgroundTab' });
         return true;
       } catch (error) {
         // Fall through to window.open when the tabs API is unavailable.
@@ -375,19 +379,34 @@
     return false;
   }
 
-  function openSiteSearchOptionsFallback() {
-    return openExtensionPageTab(SITE_SEARCH_OPTIONS_PAGE_PATH);
+  function openSiteSearchOptionsFallback(eventOrDisposition) {
+    return openExtensionPageTab(SITE_SEARCH_OPTIONS_PAGE_PATH, eventOrDisposition);
   }
 
-  function openExternalTab(url) {
+  function getOpenDisposition(event, fallback) {
+    if (typeof event === 'string') {
+      return event === 'backgroundTab' ? 'backgroundTab' : (fallback || event || 'newTab');
+    }
+    if (typeof NAVIGATION_DISPOSITION.getDisposition === 'function') {
+      return NAVIGATION_DISPOSITION.getDisposition(event, fallback);
+    }
+    return event && (event.metaKey || event.ctrlKey || Number(event.button) === 1)
+      ? 'backgroundTab'
+      : (fallback || 'newTab');
+  }
+
+  function openExternalTab(url, eventOrDisposition) {
     const targetUrl = String(url || '').trim();
     if (!targetUrl) {
       return false;
     }
     const chromeApi = getChromeApi();
+    const disposition = typeof eventOrDisposition === 'string'
+      ? eventOrDisposition
+      : getOpenDisposition(eventOrDisposition, 'newTab');
     if (chromeApi && chromeApi.runtime && typeof chromeApi.runtime.sendMessage === 'function') {
       try {
-        chromeApi.runtime.sendMessage({ action: 'createTab', url: targetUrl }, (response) => {
+        chromeApi.runtime.sendMessage({ action: 'createTab', url: targetUrl, disposition }, (response) => {
           const lastError = chromeApi.runtime && chromeApi.runtime.lastError;
           if (!lastError && response && response.ok !== false) {
             return;
@@ -3757,7 +3776,7 @@
     animateCopySwap(nextState);
   }
 
-  function runExtensionAction(actionTarget) {
+  function runExtensionAction(actionTarget, event) {
     const target = typeof actionTarget === 'string' ? null : actionTarget;
     const id = typeof actionTarget === 'string'
       ? String(actionTarget || '')
@@ -3765,6 +3784,7 @@
     if (!id) {
       return;
     }
+    const disposition = getOpenDisposition(event, 'newTab');
     if (id === 'next') {
       dispatch({ type: 'NEXT' });
       return;
@@ -3778,12 +3798,14 @@
       return;
     }
     if (id === 'openChromeWebStore') {
-      openExternalTab(LUMNO_CHROME_WEB_STORE_URL);
+      openExternalTab(LUMNO_CHROME_WEB_STORE_URL, disposition);
       return;
     }
     if (id === 'openNewtab') {
-      if (navigateOnboardingToNewtab()) {
-        return;
+      if (disposition !== 'backgroundTab') {
+        if (navigateOnboardingToNewtab()) {
+          return;
+        }
       }
     }
 
@@ -3791,20 +3813,23 @@
     const messageAction = ACTION_MESSAGE_BY_ID[id];
     if (!messageAction || !chromeApi || !chromeApi.runtime || typeof chromeApi.runtime.sendMessage !== 'function') {
       if (id === 'openSiteSearchOptions') {
-        openSiteSearchOptionsFallback();
+        openSiteSearchOptionsFallback(disposition);
       }
       return;
     }
     try {
-      chromeApi.runtime.sendMessage({ action: messageAction }, (response) => {
+      chromeApi.runtime.sendMessage({
+        action: messageAction,
+        disposition
+      }, (response) => {
         const lastError = chromeApi.runtime && chromeApi.runtime.lastError;
         if (id === 'openSiteSearchOptions' && (lastError || !response || response.ok === false)) {
-          openSiteSearchOptionsFallback();
+          openSiteSearchOptionsFallback(disposition);
         }
       });
     } catch (error) {
       if (id === 'openSiteSearchOptions') {
-        openSiteSearchOptionsFallback();
+        openSiteSearchOptionsFallback(disposition);
       }
     }
   }
@@ -3815,7 +3840,7 @@
       : null;
     if (accordionLinkTarget) {
       event.preventDefault();
-      runExtensionAction(accordionLinkTarget);
+      runExtensionAction(accordionLinkTarget, event);
       return;
     }
     if (event.target && event.target.closest && event.target.closest('.interaction-accordion-panel')) {
@@ -3832,7 +3857,22 @@
       dispatch({ type: 'GOTO', index: Number(target.dataset.slideTarget) });
       return;
     }
-    runExtensionAction(target);
+    runExtensionAction(target, event);
+  });
+
+  document.addEventListener('auxclick', (event) => {
+    if (!event || Number(event.button) !== 1) {
+      return;
+    }
+    const target = event.target && event.target.closest
+      ? event.target.closest('.interaction-accordion-link[data-action]')
+      : null;
+    if (!target) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    runExtensionAction(target, event);
   });
 
   document.addEventListener('keydown', (event) => {

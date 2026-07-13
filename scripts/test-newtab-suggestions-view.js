@@ -1850,6 +1850,7 @@ function testNewtabShiftEnterOpensMatchedTabInNewTab() {
 
 function testNewtabCommandEnterOpensFocusedResultInBackgroundTab() {
   const newtabJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/newtab.js'), 'utf8');
+  const suggestionsViewJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/suggestions-view.js'), 'utf8');
   const backgroundJs = fs.readFileSync(path.join(repoRoot, 'src/background/background.js'), 'utf8');
   assert.ok(
     /function shouldOpenSearchResultInBackgroundTab\(event\)[\s\S]*event\.metaKey \|\| event\.ctrlKey[\s\S]*event\.altKey/.test(newtabJs),
@@ -1862,6 +1863,16 @@ function testNewtabCommandEnterOpensFocusedResultInBackgroundTab() {
   assert.ok(
     /function openMatchedTabSuggestion\(suggestion,\s*event,\s*item,\s*query\)[\s\S]*disposition:\s*getSearchResultNewTabDisposition\(event\)/.test(newtabJs),
     'newtab matched open-tab results should use the same foreground/background tab disposition helper'
+  );
+  assert.ok(
+    /suggestionItem\.addEventListener\('auxclick',[\s\S]*Number\(event\.button\) !== 1[\s\S]*activateSuggestionItem\(event\)/.test(suggestionsViewJs) &&
+      /visitButton\.addEventListener\('auxclick',[\s\S]*Number\(event\.button\) !== 1[\s\S]*activateVisitButton\(event\)/.test(suggestionsViewJs),
+    'newtab result rows and action buttons should support middle-click activation'
+  );
+  assert.ok(
+    /const activateOpenTabSuggestion = function\(event\)[\s\S]*onSwitchToTab\(tab, event\)[\s\S]*switchButton\.addEventListener\('auxclick'[\s\S]*suggestionItem\.addEventListener\('auxclick'/.test(suggestionsViewJs) &&
+      /onSwitchToTab: \(tab, event\) =>[\s\S]*shouldOpenSearchResultInBackgroundTab\(event\)[\s\S]*action: 'createTab'[\s\S]*disposition: 'backgroundTab'[\s\S]*action: 'switchToTab'/.test(newtabJs),
+    'newtab open-tab rows should duplicate in the background on middle-click instead of switching'
   );
   assert.ok(
     /(?:chrome\.tabs\.create|createTabWithSourceGroup)\(\{\s*url:\s*targetUrl,\s*active:\s*request\.disposition !== 'backgroundTab'/.test(backgroundJs),
@@ -1888,6 +1899,15 @@ function testOverlayCommandEnterOpensFocusedResultInBackgroundTab() {
   assert.ok(
     /function shouldOpenSearchResultInBackgroundTab\(event\)[\s\S]*event\.metaKey \|\| event\.ctrlKey[\s\S]*event\.altKey/.test(overlayJs),
     'overlay should treat Command/Ctrl, but not Alt/Option, as the background-open modifier'
+  );
+  assert.ok(
+    /visitButton\.addEventListener\('auxclick',[\s\S]*Number\(event\.button\) !== 1[\s\S]*activateVisitButton\(event\)/.test(overlayJs) &&
+      /suggestionItem\.addEventListener\('auxclick',[\s\S]*Number\(event\.button\) !== 1[\s\S]*activateSuggestionItem\(event\)/.test(overlayJs),
+    'overlay result rows and action buttons should support middle-click activation'
+  );
+  assert.ok(
+    /const activateRenderedTabSuggestion = function\(event\)[\s\S]*switchButton\.addEventListener\('auxclick'[\s\S]*suggestionItem\.addEventListener\('auxclick'/.test(overlayJs),
+    'overlay open-tab rows should support middle-click background duplication'
   );
   assert.ok(
     /function getSearchResultCreateDisposition\(suggestion,\s*event,\s*item\)[\s\S]*shouldUseCurrentTabForOpenNewTabAction\(suggestion,\s*event,\s*item\)[\s\S]*getSearchResultNewTabDisposition\(event\)/.test(overlayJs),

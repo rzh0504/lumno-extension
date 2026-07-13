@@ -142,7 +142,7 @@
     });
 
     function shouldOpenUrlInBackground(event) {
-      return Boolean(event && (event.metaKey || event.ctrlKey));
+      return Boolean(event && (event.metaKey || event.ctrlKey || Number(event.button) === 1));
     }
 
     function openBookmarkUrl(url, event) {
@@ -435,6 +435,15 @@
           openFolder(item.id);
           return;
         }
+        openBookmarkUrl(item.url, event);
+      });
+      card.addEventListener('auxclick', (event) => {
+        if (isFolder || !event || Number(event.button) !== 1) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        hideCursorTooltip();
         openBookmarkUrl(item.url, event);
       });
       card.addEventListener('keydown', (event) => {

@@ -233,7 +233,9 @@ function testBookmarkUrlCardsOpenInBackgroundWithCommandOrControl() {
 
   card.dispatchEvent(createFakeEvent('click', { metaKey: true }));
   card.dispatchEvent(createFakeEvent('keydown', { key: 'Enter', ctrlKey: true }));
+  card.dispatchEvent(createFakeEvent('auxclick', { button: 1 }));
   assert.deepStrictEqual(opened, [
+    { url: 'https://example.com/docs', background: true },
     { url: 'https://example.com/docs', background: true },
     { url: 'https://example.com/docs', background: true }
   ]);
@@ -280,7 +282,9 @@ function testRecentUrlCardsOpenInBackgroundAndBindCursorTooltip() {
     pendingTimers.shift()();
   }
   card.dispatchEvent(createFakeEvent('click', { metaKey: true }));
+  card.dispatchEvent(createFakeEvent('auxclick', { button: 1 }));
   assert.deepStrictEqual(opened, [
+    { url: 'https://example.com/docs', background: true },
     { url: 'https://example.com/docs', background: true }
   ], 'recent card should only open once for a pointerdown followed by the browser click event');
 }
@@ -300,6 +304,33 @@ function testNewtabPassesBackgroundOpenHelperToCardViews() {
   );
 }
 
+function testNewtabShortcutAndWordmarkBackgroundOpening() {
+  assert.ok(
+    /const NAVIGATION_DISPOSITION = globalThis\.LumnoNavigationDisposition \|\| \{\};/.test(newtabJs),
+    'newtab should use the shared navigation disposition helper'
+  );
+  assert.ok(
+    /function openShortcutUrl\(shortcut, event\)[\s\S]*openUrlFromNewtabCard\(shortcut\.url,[\s\S]*openInBackgroundTab: isBackgroundOpenEvent\(event\)/.test(newtabJs),
+    'shortcut tiles should route modified activation through the background-aware card opener'
+  );
+  assert.ok(
+    /tile\.addEventListener\('auxclick',[\s\S]*isMiddleClick\(event\)[\s\S]*openShortcutUrl\(shortcut, event\)/.test(newtabJs),
+    'shortcut tiles should open middle-clicks in the background'
+  );
+  assert.ok(
+    /function openWordmarkUrl\(event\)[\s\S]*openExternalNewTabUrl\(LUMNO_CHROME_WEB_STORE_URL, event\)/.test(newtabJs),
+    'wordmark should use the background-aware external new-tab opener'
+  );
+  assert.ok(
+    /wordmarkButton\.addEventListener\('auxclick',[\s\S]*openWordmarkUrl\(event\)/.test(newtabJs),
+    'wordmark should support middle-click background opening'
+  );
+  assert.ok(
+    /onDetailsClick\(_notice, event\)[\s\S]*action: 'openReleasePage',[\s\S]*disposition: getOpenDisposition\(event, 'newTab'\)/.test(newtabJs),
+    'newtab update notice should forward the modifier disposition'
+  );
+}
+
 function testRecentDismissUsesSubtractIcon() {
   const match = newtabJs.match(/function updateRecentDismissButton\(button, item\) \{[\s\S]*?\n  \}/);
   assert.ok(match, 'newtab should define recent dismiss button rendering');
@@ -316,6 +347,7 @@ function testRecentDismissUsesSubtractIcon() {
 testBookmarkUrlCardsOpenInBackgroundWithCommandOrControl();
 testRecentUrlCardsOpenInBackgroundAndBindCursorTooltip();
 testNewtabPassesBackgroundOpenHelperToCardViews();
+testNewtabShortcutAndWordmarkBackgroundOpening();
 testRecentDismissUsesSubtractIcon();
 
 console.log('newtab card background open tests passed');

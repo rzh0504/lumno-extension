@@ -200,6 +200,18 @@ assertContains(
   'feedback popover should place the Chrome review action in the icon row'
 );
 
+assert.match(
+  newtabJs,
+  /async function handleFeedbackCommunityClick\(event\)[\s\S]*const disposition = getOpenDisposition\(event, 'newTab'\);[\s\S]*openFeedbackExternalUrl\([\s\S]*disposition\s*\);/,
+  'Discord feedback activation should preserve background-opening modifiers across async link loading'
+);
+
+assert.match(
+  newtabJs,
+  /feedbackCommunityButton\.addEventListener\('auxclick',[\s\S]*isMiddleClick\(event\)[\s\S]*handleFeedbackCommunityClick\(event\)/,
+  'Discord feedback action should support middle-click background opening'
+);
+
 assert.ok(
   !newtabJs.includes('feedbackMailButton') &&
     !newtabJs.includes('handleFeedbackMailClick') &&

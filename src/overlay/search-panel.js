@@ -48,6 +48,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   const OVERLAY_CONTEXT_TOKEN_ATTRIBUTE = 'data-lumno-overlay-context-token';
   const overlayContextToken = getOrCreateOverlayContextToken();
   const SETTINGS = window.LumnoSettings || {};
+  const NAVIGATION_DISPOSITION = window.LumnoNavigationDisposition || {};
   const SEARCH_UTILS = window.LumnoSearchUtils || {};
   const SITE_SEARCH_STORE = window.LumnoSiteSearchStore || {};
   const SUGGESTION_ACTION_MODEL = window.LumnoSuggestionActionModel || {};
@@ -1371,8 +1372,12 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         surface: 'overlay',
         t,
         getRiSvg,
-        onDetailsClick() {
-          chrome.runtime.sendMessage({ action: 'openReleasePage', reason: 'notice' });
+        onDetailsClick(_notice, event) {
+          chrome.runtime.sendMessage({
+            action: 'openReleasePage',
+            reason: 'notice',
+            disposition: getOpenDisposition(event, 'newTab')
+          });
         }
       })
       : null;
@@ -3749,7 +3754,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
 
     function shouldOpenSearchResultInBackgroundTab(event) {
       const config = {
-        openInBackgroundTab: Boolean(event && (event.metaKey || event.ctrlKey)),
+        openInBackgroundTab: Boolean(event && (event.metaKey || event.ctrlKey || isMiddleClick(event))),
         openInCurrentTab: Boolean(event && event.altKey)
       };
       if (SUGGESTION_ACTION_MODEL &&
@@ -3757,6 +3762,22 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         return SUGGESTION_ACTION_MODEL.getSearchResultOpenDisposition(config) === 'backgroundTab';
       }
       return Boolean(config.openInBackgroundTab && !config.openInCurrentTab);
+    }
+
+    function isMiddleClick(event) {
+      if (typeof NAVIGATION_DISPOSITION.isMiddleClick === 'function') {
+        return NAVIGATION_DISPOSITION.isMiddleClick(event);
+      }
+      return Boolean(event && Number(event.button) === 1);
+    }
+
+    function getOpenDisposition(event, fallback) {
+      if (typeof NAVIGATION_DISPOSITION.getDisposition === 'function') {
+        return NAVIGATION_DISPOSITION.getDisposition(event, fallback);
+      }
+      return isMiddleClick(event) || Boolean(event && (event.metaKey || event.ctrlKey))
+        ? 'backgroundTab'
+        : (fallback || 'newTab');
     }
 
     function getSearchResultNewTabDisposition(event) {
@@ -6099,9 +6120,24 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           e.stopPropagation();
           activateRenderedTabSuggestion(e);
         });
+        switchButton.addEventListener('auxclick', function(event) {
+          if (!event || Number(event.button) !== 1) {
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          activateRenderedTabSuggestion(event);
+        });
 
         // Add click handler to select item
         suggestionItem.addEventListener('click', function(event) {
+          activateRenderedTabSuggestion(event);
+        });
+        suggestionItem.addEventListener('auxclick', function(event) {
+          if (!event || Number(event.button) !== 1) {
+            return;
+          }
+          event.preventDefault();
           activateRenderedTabSuggestion(event);
         });
 
@@ -7006,7 +7042,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           });
 
           // Add click handler to visit URL
-          visitButton.addEventListener('click', function(e) {
+          const activateVisitButton = function(e) {
             e.stopPropagation();
             if (suggestion.type === 'commandNewTab') {
               chrome.runtime.sendMessage({ action: 'openNewTab' });
@@ -7081,10 +7117,18 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             document.removeEventListener('click', clickOutsideHandler);
             document.removeEventListener('keydown', keydownHandler);
             document.removeEventListener('keydown', captureTabHandler, true);
+          };
+          visitButton.addEventListener('click', activateVisitButton);
+          visitButton.addEventListener('auxclick', function(event) {
+            if (!event || Number(event.button) !== 1) {
+              return;
+            }
+            event.preventDefault();
+            activateVisitButton(event);
           });
 
           // Add click handler to select item
-          suggestionItem.addEventListener('click', function(event) {
+          const activateSuggestionItem = function(event) {
             if (suggestion.type === 'commandNewTab') {
               chrome.runtime.sendMessage({ action: 'openNewTab' });
               removeOverlay(overlay);
@@ -7161,6 +7205,14 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             document.removeEventListener('click', clickOutsideHandler);
             document.removeEventListener('keydown', keydownHandler);
             document.removeEventListener('keydown', captureTabHandler, true);
+          };
+          suggestionItem.addEventListener('click', activateSuggestionItem);
+          suggestionItem.addEventListener('auxclick', function(event) {
+            if (!event || Number(event.button) !== 1) {
+              return;
+            }
+            event.preventDefault();
+            activateSuggestionItem(event);
           });
 
           leftSide.appendChild(iconNode);

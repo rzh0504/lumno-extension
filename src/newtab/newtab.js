@@ -71,6 +71,7 @@
   const BLACKLIST_UTILS = globalThis.LumnoBlacklistUtils || {};
   const SETTINGS = globalThis.LumnoSettings || {};
   const EXTENSION_ROUTES = globalThis.LumnoExtensionRoutes || {};
+  const NAVIGATION_DISPOSITION = globalThis.LumnoNavigationDisposition || {};
   const SEARCH_UTILS = globalThis.LumnoSearchUtils || {};
   const SITE_SEARCH_STORE = globalThis.LumnoSiteSearchStore || {};
   const SUGGESTION_ACTION_MODEL = globalThis.LumnoSuggestionActionModel || {};
@@ -1330,17 +1331,12 @@
     }
   }
 
-  function openFeedbackExternalUrl(url) {
+  function openFeedbackExternalUrl(url, disposition) {
     const safeUrl = normalizeFeedbackHttpsUrl(url);
     if (!safeUrl) {
       return false;
     }
-    if (chrome && chrome.tabs && typeof chrome.tabs.create === 'function') {
-      chrome.tabs.create({ url: safeUrl, active: true });
-      return true;
-    }
-    window.open(safeUrl, '_blank', 'noopener');
-    return true;
+    return openExternalNewTabUrl(safeUrl, disposition || 'newTab');
   }
 
   function updateFeedbackLanguageStrings() {
@@ -1414,9 +1410,14 @@
 
     const currentLinks = feedbackLinks || LUMNO_FEEDBACK_LINKS_FALLBACK;
     if (getFeedbackCommunityChannel(currentLinks) === 'wechat') {
+      if (isMiddleClick(event)) {
+        return;
+      }
       setFeedbackDetailOpen(feedbackDetail ? feedbackDetail.hidden : true);
       return;
     }
+
+    const disposition = getOpenDisposition(event, 'newTab');
 
     const links = await loadFeedbackLinks({ force: false });
     updateFeedbackContactUi();
@@ -1425,7 +1426,10 @@
       return;
     }
     closeFeedbackPopover();
-    openFeedbackExternalUrl((links && links.discord) || LUMNO_FEEDBACK_LINKS_FALLBACK.discord);
+    openFeedbackExternalUrl(
+      (links && links.discord) || LUMNO_FEEDBACK_LINKS_FALLBACK.discord,
+      disposition
+    );
   }
 
   function createFeedbackControls() {
@@ -1524,6 +1528,12 @@
     feedbackCommunityButton.setAttribute('aria-haspopup', 'false');
     feedbackCommunityButton.setAttribute('aria-expanded', 'false');
     feedbackCommunityButton.addEventListener('click', handleFeedbackCommunityClick);
+    feedbackCommunityButton.addEventListener('auxclick', (event) => {
+      if (!isMiddleClick(event)) {
+        return;
+      }
+      handleFeedbackCommunityClick(event);
+    });
     bindFeedbackActionTooltip(
       feedbackCommunityButton,
       () => feedbackCommunityButton.getAttribute('data-tooltip') ||
@@ -4789,6 +4799,53 @@
     }
   }
 
+  function isMiddleClick(event) {
+    if (typeof NAVIGATION_DISPOSITION.isMiddleClick === 'function') {
+      return NAVIGATION_DISPOSITION.isMiddleClick(event);
+    }
+    return Boolean(event && Number(event.button) === 1);
+  }
+
+  function isBackgroundOpenEvent(event) {
+    if (typeof NAVIGATION_DISPOSITION.isBackgroundOpenEvent === 'function') {
+      return NAVIGATION_DISPOSITION.isBackgroundOpenEvent(event);
+    }
+    return Boolean(event && (event.metaKey || event.ctrlKey || isMiddleClick(event)));
+  }
+
+  function getOpenDisposition(event, fallback) {
+    if (typeof event === 'string') {
+      return event === 'backgroundTab' ? 'backgroundTab' : (fallback || event || 'newTab');
+    }
+    if (typeof NAVIGATION_DISPOSITION.getDisposition === 'function') {
+      return NAVIGATION_DISPOSITION.getDisposition(event, fallback);
+    }
+    return isBackgroundOpenEvent(event) ? 'backgroundTab' : (fallback || 'newTab');
+  }
+
+  function openExternalNewTabUrl(url, eventOrDisposition) {
+    if (!url) {
+      return false;
+    }
+    const disposition = typeof eventOrDisposition === 'string'
+      ? eventOrDisposition
+      : getOpenDisposition(eventOrDisposition, 'newTab');
+    if (chrome && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+      chrome.runtime.sendMessage({
+        action: 'createTab',
+        url,
+        disposition
+      });
+      return true;
+    }
+    if (chrome && chrome.tabs && typeof chrome.tabs.create === 'function') {
+      chrome.tabs.create({ url, active: disposition !== 'backgroundTab' });
+      return true;
+    }
+    window.open(url, '_blank', 'noopener');
+    return true;
+  }
+
   function openUrlFromNewtabCard(url, options) {
     if (!url) {
       return;
@@ -4804,6 +4861,15 @@
       return;
     }
     navigateToUrl(url);
+  }
+
+  function openShortcutUrl(shortcut, event) {
+    if (!shortcut || !shortcut.url) {
+      return;
+    }
+    openUrlFromNewtabCard(shortcut.url, {
+      openInBackgroundTab: isBackgroundOpenEvent(event)
+    });
   }
 
   function recordSearchSuggestionSelection(suggestion, rawQuery) {
@@ -6226,14 +6292,30 @@
       tile._xTheme = theme || tile._xTheme;
       applyShortcutTileTheme(tile, theme, shortcutHost);
     }, { priority: 0 });
-    tile.addEventListener('click', (event) => {
+    const activateShortcut = (event) => {
       if (tile._xShortcutSuppressClick) {
         event.preventDefault();
         event.stopPropagation();
         return;
       }
       hideShortcutTooltip();
-      navigateToUrl(shortcut.url);
+      openShortcutUrl(shortcut, event);
+    };
+    tile.addEventListener('click', activateShortcut);
+    tile.addEventListener('auxclick', (event) => {
+      if (!isMiddleClick(event)) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      openShortcutUrl(shortcut, event);
+    });
+    tile.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') {
+        return;
+      }
+      event.preventDefault();
+      activateShortcut(event);
     });
     tile.addEventListener('contextmenu', handleShortcutContextMenu);
     tile.addEventListener('dragstart', handleShortcutNativeDragStart);
@@ -10042,7 +10124,7 @@
 
   function shouldOpenSearchResultInBackgroundTab(event) {
     const config = {
-      openInBackgroundTab: Boolean(event && (event.metaKey || event.ctrlKey)),
+      openInBackgroundTab: isBackgroundOpenEvent(event),
       openInCurrentTab: Boolean(event && event.altKey)
     };
     if (SUGGESTION_ACTION_MODEL &&
@@ -10180,7 +10262,15 @@
       selectedIndex = nextIndex;
     },
     getSelectedIndex: () => selectedIndex,
-    onSwitchToTab: (tab) => {
+    onSwitchToTab: (tab, event) => {
+      if (shouldOpenSearchResultInBackgroundTab(event) && tab && tab.url) {
+        chrome.runtime.sendMessage({
+          action: 'createTab',
+          url: tab.url,
+          disposition: 'backgroundTab'
+        });
+        return;
+      }
       chrome.runtime.sendMessage({
         action: 'switchToTab',
         tabId: tab.id
@@ -11485,14 +11575,17 @@
     line-height: 0;
     pointer-events: auto;
   `;
-  wordmarkButton.addEventListener('click', (event) => {
+  function openWordmarkUrl(event) {
     event.preventDefault();
     event.stopPropagation();
-    if (chrome.tabs && typeof chrome.tabs.create === 'function') {
-      chrome.tabs.create({ url: LUMNO_CHROME_WEB_STORE_URL, active: true });
+    openExternalNewTabUrl(LUMNO_CHROME_WEB_STORE_URL, event);
+  }
+  wordmarkButton.addEventListener('click', openWordmarkUrl);
+  wordmarkButton.addEventListener('auxclick', (event) => {
+    if (!isMiddleClick(event)) {
       return;
     }
-    window.open(LUMNO_CHROME_WEB_STORE_URL, '_blank', 'noopener');
+    openWordmarkUrl(event);
   });
   const shouldAnimateWordmarkEntry = !window.matchMedia ||
     !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -11551,8 +11644,12 @@
       surface: 'newtab',
       t,
       getRiSvg,
-      onDetailsClick() {
-        chrome.runtime.sendMessage({ action: 'openReleasePage', reason: 'notice' });
+      onDetailsClick(_notice, event) {
+        chrome.runtime.sendMessage({
+          action: 'openReleasePage',
+          reason: 'notice',
+          disposition: getOpenDisposition(event, 'newTab')
+        });
       }
     })
     : null;

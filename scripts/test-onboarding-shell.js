@@ -22,6 +22,17 @@ const lumnoWebWordmarkAsset = fs.readFileSync(
   path.join(__dirname, '..', 'assets', 'images', 'lumno-web-textlogo.svg'),
   'utf8'
 );
+
+assert.match(
+  script,
+  /const NAVIGATION_DISPOSITION = globalThis\.LumnoNavigationDisposition \|\| \{\};[\s\S]*function runExtensionAction\(actionTarget, event\)[\s\S]*const disposition = getOpenDisposition\(event, 'newTab'\);[\s\S]*action: messageAction,[\s\S]*disposition/,
+  'action-backed onboarding links should forward background-opening modifiers'
+);
+assert.match(
+  script,
+  /document\.addEventListener\('auxclick',[\s\S]*Number\(event\.button\) !== 1[\s\S]*interaction-accordion-link\[data-action\][\s\S]*runExtensionAction\(target, event\)/,
+  'onboarding inline action links should support middle-click background opening'
+);
 const homepagePipAsset = fs.readFileSync(
   path.join(__dirname, '..', 'assets', 'images', 'onboarding-auto-pip.svg'),
   'utf8'
@@ -353,7 +364,7 @@ assert.match(
 );
 assert.match(
   script,
-  /const accordionLinkTarget = event\.target && event\.target\.closest[\s\S]*?event\.target\.closest\('\.interaction-accordion-link\[data-action\]'\)[\s\S]*?if \(accordionLinkTarget\)[\s\S]*?event\.preventDefault\(\);[\s\S]*?runExtensionAction\(accordionLinkTarget\);[\s\S]*?return;/,
+  /const accordionLinkTarget = event\.target && event\.target\.closest[\s\S]*?event\.target\.closest\('\.interaction-accordion-link\[data-action\]'\)[\s\S]*?if \(accordionLinkTarget\)[\s\S]*?event\.preventDefault\(\);[\s\S]*?runExtensionAction\(accordionLinkTarget, event\);[\s\S]*?return;/,
   'accordion chrome links should use background actions instead of blocked direct chrome:// navigation'
 );
 assert.match(
@@ -1113,12 +1124,12 @@ assert.match(
 );
 assert.match(
   script,
-  /function openExternalTab\(url\)[\s\S]*?chromeApi\.runtime\.sendMessage\(\{\s*action:\s*'createTab',\s*url:\s*targetUrl\s*\}/,
+  /function openExternalTab\(url, eventOrDisposition\)[\s\S]*?chromeApi\.runtime\.sendMessage\(\{\s*action:\s*'createTab',\s*url:\s*targetUrl,\s*disposition\s*\}/,
   'onboarding should open external action URLs through the background createTab message'
 );
 assert.match(
   script,
-  /if \(id === 'openChromeWebStore'\) \{[\s\S]*?openExternalTab\(LUMNO_CHROME_WEB_STORE_URL\);[\s\S]*?return;[\s\S]*?\}/,
+  /if \(id === 'openChromeWebStore'\) \{[\s\S]*?openExternalTab\(LUMNO_CHROME_WEB_STORE_URL, disposition\);[\s\S]*?return;[\s\S]*?\}/,
   'final rating action should open the Chrome Web Store landing page'
 );
 assert.match(
@@ -1339,12 +1350,12 @@ assert.match(
 );
 assert.match(
   script,
-  /const SITE_SEARCH_OPTIONS_PAGE_PATH = 'src\/options\/options\.html#shortcuts';[\s\S]*?function openExtensionPageTab\([\s\S]*?chromeApi\.tabs\.create\(\{\s*url\s*\}\);[\s\S]*?function openSiteSearchOptionsFallback\([\s\S]*?openExtensionPageTab\(SITE_SEARCH_OPTIONS_PAGE_PATH\)/,
+  /const SITE_SEARCH_OPTIONS_PAGE_PATH = 'src\/options\/options\.html#shortcuts';[\s\S]*?function openExtensionPageTab\([\s\S]*?chromeApi\.tabs\.create\(\{\s*url,\s*active:\s*disposition !== 'backgroundTab'\s*\}\);[\s\S]*?function openSiteSearchOptionsFallback\([\s\S]*?openExtensionPageTab\(SITE_SEARCH_OPTIONS_PAGE_PATH, eventOrDisposition\)/,
   'site list ghost action should fall back to opening the options shortcuts tab directly from onboarding'
 );
 assert.match(
   script,
-  /chromeApi\.runtime\.sendMessage\(\{\s*action:\s*messageAction\s*\},\s*\(response\)\s*=>\s*\{[\s\S]*?id === 'openSiteSearchOptions'[\s\S]*?openSiteSearchOptionsFallback\(\)/,
+  /chromeApi\.runtime\.sendMessage\(\{\s*action:\s*messageAction,\s*disposition\s*\},\s*\(response\)\s*=>\s*\{[\s\S]*?id === 'openSiteSearchOptions'[\s\S]*?openSiteSearchOptionsFallback\(disposition\)/,
   'site list ghost action should not silently fail when the background message is unavailable or rejected'
 );
 assert.match(
