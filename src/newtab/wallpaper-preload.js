@@ -1,8 +1,9 @@
 (function() {
   const PRELOAD_STORAGE_KEY = '_x_extension_newtab_wallpaper_preload_2026_unique_';
+  const PRELOAD_STORAGE_VERSION = 3;
   const FAVICON_STORAGE_KEY = '_x_extension_newtab_favicon_2026_unique_';
   const FAVICON_PRELOAD_STORAGE_KEY = '_x_extension_newtab_favicon_preload_2026_unique_';
-  const WALLPAPER_PATH_PATTERN = /^output\/imagegen\/[-.\w]+\.webp$/;
+  const WALLPAPER_PATH_PATTERN = /^(?:assets\/wallpapers|output\/imagegen)\/[-.\w]+\.webp$/;
   const FAVICON_OPTIONS = {
     default: {
       file: 'assets/images/lumno.png',
@@ -16,17 +17,46 @@
     }
   };
 
-  function readCachedWallpaperPath() {
+  function normalizeWallpaperMode(value) {
+    return value === 'dark' ? 'dark' : 'light';
+  }
+
+  function resolveCachedWallpaperMode(data) {
+    const themeMode = data && typeof data.themeMode === 'string' ? data.themeMode : '';
+    if (themeMode === 'dark' || themeMode === 'light') {
+      return themeMode;
+    }
+    if (themeMode === 'system') {
+      try {
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light';
+      } catch (e) {
+        return normalizeWallpaperMode(data && data.mode);
+      }
+    }
+    return normalizeWallpaperMode(data && data.mode);
+  }
+
+  function readCachedWallpaper() {
     try {
       const raw = window.localStorage ? window.localStorage.getItem(PRELOAD_STORAGE_KEY) : '';
       if (!raw) {
-        return '';
+        return null;
       }
       const data = JSON.parse(raw);
-      const path = data && typeof data.path === 'string' ? data.path.trim() : '';
-      return WALLPAPER_PATH_PATTERN.test(path) ? path : '';
+      if (!data || Number(data.version) !== PRELOAD_STORAGE_VERSION || !data.wallpapers) {
+        return null;
+      }
+      const mode = resolveCachedWallpaperMode(data);
+      const entry = data.wallpapers[mode];
+      const path = entry && typeof entry.path === 'string' ? entry.path.trim() : '';
+      return {
+        mode,
+        path: WALLPAPER_PATH_PATTERN.test(path) ? path : ''
+      };
     } catch (e) {
-      return '';
+      return null;
     }
   }
 
@@ -156,12 +186,18 @@
 
   applyStoredFaviconWhenAvailable();
 
-  const path = readCachedWallpaperPath();
-  if (!path) {
+  const cachedWallpaper = readCachedWallpaper();
+  if (!cachedWallpaper) {
     return;
   }
-  const url = getRuntimeUrl(path);
   const root = document.documentElement;
+  if (root) {
+    root.setAttribute('data-wallpaper-preload-theme', cachedWallpaper.mode);
+  }
+  if (!cachedWallpaper.path) {
+    return;
+  }
+  const url = getRuntimeUrl(cachedWallpaper.path);
   if (root) {
     root.style.setProperty('--x-nt-wallpaper-image', getCssUrlValue(url));
     root.style.setProperty('--x-nt-wallpaper-size', 'cover');

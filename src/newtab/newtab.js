@@ -1643,6 +1643,7 @@
     t,
     formatMessage,
     getThemeMode: getSelectedThemeMode,
+    getEffectiveThemeMode: getScopedThemeMode,
     getThemeScope,
     setThemeMode,
     setThemeScope,
@@ -1676,7 +1677,10 @@
   }
 
   function bootstrapInitialWallpaper() {
-    return wallpaperRuntime ? wallpaperRuntime.bootstrapInitialWallpaper() : Promise.resolve();
+    if (!wallpaperRuntime) {
+      return Promise.resolve();
+    }
+    return bootstrapInitialThemeMode().then(() => wallpaperRuntime.bootstrapInitialWallpaper());
   }
 
   function bootstrapInitialWallpaperOverlay() {
@@ -2775,6 +2779,7 @@
   }
 
   function applyThemeMode(mode, options) {
+    const previousThemeMode = currentThemeMode;
     currentThemeMode = normalizeThemeMode(mode);
     const mediaMatchesOverride = options && typeof options.mediaMatches === 'boolean'
       ? options.mediaMatches
@@ -2782,6 +2787,9 @@
     const previousResolved = document.body ? document.body.getAttribute('data-theme') : '';
     const resolved = resolveTheme(mode, mediaMatchesOverride);
     document.body.setAttribute('data-theme', resolved);
+    if (document.documentElement) {
+      document.documentElement.removeAttribute('data-wallpaper-preload-theme');
+    }
     applyWordmarkThemeAppearance(resolved);
     const didResolvedThemeChange = previousResolved !== resolved;
     suggestionItems.forEach((item) => {
@@ -2810,9 +2818,10 @@
     if (didResolvedThemeChange) {
       refreshThemeAwareFavicons();
       scheduleThemeAwareFaviconRescue();
-      if (wallpaperRuntime && typeof wallpaperRuntime.handleThemeModeChange === 'function') {
-        wallpaperRuntime.handleThemeModeChange();
-      }
+    }
+    if ((didResolvedThemeChange || previousThemeMode !== currentThemeMode) &&
+        wallpaperRuntime && typeof wallpaperRuntime.handleThemeModeChange === 'function') {
+      wallpaperRuntime.handleThemeModeChange();
     }
     if (!initialThemeApplied) {
       initialThemeApplied = true;

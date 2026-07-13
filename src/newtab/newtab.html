@@ -20,6 +20,13 @@
       body {
         height: 100%;
       }
+      html[data-wallpaper-preload-theme="dark"] {
+        background-color: #111111;
+      }
+      html[data-wallpaper-preload-theme="dark"] body:not([data-theme]) {
+        --x-nt-bg: #111111;
+        color-scheme: dark;
+      }
       body {
         margin: 0;
         background-color: var(--x-nt-bg);

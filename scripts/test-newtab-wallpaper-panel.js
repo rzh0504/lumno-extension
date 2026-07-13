@@ -6,6 +6,8 @@ const WALLPAPER_STORAGE_KEY = '_x_extension_newtab_wallpaper_2026_unique_';
 const LOCAL_WALLPAPER_STORAGE_KEY = '_x_extension_newtab_local_wallpaper_2026_unique_';
 const NEWTAB_FAVICON_STORAGE_KEY = '_x_extension_newtab_favicon_2026_unique_';
 const NEWTAB_FAVICON_PRELOAD_STORAGE_KEY = '_x_extension_newtab_favicon_preload_2026_unique_';
+const WALLPAPER_PRELOAD_STORAGE_KEY = '_x_extension_newtab_wallpaper_preload_2026_unique_';
+const WALLPAPER_PRELOAD_STORAGE_VERSION = 3;
 const DEFAULT_WALLPAPER_ID = 'monet-coastal-white';
 const WALLPAPER_PREFS_STORAGE_VERSION = 2;
 const CUSTOM_WALLPAPER_ID_PREFIX = 'custom-wallpaper-';
@@ -634,6 +636,112 @@ function testNewtabFaviconPreloadAppliesCachedAlternateBeforeMainRuntime() {
   );
 }
 
+function testWallpaperPreloadUsesTheCachedResolvedMode() {
+  const runWallpaperPreload = (documentObj, windowObj) => {
+    vm.runInNewContext(fs.readFileSync('src/newtab/wallpaper-preload.js', 'utf8'), {
+      document: documentObj,
+      window: windowObj,
+      chrome: {
+        runtime: {
+          getURL: (path) => `chrome-extension://abc/${String(path || '').replace(/^\/+/, '')}`
+        }
+      }
+    }, {
+      filename: 'src/newtab/wallpaper-preload.js'
+    });
+  };
+  const documentObj = createFakeDocument();
+  const windowObj = createFakeWindow();
+  windowObj.localStorage.setItem(WALLPAPER_PRELOAD_STORAGE_KEY, JSON.stringify({
+    version: WALLPAPER_PRELOAD_STORAGE_VERSION,
+    mode: 'dark',
+    themeMode: 'dark',
+    wallpapers: {
+      light: {
+        id: 'monet-coastal-white',
+        path: 'assets/wallpapers/lumno-newtab-monet-coastal-white.webp'
+      },
+      dark: {
+        id: 'dark-shanshui-moonlit',
+        path: 'assets/wallpapers/lumno-newtab-dark-shanshui-moonlit.webp'
+      }
+    }
+  }));
+  runWallpaperPreload(documentObj, windowObj);
+
+  const preloadedImage = documentObj.documentElement.style.getPropertyValue('--x-nt-wallpaper-image');
+  assert.ok(
+    preloadedImage.includes('lumno-newtab-dark-shanshui-moonlit.webp'),
+    'dark mode should preload its own wallpaper instead of the cached light fallback'
+  );
+  assert.doesNotMatch(
+    preloadedImage,
+    /monet-coastal-white/,
+    'dark mode preload should not paint the default white wallpaper first'
+  );
+  assert.strictEqual(
+    documentObj.documentElement.getAttribute('data-wallpaper-preload-theme'),
+    'dark',
+    'the preload should expose a dark placeholder before the runtime resolves the theme'
+  );
+
+  const localDocument = createFakeDocument();
+  const localWindow = createFakeWindow();
+  localWindow.localStorage.setItem(WALLPAPER_PRELOAD_STORAGE_KEY, JSON.stringify({
+    version: WALLPAPER_PRELOAD_STORAGE_VERSION,
+    mode: 'dark',
+    themeMode: 'dark',
+    wallpapers: {
+      light: {
+        id: 'monet-coastal-white',
+        path: 'assets/wallpapers/lumno-newtab-monet-coastal-white.webp'
+      },
+      dark: null
+    }
+  }));
+  runWallpaperPreload(localDocument, localWindow);
+  assert.strictEqual(
+    localDocument.documentElement.getAttribute('data-wallpaper-preload-theme'),
+    'dark',
+    'a local-only wallpaper should keep a dark placeholder while its image data loads'
+  );
+  assert.strictEqual(
+    localDocument.documentElement.style.getPropertyValue('--x-nt-wallpaper-image'),
+    '',
+    'a local-only dark wallpaper should not preload the synced white fallback'
+  );
+
+  const staleDocument = createFakeDocument();
+  const staleWindow = createFakeWindow();
+  staleWindow.localStorage.setItem(WALLPAPER_PRELOAD_STORAGE_KEY, JSON.stringify({
+    version: 2,
+    mode: 'dark',
+    themeMode: 'dark',
+    wallpapers: {
+      light: null,
+      dark: {
+        id: DEFAULT_WALLPAPER_ID,
+        path: 'assets/wallpapers/lumno-newtab-monet-coastal-white.webp'
+      }
+    }
+  }));
+  runWallpaperPreload(staleDocument, staleWindow);
+  assert.strictEqual(
+    staleDocument.documentElement.style.getPropertyValue('--x-nt-wallpaper-image'),
+    '',
+    'stale mode-aware caches that may contain the fallback race should be ignored after the fix'
+  );
+}
+
+function assertWallpaperBootstrapWaitsForTheme() {
+  const newtabSource = fs.readFileSync('src/newtab/newtab.js', 'utf8');
+  assert.match(
+    newtabSource,
+    /function bootstrapInitialWallpaper\(\)\s*\{[\s\S]*?return bootstrapInitialThemeMode\(\)\.then\(\(\) => wallpaperRuntime\.bootstrapInitialWallpaper\(\)\);[\s\S]*?\}/,
+    'initial wallpaper resolution should wait until the page theme has been resolved'
+  );
+}
+
 function createMemoryStorage(initialData) {
   const data = Object.assign({}, initialData || {});
   const sets = [];
@@ -936,6 +1044,83 @@ async function testLegacySyncedCustomWallpaperMigratesToLocalOnlySelection() {
   );
 }
 
+async function testInitialThemeResolutionDoesNotPaintFallbackBeforeCustomWallpaper() {
+  for (const mode of ['light', 'dark']) {
+    const customWallpaperId = `${CUSTOM_WALLPAPER_ID_PREFIX}initial-${mode}`;
+    const syncStorage = createMemoryStorage({
+      [WALLPAPER_STORAGE_KEY]: {
+        version: WALLPAPER_PREFS_STORAGE_VERSION,
+        sameForModes: false,
+        light: DEFAULT_WALLPAPER_ID,
+        dark: DEFAULT_WALLPAPER_ID
+      }
+    });
+    const localStorageArea = createMemoryStorage({
+      [LOCAL_WALLPAPER_STORAGE_KEY]: {
+        version: WALLPAPER_PREFS_STORAGE_VERSION,
+        light: customWallpaperId,
+        dark: customWallpaperId
+      }
+    });
+    const localStoreApi = createLocalWallpaperStoreApi([{
+      id: customWallpaperId,
+      imageDataUrl: `data:image/webp;base64,initial-${mode}`,
+      thumbnailDataUrl: `data:image/webp;base64,thumb-${mode}`,
+      updatedAt: 1
+    }]);
+    const { documentObj: testDocument, windowObj: testWindow, sandbox: testSandbox } = createWallpaperSandbox({
+      localStoreApi
+    });
+    testDocument.body.setAttribute('data-theme', mode);
+    const testRuntime = testSandbox.LumnoNewtabWallpaper.createWallpaperRuntime({
+      documentObj: testDocument,
+      windowObj: testWindow,
+      storageArea: syncStorage,
+      localWallpaperStorageArea: localStorageArea,
+      storageKeys: {
+        wallpaper: WALLPAPER_STORAGE_KEY,
+        localWallpaper: LOCAL_WALLPAPER_STORAGE_KEY
+      },
+      t: (_key, fallback) => fallback || '',
+      getRiSvg: () => ''
+    });
+
+    testRuntime.handleThemeModeChange();
+
+    assert.strictEqual(
+      testDocument.documentElement.style.getPropertyValue('--x-nt-wallpaper-image'),
+      '',
+      `${mode} theme resolution should not paint the synced fallback before local state loads`
+    );
+    assert.strictEqual(
+      testDocument.body.getAttribute('data-wallpaper-active'),
+      null,
+      `${mode} theme resolution should leave the wallpaper visual pending before local state loads`
+    );
+
+    await testRuntime.bootstrapInitialWallpaper();
+
+    const preloadCache = JSON.parse(testWindow.localStorage.getItem(WALLPAPER_PRELOAD_STORAGE_KEY));
+    assert.strictEqual(
+      preloadCache.version,
+      WALLPAPER_PRELOAD_STORAGE_VERSION,
+      `${mode} mode should replace stale preload data with the pending-safe cache format`
+    );
+    assert.strictEqual(
+      preloadCache.wallpapers[mode],
+      null,
+      `${mode} mode should remember that its local wallpaper has no built-in preload image`
+    );
+
+    assert.ok(
+      testDocument.documentElement.style
+        .getPropertyValue('--x-nt-wallpaper-image')
+        .includes(`data:image/webp;base64,initial-${mode}`),
+      `${mode} mode should commit the local custom wallpaper as its first runtime wallpaper`
+    );
+  }
+}
+
 async function testWallpaperModeConsistencyDefaultsOnAndCopiesLegacySelectionWhenDisabled() {
   const syncStorage = createMemoryStorage({
     [WALLPAPER_STORAGE_KEY]: 'white-shanshui'
@@ -1075,6 +1260,20 @@ async function testSplitBuiltInWallpaperSelectionFollowsResolvedTheme() {
   });
 
   await testRuntime.bootstrapInitialWallpaper();
+  const preloadCache = JSON.parse(testWindow.localStorage.getItem(WALLPAPER_PRELOAD_STORAGE_KEY));
+  assert.strictEqual(
+    preloadCache.version,
+    WALLPAPER_PRELOAD_STORAGE_VERSION,
+    'wallpaper preload cache should use the mode-aware format'
+  );
+  assert.ok(
+    preloadCache.wallpapers.light.path.includes('lumno-newtab-monet-coastal-white.webp'),
+    'wallpaper preload cache should retain the light selection'
+  );
+  assert.ok(
+    preloadCache.wallpapers.dark.path.includes('lumno-newtab-dark-shanshui-moonlit.webp'),
+    'wallpaper preload cache should retain the dark selection before it is active'
+  );
   assert.ok(
     testDocument.documentElement.style
       .getPropertyValue('--x-nt-wallpaper-image')
@@ -1179,6 +1378,13 @@ async function testSplitLocalWallpaperSelectionStaysLocalOnly() {
   testDocument.body.setAttribute('data-theme', 'dark');
   testRuntime.handleThemeModeChange();
   await waitForAsyncWallpaperApply();
+
+  const preloadCache = JSON.parse(testWindow.localStorage.getItem(WALLPAPER_PRELOAD_STORAGE_KEY));
+  assert.strictEqual(
+    preloadCache.wallpapers.dark,
+    null,
+    'a local-only dark wallpaper should suppress the synced white fallback during preload'
+  );
 
   assert.ok(
     testDocument.documentElement.style
@@ -1360,10 +1566,13 @@ Promise.resolve()
     assertBrandMarkCopy();
     assertThemeAwareAlternateFaviconAsset();
     assertSquareFaviconOptionCss('src/newtab/newtab.html');
+    assertWallpaperBootstrapWaitsForTheme();
   })
   .then(testNewtabFaviconPreloadAppliesCachedAlternateBeforeMainRuntime)
+  .then(testWallpaperPreloadUsesTheCachedResolvedMode)
   .then(testSyncedCustomWallpaperWithoutLocalRecordFallsBackToDefault)
   .then(testLegacySyncedCustomWallpaperMigratesToLocalOnlySelection)
+  .then(testInitialThemeResolutionDoesNotPaintFallbackBeforeCustomWallpaper)
   .then(testWallpaperModeConsistencyDefaultsOnAndCopiesLegacySelectionWhenDisabled)
   .then(testDisablingWallpaperModeConsistencyIgnoresStaleLocalDisabledOverride)
   .then(testSplitBuiltInWallpaperSelectionFollowsResolvedTheme)

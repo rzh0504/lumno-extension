@@ -11,6 +11,7 @@
     favicon: '_x_extension_newtab_favicon_2026_unique_'
   };
   const PRELOAD_STORAGE_KEY = '_x_extension_newtab_wallpaper_preload_2026_unique_';
+  const PRELOAD_STORAGE_VERSION = 3;
 
   function createWallpaperRuntime(options) {
     options = options || {};
@@ -44,6 +45,9 @@
     const getThemeMode = typeof options.getThemeMode === 'function'
       ? options.getThemeMode
       : function() { return 'system'; };
+    const getEffectiveThemeMode = typeof options.getEffectiveThemeMode === 'function'
+      ? options.getEffectiveThemeMode
+      : getThemeMode;
     const getThemeScope = typeof options.getThemeScope === 'function'
       ? options.getThemeScope
       : function() { return 'global'; };
@@ -269,6 +273,7 @@
 
     let initialWallpaperApplied = false;
     let hasWallpaperBootstrapStarted = false;
+    let hasStoredWallpaperStateLoaded = false;
     let hasNewtabFaviconBootstrapStarted = false;
     let resolveInitialWallpaperReady = null;
     const initialWallpaperReadyPromise = new Promise((resolve) => {
@@ -1775,22 +1780,28 @@
       );
     }
 
-    function writeWallpaperPreloadCache(wallpaper) {
+    function getWallpaperPreloadEntryForMode(mode) {
+      const wallpaper = getWallpaperById(getEffectiveWallpaperIdForMode(mode));
+      const path = wallpaper && !isCustomWallpaperId(wallpaper.id)
+        ? getWallpaperRuntimePath(wallpaper)
+        : '';
+      return path ? { id: wallpaper.id, path } : null;
+    }
+
+    function writeWallpaperPreloadCache() {
       try {
         if (!window.localStorage) {
           return;
         }
-        const path = wallpaper && !isCustomWallpaperId(wallpaper.id)
-          ? getWallpaperRuntimePath(wallpaper)
-          : '';
-        if (!path) {
-          window.localStorage.removeItem(PRELOAD_STORAGE_KEY);
-          return;
-        }
+        const wallpapers = {
+          light: getWallpaperPreloadEntryForMode(NEWTAB_WALLPAPER_MODE_LIGHT),
+          dark: getWallpaperPreloadEntryForMode(NEWTAB_WALLPAPER_MODE_DARK)
+        };
         window.localStorage.setItem(PRELOAD_STORAGE_KEY, JSON.stringify({
-          version: 1,
-          id: wallpaper.id,
-          path,
+          version: PRELOAD_STORAGE_VERSION,
+          mode: getResolvedWallpaperMode(),
+          themeMode: getEffectiveThemeMode(),
+          wallpapers,
           updatedAt: Date.now()
         }));
       } catch (e) {
@@ -3026,7 +3037,7 @@
       if (currentWallpaperId) {
         rememberActiveWallpaperId(mode, currentWallpaperId);
       }
-      writeWallpaperPreloadCache(wallpaper);
+      writeWallpaperPreloadCache();
       updateWallpaperSelectionUi();
       if (isInitialWallpaperApply) {
         applyWallpaperVisualState(wallpaper);
@@ -3059,6 +3070,7 @@
         syncedResolution.localMigrations
       );
       setWallpaperPrefs(syncedResolution.prefs, migrated.overrides);
+      hasStoredWallpaperStateLoaded = true;
       activeWallpaperMode = currentWallpaperPrefs.sameForModes
         ? getResolvedWallpaperMode()
         : normalizeWallpaperMode(activeWallpaperMode);
@@ -4535,6 +4547,9 @@
     }
 
     function handleThemeModeChange() {
+      if (!hasStoredWallpaperStateLoaded) {
+        return;
+      }
       if (currentWallpaperPrefs && (currentWallpaperPrefs.sameForModes || !isWallpaperPanelOpen())) {
         activeWallpaperMode = getResolvedWallpaperMode();
       }
