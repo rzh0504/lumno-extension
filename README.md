@@ -10,6 +10,15 @@
   在任意网页快速搜索、直达网址、切换标签页，并增强新标签页体验。
 </p>
 
+<p align="center">
+  <a href="https://chromewebstore.google.com/detail/nggfkkbmogmadfoikakkfegkoilfcfao">
+    <img src="./assets/images/readme/chrome-web-store-large-bordered.png" alt="Get it from Chrome Web Store" height="60" />
+  </a>
+  <a href="https://microsoftedge.microsoft.com/addons/detail/pfbklkaefmfamjpibfiapaiihlddhchc">
+    <img src="./assets/images/readme/microsoft-edge-addons-badge.png" alt="Get it from Microsoft Edge" height="52" />
+  </a>
+</p>
+
 
 <p align="center">
   <img src="https://img.shields.io/badge/Manifest-MV3-111827?style=flat-square" alt="Manifest V3" />
@@ -63,7 +72,7 @@ Lumno 是一个面向 Chromium 浏览器的 Manifest V3 扩展，把「聚焦搜
 
 ## 安装使用
 
-也可以从 Chrome Web Store 安装：[Install Lumno on Chrome Web Store](https://chromewebstore.google.com/detail/nggfkkbmogmadfoikakkfegkoilfcfao?utm_source=item-share-cb)
+可通过上方的 Chrome Web Store 或 Microsoft Edge Add-ons 入口安装。
 
 手动安装：
 
