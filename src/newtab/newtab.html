@@ -1184,10 +1184,20 @@
         --x-nt-dock-recent-url-size: 12px;
       }
       #_x_extension_newtab_bottom_dock_2024_unique_[data-density="mobile"] {
-        --x-nt-dock-bookmark-card-height: 48px;
-        --x-nt-dock-recent-inner-height: 92px;
-        --x-nt-dock-recent-inner-hover-height: 92px;
+        --x-nt-dock-bookmark-card-height: 44px;
+        --x-nt-dock-bookmark-card-padding: 8px 10px;
+        --x-nt-dock-bookmark-icon-size: 20px;
+        --x-nt-dock-bookmark-title-size: 13px;
+        --x-nt-dock-recent-card-padding: 6px 6px 8px;
+        --x-nt-dock-recent-card-gap: 6px;
+        --x-nt-dock-recent-card-radius: 22px;
+        --x-nt-dock-recent-inner-height: 82px;
+        --x-nt-dock-recent-inner-hover-height: 82px;
         --x-nt-dock-recent-inner-hover-offset: 0px;
+        --x-nt-dock-recent-inner-padding: 10px 10px 11px 12px;
+        --x-nt-dock-recent-inner-radius: 16px;
+        --x-nt-dock-recent-title-lines: 2;
+        --x-nt-dock-recent-title-hover-lines: 2;
       }
       #_x_extension_newtab_bottom_dock_scroller_2024_unique_ {
         all: unset;
@@ -5434,11 +5444,16 @@
       @media (max-width: 640px) {
         :root {
           --x-nt-content-viewport-width: 100%;
-          --x-nt-section-inner-gap: 14px;
-          --x-nt-grid-row-gap: 12px;
-          --x-nt-bottom-dock-section-gap: 24px;
-          --x-nt-bottom-dock-top-padding: 18px;
-          --x-nt-bottom-dock-bottom-padding: calc(88px + env(safe-area-inset-bottom));
+          --x-nt-section-inner-gap: 10px;
+          --x-nt-grid-row-gap: 8px;
+          --x-nt-bottom-dock-section-gap: 10px;
+          --x-nt-bottom-dock-corridor-size: 0px;
+          --x-nt-bottom-dock-top-padding: 12px;
+          --x-nt-bottom-dock-bottom-padding: calc(72px + env(safe-area-inset-bottom));
+          --x-nt-shortcuts-reserved-height: 64px;
+          --x-nt-shortcuts-section-margin-top: 10px;
+          --x-nt-shortcut-tile-size: 52px;
+          --x-nt-shortcut-icon-size: 40px;
         }
         body.x-nt-mobile-flow {
           width: 100%;
@@ -5446,7 +5461,7 @@
           min-height: 100vh;
           min-height: 100dvh;
           align-items: stretch;
-          padding-top: max(20px, env(safe-area-inset-top));
+          padding-top: max(32px, env(safe-area-inset-top));
           padding-right: max(16px, env(safe-area-inset-right));
           padding-bottom: 0;
           padding-left: max(16px, env(safe-area-inset-left));
@@ -5466,8 +5481,8 @@
           left: auto;
           bottom: auto;
           transform: none;
+          margin-top: 4px;
           max-height: none;
-          margin-top: 10px;
           overflow: visible;
         }
         #_x_extension_newtab_bottom_dock_scroller_2024_unique_ {

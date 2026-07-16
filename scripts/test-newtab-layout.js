@@ -579,8 +579,28 @@ function testBottomDockCssDefinesAdaptiveDensityVariables() {
   );
   assert.match(
     newtabHtml,
-    /#_x_extension_newtab_bottom_dock_2024_unique_\[data-density="mobile"\]\s*\{[\s\S]*?--x-nt-dock-bookmark-card-height:\s*48px;[\s\S]*?--x-nt-dock-recent-inner-height:\s*92px;/,
-    'mobile dock density should preserve comfortable touch-sized content rows'
+    /@media \(max-width:\s*640px\)[\s\S]*?:root\s*\{[\s\S]*?--x-nt-section-inner-gap:\s*10px;[\s\S]*?--x-nt-grid-row-gap:\s*8px;[\s\S]*?--x-nt-bottom-dock-section-gap:\s*10px;[\s\S]*?--x-nt-bottom-dock-corridor-size:\s*0px;[\s\S]*?--x-nt-bottom-dock-top-padding:\s*12px;[\s\S]*?--x-nt-bottom-dock-bottom-padding:\s*calc\(72px \+ env\(safe-area-inset-bottom\)\);/,
+    'mobile flow should use the compact vertical spacing budget'
+  );
+  assert.match(
+    newtabHtml,
+    /@media \(max-width:\s*640px\)[\s\S]*?body\.x-nt-mobile-flow\s*\{[\s\S]*?padding-top:\s*max\(32px,\s*env\(safe-area-inset-top\)\);/,
+    'mobile flow should keep a 32px minimum top inset'
+  );
+  assert.match(
+    newtabHtml,
+    /@media \(max-width:\s*640px\)[\s\S]*?:root\s*\{[\s\S]*?--x-nt-shortcuts-reserved-height:\s*64px;[\s\S]*?--x-nt-shortcuts-section-margin-top:\s*10px;[\s\S]*?--x-nt-shortcut-tile-size:\s*52px;[\s\S]*?--x-nt-shortcut-icon-size:\s*40px;/,
+    'mobile shortcuts should use the compact touch-safe footprint'
+  );
+  assert.match(
+    newtabHtml,
+    /@media \(max-width:\s*640px\)[\s\S]*?#_x_extension_newtab_bottom_dock_2024_unique_\s*\{[\s\S]*?margin-top:\s*4px;/,
+    'mobile dock should keep only a compact gap below shortcuts'
+  );
+  assert.match(
+    newtabHtml,
+    /#_x_extension_newtab_bottom_dock_2024_unique_\[data-density="mobile"\]\s*\{[\s\S]*?--x-nt-dock-bookmark-card-height:\s*44px;[\s\S]*?--x-nt-dock-recent-card-padding:\s*6px 6px 8px;[\s\S]*?--x-nt-dock-recent-card-gap:\s*6px;[\s\S]*?--x-nt-dock-recent-inner-height:\s*82px;[\s\S]*?--x-nt-dock-recent-inner-hover-height:\s*82px;/,
+    'mobile density should compact cards without dropping below touch size'
   );
   assert.match(
     newtabHtml,
