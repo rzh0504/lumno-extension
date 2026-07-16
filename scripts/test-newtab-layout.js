@@ -233,7 +233,8 @@ function createFixture(options) {
     body,
     bottomDock,
     shortcutSection,
-    controller
+    controller,
+    windowObj
   };
 }
 
@@ -446,6 +447,45 @@ function testShortDockReservesVisibleShortcutRow() {
   );
 }
 
+function testMobileViewportReleasesFixedDockLayout() {
+  const { body, bottomDock, controller } = createFixture({
+    innerWidth: 375,
+    innerHeight: 667,
+    constants: {
+      mobileFlowBreakpointPx: 640
+    }
+  });
+  body.style.setProperty('padding-top', '120px');
+  bottomDock.style.setProperty('max-height', '427px');
+
+  controller.updateBottomDockLayout();
+
+  assert.strictEqual(body.classList.contains('x-nt-mobile-flow'), true);
+  assert.strictEqual(body.getAttribute('data-nt-bottom-dock-density'), 'mobile');
+  assert.strictEqual(bottomDock.getAttribute('data-layout'), 'flow');
+  assert.strictEqual(bottomDock.style.getPropertyValue('max-height'), '');
+  assert.strictEqual(body.style.getPropertyValue('padding-top'), '');
+}
+
+function testResizeOutOfMobileRestoresFixedDockLayout() {
+  const { body, bottomDock, controller, windowObj } = createFixture({
+    innerWidth: 375,
+    innerHeight: 667,
+    constants: {
+      mobileFlowBreakpointPx: 640
+    }
+  });
+
+  controller.updateBottomDockLayout();
+  windowObj.innerWidth = 1024;
+  controller.updateBottomDockLayout();
+
+  assert.strictEqual(body.classList.contains('x-nt-mobile-flow'), false);
+  assert.strictEqual(bottomDock.getAttribute('data-layout'), 'fixed');
+  assert.match(bottomDock.style.getPropertyValue('max-height'), /^\d+px$/);
+  assert.match(body.style.getPropertyValue('padding-top'), /^\d+px$/);
+}
+
 function testBottomDockCssDefinesAdaptiveDensityVariables() {
   assert.match(
     newtabHtml,
@@ -497,6 +537,8 @@ function testBottomDockCssDefinesAdaptiveDensityVariables() {
 testCompactDockKeepsSearchEntryClearOnShortViewports();
 testTinyDockDensityForVeryShortViewports();
 testShortDockReservesVisibleShortcutRow();
+testMobileViewportReleasesFixedDockLayout();
+testResizeOutOfMobileRestoresFixedDockLayout();
 testBottomDockCssDefinesAdaptiveDensityVariables();
 
 function testAdaptiveGridUsesMobileTierBeforeCompactTier() {

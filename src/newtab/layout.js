@@ -76,6 +76,7 @@
     const compactDockSearchGapPx = getOptionNumber(constants, 'compactDockSearchGapPx', 32);
     const compactDockShortcutGapPx = getOptionNumber(constants, 'compactDockShortcutGapPx', 8);
     const compactDockMinTopReservePx = getOptionNumber(constants, 'compactDockMinTopReservePx', 168);
+    const mobileFlowBreakpointPx = getOptionNumber(constants, 'mobileFlowBreakpointPx', 0);
     const suggestionsBottomInsetPx = getOptionNumber(constants, 'suggestionsBottomInsetPx', 14);
     const visibleAttribute = 'data-visible';
     const suggestionsOpenAttribute = 'data-nt-suggestions-open';
@@ -126,6 +127,11 @@
 
     function getSuggestionsOutline() {
       return resolveElement(options.suggestionsOutline);
+    }
+
+    function isMobileFlowViewport() {
+      const viewportWidth = Math.max(0, windowObj.innerWidth || 0);
+      return mobileFlowBreakpointPx > 0 && viewportWidth <= mobileFlowBreakpointPx;
     }
 
     function setBooleanAttribute(element, name, value) {
@@ -277,6 +283,10 @@
       if (!body || !root) {
         return;
       }
+      if (isMobileFlowViewport()) {
+        body.style.removeProperty('padding-top');
+        return;
+      }
       const viewportHeight = Math.max(0, windowObj.innerHeight || 0);
       if (viewportHeight <= 0) {
         return;
@@ -340,6 +350,7 @@
         return;
       }
       const viewportHeight = Math.max(0, windowObj.innerHeight || 0);
+      const mobileFlow = isMobileFlowViewport();
       let bottomDockTopReserve = bottomDockTopReservePx;
       if (compactDockViewportMaxHeightPx > 0 && viewportHeight <= compactDockViewportMaxHeightPx) {
         const root = getRoot();
@@ -367,19 +378,27 @@
       }
       body.classList.remove('x-nt-stack-layout');
       body.classList.add('x-nt-bottom-layout');
+      body.classList.toggle('x-nt-mobile-flow', mobileFlow);
       body.classList.toggle('x-nt-no-bookmarks', !bookmarkVisible);
+      bottomDock.setAttribute('data-layout', mobileFlow ? 'flow' : 'fixed');
       const previousDockDensity = typeof bottomDock.getAttribute === 'function'
         ? bottomDock.getAttribute('data-density')
         : '';
-      const dockDensity = bottomDockMaxHeight <= 260
-        ? 'tiny'
-        : bottomDockMaxHeight <= 360
-          ? 'compact'
-          : 'default';
+      const dockDensity = mobileFlow
+        ? 'mobile'
+        : bottomDockMaxHeight <= 260
+          ? 'tiny'
+          : bottomDockMaxHeight <= 360
+            ? 'compact'
+            : 'default';
       body.setAttribute('data-nt-bottom-dock-density', dockDensity);
       bottomDock.setAttribute('data-density', dockDensity);
       sectionSafeCorridor.style.setProperty('display', (bookmarkVisible && recentVisible) ? 'block' : 'none', 'important');
-      bottomDock.style.setProperty('max-height', `${bottomDockMaxHeight}px`, 'important');
+      if (mobileFlow) {
+        bottomDock.style.removeProperty('max-height');
+      } else {
+        bottomDock.style.setProperty('max-height', `${bottomDockMaxHeight}px`, 'important');
+      }
       bottomDock.style.setProperty('display', (bookmarkVisible || recentVisible) ? 'flex' : 'none', 'important');
       updateSearchEntryLayout({
         preserveCurrentTop: Boolean(callbacks && callbacks.preserveSearchEntryLayout)

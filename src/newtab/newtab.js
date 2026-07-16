@@ -7086,7 +7086,8 @@
       narrowViewportMaxWidthPx: SEARCH_LAYOUT_NARROW_VIEWPORT_MAX_WIDTH_PX,
       narrowTopInsetPx: SEARCH_LAYOUT_NARROW_TOP_INSET_PX,
       shortViewportMaxHeightPx: SEARCH_LAYOUT_SHORT_VIEWPORT_MAX_HEIGHT_PX,
-      shortMinTopPx: SEARCH_LAYOUT_SHORT_MIN_TOP_PX
+      shortMinTopPx: SEARCH_LAYOUT_SHORT_MIN_TOP_PX,
+      mobileFlowBreakpointPx: NEWTAB_MOBILE_FLOW_BREAKPOINT_PX
     }
   });
   const bottomDock = bottomDockRuntime.element;
