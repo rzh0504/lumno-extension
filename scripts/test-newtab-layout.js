@@ -609,8 +609,13 @@ function testBottomDockCssDefinesAdaptiveDensityVariables() {
   );
   assert.match(
     newtabHtml,
-    /@media \(max-width:\s*640px\)[\s\S]*?\.x-nt-wallpaper-panel\s*\{[\s\S]*?max-height:\s*calc\(100dvh - 76px - env\(safe-area-inset-top\) - env\(safe-area-inset-bottom\)\);/,
-    'mobile wallpaper panel should stay inside the safe visual viewport'
+    /@media \(max-width:\s*640px\)[\s\S]*?\.x-nt-wallpaper-button\s*\{[\s\S]*?background:\s*var\(--control-bg\);[\s\S]*?border-color:\s*var\(--tab-border\);[\s\S]*?backdrop-filter:\s*blur\(16px\);/,
+    'mobile appearance trigger should stay visually distinct over wallpaper content'
+  );
+  assert.match(
+    newtabHtml,
+    /@media \(max-width:\s*640px\)[\s\S]*?\.x-nt-wallpaper-panel\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?left:\s*max\(12px,\s*env\(safe-area-inset-left\)\);[\s\S]*?right:\s*max\(12px,\s*env\(safe-area-inset-right\)\);[\s\S]*?bottom:\s*calc\(max\(12px,\s*env\(safe-area-inset-bottom\)\) \+ 56px\);[\s\S]*?width:\s*auto;[\s\S]*?max-width:\s*none;[\s\S]*?max-height:\s*calc\(100dvh - 100px - env\(safe-area-inset-top\) - env\(safe-area-inset-bottom\)\);[\s\S]*?padding:\s*16px;[\s\S]*?border-radius:\s*22px;[\s\S]*?scrollbar-gutter:\s*auto;/,
+    'mobile wallpaper panel should be safe-area aware and independently scrollable'
   );
 }
 

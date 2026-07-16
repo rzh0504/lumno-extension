@@ -5515,9 +5515,33 @@
           width: 44px;
           height: 44px;
         }
+        .x-nt-wallpaper-button {
+          background: var(--control-bg);
+          border-color: var(--tab-border);
+          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+        }
         .x-nt-wallpaper-panel {
-          max-width: calc(100vw - 24px);
-          max-height: calc(100dvh - 76px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+          --x-nt-panel-divider-gap: 14px;
+          --x-nt-panel-header-gap: 12px;
+          --x-nt-panel-inline-gap: 12px;
+          --x-nt-panel-item-gap: 16px;
+          --x-nt-panel-control-gap: 12px;
+          --x-nt-panel-field-gap: 12px;
+          --x-nt-panel-option-gap: 10px;
+          --x-nt-panel-tab-gap: 5px;
+          --x-nt-panel-grid-gap: 12px;
+          position: fixed;
+          left: max(12px, env(safe-area-inset-left));
+          right: max(12px, env(safe-area-inset-right));
+          bottom: calc(max(12px, env(safe-area-inset-bottom)) + 56px);
+          width: auto;
+          max-width: none;
+          max-height: calc(100dvh - 100px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+          padding: 16px;
+          border-radius: 22px;
+          scrollbar-gutter: auto;
         }
       }
       @media (hover: none) {
