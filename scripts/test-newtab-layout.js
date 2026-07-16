@@ -569,6 +569,16 @@ function testBottomDockCssDefinesAdaptiveDensityVariables() {
   );
   assert.match(
     newtabHtml,
+    /@media \(hover:\s*none\)[\s\S]*?\.x-nt-wallpaper-button,\s*\.x-nt-feedback-button\s*\{[\s\S]*?width:\s*44px;[\s\S]*?height:\s*44px;/,
+    'touch input should keep fixed utility controls at least 44px square'
+  );
+  assert.match(
+    newtabHtml,
+    /@media \(min-width:\s*641px\) and \(max-width:\s*900px\) and \(max-height:\s*560px\)[\s\S]*?body\[data-nt-bottom-dock-density="tiny"\]\s*\{[\s\S]*?--x-nt-shortcuts-reserved-height:\s*50px;[\s\S]*?--x-nt-shortcut-tile-size:\s*44px;[\s\S]*?#_x_extension_newtab_bottom_dock_2024_unique_\[data-density="tiny"\]\s*\{[\s\S]*?--x-nt-dock-bookmark-card-height:\s*44px;[\s\S]*?\.x-nt-wallpaper-button,\s*\.x-nt-feedback-button\s*\{[\s\S]*?width:\s*44px;[\s\S]*?height:\s*44px;/,
+    'narrow landscape should not let tiny density shrink interactive rows below 44px'
+  );
+  assert.match(
+    newtabHtml,
     /#_x_extension_newtab_bottom_dock_2024_unique_\[data-density="mobile"\]\s*\{[\s\S]*?--x-nt-dock-bookmark-card-height:\s*48px;[\s\S]*?--x-nt-dock-recent-inner-height:\s*92px;/,
     'mobile dock density should preserve comfortable touch-sized content rows'
   );
