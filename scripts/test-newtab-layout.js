@@ -532,6 +532,56 @@ function testBottomDockCssDefinesAdaptiveDensityVariables() {
     /@media \(max-width:\s*520px\)[\s\S]*?#_x_extension_newtab_bookmarks_grid_2024_unique_,\s*#_x_extension_newtab_recent_sites_grid_2024_unique_\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\);/,
     'phone viewports should collapse bookmarks and recent-site grids to one column'
   );
+  assert.match(
+    newtabHtml,
+    /@media \(max-width:\s*640px\)[\s\S]*?body\.x-nt-mobile-flow\s*\{[\s\S]*?min-height:\s*100dvh;[\s\S]*?padding-inline:[\s\S]*?safe-area-inset-left[\s\S]*?overflow-y:\s*auto;/,
+    'mobile flow should use one safe-area-aware document scroller'
+  );
+  assert.match(
+    newtabHtml,
+    /@media \(max-width:\s*640px\)[\s\S]*?#_x_extension_newtab_bottom_dock_2024_unique_\s*\{[\s\S]*?position:\s*static;[\s\S]*?transform:\s*none;[\s\S]*?max-height:\s*none;/,
+    'mobile bottom dock should participate in document flow'
+  );
+  assert.match(
+    newtabHtml,
+    /@media \(max-width:\s*640px\)[\s\S]*?#_x_extension_newtab_bottom_dock_scroller_2024_unique_\s*\{[\s\S]*?max-height:\s*none;[\s\S]*?overflow:\s*visible;[\s\S]*?overscroll-behavior:\s*auto;/,
+    'mobile dock content should release its nested scroll container'
+  );
+  assert.match(
+    newtabHtml,
+    /@media \(max-width:\s*640px\)[\s\S]*?#_x_extension_newtab_bookmarks_grid_2024_unique_,\s*#_x_extension_newtab_recent_sites_grid_2024_unique_\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\);/,
+    'mobile content grids should render one column'
+  );
+  assert.match(
+    newtabHtml,
+    /@media \(max-width:\s*640px\)[\s\S]*?\.x-nt-wallpaper-button,\s*\.x-nt-feedback-button\s*\{[\s\S]*?width:\s*44px;[\s\S]*?height:\s*44px;/,
+    'mobile utility controls should meet the 44px touch target'
+  );
+  assert.match(
+    newtabHtml,
+    /@media \(hover:\s*none\)[\s\S]*?\.x-nt-recent-card:hover\s*\{[\s\S]*?transform:\s*none;/,
+    'touch input should not retain hover-only recent-card movement'
+  );
+  assert.match(
+    newtabHtml,
+    /@media \(hover:\s*none\)[\s\S]*?\.x-nt-recent-card:hover \.x-nt-recent-inner\s*\{[\s\S]*?height:\s*var\(--x-nt-dock-recent-inner-height,\s*104px\);[\s\S]*?transform:\s*none;[\s\S]*?margin-bottom:\s*0;/,
+    'touch input should not retain hover-only recent-card expansion'
+  );
+  assert.match(
+    newtabHtml,
+    /#_x_extension_newtab_bottom_dock_2024_unique_\[data-density="mobile"\]\s*\{[\s\S]*?--x-nt-dock-bookmark-card-height:\s*48px;[\s\S]*?--x-nt-dock-recent-inner-height:\s*92px;/,
+    'mobile dock density should preserve comfortable touch-sized content rows'
+  );
+  assert.match(
+    newtabHtml,
+    /@media \(max-width:\s*640px\)[\s\S]*?\.x-nt-wallpaper-control,\s*\.x-nt-feedback-control\s*\{[\s\S]*?bottom:\s*max\(10px,\s*env\(safe-area-inset-bottom\)\);/,
+    'mobile utility controls should clear the bottom safe area'
+  );
+  assert.match(
+    newtabHtml,
+    /@media \(max-width:\s*640px\)[\s\S]*?\.x-nt-wallpaper-panel\s*\{[\s\S]*?max-height:\s*calc\(100dvh - 76px - env\(safe-area-inset-top\) - env\(safe-area-inset-bottom\)\);/,
+    'mobile wallpaper panel should stay inside the safe visual viewport'
+  );
 }
 
 testCompactDockKeepsSearchEntryClearOnShortViewports();
