@@ -31,10 +31,10 @@ Lumno 是一个面向 Chromium 浏览器的 Manifest V3 扩展，把「聚焦搜
 
 <p align="center">
   <a href="https://chromewebstore.google.com/detail/nggfkkbmogmadfoikakkfegkoilfcfao">
-    <img src="./assets/images/readme/chrome-web-store-large-bordered.png" alt="Get it from Chrome Web Store" width="200" />
+    <img src="./assets/images/readme/chrome-web-store-large-bordered.png" alt="Get it from Chrome Web Store" height="60" align="middle" />
   </a>
   <a href="https://microsoftedge.microsoft.com/addons/detail/pfbklkaefmfamjpibfiapaiihlddhchc">
-    <img src="./assets/images/readme/microsoft-edge-addons-badge.png" alt="Get it from Microsoft Edge" width="200" />
+    <img src="./assets/images/readme/microsoft-edge-addons-badge.png" alt="Get it from Microsoft Edge" height="56" align="middle" />
   </a>
 </p>
 
