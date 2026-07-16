@@ -529,11 +529,6 @@ function testBottomDockCssDefinesAdaptiveDensityVariables() {
   );
   assert.match(
     newtabHtml,
-    /@media \(max-width:\s*520px\)[\s\S]*?#_x_extension_newtab_bookmarks_grid_2024_unique_,\s*#_x_extension_newtab_recent_sites_grid_2024_unique_\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\);/,
-    'phone viewports should collapse bookmarks and recent-site grids to one column'
-  );
-  assert.match(
-    newtabHtml,
     /@media \(max-width:\s*640px\)[\s\S]*?body\.x-nt-mobile-flow\s*\{[\s\S]*?min-height:\s*100dvh;[\s\S]*?padding-inline:[\s\S]*?safe-area-inset-left[\s\S]*?overflow-y:\s*auto;/,
     'mobile flow should use one safe-area-aware document scroller'
   );
@@ -549,8 +544,13 @@ function testBottomDockCssDefinesAdaptiveDensityVariables() {
   );
   assert.match(
     newtabHtml,
-    /@media \(max-width:\s*640px\)[\s\S]*?#_x_extension_newtab_bookmarks_grid_2024_unique_,\s*#_x_extension_newtab_recent_sites_grid_2024_unique_\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\);/,
-    'mobile content grids should render one column'
+    /@media \(max-width:\s*640px\)[\s\S]*?#_x_extension_newtab_bookmarks_grid_2024_unique_\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
+    'mobile bookmarks should render two columns'
+  );
+  assert.match(
+    newtabHtml,
+    /@media \(max-width:\s*640px\)[\s\S]*?#_x_extension_newtab_recent_sites_grid_2024_unique_\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\);/,
+    'mobile recent sites should remain one column'
   );
   assert.match(
     newtabHtml,
@@ -627,6 +627,23 @@ function testAdaptiveGridUsesMobileTierBeforeCompactTier() {
 }
 
 testAdaptiveGridUsesMobileTierBeforeCompactTier();
+
+function testNewtabUsesDistinctMobileGridColumns() {
+  const newtabJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/newtab.js'), 'utf8');
+  const bookmarkColumnsSource = newtabJs.slice(
+    newtabJs.indexOf('function getBookmarkGridColumnCount()'),
+    newtabJs.indexOf('function getNewtabWidthModeBaseConfig()')
+  );
+  const recentColumnsSource = newtabJs.slice(
+    newtabJs.indexOf('function getRecentGridColumnCount()'),
+    newtabJs.indexOf('function clearPageNoticeQueryParam()')
+  );
+
+  assert.match(bookmarkColumnsSource, /mobileColumns:\s*2,/);
+  assert.match(recentColumnsSource, /mobileColumns:\s*1,/);
+}
+
+testNewtabUsesDistinctMobileGridColumns();
 
 function testWideRecentGridCanReachMaximumColumns() {
   assert.strictEqual(
