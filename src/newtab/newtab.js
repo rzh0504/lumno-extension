@@ -354,6 +354,7 @@
   const BOOKMARK_GRID_GAP_PX = 12;
   const RECENT_CARD_TARGET_WIDTH_PX = 248;
   const RECENT_GRID_GAP_PX = 12;
+  const NEWTAB_MOBILE_FLOW_BREAKPOINT_PX = 640;
   const RECENT_WIDE_MAX_COLUMNS = 6;
   const RECENT_WIDE_CONTENT_MAX_WIDTH_PX = NEWTAB_LAYOUT.getGridContentWidthForColumns(
     RECENT_WIDE_MAX_COLUMNS,
@@ -704,6 +705,8 @@
     const maxColumns = Math.max(2, normalizeBookmarkColumns(currentBookmarkColumns));
     return NEWTAB_LAYOUT.getAdaptiveGridColumnCount({
       viewportWidth: window.innerWidth,
+      mobileBreakpointPx: NEWTAB_MOBILE_FLOW_BREAKPOINT_PX,
+      mobileColumns: 1,
       compactBreakpointPx: 860,
       compactColumns: 2,
       contentMaxWidth: Number(config.contentMaxWidth || 1040),
@@ -734,6 +737,8 @@
     const maxColumns = Math.max(4, Number(config.recentMaxColumns || 4));
     return NEWTAB_LAYOUT.getAdaptiveGridColumnCount({
       viewportWidth: window.innerWidth,
+      mobileBreakpointPx: NEWTAB_MOBILE_FLOW_BREAKPOINT_PX,
+      mobileColumns: 1,
       compactBreakpointPx: 860,
       compactColumns: 2,
       contentMaxWidth: Number(config.contentMaxWidth || 1040),

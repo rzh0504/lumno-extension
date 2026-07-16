@@ -37,6 +37,10 @@
   function getAdaptiveGridColumnCount(options) {
     const config = options || {};
     const viewportWidth = Math.max(0, getFiniteNumber(config.viewportWidth, 0));
+    const mobileBreakpointPx = Math.max(0, getFiniteNumber(config.mobileBreakpointPx, 0));
+    if (mobileBreakpointPx > 0 && viewportWidth <= mobileBreakpointPx) {
+      return Math.max(1, Math.floor(getFiniteNumber(config.mobileColumns, 1)));
+    }
     const compactBreakpointPx = Math.max(0, getFiniteNumber(config.compactBreakpointPx, 0));
     if (compactBreakpointPx > 0 && viewportWidth <= compactBreakpointPx) {
       return Math.max(1, Math.floor(getFiniteNumber(config.compactColumns, 1)));

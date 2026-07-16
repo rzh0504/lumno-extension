@@ -499,6 +499,33 @@ testTinyDockDensityForVeryShortViewports();
 testShortDockReservesVisibleShortcutRow();
 testBottomDockCssDefinesAdaptiveDensityVariables();
 
+function testAdaptiveGridUsesMobileTierBeforeCompactTier() {
+  const config = {
+    mobileBreakpointPx: 640,
+    mobileColumns: 1,
+    compactBreakpointPx: 860,
+    compactColumns: 2,
+    contentMaxWidth: 1040,
+    targetColumnWidth: 248,
+    gap: 12,
+    minColumns: 4,
+    maxColumns: 6
+  };
+
+  assert.strictEqual(
+    layoutRuntime.getAdaptiveGridColumnCount({ ...config, viewportWidth: 375 }),
+    1,
+    'phone viewports should use one data column'
+  );
+  assert.strictEqual(
+    layoutRuntime.getAdaptiveGridColumnCount({ ...config, viewportWidth: 768 }),
+    2,
+    'compact tablet viewports should retain two data columns'
+  );
+}
+
+testAdaptiveGridUsesMobileTierBeforeCompactTier();
+
 function testWideRecentGridCanReachMaximumColumns() {
   assert.strictEqual(
     layoutRuntime.getGridContentWidthForColumns(6, 248, 12),
