@@ -4,36 +4,28 @@ const path = require('path');
 
 const readme = fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8');
 const badgeAssets = [
-  { name: 'chrome-web-store-large-bordered.png', sourceWidth: 496, sourceHeight: 150 },
-  { name: 'microsoft-edge-addons-badge.png', sourceWidth: 1178, sourceHeight: 312 }
+  'chrome-web-store-large-bordered.png',
+  'microsoft-edge-addons-badge.png'
 ];
 
-const renderedBadges = badgeAssets.map(({ name, sourceWidth, sourceHeight }) => {
+const widths = badgeAssets.map((name) => {
   const match = readme.match(new RegExp(
-    `<img[^>]+src="\\./assets/images/readme/${name}"[^>]+height="(\\d+)"[^>]+align="middle"`
+    `<img[^>]+src="\\./assets/images/readme/${name}"[^>]+width="(\\d+)"`
   ));
-  assert.ok(match, `missing vertically centered store badge markup for ${name}`);
-  const height = Number(match[1]);
-  const width = height * sourceWidth / sourceHeight;
-  return { width, height, area: width * height };
+  assert.ok(match, `missing store badge markup for ${name}`);
+  return Number(match[1]);
 });
 
-const relativeDifference = (first, second) => Math.abs(first - second) / Math.min(first, second);
+assert.strictEqual(widths[0], widths[1], 'store badges must use the same width');
 
 assert.ok(
-  relativeDifference(renderedBadges[0].width, renderedBadges[1].width) < 0.08 &&
-    relativeDifference(renderedBadges[0].height, renderedBadges[1].height) < 0.08,
-  'store badge rendered dimensions must stay visually balanced'
+  /chrome-web-store-large-bordered\.png[\s\S]*?<\/a><br \/>[\s\S]*?microsoft-edge-addons-badge\.png/.test(readme),
+  'store badges must be stacked vertically with Chrome first'
 );
 
 assert.ok(
-  relativeDifference(renderedBadges[0].area, renderedBadges[1].area) < 0.01,
-  'store badges must have approximately equal visual area'
+  /microsoft-edge-addons-badge\.png[\s\S]*?<p align="center">当前版本：<code>0\.9\.20<\/code><\/p>/.test(readme),
+  'the current version must be centered below the store badges'
 );
 
-assert.ok(
-  readme.indexOf('当前版本：') < readme.indexOf('chrome-web-store-large-bordered.png'),
-  'store badges must appear below the current version'
-);
-
-console.log('README store badge visual balance test passed');
+console.log('README store badge layout test passed');

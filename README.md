@@ -27,16 +27,16 @@
 
 Lumno 是一个面向 Chromium 浏览器的 Manifest V3 扩展，把「聚焦搜索命令栏」和「极简新标签页」放在一起：你可以从任意网页快速搜索书签、历史、常用网站、已打开标签页、站内搜索和 AI 助手，也可以把新标签页整理成更好用的工作入口。
 
-当前版本：`0.9.20`
-
 <p align="center">
   <a href="https://chromewebstore.google.com/detail/nggfkkbmogmadfoikakkfegkoilfcfao">
-    <img src="./assets/images/readme/chrome-web-store-large-bordered.png" alt="Get it from Chrome Web Store" height="60" align="middle" />
-  </a>
+    <img src="./assets/images/readme/chrome-web-store-large-bordered.png" alt="Get it from Chrome Web Store" width="200" />
+  </a><br />
   <a href="https://microsoftedge.microsoft.com/addons/detail/pfbklkaefmfamjpibfiapaiihlddhchc">
-    <img src="./assets/images/readme/microsoft-edge-addons-badge.png" alt="Get it from Microsoft Edge" height="56" align="middle" />
+    <img src="./assets/images/readme/microsoft-edge-addons-badge.png" alt="Get it from Microsoft Edge" width="200" />
   </a>
 </p>
+
+<p align="center">当前版本：<code>0.9.20</code></p>
 
 <img width="1200" height="480" alt="Lumno command bar preview" src="./assets/images/readme/banner.webp" decoding="async" />
 
