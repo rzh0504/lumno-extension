@@ -8,18 +8,18 @@ const badgeAssets = [
   'microsoft-edge-addons-badge.png'
 ];
 
-const heights = badgeAssets.map((assetName) => {
+const widths = badgeAssets.map((assetName) => {
   const match = readme.match(new RegExp(
-    `<img[^>]+src="\\./assets/images/readme/${assetName}"[^>]+height="(\\d+)"`
+    `<img[^>]+src="\\./assets/images/readme/${assetName}"[^>]+width="(\\d+)"`
   ));
   assert.ok(match, `missing store badge markup for ${assetName}`);
   return Number(match[1]);
 });
 
 assert.strictEqual(
-  heights[0],
-  heights[1],
-  'Chrome Web Store and Microsoft Edge Add-ons badges must use the same height'
+  widths[0],
+  widths[1],
+  'Chrome Web Store and Microsoft Edge Add-ons badges must use the same width'
 );
 
 assert.ok(
@@ -27,4 +27,4 @@ assert.ok(
   'store badges must appear below the current version'
 );
 
-console.log('README store badge height test passed');
+console.log('README store badge width test passed');
