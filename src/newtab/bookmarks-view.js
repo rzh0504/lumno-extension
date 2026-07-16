@@ -326,6 +326,7 @@
       let hoverIntentTimer = null;
       let isHoverVisualActive = false;
       let isMenuVisualLocked = false;
+      let isFolderIconExpanded = false;
       const clearHoverIntentTimer = () => {
         if (hoverIntentTimer !== null && windowObj) {
           windowObj.clearTimeout(hoverIntentTimer);
@@ -344,21 +345,28 @@
         }
         isHoverVisualActive = active;
         card.classList.toggle('x-nt-bookmark-card--hover', active);
-        if (folderIcon) {
-          playFolderPathMorph(folderIcon, active);
+      };
+      const setFolderIconExpanded = (active) => {
+        const nextActive = Boolean(active);
+        if (!folderIcon || isFolderIconExpanded === nextActive) {
+          return;
         }
+        isFolderIconExpanded = nextActive;
+        playFolderPathMorph(folderIcon, nextActive);
       };
       const setMenuVisualLocked = (active) => {
         const nextActive = Boolean(active);
         if (isMenuVisualLocked === nextActive) {
           if (nextActive) {
             setHoverVisualActive(true);
+            setFolderIconExpanded(true);
           }
           return;
         }
         isMenuVisualLocked = nextActive;
         clearHoverIntentTimer();
         setHoverVisualActive(nextActive);
+        setFolderIconExpanded(nextActive);
       };
       const deactivateBookmarkHoverVisual = () => {
         clearHoverIntentTimer();

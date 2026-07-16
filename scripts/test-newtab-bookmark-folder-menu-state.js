@@ -152,12 +152,29 @@ const card = view.buildCard(
   { viewMode: 'list', menuMode: true }
 );
 
+card.dispatchEvent(createFakeEvent('pointerenter', { pointerType: 'mouse' }));
+assert.strictEqual(
+  card.classList.contains('x-nt-bookmark-card--hover'),
+  true,
+  'hovering a folder should activate its card visual state'
+);
+assert.deepStrictEqual(
+  morphStates,
+  [],
+  'hovering a folder should not expand its icon'
+);
+
 card.dispatchEvent(createFakeEvent('click'));
 assert.strictEqual(openedFolders.length, 1, 'clicking a list-mode folder should open its cascade menu');
 assert.strictEqual(
   card.classList.contains('x-nt-bookmark-card--hover'),
   true,
   'clicking a folder menu trigger should immediately set the active visual state'
+);
+assert.deepStrictEqual(
+  morphStates,
+  [true],
+  'clicking a folder should expand its icon as the menu opens'
 );
 
 card.setAttribute('aria-expanded', 'true');
