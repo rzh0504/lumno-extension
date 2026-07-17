@@ -584,8 +584,8 @@ function testBottomDockCssDefinesAdaptiveDensityVariables() {
   );
   assert.match(
     newtabHtml,
-    /@media \(max-width:\s*640px\)[\s\S]*?body\.x-nt-mobile-flow\s*\{[\s\S]*?padding-top:\s*max\(32px,\s*env\(safe-area-inset-top\)\);/,
-    'mobile flow should keep a 32px minimum top inset'
+    /@media \(max-width:\s*640px\)[\s\S]*?body\.x-nt-mobile-flow\s*\{[\s\S]*?padding-top:\s*max\(48px,\s*env\(safe-area-inset-top\)\);[\s\S]*?padding-inline:\s*max\(24px,\s*env\(safe-area-inset-left\)\)\s*max\(24px,\s*env\(safe-area-inset-right\)\);/,
+    'mobile flow should keep a 48px top inset and 24px horizontal insets'
   );
   assert.match(
     newtabHtml,
