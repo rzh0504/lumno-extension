@@ -22,6 +22,26 @@ function assertDirectNavigationDelegatesToShared(relativePath) {
   );
 }
 
+function assertTabMatchUrlDelegatesToShared(relativePath, options = {}) {
+  const source = readSource(relativePath);
+  const includeSearch = options.includeSearch !== false;
+  const expectedCall = includeSearch
+    ? /SEARCH_UTILS\.buildTabMatchUrl\(url\)/
+    : /SEARCH_UTILS\.buildTabMatchUrl\(url,\s*\{\s*includeSearch:\s*false\s*\}\)/;
+  const normalizerName = includeSearch
+    ? 'normalizeTabMatchUrl'
+    : 'normalizeTabMatchUrlWithoutSearch';
+  const normalizerStart = new RegExp(`function ${normalizerName}\\(url\\)\\s*\\{`);
+  const startIndex = source.search(normalizerStart);
+  assert.ok(startIndex >= 0, `${relativePath} should define ${normalizerName}`);
+  const normalizerSource = source.slice(startIndex, startIndex + 900);
+  assert.match(
+    normalizerSource,
+    expectedCall,
+    `${relativePath} should delegate ${normalizerName} to the shared port-aware URL matcher`
+  );
+}
+
 function assertKeywordOnlySuggestionsKeepSearchActionFirst(relativePath) {
   const source = readSource(relativePath);
   assert.match(
@@ -337,6 +357,21 @@ assert.strictEqual(
   'host:port web inputs should keep direct navigation behavior'
 );
 assert.strictEqual(
+  search.buildTabMatchUrl('http://127.0.0.1:8765/'),
+  '127.0.0.1:8765/',
+  'open-tab matching should preserve an explicit numeric-IP port'
+);
+assert.notStrictEqual(
+  search.buildTabMatchUrl('http://127.0.0.1:8765/'),
+  search.buildTabMatchUrl('https://127.0.0.1:5173/'),
+  'numeric-IP URLs on different ports should not match the same open tab'
+);
+assert.strictEqual(
+  search.buildTabMatchUrl('http://127.0.0.1:8765/path?mode=one', { includeSearch: false }),
+  '127.0.0.1:8765/path',
+  'current-page matching may ignore the query while still preserving the port'
+);
+assert.strictEqual(
   search.getDirectNavigationUrl('site:example.com'),
   '',
   'search operators should not be treated as direct custom protocol navigation'
@@ -344,6 +379,9 @@ assert.strictEqual(
 assertDirectNavigationDelegatesToShared('src/newtab/newtab.js');
 assertDirectNavigationDelegatesToShared('src/overlay/search-panel.js');
 assertDirectNavigationDelegatesToShared('src/background/background.js');
+assertTabMatchUrlDelegatesToShared('src/newtab/newtab.js');
+assertTabMatchUrlDelegatesToShared('src/overlay/search-panel.js');
+assertTabMatchUrlDelegatesToShared('src/overlay/search-panel.js', { includeSearch: false });
 assertKeywordOnlySuggestionsKeepSearchActionFirst('src/newtab/newtab.js');
 assertKeywordOnlySuggestionsKeepSearchActionFirst('src/overlay/search-panel.js');
 

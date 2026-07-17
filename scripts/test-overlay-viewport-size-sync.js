@@ -111,6 +111,46 @@ assert.match(
   /translateX\(-50%\) translateY\(0\) scale\(var\(--x-ov-visible-scale,\s*1\)\)/,
   'overlay reveal state should preserve the transform scale token'
 );
+assert.match(
+  searchPanelSource,
+  /function captureSuggestionsHeightState\(container\)[\s\S]*?suggestionsHeightAnimationTargetIsCapped[\s\S]*?state\.heldHeight[\s\S]*?suggestionsHeightAnimationTarget[\s\S]*?cancelSuggestionsHeightAnimation\(container\)/,
+  'overlay suggestion rerenders should preserve a capped animation target instead of treating its intermediate height as stable'
+);
+assert.match(
+  searchPanelSource,
+  /const previousHeightState = captureSuggestionsHeightState\(suggestionsContainer\);[\s\S]*?suggestionsContainer\.innerHTML = '';[\s\S]*?holdSuggestionsHeightForRemoteMix\([\s\S]*?animateSuggestionsHeight\(suggestionsContainer, previousHeightState\.height\);/,
+  'overlay suggestion replacements should animate from the existing container height instead of restarting at zero'
+);
+assert.match(
+  searchPanelSource,
+  /function holdSuggestionsHeightForRemoteMix\(container, previousState, query, enabled\)[\s\S]*?targetMetrics\.atMaxHeight[\s\S]*?return true;[\s\S]*?previousState\.heldHeight[\s\S]*?height.*heldHeight[\s\S]*?transition', 'none'/,
+  'capped-to-capped updates should skip animation and an intermediate local result should keep the prior capped target while mixing'
+);
+assert.match(
+  searchPanelSource,
+  /suggestionsHeightAnimationTarget = toHeight;[\s\S]*?suggestionsHeightAnimationTargetIsCapped = targetMetrics\.atMaxHeight;/,
+  'height animations should track their intended target so rapid typing cannot restart from an in-flight pixel value'
+);
+assert.match(
+  searchPanelSource,
+  /updateSearchSuggestions\(localSuggestions, requestQuery, \{[\s\S]*?deferCappedShrink: true,[\s\S]*?remoteMixState[\s\S]*?remoteMixState\.settled = true;[\s\S]*?updateSearchSuggestions\(remoteResponse\.suggestions, requestQuery\);/,
+  'the overlay request pipeline should defer capped shrink only until the remote mix settles'
+);
+assert.match(
+  searchPanelSource,
+  /if \(isPaste \|\| getDirectUrlSuggestion\(query\)\) \{[\s\S]*?updateSearchSuggestions\(\[\], query, \{[\s\S]*?deferCappedShrink: true[\s\S]*?\}\);/,
+  'an immediate URL preview should keep the existing capped height until its full local and remote results arrive'
+);
+assert.match(
+  searchPanelSource,
+  /remoteMixState && remoteMixState\.settled && remoteMixState\.hasFinalSuggestions[\s\S]*?return;/,
+  'a late local render should not overwrite an already completed remote mix'
+);
+assert.doesNotMatch(
+  searchPanelSource,
+  /function animateSuggestionsGrowth\(/,
+  'overlay should not keep the append-only growth animation that caused repeated flashes while typing'
+);
 
 {
   const win = createFakeWindow({

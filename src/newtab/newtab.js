@@ -10195,6 +10195,9 @@
   }
 
   function normalizeTabMatchUrl(url) {
+    if (SEARCH_UTILS && typeof SEARCH_UTILS.buildTabMatchUrl === 'function') {
+      return SEARCH_UTILS.buildTabMatchUrl(url);
+    }
     if (!url) {
       return '';
     }
@@ -10204,7 +10207,8 @@
       if (protocol !== 'http:' && protocol !== 'https:') {
         return String(url).trim().toLowerCase();
       }
-      const host = normalizeHost(parsed.hostname);
+      const hostname = normalizeHost(parsed.hostname);
+      const host = parsed.port ? `${hostname}:${parsed.port}` : hostname;
       let path = parsed.pathname || '/';
       path = path.replace(/\/+$/, '');
       if (!path) {

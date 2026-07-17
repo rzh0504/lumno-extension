@@ -1573,6 +1573,12 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     applyNoTranslate(suggestionsContainer);
     suggestionsContainer.id = '_x_extension_suggestions_container_2024_unique_';
     suggestionsContainer.className = 'x-ov-suggestions-container';
+    let suggestionsHeightAnimationFrame = 0;
+    let suggestionsHeightAnimationTimer = 0;
+    let suggestionsHeightTransitionEndHandler = null;
+    let suggestionsHeightAnimationTarget = 0;
+    let suggestionsHeightAnimationTargetIsCapped = false;
+    let deferredSuggestionsHeightQuery = '';
     const inputDivider = inputParts.divider;
     overlayWheelIsolationHandler = createOverlayWheelIsolationHandler(overlay);
     overlay.addEventListener('wheel', overlayWheelIsolationHandler, { passive: false, capture: true });
@@ -1587,6 +1593,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
 
     function setOverlayResultsCollapsed(collapsed) {
       const shouldCollapse = Boolean(collapsed);
+      const wasCollapsed = suggestionsContainer.getAttribute('data-collapsed') === 'true';
       overlay.setAttribute('data-open-tabs-default-collapsed', shouldCollapse ? 'true' : 'false');
       suggestionsContainer.setAttribute('data-collapsed', shouldCollapse ? 'true' : 'false');
       suggestionsContainer.setAttribute('aria-hidden', shouldCollapse ? 'true' : 'false');
@@ -1601,7 +1608,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         shouldCollapse ? '32px / 28px' : '32px 32px 0 0 / 28px 28px 0 0'
       );
       if (shouldCollapse) {
-        suggestionsContainer.style.removeProperty('transition');
+        deferredSuggestionsHeightQuery = '';
+        cancelSuggestionsHeightAnimation(suggestionsContainer);
         suggestionsContainer.style.setProperty('max-height', '0px', inputUsesIsolatedStyles ? '' : 'important');
         suggestionsContainer.style.setProperty('min-height', '0px', inputUsesIsolatedStyles ? '' : 'important');
         suggestionsContainer.style.setProperty('padding-top', '0px', inputUsesIsolatedStyles ? '' : 'important');
@@ -1610,6 +1618,10 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         suggestionsContainer.style.setProperty('pointer-events', 'none', inputUsesIsolatedStyles ? '' : 'important');
         suggestionsContainer.style.setProperty('overflow', 'hidden', inputUsesIsolatedStyles ? '' : 'important');
         setInputDividerVisible(false);
+        return;
+      }
+      if (!wasCollapsed) {
+        setInputDividerVisible(true);
         return;
       }
       suggestionsContainer.style.removeProperty('max-height');
@@ -2700,6 +2712,10 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       }
       const requestSeq = ++overlaySuggestionRequestSeq;
       const requestStartedAt = Date.now();
+      const remoteMixState = {
+        settled: false,
+        hasFinalSuggestions: false
+      };
       if (overlayRemoteSuggestionDebounceTimer) {
         clearTimeout(overlayRemoteSuggestionDebounceTimer);
         overlayRemoteSuggestionDebounceTimer = null;
@@ -2717,7 +2733,10 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           return;
         }
         const localSuggestions = response && Array.isArray(response.suggestions) ? response.suggestions : [];
-        updateSearchSuggestions(localSuggestions, requestQuery);
+        updateSearchSuggestions(localSuggestions, requestQuery, {
+          deferCappedShrink: true,
+          remoteMixState
+        });
         const remoteDelay = Math.max(0, 120 - (Date.now() - requestStartedAt));
         overlayRemoteSuggestionDebounceTimer = setTimeout(function() {
           overlayRemoteSuggestionDebounceTimer = null;
@@ -2734,14 +2753,20 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
               return;
             }
             if (chrome.runtime && chrome.runtime.lastError) {
+              remoteMixState.settled = true;
+              finalizeDeferredSuggestionsHeight(requestQuery);
               return;
             }
             if (!remoteResponse ||
                 remoteResponse.aborted === true ||
                 remoteResponse.hasRemoteSuggestions !== true ||
                 !Array.isArray(remoteResponse.suggestions)) {
+              remoteMixState.settled = true;
+              finalizeDeferredSuggestionsHeight(requestQuery);
               return;
             }
+            remoteMixState.settled = true;
+            remoteMixState.hasFinalSuggestions = true;
             updateSearchSuggestions(remoteResponse.suggestions, requestQuery);
           });
         }, remoteDelay);
@@ -4002,6 +4027,9 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     }
 
     function normalizeTabMatchUrl(url) {
+      if (SEARCH_UTILS && typeof SEARCH_UTILS.buildTabMatchUrl === 'function') {
+        return SEARCH_UTILS.buildTabMatchUrl(url);
+      }
       if (!url) {
         return '';
       }
@@ -4011,7 +4039,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         if (protocol !== 'http:' && protocol !== 'https:') {
           return String(url).trim().toLowerCase();
         }
-        const host = normalizeHost(parsed.hostname);
+        const hostname = normalizeHost(parsed.hostname);
+        const host = parsed.port ? `${hostname}:${parsed.port}` : hostname;
         let path = parsed.pathname || '/';
         path = path.replace(/\/+$/, '');
         if (!path) {
@@ -4024,6 +4053,9 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     }
 
     function normalizeTabMatchUrlWithoutSearch(url) {
+      if (SEARCH_UTILS && typeof SEARCH_UTILS.buildTabMatchUrl === 'function') {
+        return SEARCH_UTILS.buildTabMatchUrl(url, { includeSearch: false });
+      }
       if (!url) {
         return '';
       }
@@ -4033,7 +4065,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         if (protocol !== 'http:' && protocol !== 'https:') {
           return String(url).trim().toLowerCase();
         }
-        const host = normalizeHost(parsed.hostname);
+        const hostname = normalizeHost(parsed.hostname);
+        const host = parsed.port ? `${hostname}:${parsed.port}` : hostname;
         let path = parsed.pathname || '/';
         path = path.replace(/\/+$/, '');
         if (!path) {
@@ -4887,7 +4920,9 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             return;
           }
           if (isPaste || getDirectUrlSuggestion(query)) {
-            updateSearchSuggestions([], query);
+            updateSearchSuggestions([], query, {
+              deferCappedShrink: true
+            });
           }
           if (isModeCommand(query) || getCommandMatch(query)) {
             updateSearchSuggestions([], query);
@@ -5818,28 +5853,145 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       });
     }
 
-    function animateSuggestionsGrowth(container, fromHeight) {
-      if (!container || !fromHeight) {
+    function cancelSuggestionsHeightAnimation(container) {
+      if (!container) {
+        return;
+      }
+      if (suggestionsHeightAnimationFrame) {
+        cancelAnimationFrame(suggestionsHeightAnimationFrame);
+        suggestionsHeightAnimationFrame = 0;
+      }
+      if (suggestionsHeightAnimationTimer) {
+        clearTimeout(suggestionsHeightAnimationTimer);
+        suggestionsHeightAnimationTimer = 0;
+      }
+      if (suggestionsHeightTransitionEndHandler) {
+        container.removeEventListener('transitionend', suggestionsHeightTransitionEndHandler);
+        suggestionsHeightTransitionEndHandler = null;
+      }
+      suggestionsHeightAnimationTarget = 0;
+      suggestionsHeightAnimationTargetIsCapped = false;
+      container.style.removeProperty('height');
+      container.style.removeProperty('overflow');
+      container.style.removeProperty('transition');
+    }
+
+    function readSuggestionsHeightMetrics(container) {
+      const metrics = {
+        height: 0,
+        maxHeight: 0,
+        atMaxHeight: false
+      };
+      if (!container) {
+        return metrics;
+      }
+      const currentHeight = Math.max(0, Number(container.getBoundingClientRect().height) || 0);
+      const computedStyle = window.getComputedStyle(container);
+      const maxHeight = Number.parseFloat(computedStyle && computedStyle.maxHeight) || 0;
+      const clientHeight = Math.max(0, Number(container.clientHeight) || currentHeight);
+      const scrollHeight = Math.max(0, Number(container.scrollHeight) || 0);
+      metrics.height = currentHeight;
+      metrics.maxHeight = maxHeight;
+      metrics.atMaxHeight = Boolean(
+        (maxHeight > 0 && currentHeight >= maxHeight - 1) ||
+        scrollHeight > clientHeight + 1
+      );
+      return metrics;
+    }
+
+    function captureSuggestionsHeightState(container) {
+      const state = {
+        height: 0,
+        heldHeight: 0,
+        atMaxHeight: false
+      };
+      if (!container) {
+        return state;
+      }
+      const hasRenderedContent = Boolean(container.children && container.children.length > 0);
+      if (hasRenderedContent) {
+        const metrics = readSuggestionsHeightMetrics(container);
+        const hasTrackedAnimationTarget = suggestionsHeightAnimationTarget > 0;
+        state.height = metrics.height;
+        state.atMaxHeight = hasTrackedAnimationTarget
+          ? suggestionsHeightAnimationTargetIsCapped
+          : metrics.atMaxHeight;
+        state.heldHeight = state.atMaxHeight && hasTrackedAnimationTarget
+          ? suggestionsHeightAnimationTarget
+          : metrics.height;
+      }
+      cancelSuggestionsHeightAnimation(container);
+      return state;
+    }
+
+    function holdSuggestionsHeightForRemoteMix(container, previousState, query, enabled) {
+      if (!container || !previousState || !previousState.atMaxHeight || !previousState.height) {
+        return false;
+      }
+      const targetMetrics = readSuggestionsHeightMetrics(container);
+      if (targetMetrics.atMaxHeight) {
+        cancelSuggestionsHeightAnimation(container);
+        if (deferredSuggestionsHeightQuery === query) {
+          deferredSuggestionsHeightQuery = '';
+        }
+        return true;
+      }
+      if (!enabled) {
+        return false;
+      }
+      const heldHeight = Math.max(0, Number(previousState.heldHeight) || previousState.height);
+      if (targetMetrics.height >= heldHeight - 1) {
+        return false;
+      }
+      cancelSuggestionsHeightAnimation(container);
+      container.style.setProperty('height', `${heldHeight}px`, 'important');
+      container.style.setProperty('overflow', 'hidden', 'important');
+      container.style.setProperty('transition', 'none', 'important');
+      deferredSuggestionsHeightQuery = query;
+      return true;
+    }
+
+    function finalizeDeferredSuggestionsHeight(query) {
+      if (!query || deferredSuggestionsHeightQuery !== query) {
+        return;
+      }
+      deferredSuggestionsHeightQuery = '';
+      const previousState = captureSuggestionsHeightState(suggestionsContainer);
+      animateSuggestionsHeight(suggestionsContainer, previousState.height);
+    }
+
+    function animateSuggestionsHeight(container, fromHeight) {
+      if (!container || !fromHeight || container.getAttribute('data-collapsed') === 'true') {
         return;
       }
       const toHeight = container.getBoundingClientRect().height;
-      if (toHeight <= fromHeight + 1) {
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduceMotion || Math.abs(toHeight - fromHeight) <= 1) {
         return;
       }
+      const targetMetrics = readSuggestionsHeightMetrics(container);
+      cancelSuggestionsHeightAnimation(container);
+      suggestionsHeightAnimationTarget = toHeight;
+      suggestionsHeightAnimationTargetIsCapped = targetMetrics.atMaxHeight;
       container.style.setProperty('height', `${fromHeight}px`, 'important');
       container.style.setProperty('overflow', 'hidden', 'important');
-      container.style.setProperty('transition', 'height 180ms ease', 'important');
-      requestAnimationFrame(() => {
+      container.style.setProperty('transition', 'none', 'important');
+      void container.offsetHeight;
+      suggestionsHeightAnimationFrame = requestAnimationFrame(() => {
+        suggestionsHeightAnimationFrame = 0;
+        container.style.setProperty('transition', 'height 180ms ease', 'important');
         container.style.setProperty('height', `${toHeight}px`, 'important');
       });
-      const cleanup = () => {
-        container.style.removeProperty('height');
-        container.style.removeProperty('overflow');
-        container.style.removeProperty('transition');
-        container.removeEventListener('transitionend', cleanup);
+      suggestionsHeightTransitionEndHandler = (event) => {
+        if (event && event.propertyName && event.propertyName !== 'height') {
+          return;
+        }
+        cancelSuggestionsHeightAnimation(container);
       };
-      container.addEventListener('transitionend', cleanup);
-      setTimeout(cleanup, 220);
+      container.addEventListener('transitionend', suggestionsHeightTransitionEndHandler);
+      suggestionsHeightAnimationTimer = setTimeout(() => {
+        cancelSuggestionsHeightAnimation(container);
+      }, 240);
     }
 
     function renderOverlayEmptyState(message) {
@@ -6444,10 +6596,15 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       ].join('|');
     }
 
-    function updateSearchSuggestions(suggestions, query) {
+    function updateSearchSuggestions(suggestions, query, options) {
       if (query !== latestOverlayQuery) {
         return;
       }
+      const renderOptions = options && typeof options === 'object' ? options : {};
+      const deferCappedShrink = renderOptions.deferCappedShrink === true;
+      const remoteMixState = renderOptions.remoteMixState && typeof renderOptions.remoteMixState === 'object'
+        ? renderOptions.remoteMixState
+        : null;
       setOverlayResultsCollapsed(false);
       lastSuggestionResponse = Array.isArray(suggestions) ? suggestions : [];
       const rawTagInput = (latestRawInputValue || query || '').trim();
@@ -6510,6 +6667,10 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         if (query !== latestOverlayQuery) {
           return;
         }
+        if (remoteMixState && remoteMixState.settled && remoteMixState.hasFinalSuggestions) {
+          return;
+        }
+        const shouldDeferCappedShrink = deferCappedShrink && !(remoteMixState && remoteMixState.settled);
         const commandMatch = (!modeCommandActive && !siteSearchQueryModeActive)
           ? getCommandMatch(rawTagInput)
           : null;
@@ -6740,10 +6901,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           actionContextKey === lastRenderedActionContextKey &&
           isSuggestionPrefix(currentSuggestions, allSuggestions);
         const startIndex = canAppend ? currentSuggestions.length : 0;
-        const shouldAnimateGrowth = canAppend && startIndex < allSuggestions.length;
-        const previousHeight = shouldAnimateGrowth
-          ? suggestionsContainer.getBoundingClientRect().height
-          : 0;
+        const previousHeightState = captureSuggestionsHeightState(suggestionsContainer);
         if (!canAppend) {
           // Clear existing suggestions
           suggestionsContainer.innerHTML = '';
@@ -7254,8 +7412,17 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         });
         syncSuggestionLastState();
         updateSelection();
-        if (shouldAnimateGrowth) {
-          animateSuggestionsGrowth(suggestionsContainer, previousHeight);
+        const heightHeldForRemoteMix = holdSuggestionsHeightForRemoteMix(
+          suggestionsContainer,
+          previousHeightState,
+          query,
+          shouldDeferCappedShrink
+        );
+        if (!heightHeldForRemoteMix) {
+          if (deferredSuggestionsHeightQuery === query) {
+            deferredSuggestionsHeightQuery = '';
+          }
+          animateSuggestionsHeight(suggestionsContainer, previousHeightState.height);
         }
       // Update keyboard navigation
         if (!canAppend) {

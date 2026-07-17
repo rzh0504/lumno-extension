@@ -2030,6 +2030,31 @@
     }
   }
 
+  function buildTabMatchUrl(url, options) {
+    if (!url) {
+      return '';
+    }
+    const settings = options && typeof options === 'object' ? options : {};
+    try {
+      const parsed = new URL(String(url));
+      const protocol = String(parsed.protocol || '').toLowerCase();
+      if (protocol !== 'http:' && protocol !== 'https:') {
+        return String(url).trim().toLowerCase();
+      }
+      const hostname = normalizeHost(parsed.hostname);
+      const authority = parsed.port ? `${hostname}:${parsed.port}` : hostname;
+      let path = parsed.pathname || '/';
+      path = path.replace(/\/+$/, '');
+      if (!path) {
+        path = '/';
+      }
+      const search = settings.includeSearch === false ? '' : (parsed.search || '');
+      return `${authority}${path}${search}`;
+    } catch (e) {
+      return String(url).trim().toLowerCase();
+    }
+  }
+
   function getDirectNavigationUrlForQuery(rawQuery, options) {
     const settings = options && typeof options === 'object' ? options : {};
     if (typeof settings.getDirectNavigationUrl !== 'function') {
@@ -2753,6 +2778,7 @@
     buildSearchQueryContext,
     buildSearchUrlFromTemplate,
     buildComparableNavigationUrl,
+    buildTabMatchUrl,
     calculateSearchRelevanceScore,
     classifySearchIntent,
     collectSearchMatches,
