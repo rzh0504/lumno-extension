@@ -1237,6 +1237,7 @@ const NEWTAB_WALLPAPER_EFFECT_STORAGE_KEY = '_x_extension_newtab_wallpaper_effec
 const OVERLAY_SIZE_MODE_STORAGE_KEY = '_x_extension_overlay_size_mode_2026_unique_';
 const BOOKMARK_COUNT_STORAGE_KEY = '_x_extension_bookmark_count_2024_unique_';
 const BOOKMARK_COLUMNS_STORAGE_KEY = '_x_extension_bookmark_columns_2024_unique_';
+const BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY = '_x_extension_bookmark_folder_icons_visible_2026_unique_';
 const PINNED_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_pinned_recent_sites_2026_unique_';
 const HIDDEN_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_hidden_recent_sites_2026_unique_';
 const NEWTAB_SHORTCUTS_STORAGE_KEY = '_x_extension_newtab_shortcuts_2026_unique_';
@@ -5479,6 +5480,7 @@ migrateStorageIfNeeded([
   OVERLAY_SIZE_MODE_STORAGE_KEY,
   BOOKMARK_COUNT_STORAGE_KEY,
   BOOKMARK_COLUMNS_STORAGE_KEY,
+  BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY,
   PINNED_RECENT_SITES_STORAGE_KEY,
   HIDDEN_RECENT_SITES_STORAGE_KEY,
   NEWTAB_SHORTCUTS_STORAGE_KEY,

@@ -33,6 +33,15 @@ assert.strictEqual(settings.normalizeNewtabShortcutsVisible(true), true);
 assert.strictEqual(settings.normalizeNewtabShortcutsVisible(undefined), true);
 assert.strictEqual(settings.normalizeNewtabShortcutsVisible('false'), true);
 
+assert.strictEqual(settings.normalizeBookmarkFolderIconsVisible(false), false);
+assert.strictEqual(settings.normalizeBookmarkFolderIconsVisible(true), true);
+assert.strictEqual(settings.normalizeBookmarkFolderIconsVisible(undefined), true);
+assert.strictEqual(settings.normalizeBookmarkFolderIconsVisible('false'), true);
+assert.strictEqual(
+  settings.BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY,
+  '_x_extension_bookmark_folder_icons_visible_2026_unique_'
+);
+
 assert.strictEqual(settings.normalizeUpdateNoticeEnabled(false), false);
 assert.strictEqual(settings.normalizeUpdateNoticeEnabled(true), true);
 assert.strictEqual(settings.normalizeUpdateNoticeEnabled(undefined), true);

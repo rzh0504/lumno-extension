@@ -38,6 +38,7 @@
   const bookmarkColumnsSelectWrap = bookmarkColumnsSelect
     ? bookmarkColumnsSelect.closest('._x_extension_select_wrap_2024_unique_')
     : null;
+  const bookmarkFolderIconsVisibleToggle = document.getElementById('_x_extension_bookmark_folder_icons_visible_toggle_2026_unique_');
   const autoPipToggle = document.getElementById('_x_extension_auto_pip_toggle_2024_unique_');
   const tabSwitcherToggle = document.getElementById('_x_extension_tab_switcher_toggle_2026_unique_');
   const documentPipToggle = document.getElementById('_x_extension_document_pip_toggle_2026_unique_');
@@ -149,6 +150,7 @@
   const BOOKMARK_COUNT_STORAGE_KEY = '_x_extension_bookmark_count_2024_unique_';
   const BOOKMARK_COLUMNS_STORAGE_KEY = '_x_extension_bookmark_columns_2024_unique_';
   const BOOKMARK_VIEW_MODE_STORAGE_KEY = '_x_extension_bookmark_view_mode_2026_unique_';
+  const BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY = '_x_extension_bookmark_folder_icons_visible_2026_unique_';
   const PINNED_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_pinned_recent_sites_2026_unique_';
   const HIDDEN_RECENT_SITES_STORAGE_KEY = '_x_extension_newtab_hidden_recent_sites_2026_unique_';
   const NEWTAB_SHORTCUTS_STORAGE_KEY = '_x_extension_newtab_shortcuts_2026_unique_';
@@ -196,6 +198,7 @@
     BOOKMARK_COUNT_STORAGE_KEY,
     BOOKMARK_COLUMNS_STORAGE_KEY,
     BOOKMARK_VIEW_MODE_STORAGE_KEY,
+    BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY,
     PINNED_RECENT_SITES_STORAGE_KEY,
     HIDDEN_RECENT_SITES_STORAGE_KEY,
     NEWTAB_SHORTCUTS_STORAGE_KEY,
@@ -746,6 +749,12 @@
   function normalizeNewtabShortcutsVisible(value) {
     return typeof SETTINGS.normalizeNewtabShortcutsVisible === 'function'
       ? SETTINGS.normalizeNewtabShortcutsVisible(value)
+      : value !== false;
+  }
+
+  function normalizeBookmarkFolderIconsVisible(value) {
+    return typeof SETTINGS.normalizeBookmarkFolderIconsVisible === 'function'
+      ? SETTINGS.normalizeBookmarkFolderIconsVisible(value)
       : value !== false;
   }
 
@@ -2615,6 +2624,7 @@
     BOOKMARK_COUNT_STORAGE_KEY,
     BOOKMARK_COLUMNS_STORAGE_KEY,
     BOOKMARK_VIEW_MODE_STORAGE_KEY,
+    BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY,
     NEWTAB_WIDTH_MODE_STORAGE_KEY,
     NEWTAB_SEARCH_WIDTH_STORAGE_KEY,
     NEWTAB_THEME_MODE_STORAGE_KEY,
@@ -3054,6 +3064,16 @@
       }
       storageArea.set({ [BOOKMARK_COLUMNS_STORAGE_KEY]: nextColumns });
       notifyNewtabSectionsRefresh('bookmarks');
+    });
+  }
+  if (bookmarkFolderIconsVisibleToggle) {
+    bookmarkFolderIconsVisibleToggle.addEventListener('change', () => {
+      const next = normalizeBookmarkFolderIconsVisible(bookmarkFolderIconsVisibleToggle.checked);
+      bookmarkFolderIconsVisibleToggle.checked = next;
+      if (!storageArea) {
+        return;
+      }
+      storageArea.set({ [BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY]: next });
     });
   }
   if (overlayTabQuickSwitchToggle) {
@@ -3593,6 +3613,16 @@
         storageArea.set({ [BOOKMARK_COLUMNS_STORAGE_KEY]: columns });
       }
       refreshCustomSelects();
+    });
+    storageArea.get([BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY], (result) => {
+      const raw = result[BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY];
+      const next = normalizeBookmarkFolderIconsVisible(raw);
+      if (bookmarkFolderIconsVisibleToggle) {
+        bookmarkFolderIconsVisibleToggle.checked = next;
+      }
+      if (raw !== next) {
+        storageArea.set({ [BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY]: next });
+      }
     });
     storageArea.get([OVERLAY_TAB_PRIORITY_STORAGE_KEY], (result) => {
       const rawValue = result[OVERLAY_TAB_PRIORITY_STORAGE_KEY];
@@ -4844,6 +4874,7 @@
         changes[BOOKMARK_COUNT_STORAGE_KEY] ||
         changes[BOOKMARK_COLUMNS_STORAGE_KEY] ||
         changes[BOOKMARK_VIEW_MODE_STORAGE_KEY] ||
+        changes[BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY] ||
         changes[NEWTAB_SHORTCUTS_STORAGE_KEY] ||
         changes[AUTO_PIP_ENABLED_STORAGE_KEY] ||
         changes[PINNED_TAB_RECOVERY_ENABLED_STORAGE_KEY] ||
@@ -4932,6 +4963,14 @@
       const stored = normalizeBookmarkColumns(changes[BOOKMARK_COLUMNS_STORAGE_KEY].newValue);
       bookmarkColumnsSelect.value = String(stored);
       refreshCustomSelects();
+    }
+    if (changes[BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY] && bookmarkFolderIconsVisibleToggle) {
+      const raw = changes[BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY].newValue;
+      const next = normalizeBookmarkFolderIconsVisible(raw);
+      bookmarkFolderIconsVisibleToggle.checked = next;
+      if (raw !== next && storageArea) {
+        storageArea.set({ [BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY]: next });
+      }
     }
     if (changes[OVERLAY_TAB_PRIORITY_STORAGE_KEY] && overlayTabQuickSwitchToggle) {
       const next = normalizeOverlayTabQuickSwitch(changes[OVERLAY_TAB_PRIORITY_STORAGE_KEY].newValue);

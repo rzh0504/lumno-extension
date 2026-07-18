@@ -137,6 +137,9 @@
   "settings_bookmarks_title": {
     "message": "書籤"
   },
+  "settings_bookmark_folder_icons_visible_title": {
+    "message": "顯示書籤資料夾內圖示"
+  },
   "settings_document_pip_title": {
     "message": "網頁剪裁"
   },

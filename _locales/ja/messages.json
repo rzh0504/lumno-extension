@@ -137,6 +137,9 @@
   "settings_bookmarks_title": {
     "message": "ブックマーク"
   },
+  "settings_bookmark_folder_icons_visible_title": {
+    "message": "ブックマークフォルダ内のアイコンを表示"
+  },
   "settings_document_pip_title": {
     "message": "Webクリップ"
   },

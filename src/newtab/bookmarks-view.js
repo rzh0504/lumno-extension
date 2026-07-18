@@ -68,6 +68,7 @@
     const cards = Array.isArray(getOption(options, 'cards', null))
       ? getOption(options, 'cards', null)
       : [];
+    let folderIconsVisible = getOption(options, 'folderIconsVisible', true) !== false;
     const cardElementCache = getOption(options, 'cardElementCache', new Map());
     const t = getFunction(options, 't', function(key, fallback) {
       return fallback || key || '';
@@ -326,6 +327,7 @@
       let hoverIntentTimer = null;
       let isHoverVisualActive = false;
       let isMenuVisualLocked = false;
+      let isFolderExpanded = false;
       const clearHoverIntentTimer = () => {
         if (hoverIntentTimer !== null && windowObj) {
           windowObj.clearTimeout(hoverIntentTimer);
@@ -338,27 +340,45 @@
         (isMenuVisualLocked || card.getAttribute('aria-expanded') === 'true')
       );
       const isHoverSuppressed = (event) => shouldSuppressHover(card, event) === true;
-      const setHoverVisualActive = (active) => {
-        if (isHoverVisualActive === active) {
+      const setFolderExpanded = (active) => {
+        const nextActive = Boolean(active);
+        if (!folderIcon || isFolderExpanded === nextActive) {
           return;
         }
-        isHoverVisualActive = active;
-        card.classList.toggle('x-nt-bookmark-card--hover', active);
-        if (folderIcon) {
-          playFolderPathMorph(folderIcon, active);
+        isFolderExpanded = nextActive;
+        card.classList.toggle('x-nt-bookmark-card--folder-expanded', nextActive);
+        playFolderPathMorph(folderIcon, nextActive);
+      };
+      const syncFolderExpandedState = () => {
+        setFolderExpanded(
+          shouldKeepMenuVisualActive() || (folderIconsVisible && isHoverVisualActive)
+        );
+      };
+      const setHoverVisualActive = (active) => {
+        const nextActive = Boolean(active);
+        if (isHoverVisualActive === nextActive) {
+          syncFolderExpandedState();
+          return;
         }
+        isHoverVisualActive = nextActive;
+        card.classList.toggle('x-nt-bookmark-card--hover', nextActive);
+        syncFolderExpandedState();
       };
       const setMenuVisualLocked = (active) => {
         const nextActive = Boolean(active);
         if (isMenuVisualLocked === nextActive) {
           if (nextActive) {
             setHoverVisualActive(true);
+            setFolderExpanded(true);
           }
           return;
         }
         isMenuVisualLocked = nextActive;
         clearHoverIntentTimer();
         setHoverVisualActive(nextActive);
+        if (nextActive) {
+          setFolderExpanded(true);
+        }
       };
       const deactivateBookmarkHoverVisual = () => {
         clearHoverIntentTimer();
@@ -369,6 +389,14 @@
         setHoverVisualActive(false);
       };
       card._xDeactivateBookmarkHoverVisual = deactivateBookmarkHoverVisual;
+      card._xSyncBookmarkFolderExpandedState = syncFolderExpandedState;
+      card._xResetBookmarkInteractionState = () => {
+        clearHoverIntentTimer();
+        isHoverVisualActive = false;
+        isMenuVisualLocked = false;
+        card.classList.remove('x-nt-bookmark-card--hover');
+        setFolderExpanded(false);
+      };
       if (isFolder && menuMode) {
         card._xSetBookmarkMenuVisualActive = setMenuVisualLocked;
       }
@@ -432,6 +460,7 @@
             openFolderMenu(item, card);
             return;
           }
+          setFolderExpanded(true);
           openFolder(item.id);
           return;
         }
@@ -455,6 +484,7 @@
               openFolderMenu(item, card);
               return;
             }
+            setFolderExpanded(true);
             openFolder(item.id);
             return;
           }
@@ -507,6 +537,9 @@
           }
         }
         if (card && grid) {
+          if (typeof card._xResetBookmarkInteractionState === 'function') {
+            card._xResetBookmarkInteractionState();
+          }
           applyBookmarkCardMetadata(card, item, index);
           applyCardTheme(card, card._xTheme, card._xHost || '');
           cards.push(card);
@@ -521,6 +554,16 @@
       };
     }
 
+    function setFolderIconsVisible(value) {
+      folderIconsVisible = value !== false;
+      cards.forEach((card) => {
+        if (card && typeof card._xSyncBookmarkFolderExpandedState === 'function') {
+          card._xSyncBookmarkFolderExpandedState();
+        }
+      });
+      return folderIconsVisible;
+    }
+
     return {
       appendEmptyFolderState,
       buildCard,
@@ -528,6 +571,7 @@
       render,
       getSignature: getBookmarksSignature,
       getCacheKey: getBookmarkCacheKey,
+      setFolderIconsVisible,
       syncCardElementCache,
       getCards: function() {
         return cards;

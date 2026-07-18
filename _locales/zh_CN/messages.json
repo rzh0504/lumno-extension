@@ -137,6 +137,9 @@
   "settings_bookmarks_title": {
     "message": "书签"
   },
+  "settings_bookmark_folder_icons_visible_title": {
+    "message": "展示书签文件夹内图标"
+  },
   "settings_document_pip_title": {
     "message": "网页剪裁"
   },

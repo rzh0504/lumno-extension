@@ -1,9 +1,20 @@
 const assert = require('assert');
+const fs = require('fs');
 const path = require('path');
 
 require(path.join('..', 'src', 'newtab', 'bookmarks-view.js'));
 
 const { createBookmarksView } = globalThis.LumnoNewtabBookmarksView;
+const newtabHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'newtab', 'newtab.html'), 'utf8');
+
+assert(
+  /\.x-nt-bookmark-card--folder\.x-nt-bookmark-card--folder-expanded\s+\.x-nt-folder-preview/.test(newtabHtml),
+  'folder preview favicons should be revealed by the explicit expanded state'
+);
+assert(
+  !/\.x-nt-bookmark-card--folder\.x-nt-bookmark-card--hover\s+\.x-nt-folder-preview/.test(newtabHtml),
+  'card hover alone should not reveal folder preview favicons'
+);
 
 function createFakeEvent(type, values) {
   return {
@@ -112,11 +123,12 @@ const windowObj = {
 };
 const openedFolders = [];
 const morphStates = [];
+const cards = [];
 const view = createBookmarksView({
   documentObj,
   windowObj,
   grid: createFakeElement('div'),
-  cards: [],
+  cards,
   cardElementCache: new Map(),
   t: (_key, fallback) => fallback || '',
   formatMessage: (_key, fallback, values) => fallback.replace('{title}', values.title),
@@ -152,12 +164,78 @@ const card = view.buildCard(
   { viewMode: 'list', menuMode: true }
 );
 
+card.dispatchEvent(createFakeEvent('pointerenter', { pointerType: 'mouse' }));
+assert.strictEqual(
+  card.classList.contains('x-nt-bookmark-card--hover'),
+  true,
+  'hovering a folder should activate its card visual state'
+);
+assert.strictEqual(
+  card.classList.contains('x-nt-bookmark-card--folder-expanded'),
+  true,
+  'folder preview icons should expand on hover by default'
+);
+assert.deepStrictEqual(
+  morphStates,
+  [true],
+  'folder icon should animate on hover while preview icons are enabled'
+);
+
+cards.push(card);
+assert.strictEqual(
+  typeof view.setFolderIconsVisible,
+  'function',
+  'bookmark view should expose a live folder-icon setting hook'
+);
+view.setFolderIconsVisible(false);
+assert.strictEqual(
+  card.classList.contains('x-nt-bookmark-card--folder-expanded'),
+  false,
+  'turning folder icons off should immediately collapse a hovered folder'
+);
+assert.deepStrictEqual(morphStates, [true, false]);
+
+card.dispatchEvent(createFakeEvent('pointerleave'));
+assert.strictEqual(
+  card.classList.contains('x-nt-bookmark-card--folder-expanded'),
+  false,
+  'folder preview icons should stay collapsed after hover ends'
+);
+assert.deepStrictEqual(morphStates, [true, false]);
+
+card.dispatchEvent(createFakeEvent('pointerenter', { pointerType: 'mouse' }));
+assert.strictEqual(
+  card.classList.contains('x-nt-bookmark-card--hover'),
+  true,
+  'disabled folder icons should not remove the card hover visual'
+);
+assert.strictEqual(
+  card.classList.contains('x-nt-bookmark-card--folder-expanded'),
+  false,
+  'disabled folder icons should stay hidden on hover'
+);
+assert.deepStrictEqual(
+  morphStates,
+  [true, false],
+  'disabled folder icons should not animate on hover'
+);
+
 card.dispatchEvent(createFakeEvent('click'));
 assert.strictEqual(openedFolders.length, 1, 'clicking a list-mode folder should open its cascade menu');
 assert.strictEqual(
   card.classList.contains('x-nt-bookmark-card--hover'),
   true,
   'clicking a folder menu trigger should immediately set the active visual state'
+);
+assert.strictEqual(
+  card.classList.contains('x-nt-bookmark-card--folder-expanded'),
+  true,
+  'clicking a folder should reveal its preview icons even when hover previews are disabled'
+);
+assert.deepStrictEqual(
+  morphStates,
+  [true, false, true],
+  'clicking a folder should still play its opening animation when hover previews are disabled'
 );
 
 card.setAttribute('aria-expanded', 'true');
@@ -189,8 +267,32 @@ assert.strictEqual(
 );
 assert.deepStrictEqual(
   morphStates,
-  [true, false],
+  [true, false, true, false],
   'folder icon morph should follow the locked active state and release on close'
+);
+
+const directFolderCard = view.buildCard(
+  { id: 'engineering', title: 'Engineering', type: 'folder', previewUrls: [] },
+  1,
+  { viewMode: 'folder', menuMode: false }
+);
+directFolderCard.dispatchEvent(createFakeEvent('pointerenter', { pointerType: 'mouse' }));
+assert.strictEqual(
+  directFolderCard.classList.contains('x-nt-bookmark-card--folder-expanded'),
+  false,
+  'disabled folder icons should stay collapsed on hover in direct folder view'
+);
+assert.deepStrictEqual(morphStates, [true, false, true, false]);
+directFolderCard.dispatchEvent(createFakeEvent('click'));
+assert.strictEqual(
+  directFolderCard.classList.contains('x-nt-bookmark-card--folder-expanded'),
+  true,
+  'clicking a folder in direct folder view should still expand its icon'
+);
+assert.deepStrictEqual(
+  morphStates,
+  [true, false, true, false, true],
+  'direct folder navigation should play the opening animation when hover previews are disabled'
 );
 
 console.log('newtab bookmark folder menu state tests passed');

@@ -60,6 +60,7 @@
   const BOOKMARK_COUNT_STORAGE_KEY = '_x_extension_bookmark_count_2024_unique_';
   const BOOKMARK_COLUMNS_STORAGE_KEY = '_x_extension_bookmark_columns_2024_unique_';
   const BOOKMARK_VIEW_MODE_STORAGE_KEY = '_x_extension_bookmark_view_mode_2026_unique_';
+  const BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY = '_x_extension_bookmark_folder_icons_visible_2026_unique_';
   const BOOKMARK_CASCADE_DEBUG_STORAGE_KEY = '_x_extension_bookmark_cascade_debug_2026_unique_';
   // Flip this to true when inspecting bookmark cascade hover intent and safe-triangle timing.
   const BOOKMARK_CASCADE_DEBUG_UI_ENABLED = false;
@@ -212,6 +213,7 @@
   let currentBookmarkCount = 8;
   let currentBookmarkColumns = 4;
   let currentBookmarkViewMode = 'folder';
+  let bookmarkFolderIconsVisible = true;
   let tabRankScoreDebugEnabled = false;
   let searchLayer = null;
   let wordmarkContainer = null;
@@ -430,6 +432,12 @@
   function normalizeNewtabShortcutsVisible(value) {
     return typeof SETTINGS.normalizeNewtabShortcutsVisible === 'function'
       ? SETTINGS.normalizeNewtabShortcutsVisible(value)
+      : value !== false;
+  }
+
+  function normalizeBookmarkFolderIconsVisible(value) {
+    return typeof SETTINGS.normalizeBookmarkFolderIconsVisible === 'function'
+      ? SETTINGS.normalizeBookmarkFolderIconsVisible(value)
       : value !== false;
   }
 
@@ -3153,6 +3161,17 @@
         loadBookmarks({ force: true });
       }
     }
+    if (changes[BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY]) {
+      const raw = changes[BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY].newValue;
+      const nextValue = normalizeBookmarkFolderIconsVisible(raw);
+      bookmarkFolderIconsVisible = nextValue;
+      if (storageArea && raw !== nextValue) {
+        storageArea.set({ [BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY]: nextValue });
+      }
+      if (bookmarksView && typeof bookmarksView.setFolderIconsVisible === 'function') {
+        bookmarksView.setFolderIconsVisible(nextValue);
+      }
+    }
     if (changes[BOOKMARK_COUNT_STORAGE_KEY]) {
       const raw = changes[BOOKMARK_COUNT_STORAGE_KEY].newValue;
       const nextCount = normalizeBookmarkCount(raw);
@@ -3344,6 +3363,17 @@
         bookmarkRenderSignature = '';
         markBookmarkDataDirty();
         loadBookmarks();
+      }
+    });
+    storageArea.get([BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY], (result) => {
+      const raw = result[BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY];
+      const nextValue = normalizeBookmarkFolderIconsVisible(raw);
+      bookmarkFolderIconsVisible = nextValue;
+      if (raw !== nextValue) {
+        storageArea.set({ [BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY]: nextValue });
+      }
+      if (bookmarksView && typeof bookmarksView.setFolderIconsVisible === 'function') {
+        bookmarksView.setFolderIconsVisible(nextValue);
       }
     });
     storageArea.get([BOOKMARK_COUNT_STORAGE_KEY], (result) => {
@@ -3787,6 +3817,7 @@
     BOOKMARK_COUNT_STORAGE_KEY,
     BOOKMARK_COLUMNS_STORAGE_KEY,
     BOOKMARK_VIEW_MODE_STORAGE_KEY,
+    BOOKMARK_FOLDER_ICONS_VISIBLE_STORAGE_KEY,
     BOOKMARK_CASCADE_DEBUG_STORAGE_KEY,
     TAB_RANK_SCORE_DEBUG_STORAGE_KEY,
     DEFAULT_SEARCH_ENGINE_STORAGE_KEY,
@@ -6895,6 +6926,7 @@
     grid: bookmarkGrid,
     cards: bookmarkCards,
     cardElementCache: bookmarkCardElementCache,
+    folderIconsVisible: bookmarkFolderIconsVisible,
     t,
     formatMessage,
     sanitizeDisplayText,

@@ -137,6 +137,9 @@
   "settings_bookmarks_title": {
     "message": "Show Bookmarks"
   },
+  "settings_bookmark_folder_icons_visible_title": {
+    "message": "Show Icons Inside Bookmark Folders"
+  },
   "settings_document_pip_title": {
     "message": "Web Clip"
   },
