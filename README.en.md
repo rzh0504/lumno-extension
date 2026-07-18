@@ -122,8 +122,8 @@ npm run test:onboarding-content
 ## Star History
 
 <p align="center">
-  <a href="https://www.star-history.com/#kubai087/lumno-extension&Date">
-    <img src="https://api.star-history.com/svg?repos=kubai087/lumno-extension&type=Date" alt="Star History Chart" />
+  <a href="https://github.com/kubai087/lumno-extension/stargazers">
+    <img src="assets/star-history.svg" alt="GitHub Star History Chart" />
   </a>
 </p>
 
