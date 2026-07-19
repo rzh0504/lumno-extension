@@ -47,8 +47,13 @@ assertContains(
 );
 assertContains(
   bookmarksView,
-  'shouldShow: () => isBookmarkTitleTruncated(title)',
+  'return isBookmarkTitleTruncated(title);',
   'bookmark card cursor tooltips should only show for truncated titles'
+);
+assertContains(
+  bookmarksView,
+  "eventTarget.closest('.x-nt-bookmark-copy-action')",
+  'bookmark card cursor tooltips should stay hidden over the copy action'
 );
 assert.ok(
   !bookmarksView.includes('getTagText: isFolder ? null : getBackgroundOpenTagText'),
