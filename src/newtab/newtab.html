@@ -1595,6 +1595,49 @@
         overflow: hidden;
         text-overflow: ellipsis;
       }
+      .x-nt-bookmark-copy-action {
+        all: unset;
+        position: absolute;
+        right: 7px;
+        top: 50%;
+        z-index: 3;
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        color: var(--x-nt-bookmark-title, #475569);
+        opacity: 0;
+        transform: translate3d(5px, -50%, 0) scale(0.92);
+        pointer-events: auto;
+        cursor: pointer;
+        transition:
+          opacity 140ms ease,
+          transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+          color 140ms ease;
+      }
+      .x-nt-bookmark-card[data-bookmark-copy-action-visible="true"] .x-nt-bookmark-copy-action,
+      .x-nt-bookmark-copy-action:focus-visible {
+        opacity: 1;
+        transform: translate3d(0, -50%, 0) scale(1);
+      }
+      .x-nt-bookmark-copy-action:hover,
+      .x-nt-bookmark-copy-action:focus-visible {
+        color: color-mix(in srgb, var(--x-nt-bookmark-title, #475569) 72%, #2563eb);
+      }
+      .x-nt-bookmark-card[data-bookmark-copy-action-visible="true"] .x-nt-bookmark-title {
+        -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 36px), transparent 100%);
+        mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 36px), transparent 100%);
+      }
+      body[data-theme="dark"] .x-nt-bookmark-copy-action {
+        color: #cbd5e1;
+      }
+      body[data-theme="dark"] .x-nt-bookmark-copy-action:hover,
+      body[data-theme="dark"] .x-nt-bookmark-copy-action:focus-visible {
+        color: #f8fafc;
+      }
       .x-nt-folder-preview {
         display: inline-flex;
         align-items: center;
@@ -1835,6 +1878,12 @@
         cursor: default;
         user-select: none;
       }
+      .x-nt-bookmark-cascade-row {
+        position: relative;
+        flex: 0 0 auto;
+        width: 100%;
+        min-height: 32px;
+      }
       .x-nt-bookmark-cascade-item {
         all: unset;
         flex: 0 0 auto;
@@ -1850,6 +1899,21 @@
         cursor: pointer;
         white-space: nowrap;
         transition: color 120ms ease;
+      }
+      .x-nt-bookmark-cascade-row .x-nt-bookmark-cascade-copy-action {
+        right: 3px;
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        color: #64748b;
+      }
+      .x-nt-bookmark-cascade-row[data-bookmark-copy-action-visible="true"] .x-nt-bookmark-cascade-copy-action {
+        opacity: 1;
+        transform: translate3d(0, -50%, 0) scale(1);
+      }
+      .x-nt-bookmark-cascade-row[data-bookmark-copy-action-visible="true"] .x-nt-bookmark-cascade-label {
+        -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 32px), transparent 100%);
+        mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 32px), transparent 100%);
       }
       .x-nt-bookmark-cascade-item:hover,
       .x-nt-bookmark-cascade-item:focus-visible,
@@ -1954,6 +2018,9 @@
       body[data-theme="dark"] .x-nt-bookmark-cascade-item[data-hover-suppressed="true"]:hover:not([data-active="true"]) {
         background: transparent;
         color: #d6dbe3;
+      }
+      body[data-theme="dark"] .x-nt-bookmark-cascade-row .x-nt-bookmark-cascade-copy-action {
+        color: #cbd5e1;
       }
       body[data-theme="dark"] .x-nt-bookmark-cascade-icon--folder,
       body[data-theme="dark"] .x-nt-bookmark-cascade-arrow,
@@ -3030,6 +3097,7 @@
         background: #18181b;
       }
       @media (prefers-reduced-motion: reduce) {
+        .x-nt-bookmark-copy-action,
         .x-nt-feedback-popover,
         .x-nt-feedback-action,
         .x-nt-feedback-menu,

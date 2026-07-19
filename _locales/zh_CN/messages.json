@@ -1034,6 +1034,15 @@
   "bookmarks_open_manager": {
     "message": "打开书签管理页"
   },
+  "bookmarks_copy_url": {
+    "message": "复制链接"
+  },
+  "bookmarks_copy_url_success": {
+    "message": "已复制书签链接"
+  },
+  "bookmarks_copy_url_failed": {
+    "message": "复制链接失败，请重试"
+  },
   "search_tag_history": {
     "message": "历史"
   },

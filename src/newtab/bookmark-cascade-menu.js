@@ -87,6 +87,9 @@
     const hideCursorTooltip = getFunction(config, 'hideCursorTooltip');
     const showTopActionTooltip = getFunction(config, 'showTopActionTooltip');
     const hideTopActionTooltip = getFunction(config, 'hideTopActionTooltip');
+    const copyUrl = getFunction(config, 'copyUrl', function() {
+      return Promise.resolve(false);
+    });
     const shouldSuppressHover = getFunction(config, 'shouldSuppressHover', function() {
       return false;
     });
@@ -1193,6 +1196,9 @@
         }
         const isFolder = item.type === 'folder';
         const titleText = item.title || (item.url ? getUrlDisplay(item.url) : t('bookmarks_heading', 'Bookmarks'));
+        const itemRow = documentObj.createElement('div');
+        itemRow.className = 'x-nt-bookmark-cascade-row';
+        itemRow.setAttribute('role', 'none');
         const itemButton = documentObj.createElement('button');
         itemButton.type = 'button';
         itemButton.className = 'x-nt-bookmark-cascade-item';
@@ -1210,6 +1216,7 @@
           itemButton.appendChild(icon);
         }
         itemButton.appendChild(label);
+        itemRow.appendChild(itemButton);
 
         const openNestedLevel = (openOptions) => {
           if (!isFolder) {
@@ -1258,6 +1265,7 @@
         });
 
         if (isFolder) {
+          itemRow.classList.add('x-nt-bookmark-cascade-row--folder');
           itemButton.classList.add('x-nt-bookmark-cascade-item--folder');
           itemButton.setAttribute('aria-haspopup', 'menu');
           itemButton.setAttribute('aria-expanded', 'false');
@@ -1300,6 +1308,51 @@
             }
           });
         } else {
+          const copyButton = documentObj.createElement('button');
+          let copyActionFocused = false;
+          const setCopyActionVisible = (visible) => {
+            if (visible) {
+              itemRow.setAttribute('data-bookmark-copy-action-visible', 'true');
+            } else {
+              itemRow.removeAttribute('data-bookmark-copy-action-visible');
+            }
+          };
+          copyButton.type = 'button';
+          copyButton.className = 'x-nt-bookmark-copy-action x-nt-bookmark-cascade-copy-action';
+          copyButton.innerHTML = getRiSvg('ri-file-copy-line', 'ri-size-16');
+          copyButton.setAttribute('aria-label', t('bookmarks_copy_url', 'Copy link'));
+          copyButton.addEventListener('pointerenter', () => {
+            cancelBookmarkCascadeHoverIntent();
+            hideCursorTooltip();
+            activateLeafItem();
+            setCopyActionVisible(true);
+          });
+          copyButton.addEventListener('pointerleave', () => {
+            if (!copyActionFocused) {
+              setCopyActionVisible(false);
+            }
+          });
+          copyButton.addEventListener('focus', () => {
+            copyActionFocused = true;
+            cancelBookmarkCascadeHoverIntent();
+            hideCursorTooltip();
+            activateLeafItem();
+            setCopyActionVisible(true);
+          });
+          copyButton.addEventListener('blur', () => {
+            copyActionFocused = false;
+            setCopyActionVisible(false);
+          });
+          copyButton.addEventListener('pointerdown', (event) => {
+            event.stopPropagation();
+          });
+          copyButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            hideCursorTooltip();
+            Promise.resolve().then(() => copyUrl(item.url)).catch(noop);
+          });
+          itemRow.appendChild(copyButton);
           bindCursorTooltip(itemButton, () => titleText, {
             maxWidth: 460,
             shouldShow: (_target, event) => shouldOpenUrlInBackground(event)
@@ -1314,6 +1367,11 @@
             }, event);
           });
           itemButton.addEventListener('pointerleave', (event) => {
+            if (event && event.relatedTarget &&
+                typeof itemRow.contains === 'function' &&
+                itemRow.contains(event.relatedTarget)) {
+              return;
+            }
             cancelBookmarkCascadeHoverIntentFor(itemButton);
             setBookmarkCascadeItemHoverSuppressed(itemButton, false);
             clearBookmarkCascadePointerActiveItem(levelElement, null, event);
@@ -1341,7 +1399,7 @@
             navigateLeafItem(event);
           });
         }
-        contentElement.appendChild(itemButton);
+        contentElement.appendChild(itemRow);
       });
 
       bookmarkCascadeMenu.appendChild(levelElement);

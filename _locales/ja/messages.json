@@ -1034,6 +1034,15 @@
   "bookmarks_open_manager": {
     "message": "ブックマークマネージャーを開く"
   },
+  "bookmarks_copy_url": {
+    "message": "リンクをコピー"
+  },
+  "bookmarks_copy_url_success": {
+    "message": "ブックマークのリンクをコピーしました"
+  },
+  "bookmarks_copy_url_failed": {
+    "message": "リンクをコピーできませんでした"
+  },
   "search_tag_history": {
     "message": "履歴"
   },
