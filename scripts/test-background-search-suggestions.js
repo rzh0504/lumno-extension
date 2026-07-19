@@ -129,7 +129,7 @@ function createChromeStub(options) {
         return path.join(repoRoot, relativePath);
       },
       getManifest() {
-        return { version: '0.9.20' };
+        return { version: '0.9.21' };
       },
       onMessage: {
         addListener(listener) {
