@@ -1034,6 +1034,15 @@
   "bookmarks_open_manager": {
     "message": "開啟書籤管理頁"
   },
+  "bookmarks_copy_url": {
+    "message": "複製連結"
+  },
+  "bookmarks_copy_url_success": {
+    "message": "已複製書籤連結"
+  },
+  "bookmarks_copy_url_failed": {
+    "message": "複製連結失敗，請重試"
+  },
   "search_tag_history": {
     "message": "歷史"
   },

@@ -58,6 +58,7 @@
     "test:newtab-bookmark-cascade-hover-intent": "node scripts/test-newtab-bookmark-cascade-hover-intent.js",
     "test:newtab-bookmark-cascade-keyboard": "node scripts/test-newtab-bookmark-cascade-keyboard.js",
     "test:newtab-bookmark-folder-menu-state": "node scripts/test-newtab-bookmark-folder-menu-state.js",
+    "test:newtab-bookmark-copy-action": "node scripts/test-newtab-bookmark-copy-action.js",
     "test:newtab-feedback-popover": "node scripts/test-newtab-feedback-popover.js",
     "test:newtab-section-mode-menus": "node scripts/test-newtab-section-mode-menus.js",
     "test:newtab-shortcuts-ui": "node scripts/test-newtab-shortcuts-ui.js",

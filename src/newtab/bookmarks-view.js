@@ -137,6 +137,9 @@
     const hideCursorTooltip = getFunction(options, 'hideCursorTooltip');
     const openFolder = getFunction(options, 'openFolder');
     const openFolderMenu = getFunction(options, 'openFolderMenu');
+    const copyUrl = getFunction(options, 'copyUrl', function() {
+      return Promise.resolve(false);
+    });
     const navigateToUrl = getFunction(options, 'navigateToUrl');
     const openUrl = getFunction(options, 'openUrl', function(url) {
       navigateToUrl(url);
@@ -223,9 +226,10 @@
       const host = item.host || getHostFromUrl(themeUrl) || '';
       const siteName = getSiteDisplayName(host, item.title);
       const titleText = item.title || siteName || (item.url ? getUrlDisplay(item.url) : t('bookmarks_heading', '书签'));
-      const card = documentObj.createElement('button');
-      card.type = 'button';
+      const card = documentObj.createElement('div');
       card.className = 'x-nt-bookmark-card';
+      card.tabIndex = 0;
+      card.setAttribute('role', 'button');
       card.draggable = false;
       if (isFolder) {
         card.classList.add('x-nt-bookmark-card--folder');
@@ -289,6 +293,52 @@
 
       card.appendChild(icon);
       card.appendChild(title);
+      if (!isFolder) {
+        const copyButton = documentObj.createElement('button');
+        let copyActionFocused = false;
+        const setCopyActionVisible = (visible) => {
+          if (visible) {
+            card.setAttribute('data-bookmark-copy-action-visible', 'true');
+          } else {
+            card.removeAttribute('data-bookmark-copy-action-visible');
+          }
+        };
+        copyButton.type = 'button';
+        copyButton.className = 'x-nt-bookmark-copy-action';
+        copyButton.innerHTML = getRiSvg('ri-file-copy-line', 'ri-size-16');
+        copyButton.setAttribute('aria-label', t('bookmarks_copy_url', 'Copy link'));
+        copyButton.addEventListener('pointerenter', () => {
+          hideCursorTooltip();
+          setCopyActionVisible(true);
+        });
+        copyButton.addEventListener('pointerleave', () => {
+          if (!copyActionFocused) {
+            setCopyActionVisible(false);
+          }
+        });
+        copyButton.addEventListener('focus', () => {
+          copyActionFocused = true;
+          hideCursorTooltip();
+          setCopyActionVisible(true);
+        });
+        copyButton.addEventListener('blur', () => {
+          copyActionFocused = false;
+          setCopyActionVisible(false);
+        });
+        copyButton.addEventListener('pointerdown', (event) => {
+          event.stopPropagation();
+        });
+        copyButton.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          hideCursorTooltip();
+          Promise.resolve().then(() => copyUrl(item.url)).catch(noop);
+        });
+        copyButton.addEventListener('keydown', (event) => {
+          event.stopPropagation();
+        });
+        card.appendChild(copyButton);
+      }
       if (isFolder && Array.isArray(item.previewUrls) && item.previewUrls.length > 0) {
         const previewWrap = documentObj.createElement('span');
         previewWrap.className = 'x-nt-folder-preview';
@@ -395,6 +445,7 @@
         isHoverVisualActive = false;
         isMenuVisualLocked = false;
         card.classList.remove('x-nt-bookmark-card--hover');
+        card.removeAttribute('data-bookmark-copy-action-visible');
         setFolderExpanded(false);
       };
       if (isFolder && menuMode) {
@@ -445,7 +496,14 @@
       });
       bindCursorTooltip(card, () => card._xTitleText || titleText, {
         maxWidth: 460,
-        shouldShow: () => isBookmarkTitleTruncated(title)
+        shouldShow: (_target, event) => {
+          const eventTarget = event && event.target;
+          if (eventTarget && typeof eventTarget.closest === 'function' &&
+              eventTarget.closest('.x-nt-bookmark-copy-action')) {
+            return false;
+          }
+          return isBookmarkTitleTruncated(title);
+        }
       });
       card.addEventListener('click', (event) => {
         if (card._xBookmarkSuppressClick) {

@@ -1034,6 +1034,15 @@
   "bookmarks_open_manager": {
     "message": "Open bookmark manager"
   },
+  "bookmarks_copy_url": {
+    "message": "Copy link"
+  },
+  "bookmarks_copy_url_success": {
+    "message": "Bookmark link copied"
+  },
+  "bookmarks_copy_url_failed": {
+    "message": "Could not copy link"
+  },
   "search_tag_history": {
     "message": "History"
   },
