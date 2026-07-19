@@ -161,13 +161,13 @@ function testCopyActionIntegration() {
 
   assert.match(
     html,
-    /\.x-nt-bookmark-card\[data-bookmark-copy-action-visible="true"\] \.x-nt-bookmark-title[\s\S]*?mask-image:/,
-    'Visible copy actions should fade the tail of long card titles'
+    /\.x-nt-bookmark-card\[data-bookmark-copy-action-visible="true"\] \.x-nt-bookmark-title[\s\S]*?padding-right:\s*30px/,
+    'Visible copy actions should reserve space before long card titles are truncated'
   );
   assert.match(
     html,
-    /\.x-nt-bookmark-cascade-row\[data-bookmark-copy-action-visible="true"\] \.x-nt-bookmark-cascade-label[\s\S]*?mask-image:/,
-    'Visible cascade copy actions should fade the tail of long labels'
+    /\.x-nt-bookmark-cascade-row\[data-bookmark-copy-action-visible="true"\] \.x-nt-bookmark-cascade-label[\s\S]*?padding-right:\s*28px/,
+    'Visible cascade copy actions should reserve space before long labels are truncated'
   );
   assert.match(cascadeSource, /x-nt-bookmark-cascade-copy-action/);
   assert.match(newtabSource, /copyUrl: copyBookmarkUrl/);

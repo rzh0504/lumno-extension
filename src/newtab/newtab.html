@@ -1628,8 +1628,8 @@
         color: color-mix(in srgb, var(--x-nt-bookmark-title, #475569) 72%, #2563eb);
       }
       .x-nt-bookmark-card[data-bookmark-copy-action-visible="true"] .x-nt-bookmark-title {
-        -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 36px), transparent 100%);
-        mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 36px), transparent 100%);
+        box-sizing: border-box;
+        padding-right: 30px;
       }
       body[data-theme="dark"] .x-nt-bookmark-copy-action {
         color: #cbd5e1;
@@ -1912,8 +1912,8 @@
         transform: translate3d(0, -50%, 0) scale(1);
       }
       .x-nt-bookmark-cascade-row[data-bookmark-copy-action-visible="true"] .x-nt-bookmark-cascade-label {
-        -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 32px), transparent 100%);
-        mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 32px), transparent 100%);
+        box-sizing: border-box;
+        padding-right: 28px;
       }
       .x-nt-bookmark-cascade-item:hover,
       .x-nt-bookmark-cascade-item:focus-visible,
