@@ -3,6 +3,8 @@ const fs = require('fs');
 const path = require('path');
 
 const readme = fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8');
+const packageJson = require(path.join('..', 'package.json'));
+const escapedVersion = String(packageJson.version || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const badgeAssets = [
   'chrome-web-store-large-bordered.png',
   'microsoft-edge-addons-badge.png'
@@ -24,7 +26,9 @@ assert.ok(
 );
 
 assert.ok(
-  /microsoft-edge-addons-badge\.png[\s\S]*?<p align="center">当前版本：<code>0\.9\.20<\/code><\/p>/.test(readme),
+  new RegExp(
+    `microsoft-edge-addons-badge\\.png[\\s\\S]*?<p align="center">当前版本：<code>${escapedVersion}<\\/code><\\/p>`
+  ).test(readme),
   'the current version must be centered below the store badges'
 );
 
