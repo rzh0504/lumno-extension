@@ -1,13 +1,15 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
 const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
+const storeManifest = { ...manifest };
+delete storeManifest.key;
 const version = manifest.version;
 const distDir = path.join(process.cwd(), 'dist');
 const zipPath = path.join(distDir, `lumno-store-v${version}.zip`);
 const packageRoots = [
-  'manifest.json',
   'src',
   '_locales',
   'assets'
@@ -54,13 +56,32 @@ if (fs.existsSync(zipPath)) {
   fs.rmSync(zipPath);
 }
 
-const zipArgs = ['-r', '-D', zipPath, ...packageRoots, '-x', ...packageExcludePatterns];
-const zipResult = spawnSync('zip', zipArgs, {
-  cwd: process.cwd(),
-  stdio: 'inherit'
-});
+const manifestStageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lumno-store-manifest-'));
+const stagedManifestPath = path.join(manifestStageDir, 'manifest.json');
+fs.writeFileSync(stagedManifestPath, `${JSON.stringify(storeManifest, null, 3)}\n`);
+
+let zipResult = null;
+let manifestZipResult = null;
+try {
+  const zipArgs = ['-r', '-D', zipPath, ...packageRoots, '-x', ...packageExcludePatterns];
+  zipResult = spawnSync('zip', zipArgs, {
+    cwd: process.cwd(),
+    stdio: 'inherit'
+  });
+  if (zipResult.status === 0) {
+    manifestZipResult = spawnSync('zip', ['-j', zipPath, stagedManifestPath], {
+      cwd: process.cwd(),
+      stdio: 'inherit'
+    });
+  }
+} finally {
+  fs.rmSync(manifestStageDir, { recursive: true, force: true });
+}
 if (zipResult.status !== 0) {
   process.exit(zipResult.status || 1);
+}
+if (!manifestZipResult || manifestZipResult.status !== 0) {
+  process.exit((manifestZipResult && manifestZipResult.status) || 1);
 }
 
 const listResult = spawnSync('zipinfo', ['-1', zipPath], {
