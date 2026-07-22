@@ -677,6 +677,7 @@
       cancelBookmarkCascadeHoverIntent();
       cancelBookmarkCascadeDelayedClose();
       hideCursorTooltip();
+      hideTopActionTooltip();
       bookmarkCascadeKeyboardLevelIndex = 0;
       if (bookmarkCascadeDebugLabelFrame) {
         cancelFrame(bookmarkCascadeDebugLabelFrame);
@@ -1162,6 +1163,64 @@
       return titleElement;
     }
 
+    function createBookmarkCascadeCopyTrigger(itemRow, item, activateLeafItem) {
+      if (!documentObj || !itemRow || !item || !item.url) {
+        return null;
+      }
+      const copyLabel = t('bookmarks_copy_url', 'Copy link');
+      const copyButton = documentObj.createElement('button');
+      let copyActionFocused = false;
+
+      const setCopyActionVisible = (visible) => {
+        if (visible) {
+          itemRow.setAttribute('data-bookmark-copy-action-visible', 'true');
+          return;
+        }
+        itemRow.removeAttribute('data-bookmark-copy-action-visible');
+      };
+      const showCopyAction = () => {
+        cancelBookmarkCascadeHoverIntent();
+        hideCursorTooltip();
+        activateLeafItem();
+        setCopyActionVisible(true);
+        showTopActionTooltip(copyButton, copyLabel, { placement: 'top' });
+      };
+      const hideCopyAction = () => {
+        hideTopActionTooltip();
+        if (!copyActionFocused) {
+          setCopyActionVisible(false);
+        }
+      };
+
+      copyButton.type = 'button';
+      copyButton.className = 'x-nt-bookmark-cascade-copy-trigger';
+      copyButton.innerHTML = getRiSvg('ri-file-copy-line', 'ri-size-16');
+      copyButton.setAttribute('aria-label', copyLabel);
+      copyButton.setAttribute('data-tooltip', copyLabel);
+      copyButton.addEventListener('pointerenter', showCopyAction);
+      copyButton.addEventListener('pointerleave', hideCopyAction);
+      copyButton.addEventListener('focus', () => {
+        copyActionFocused = true;
+        showCopyAction();
+      });
+      copyButton.addEventListener('blur', () => {
+        copyActionFocused = false;
+        hideCopyAction();
+      });
+      copyButton.addEventListener('pointerdown', (event) => {
+        event.stopPropagation();
+      });
+      copyButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        hideCursorTooltip();
+        hideTopActionTooltip();
+        Promise.resolve().then(() => copyUrl(item.url)).catch(noop);
+      });
+      itemRow.appendChild(copyButton);
+      return copyButton;
+    }
+
     function renderBookmarkCascadeMenuLevel(folderId, levelIndex, triggerElement, parentLevelElement, folderTitle) {
       if (!bookmarkCascadeMenu || !documentObj) {
         return;
@@ -1308,51 +1367,7 @@
             }
           });
         } else {
-          const copyButton = documentObj.createElement('button');
-          let copyActionFocused = false;
-          const setCopyActionVisible = (visible) => {
-            if (visible) {
-              itemRow.setAttribute('data-bookmark-copy-action-visible', 'true');
-            } else {
-              itemRow.removeAttribute('data-bookmark-copy-action-visible');
-            }
-          };
-          copyButton.type = 'button';
-          copyButton.className = 'x-nt-bookmark-copy-action x-nt-bookmark-cascade-copy-action';
-          copyButton.innerHTML = getRiSvg('ri-file-copy-line', 'ri-size-16');
-          copyButton.setAttribute('aria-label', t('bookmarks_copy_url', 'Copy link'));
-          copyButton.addEventListener('pointerenter', () => {
-            cancelBookmarkCascadeHoverIntent();
-            hideCursorTooltip();
-            activateLeafItem();
-            setCopyActionVisible(true);
-          });
-          copyButton.addEventListener('pointerleave', () => {
-            if (!copyActionFocused) {
-              setCopyActionVisible(false);
-            }
-          });
-          copyButton.addEventListener('focus', () => {
-            copyActionFocused = true;
-            cancelBookmarkCascadeHoverIntent();
-            hideCursorTooltip();
-            activateLeafItem();
-            setCopyActionVisible(true);
-          });
-          copyButton.addEventListener('blur', () => {
-            copyActionFocused = false;
-            setCopyActionVisible(false);
-          });
-          copyButton.addEventListener('pointerdown', (event) => {
-            event.stopPropagation();
-          });
-          copyButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            hideCursorTooltip();
-            Promise.resolve().then(() => copyUrl(item.url)).catch(noop);
-          });
-          itemRow.appendChild(copyButton);
+          createBookmarkCascadeCopyTrigger(itemRow, item, activateLeafItem);
           bindCursorTooltip(itemButton, () => titleText, {
             maxWidth: 460,
             shouldShow: (_target, event) => shouldOpenUrlInBackground(event)

@@ -791,8 +791,8 @@ assertContains(
 );
 assertContains(
   bookmarkCascadeContentCss,
-  'scrollbar-gutter: stable;',
-  'bookmark cascade scroll content should reserve room for the custom scrollbar'
+  'scrollbar-gutter: auto;',
+  'bookmark cascade scroll content should only reserve scrollbar space when scrolling is needed'
 );
 assertContains(
   newtabHtml,

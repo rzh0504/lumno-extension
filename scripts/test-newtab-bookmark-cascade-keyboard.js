@@ -285,6 +285,8 @@ async function flushPromises() {
   };
 
   const faviconCalls = [];
+  const copyCalls = [];
+  const tooltipCalls = [];
   const runtime = createBookmarkCascadeMenuRuntime({
     documentObj,
     windowObj: {
@@ -329,6 +331,16 @@ async function flushPromises() {
     getChromeFaviconUrl: (url) => `chrome://favicon2/?pageUrl=${encodeURIComponent(url)}&size=128`,
     ensureReady: () => Promise.resolve(true),
     getItems: (folderId) => itemsByFolder[String(folderId || '')] || [],
+    showTopActionTooltip(target, text, options) {
+      tooltipCalls.push({ type: 'show', target, text, placement: options && options.placement });
+    },
+    hideTopActionTooltip() {
+      tooltipCalls.push({ type: 'hide' });
+    },
+    copyUrl(url) {
+      copyCalls.push(url);
+      return Promise.resolve(true);
+    },
     navigateToUrl() {}
   });
 
@@ -355,6 +367,43 @@ async function flushPromises() {
   );
   assert.strictEqual(getActiveLabel(levels[0]), 'Research', 'opening a cascade should select the first menu item');
   assert.strictEqual(documentObj.activeElement, rootItems[0], 'opening a cascade should move keyboard focus into the menu');
+
+  const rootCopyTriggers = levels[0].querySelectorAll('.x-nt-bookmark-cascade-copy-trigger');
+  assert.strictEqual(rootCopyTriggers.length, 2, 'URL bookmarks should render copy triggers while folders do not');
+  const archiveCopyTrigger = rootCopyTriggers[0];
+  const archiveCopyRow = archiveCopyTrigger.parentNode;
+  assert.strictEqual(archiveCopyTrigger.getAttribute('aria-label'), 'Copy link');
+  archiveCopyTrigger.dispatchEvent(createFakeEvent('pointerenter'));
+  assert.strictEqual(
+    archiveCopyRow.getAttribute('data-bookmark-copy-action-visible'),
+    'true',
+    'entering the trailing copy hit area should reveal its icon'
+  );
+  assert.deepStrictEqual(
+    tooltipCalls[tooltipCalls.length - 1],
+    { type: 'show', target: archiveCopyTrigger, text: 'Copy link', placement: 'top' },
+    'revealing the copy icon should show its Copy link tooltip'
+  );
+  const copyClick = createFakeEvent('click');
+  archiveCopyTrigger.dispatchEvent(copyClick);
+  await flushPromises();
+  assert.deepStrictEqual(copyCalls, ['https://example.com/archive']);
+  assert.ok(copyClick.defaultPrevented, 'copy clicks should not open the bookmark');
+  assert.ok(copyClick.propagationStopped, 'copy clicks should not bubble into the bookmark row');
+  archiveCopyTrigger.dispatchEvent(createFakeEvent('pointerleave'));
+  assert.strictEqual(
+    archiveCopyRow.getAttribute('data-bookmark-copy-action-visible'),
+    '',
+    'leaving the copy hit area should hide the icon when it is not keyboard-focused'
+  );
+  archiveCopyTrigger.focus();
+  assert.strictEqual(
+    archiveCopyRow.getAttribute('data-bookmark-copy-action-visible'),
+    'true',
+    'keyboard focus should reveal the copy icon'
+  );
+  archiveCopyTrigger.dispatchEvent(createFakeEvent('blur'));
+  rootItems[0].focus();
 
   dispatchKey(documentObj, 'ArrowDown');
   assert.strictEqual(getActiveLabel(levels[0]), 'Patterns', 'ArrowDown should move selection to the next root item');

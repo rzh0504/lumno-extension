@@ -166,10 +166,25 @@ function testCopyActionIntegration() {
   );
   assert.match(
     html,
-    /\.x-nt-bookmark-cascade-row\[data-bookmark-copy-action-visible="true"\] \.x-nt-bookmark-cascade-label[\s\S]*?padding-right:\s*28px/,
+    /\.x-nt-bookmark-cascade-row\[data-bookmark-copy-action-visible="true"\] \.x-nt-bookmark-cascade-label[\s\S]*?padding-right:\s*32px/,
     'Visible cascade copy actions should reserve space before long labels are truncated'
   );
-  assert.match(cascadeSource, /x-nt-bookmark-cascade-copy-action/);
+  assert.match(
+    html,
+    /\.x-nt-bookmark-cascade-content[\s\S]*?scrollbar-gutter:\s*auto/,
+    'Short cascade menus should not reserve an empty scrollbar gutter'
+  );
+  assert.match(cascadeSource, /x-nt-bookmark-cascade-copy-trigger/);
+  assert.match(
+    cascadeSource,
+    /showTopActionTooltip\(copyButton, copyLabel, \{ placement: 'top' \}\)/,
+    'Cascade copy actions should explain themselves with a Copy link tooltip'
+  );
+  assert.doesNotMatch(
+    cascadeSource,
+    /x-nt-bookmark-cascade-copy-action/,
+    'Cascade copy actions should use their independent trigger implementation'
+  );
   assert.match(newtabSource, /copyUrl: copyBookmarkUrl/);
   assert.doesNotMatch(html, /bookmark-context-menu\.js/);
 }
