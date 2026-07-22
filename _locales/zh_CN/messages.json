@@ -117,7 +117,22 @@
     "message": "增强图标与主题色获取"
   },
   "settings_favicon_enhanced_fetch_desc": {
-    "message": "内网或 VPN 页面若出现“请求访问局域网上其他设备”提示，可关闭此项。"
+    "message": "关闭后只使用浏览器缓存、Lumno 内置或通用图标，不会访问网站来获取图标或主题色。"
+  },
+  "favicon_blacklist_section_title": {
+    "message": "按网站排除"
+  },
+  "favicon_blacklist_section_desc": {
+    "message": "匹配的网站仍可显示、搜索和打开，但不会发起图标或主题色请求。"
+  },
+  "favicon_blacklist_add": {
+    "message": "添加排除规则"
+  },
+  "favicon_blacklist_removed_toast": {
+    "message": "已从图标与主题色排除中移除"
+  },
+  "favicon_blacklist_clear": {
+    "message": "清空排除规则"
   },
   "search_result_priority_autocomplete": {
     "message": "补全优先"
@@ -970,6 +985,9 @@
   },
   "confirm_clear_blacklist": {
     "message": "确认清空隐藏规则？"
+  },
+  "confirm_clear_favicon_blacklist": {
+    "message": "确认清空排除规则？"
   },
   "confirm_reset_builtin": {
     "message": "确认重置内置列表？"

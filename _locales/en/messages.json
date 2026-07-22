@@ -117,7 +117,22 @@
     "message": "Enhanced Icon and Theme Color Fetching"
   },
   "settings_favicon_enhanced_fetch_desc": {
-    "message": "Turn this off if intranet or VPN pages show a local network access prompt."
+    "message": "When off, Lumno uses only browser-cached, built-in, or generic icons and does not access websites for icons or theme colors."
+  },
+  "favicon_blacklist_section_title": {
+    "message": "Exclude specific sites"
+  },
+  "favicon_blacklist_section_desc": {
+    "message": "Matched sites remain visible, searchable, and openable, but Lumno makes no icon or theme requests for them."
+  },
+  "favicon_blacklist_add": {
+    "message": "Add exclusion rule"
+  },
+  "favicon_blacklist_removed_toast": {
+    "message": "Removed from icon and theme exclusions"
+  },
+  "favicon_blacklist_clear": {
+    "message": "Clear exclusion rules"
   },
   "search_result_priority_autocomplete": {
     "message": "Autocomplete First"
@@ -970,6 +985,9 @@
   },
   "confirm_clear_blacklist": {
     "message": "Clear the hide rules?"
+  },
+  "confirm_clear_favicon_blacklist": {
+    "message": "Clear the exclusion rules?"
   },
   "confirm_reset_builtin": {
     "message": "Reset built-in list?"

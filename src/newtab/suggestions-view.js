@@ -895,7 +895,7 @@
       }
       list.forEach((tab) => {
         if (tab && tab.favIconUrl) {
-          preloadIcon(tab.favIconUrl);
+          preloadIcon(tab.favIconUrl, tab.url || '');
         }
       });
       list.forEach((tab, index) => {

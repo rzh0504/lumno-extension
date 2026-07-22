@@ -16,6 +16,7 @@
     searchResultPriority: '_x_extension_search_result_priority_2026_unique_',
     searchResultSourceTypes: '_x_extension_search_result_source_types_2026_unique_',
     searchBlacklist: '_x_extension_search_blacklist_2026_unique_',
+    faviconRequestBlacklist: '_x_extension_favicon_request_blacklist_2026_unique_',
     faviconEnhancedFetchEnabled: '_x_extension_favicon_enhanced_fetch_enabled_2026_unique_',
     overlayOpenTabsDefaultVisible: '_x_extension_overlay_open_tabs_default_visible_2026_unique_',
     overlaySizeMode: '_x_extension_overlay_size_mode_2026_unique_',

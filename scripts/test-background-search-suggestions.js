@@ -7,8 +7,8 @@ const repoRoot = path.resolve(__dirname, '..');
 const backgroundSourceForAssertions = fs.readFileSync(path.join(repoRoot, 'src/background/background.js'), 'utf8');
 
 assert.ok(
-  /searchBlacklistItems,\s*faviconRequestBlacklistItems,\s*searchSelectionStats\s*\]\s*=\s*await Promise\.all/.test(backgroundSourceForAssertions),
-  'background search suggestions should keep Promise.all result order aligned with searchSelectionStats'
+  /searchBlacklistItems,\s*faviconRequestBlacklistItems,\s*_faviconEnhancedFetchEnabled,\s*searchSelectionStats\s*\]\s*=\s*await Promise\.all\([\s\S]*?loadSearchBlacklistItems\(\),\s*loadFaviconRequestBlacklistItems\(\),\s*loadFaviconEnhancedFetchEnabled\(\),\s*loadSearchSelectionStats\(\)/.test(backgroundSourceForAssertions),
+  'background search suggestions should load favicon policy state before resolving suggestion favicons and keep Promise.all results aligned'
 );
 
 function createEvent() {

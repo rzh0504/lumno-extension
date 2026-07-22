@@ -51,6 +51,23 @@
   const searchResultSourceTypeInputs = Array.from(document.querySelectorAll('input[data-search-result-source-type]'));
   const overlayOpenTabsDefaultVisibleToggle = document.getElementById('_x_extension_overlay_open_tabs_default_visible_toggle_2026_unique_');
   const faviconEnhancedFetchToggle = document.getElementById('_x_extension_favicon_enhanced_fetch_toggle_2026_unique_');
+  const faviconBlacklistEditor = document.getElementById('_x_extension_favicon_blacklist_editor_2026_unique_');
+  const faviconBlacklistList = document.getElementById('_x_extension_favicon_blacklist_list_2026_unique_');
+  const faviconBlacklistForm = document.getElementById('_x_extension_favicon_blacklist_form_2026_unique_');
+  const faviconBlacklistFormTrigger = document.getElementById('_x_extension_favicon_blacklist_expand_2026_unique_');
+  const faviconBlacklistClearButton = document.getElementById('_x_extension_favicon_blacklist_clear_2026_unique_');
+  const faviconBlacklistUrlLabel = document.getElementById('_x_extension_favicon_blacklist_url_label_2026_unique_');
+  const faviconBlacklistUrlPrefix = document.getElementById('_x_extension_favicon_blacklist_url_prefix_2026_unique_');
+  const faviconBlacklistUrlInput = document.getElementById('_x_extension_favicon_blacklist_url_2026_unique_');
+  const faviconBlacklistMatchExactInput = document.getElementById('_x_extension_favicon_blacklist_match_exact_2026_unique_');
+  const faviconBlacklistMatchPrefixInput = document.getElementById('_x_extension_favicon_blacklist_match_prefix_2026_unique_');
+  const faviconBlacklistMatchSuffixInput = document.getElementById('_x_extension_favicon_blacklist_match_suffix_2026_unique_');
+  const faviconBlacklistMatchExactWrap = document.getElementById('_x_extension_favicon_blacklist_match_exact_wrap_2026_unique_');
+  const faviconBlacklistMatchPrefixWrap = document.getElementById('_x_extension_favicon_blacklist_match_prefix_wrap_2026_unique_');
+  const faviconBlacklistMatchSuffixWrap = document.getElementById('_x_extension_favicon_blacklist_match_suffix_wrap_2026_unique_');
+  const faviconBlacklistAddButton = document.getElementById('_x_extension_favicon_blacklist_add_2026_unique_');
+  const faviconBlacklistCancelButton = document.getElementById('_x_extension_favicon_blacklist_cancel_2026_unique_');
+  const faviconBlacklistError = document.getElementById('_x_extension_favicon_blacklist_error_2026_unique_');
   const syncStatus = document.getElementById('_x_extension_sync_status_2024_unique_');
   const syncStatusText = document.getElementById('_x_extension_sync_status_text_2024_unique_');
   const syncNowButton = document.getElementById('_x_extension_sync_now_2024_unique_');
@@ -252,6 +269,8 @@
   let isFallbackWidthReady = false;
   let searchBlacklistItems = [];
   let blacklistFormExpanded = false;
+  let faviconRequestBlacklistItems = [];
+  let faviconBlacklistFormExpanded = false;
   let searchResultSourceTypeGroup = null;
   const customSelectController = globalThis.LumnoCustomSelect &&
       typeof globalThis.LumnoCustomSelect.createController === 'function'
@@ -300,6 +319,13 @@
   }
 
   function normalizeSearchBlacklistItems(items) {
+    if (BLACKLIST_UTILS.normalizeItems) {
+      return BLACKLIST_UTILS.normalizeItems(items, 'prefix');
+    }
+    return [];
+  }
+
+  function normalizeFaviconRequestBlacklistItems(items) {
     if (BLACKLIST_UTILS.normalizeItems) {
       return BLACKLIST_UTILS.normalizeItems(items, 'prefix');
     }
@@ -441,6 +467,89 @@
     syncBlacklistMatchModeAvailability();
     updateBlacklistInputPresentation();
     setBlacklistFormExpanded(false);
+  }
+
+  function setFaviconBlacklistError(message) {
+    setInlineError(faviconBlacklistError, message);
+  }
+
+  function getFaviconBlacklistMatchModesFromForm() {
+    return normalizeBlacklistMatchModes([
+      faviconBlacklistMatchExactInput && faviconBlacklistMatchExactInput.checked ? 'exact' : '',
+      faviconBlacklistMatchPrefixInput && faviconBlacklistMatchPrefixInput.checked ? 'prefix' : '',
+      faviconBlacklistMatchSuffixInput && faviconBlacklistMatchSuffixInput.checked ? 'suffix' : ''
+    ], null);
+  }
+
+  function updateFaviconBlacklistInputPresentation() {
+    applyBlacklistInputPresentationToElements(
+      faviconBlacklistUrlLabel,
+      faviconBlacklistUrlPrefix,
+      faviconBlacklistUrlInput,
+      getFaviconBlacklistMatchModesFromForm()
+    );
+  }
+
+  function syncFaviconBlacklistMatchModeAvailability(changedMode) {
+    syncBlacklistModeSelection(
+      {
+        exact: faviconBlacklistMatchExactInput,
+        prefix: faviconBlacklistMatchPrefixInput,
+        suffix: faviconBlacklistMatchSuffixInput
+      },
+      changedMode,
+      {
+        exact: faviconBlacklistMatchExactWrap,
+        prefix: faviconBlacklistMatchPrefixWrap,
+        suffix: faviconBlacklistMatchSuffixWrap
+      },
+      updateFaviconBlacklistInputPresentation
+    );
+  }
+
+  function setFaviconBlacklistFormExpanded(expanded) {
+    faviconBlacklistFormExpanded = Boolean(expanded);
+    if (faviconBlacklistForm) {
+      faviconBlacklistForm.setAttribute('data-expanded', faviconBlacklistFormExpanded ? 'true' : 'false');
+    }
+    if (faviconBlacklistFormTrigger) {
+      faviconBlacklistFormTrigger.setAttribute('aria-expanded', faviconBlacklistFormExpanded ? 'true' : 'false');
+    }
+    if (faviconBlacklistCancelButton) {
+      faviconBlacklistCancelButton.style.display = faviconBlacklistFormExpanded ? 'inline-flex' : 'none';
+    }
+    if (faviconBlacklistFormExpanded && faviconBlacklistUrlInput) {
+      updateFaviconBlacklistInputPresentation();
+      faviconBlacklistUrlInput.focus();
+    }
+  }
+
+  function resetFaviconBlacklistForm() {
+    if (faviconBlacklistUrlInput) {
+      faviconBlacklistUrlInput.value = '';
+    }
+    if (faviconBlacklistMatchExactInput) faviconBlacklistMatchExactInput.checked = false;
+    if (faviconBlacklistMatchPrefixInput) faviconBlacklistMatchPrefixInput.checked = false;
+    if (faviconBlacklistMatchSuffixInput) faviconBlacklistMatchSuffixInput.checked = true;
+    setFaviconBlacklistError('');
+    syncFaviconBlacklistMatchModeAvailability();
+    updateFaviconBlacklistInputPresentation();
+    setFaviconBlacklistFormExpanded(false);
+  }
+
+  function setFaviconBlacklistEditorEnabled(enabled) {
+    const editable = enabled === true;
+    if (!faviconBlacklistEditor) {
+      return;
+    }
+    faviconBlacklistEditor.setAttribute('aria-disabled', editable ? 'false' : 'true');
+    faviconBlacklistEditor.inert = !editable;
+    if (editable) {
+      faviconBlacklistEditor.removeAttribute('inert');
+    } else {
+      faviconBlacklistEditor.setAttribute('inert', '');
+      setFaviconBlacklistFormExpanded(false);
+    }
   }
 
   function getBlacklistMatchModesFromForm() {
@@ -2952,6 +3061,7 @@
     faviconEnhancedFetchToggle.addEventListener('change', () => {
       const next = normalizeFaviconEnhancedFetchEnabled(faviconEnhancedFetchToggle.checked);
       faviconEnhancedFetchToggle.checked = next;
+      setFaviconBlacklistEditorEnabled(next);
       if (!storageArea) {
         return;
       }
@@ -3042,6 +3152,54 @@
         if (blacklistAddButton) {
           blacklistAddButton.click();
         }
+      }
+    });
+  }
+  if (faviconBlacklistAddButton) {
+    faviconBlacklistAddButton.addEventListener('click', () => {
+      if (!faviconBlacklistFormExpanded) {
+        setFaviconBlacklistFormExpanded(true);
+        return;
+      }
+      const matchModes = getFaviconBlacklistMatchModesFromForm();
+      const draft = buildBlacklistRuleDraft(faviconBlacklistUrlInput && faviconBlacklistUrlInput.value, matchModes);
+      if (!draft.item) {
+        setFaviconBlacklistError(draft.error || '');
+        return;
+      }
+      const nextKey = buildBlacklistItemKey(draft.item);
+      const nextItems = [draft.item].concat(
+        faviconRequestBlacklistItems.filter((item) => buildBlacklistItemKey(item) !== nextKey)
+      );
+      saveFaviconRequestBlacklistItems(nextItems).then((savedItems) => {
+        faviconRequestBlacklistItems = savedItems;
+        renderFaviconRequestBlacklistList();
+        resetFaviconBlacklistForm();
+        showToast(getMessage('toast_saved', '已保存'), false);
+      }).catch(() => showToast(getMessage('toast_error', '操作失败，请重试'), true));
+    });
+  }
+  if (faviconBlacklistFormTrigger) {
+    faviconBlacklistFormTrigger.addEventListener('click', () => setFaviconBlacklistFormExpanded(true));
+  }
+  [
+    [faviconBlacklistMatchExactInput, 'exact'],
+    [faviconBlacklistMatchPrefixInput, 'prefix'],
+    [faviconBlacklistMatchSuffixInput, 'suffix']
+  ].forEach(([input, mode]) => {
+    if (input) {
+      input.addEventListener('change', () => syncFaviconBlacklistMatchModeAvailability(mode));
+    }
+  });
+  if (faviconBlacklistCancelButton) {
+    faviconBlacklistCancelButton.addEventListener('click', resetFaviconBlacklistForm);
+  }
+  if (faviconBlacklistUrlInput) {
+    faviconBlacklistUrlInput.addEventListener('input', () => setFaviconBlacklistError(''));
+    faviconBlacklistUrlInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        faviconBlacklistAddButton.click();
       }
     });
   }
@@ -3574,6 +3732,7 @@
       if (faviconEnhancedFetchToggle) {
         faviconEnhancedFetchToggle.checked = stored;
       }
+      setFaviconBlacklistEditorEnabled(stored);
       if (rawValue !== stored) {
         storageArea.set({ [FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY]: stored });
       }
@@ -4288,6 +4447,74 @@
     });
   }
 
+  function loadFaviconRequestBlacklistItems() {
+    return new Promise((resolve) => {
+      if (!storageArea) {
+        resolve([]);
+        return;
+      }
+      storageArea.get([FAVICON_REQUEST_BLACKLIST_STORAGE_KEY], (result) => {
+        resolve(normalizeFaviconRequestBlacklistItems(result && result[FAVICON_REQUEST_BLACKLIST_STORAGE_KEY]));
+      });
+    });
+  }
+
+  function saveFaviconRequestBlacklistItems(items) {
+    return new Promise((resolve) => {
+      const normalized = normalizeFaviconRequestBlacklistItems(items);
+      if (!storageArea) {
+        resolve(normalized);
+        return;
+      }
+      storageArea.set({ [FAVICON_REQUEST_BLACKLIST_STORAGE_KEY]: normalized }, () => resolve(normalized));
+    });
+  }
+
+  function renderFaviconRequestBlacklistList() {
+    if (!faviconBlacklistList) {
+      return;
+    }
+    faviconBlacklistList.innerHTML = '';
+    (Array.isArray(faviconRequestBlacklistItems) ? faviconRequestBlacklistItems : []).forEach((item) => {
+      const itemKey = buildBlacklistItemKey(item);
+      const row = document.createElement('div');
+      row.className = '_x_extension_shortcut_item_2024_unique_';
+      const header = document.createElement('div');
+      header.className = '_x_extension_shortcut_item_header_2024_unique_';
+      const info = document.createElement('div');
+      info.className = '_x_extension_shortcut_item_info_2024_unique_';
+      const title = document.createElement('div');
+      title.className = '_x_extension_shortcut_item_title_2024_unique_';
+      const badge = document.createElement('div');
+      const badgeConfig = getBlacklistMatchBadgeConfig(item.matchModes);
+      badge.className = '_x_extension_shortcut_badge_2024_unique_';
+      badge.setAttribute('data-tone', badgeConfig.tone);
+      badge.textContent = badgeConfig.text;
+      const titleText = document.createElement('span');
+      titleText.textContent = formatBlacklistPatternForDisplay(item);
+      title.appendChild(badge);
+      title.appendChild(titleText);
+      info.appendChild(title);
+      const removeButton = document.createElement('button');
+      removeButton.className = '_x_extension_shortcut_remove_2024_unique_';
+      removeButton.type = 'button';
+      removeButton.innerHTML = getRiSvg('ri-delete-bin-4-line', 'ri-size-14');
+      removeButton.setAttribute('aria-label', getMessage('shortcuts_remove', '移除'));
+      removeButton.addEventListener('click', () => {
+        const nextItems = faviconRequestBlacklistItems.filter((entry) => buildBlacklistItemKey(entry) !== itemKey);
+        saveFaviconRequestBlacklistItems(nextItems).then((savedItems) => {
+          faviconRequestBlacklistItems = savedItems;
+          renderFaviconRequestBlacklistList();
+          showToast(getMessage('favicon_blacklist_removed_toast', '已移除排除规则'), false);
+        }).catch(() => showToast(getMessage('toast_error', '操作失败，请重试'), true));
+      });
+      header.appendChild(info);
+      header.appendChild(removeButton);
+      row.appendChild(header);
+      faviconBlacklistList.appendChild(row);
+    });
+  }
+
   function renderSearchBlacklistList() {
     if (!blacklistList) {
       return;
@@ -4649,6 +4876,13 @@
       renderSearchBlacklistList();
     });
   }
+  if (faviconBlacklistList) {
+    loadFaviconRequestBlacklistItems().then((items) => {
+      faviconRequestBlacklistItems = items;
+      syncFaviconBlacklistMatchModeAvailability();
+      renderFaviconRequestBlacklistList();
+    });
+  }
 
   function handleSiteSearchListClick(event) {
       const target = event.target;
@@ -4843,6 +5077,21 @@
       }
     );
   }
+  if (faviconBlacklistClearButton) {
+    attachPopconfirm(
+      faviconBlacklistClearButton,
+      'confirm_clear_favicon_blacklist',
+      '确认清空排除规则？',
+      () => {
+        saveFaviconRequestBlacklistItems([]).then((savedItems) => {
+          faviconRequestBlacklistItems = savedItems;
+          renderFaviconRequestBlacklistList();
+          resetFaviconBlacklistForm();
+          showToast(getMessage('toast_cleared', '已清空'), false);
+        }).catch(() => showToast(getMessage('toast_error', '操作失败，请重试'), true));
+      }
+    );
+  }
   /*
   if (confirmOk) {
     confirmOk.addEventListener('click', () => closeConfirm(true));
@@ -4942,6 +5191,7 @@
       const raw = changes[FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY].newValue;
       const next = normalizeFaviconEnhancedFetchEnabled(raw);
       faviconEnhancedFetchToggle.checked = next;
+      setFaviconBlacklistEditorEnabled(next);
       if (raw !== next && storageArea) {
         storageArea.set({ [FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY]: next });
       }
@@ -5059,6 +5309,12 @@
     if (changes[SEARCH_BLACKLIST_STORAGE_KEY]) {
       searchBlacklistItems = normalizeSearchBlacklistItems(changes[SEARCH_BLACKLIST_STORAGE_KEY].newValue);
       renderSearchBlacklistList();
+    }
+    if (changes[FAVICON_REQUEST_BLACKLIST_STORAGE_KEY]) {
+      faviconRequestBlacklistItems = normalizeFaviconRequestBlacklistItems(
+        changes[FAVICON_REQUEST_BLACKLIST_STORAGE_KEY].newValue
+      );
+      renderFaviconRequestBlacklistList();
     }
     if (!changes[SITE_SEARCH_STORAGE_KEY] && !changes[SITE_SEARCH_DISABLED_STORAGE_KEY]) {
       return;
