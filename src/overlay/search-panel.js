@@ -3574,7 +3574,9 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         return false;
       }
       if (latestOverlayQuery) {
-        updateSearchSuggestions(lastSuggestionResponse, latestOverlayQuery);
+        updateSearchSuggestions(lastSuggestionResponse, latestOverlayQuery, {
+          forceFullRerender: true
+        });
       } else {
         renderTabSuggestions(tabs);
       }
@@ -6615,6 +6617,14 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       return true;
     }
 
+    function shouldAppendSearchSuggestionRows(options) {
+      const renderState = options && typeof options === 'object' ? options : {};
+      return renderState.forceFullRerender !== true &&
+        renderState.query === renderState.lastRenderedQuery &&
+        renderState.actionContextKey === renderState.lastRenderedActionContextKey &&
+        isSuggestionPrefix(renderState.currentSuggestions, renderState.allSuggestions);
+    }
+
     function getSuggestionActionContextKey(options) {
       if (SUGGESTION_ACTION_MODEL &&
           typeof SUGGESTION_ACTION_MODEL.getActionContextKey === 'function') {
@@ -6633,6 +6643,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         return;
       }
       const renderOptions = options && typeof options === 'object' ? options : {};
+      const forceFullRerender = renderOptions.forceFullRerender === true;
       const deferCappedShrink = renderOptions.deferCappedShrink === true;
       const remoteMixState = renderOptions.remoteMixState && typeof renderOptions.remoteMixState === 'object'
         ? renderOptions.remoteMixState
@@ -6929,9 +6940,15 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           primarySuggestion,
           mergedProvider
         });
-        const canAppend = query === lastRenderedQuery &&
-          actionContextKey === lastRenderedActionContextKey &&
-          isSuggestionPrefix(currentSuggestions, allSuggestions);
+        const canAppend = shouldAppendSearchSuggestionRows({
+          forceFullRerender,
+          query,
+          lastRenderedQuery,
+          actionContextKey,
+          lastRenderedActionContextKey,
+          currentSuggestions,
+          allSuggestions
+        });
         const startIndex = canAppend ? currentSuggestions.length : 0;
         const previousHeightState = captureSuggestionsHeightState(suggestionsContainer);
         if (!canAppend) {
