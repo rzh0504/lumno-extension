@@ -34,6 +34,12 @@
     const preloadThemeFromFavicon = typeof config.preloadThemeFromFavicon === 'function' ? config.preloadThemeFromFavicon : noop;
     const hasThemeForHost = typeof config.hasThemeForHost === 'function' ? config.hasThemeForHost : (() => false);
     const getOverlayPanel = typeof config.getOverlayPanel === 'function' ? config.getOverlayPanel : (() => null);
+    const getSuggestionRowsRoot = typeof config.getSuggestionRowsRoot === 'function'
+      ? config.getSuggestionRowsRoot
+      : (() => null);
+    const rerenderReplacedFaviconRows = typeof config.rerenderReplacedFaviconRows === 'function'
+      ? config.rerenderReplacedFaviconRows
+      : (() => false);
     const setPersistedFaviconUrl = typeof config.setPersistedFaviconUrl === 'function'
       ? config.setPersistedFaviconUrl
       : noop;
@@ -701,13 +707,17 @@
       }
     }
 
-    function refreshOverlayThemeAwareFavicons() {
+    function refreshOverlayThemeAwareFavicons(optionsArg) {
       const overlay = getOverlayPanel();
       if (!overlay) {
         return;
       }
+      const skipWithin = optionsArg && optionsArg.skipWithin ? optionsArg.skipWithin : null;
       overlay.querySelectorAll('img[data-x-ov-theme-favicon="1"]').forEach((img) => {
         if (!img || !img.isConnected) {
+          return;
+        }
+        if (skipWithin && typeof skipWithin.contains === 'function' && skipWithin.contains(img)) {
           return;
         }
         const pageUrl = img.getAttribute('data-x-ov-favicon-page-url') || '';
@@ -718,6 +728,19 @@
         const fallbackUrl = img.getAttribute('data-x-ov-favicon-fallback-url') || '';
         attachResolvedFaviconWithFallbacks(img, pageUrl, hostKey, fallbackUrl);
       });
+    }
+
+    function refreshOverlayFaviconsForPolicyChange() {
+      let rowsRerendered = false;
+      try {
+        rowsRerendered = rerenderReplacedFaviconRows() === true;
+      } catch (e) {
+        rowsRerendered = false;
+      }
+      refreshOverlayThemeAwareFavicons({
+        skipWithin: rowsRerendered ? getSuggestionRowsRoot() : null
+      });
+      return rowsRerendered;
     }
 
     function attachFaviconData(img, url, hostOverride) {
@@ -759,6 +782,7 @@
       attachFaviconData,
       attachResolvedFaviconWithFallbacks,
       refreshOverlayThemeAwareFavicons,
+      refreshOverlayFaviconsForPolicyChange,
       preloadIcon,
       warmIconCache
     });

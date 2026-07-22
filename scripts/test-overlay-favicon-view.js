@@ -39,6 +39,13 @@ function createFakeImage() {
       if (set) {
         set.delete(listener);
       }
+    },
+    dispatchEvent(type) {
+      const set = listeners.get(type);
+      if (!set) {
+        return;
+      }
+      Array.from(set).forEach((listener) => listener.call(this, { type, target: this }));
     }
   };
 }
@@ -212,6 +219,9 @@ function createRuntime(options) {
       },
       preloadThemeFromFavicon() {},
       faviconDataCache: config.faviconDataCache,
+      getOverlayPanel: config.getOverlayPanel,
+      getSuggestionRowsRoot: config.getSuggestionRowsRoot,
+      rerenderReplacedFaviconRows: config.rerenderReplacedFaviconRows,
       faviconCandidateLoadTimeoutMs: 1000
     })
   };
@@ -236,8 +246,8 @@ function testOverlayRendererLoadsFaviconPolicyBeforeInitialTabs() {
   );
   assert.match(
     overlayJs,
-    /overlayFaviconEnhancedFetchStorageListener[\s\S]*?faviconEnhancedFetchEnabled = normalizeFaviconEnhancedFetchEnabled[\s\S]*?refreshOverlayThemeAwareFavicons\(\)/,
-    'favicon setting changes should refresh visible overlay favicons after updating the policy state'
+    /overlayFaviconEnhancedFetchStorageListener[\s\S]*?faviconEnhancedFetchEnabled = normalizeFaviconEnhancedFetchEnabled[\s\S]*?refreshOverlayFaviconsForPolicyChange\(\)/,
+    'favicon setting changes should recover replaced rows after updating the policy state'
   );
   const faviconViewJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/favicon-view.js'), 'utf8');
   assert.match(
@@ -304,6 +314,16 @@ function testOverlayRendererDefersFallbackReplacementUntilFaviconIsMounted() {
     overlayJs,
     /function replaceFaviconWithFallbackIcon\(favicon,\s*fallbackIconFactory\)[\s\S]*?scheduleFaviconFallbackReplacement\(favicon,\s*replace\);/,
     'overlay favicon fallback replacement should retry after the favicon has been mounted'
+  );
+  assert.match(
+    overlayJs,
+    /fallbackDiv\.setAttribute\('data-x-ov-favicon-policy-fallback', 'true'\)[\s\S]*?replaceChild\(fallbackDiv, favicon\)/,
+    'replaced favicon fallbacks should remain discoverable for policy-change recovery'
+  );
+  assert.match(
+    overlayJs,
+    /function rerenderReplacedFaviconRows\(\)[\s\S]*?data-x-ov-favicon-policy-fallback[\s\S]*?updateSearchSuggestions\(lastSuggestionResponse, latestOverlayQuery\)[\s\S]*?renderTabSuggestions\(tabs\)/,
+    'policy-change recovery should rerender cached search or open-tab rows only when a replacement exists'
   );
   assert.match(
     overlayJs,
@@ -577,6 +597,90 @@ async function testOverlayStrictModeReusesCachedFaviconData() {
   assert.strictEqual(img.src, cachedDataUrl, 'strict mode should prefer cached data without reusing its direct URL');
 }
 
+async function testOverlayPolicyEnableRecoversReplacedStrictFallback() {
+  const suggestionRowsRoot = {
+    contains(img) {
+      return img === currentImg;
+    }
+  };
+  const runtimeOptions = {
+    enhancedFaviconFetchEnabled: false,
+    getOverlayPanel() {
+      return {
+        querySelectorAll() {
+          return currentImg && currentImg.isConnected ? [currentImg] : [];
+        }
+      };
+    },
+    getSuggestionRowsRoot() {
+      return suggestionRowsRoot;
+    },
+    rerenderReplacedFaviconRows() {
+      if (!replacementVisible) {
+        return false;
+      }
+      replacementVisible = false;
+      rerenderCount += 1;
+      currentImg = createFakeImage();
+      runtime.attachResolvedFaviconWithFallbacks(
+        currentImg,
+        created.vpnPageUrl,
+        'foo.example.com',
+        created.vpnDirectFaviconUrl,
+        replaceFailedImage
+      );
+      return true;
+    }
+  };
+  let replacementVisible = false;
+  let rerenderCount = 0;
+  let currentImg = createFakeImage();
+  let runtime = null;
+  let created = null;
+  const replaceFailedImage = () => {
+    replacementVisible = true;
+    currentImg.isConnected = false;
+  };
+  created = createRuntime(runtimeOptions);
+  runtime = created.runtime;
+
+  runtime.attachResolvedFaviconWithFallbacks(
+    currentImg,
+    created.vpnPageUrl,
+    'foo.example.com',
+    created.vpnDirectFaviconUrl,
+    replaceFailedImage
+  );
+  assert.strictEqual(currentImg.src, created.vpnExtensionUrl, 'strict mode should initially try only the virtual favicon');
+  assert.notStrictEqual(
+    currentImg.src,
+    created.vpnDirectFaviconUrl,
+    'strict mode should not make the direct favicon retryable before the policy is enabled'
+  );
+
+  currentImg.dispatchEvent('error');
+  assert.strictEqual(replacementVisible, true, 'virtual favicon failure should replace the strict-mode image');
+
+  runtimeOptions.enhancedFaviconFetchEnabled = true;
+  runtime.refreshOverlayFaviconsForPolicyChange();
+
+  assert.strictEqual(rerenderCount, 1, 'enabling enhanced fetching should rerender the replaced row once');
+  assert.strictEqual(replacementVisible, false, 'the replacement should be consumed by the recovery rerender');
+  assert.strictEqual(
+    currentImg.src,
+    created.vpnDirectFaviconUrl,
+    'the direct favicon candidate should become retryable only after enhanced fetching is enabled'
+  );
+
+  runtimeOptions.enhancedFaviconFetchEnabled = false;
+  runtime.refreshOverlayFaviconsForPolicyChange();
+
+  assert.strictEqual(rerenderCount, 1, 'disabling should refresh a surviving row without an unnecessary rerender');
+  assert.strictEqual(currentImg.src, created.vpnExtensionUrl, 'disabling should restore the strict virtual favicon source');
+  assert.strictEqual(currentImg.src.includes('favicon.ico'), false, 'disabling should not retain the direct target candidate');
+  assert.strictEqual(currentImg.src.includes('gstatic'), false, 'disabling should not introduce a third-party fallback');
+}
+
 async function testOverlayUsesChromeFavicon2ForBrowserInternalPages() {
   const requestedUrls = [];
   const {
@@ -661,6 +765,7 @@ testOverlayResolvesLocalFaviconThroughDataUrl()
   .then(testOverlayStrictModeUsesOnlyVirtualFaviconForVpnHostname)
   .then(testOverlayFailsClosedBeforePolicyStateLoads)
   .then(testOverlayStrictModeReusesCachedFaviconData)
+  .then(testOverlayPolicyEnableRecoversReplacedStrictFallback)
   .then(testOverlayUsesChromeFavicon2ForBrowserInternalPages)
   .then(testOverlayUsesExtensionFaviconProxyForBrowserInternalPagesWithoutExplicitIcon)
   .then(testOverlayRendererLetsLocalFaviconsReachRuntime)
