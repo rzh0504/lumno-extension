@@ -259,6 +259,16 @@ function testOverlayRendererGuardsThemeSourcesInStrictMode() {
     /function getSiteFaviconUrl\(hostname\)[\s\S]*?if \(!faviconEnhancedFetchEnabled\) \{\s*return '';\s*\}[\s\S]*?favicon\.ico/,
     'strict mode should stop before constructing a target-host root favicon URL for theme extraction'
   );
+  const defaultSearchFaviconStart = overlayJs.indexOf('function getDefaultSearchEngineFaviconUrlForOverlay()');
+  const defaultSearchFaviconEnd = overlayJs.indexOf('function getDefaultSearchEngineThemeUrlForOverlay()', defaultSearchFaviconStart);
+  assert.notStrictEqual(defaultSearchFaviconStart, -1, 'overlay should define the default search favicon helper');
+  assert.notStrictEqual(defaultSearchFaviconEnd, -1, 'default search favicon helper should have a bounded source block');
+  const defaultSearchFaviconSource = overlayJs.slice(defaultSearchFaviconStart, defaultSearchFaviconEnd);
+  assert.match(
+    defaultSearchFaviconSource,
+    /if \(!faviconEnhancedFetchEnabled\) \{\s*return '';\s*\}[\s\S]*?favicon\.ico/,
+    'strict mode should return before constructing a default search target /favicon.ico candidate'
+  );
   assert.match(
     overlayJs,
     /function getThemeFromUrl\(url, hostOverride\)[\s\S]*?isBlockedLocalFaviconUrl\(url\)[\s\S]*?new Image\(\)[\s\S]*?image\.src = url/,

@@ -645,6 +645,9 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   }
 
   function getDefaultSearchEngineFaviconUrlForOverlay() {
+    if (!faviconEnhancedFetchEnabled) {
+      return '';
+    }
     const state = getOverlaySearchEngineState();
     if (state.host) {
       return `https://${state.host}/favicon.ico`;
