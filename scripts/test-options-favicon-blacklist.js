@@ -27,7 +27,6 @@ assert.strictEqual(
   '_x_extension_favicon_blacklist_match_suffix_2026_unique_',
   '_x_extension_favicon_blacklist_match_exact_2026_unique_',
   '_x_extension_favicon_blacklist_match_prefix_2026_unique_',
-  'data-i18n="favicon_blacklist_section_title"',
   'data-i18n="favicon_blacklist_section_desc"'
 ].forEach((snippet) => assert.ok(optionsHtml.includes(snippet), `missing restored favicon exclusion UI: ${snippet}`));
 assert.match(
@@ -35,14 +34,47 @@ assert.match(
   /id="_x_extension_favicon_blacklist_match_suffix_2026_unique_"[^>]*checked/,
   'suffix (site and subdomains) should be the default rule type'
 );
-assert.match(
-  optionsHtml,
-  /id="_x_extension_favicon_blacklist_editor_2026_unique_"[\s\S]*?id="_x_extension_favicon_blacklist_form_2026_unique_"/,
-  'the exclusion editor should sit directly under the enhanced fetching setting'
+const generalContentStart = optionsHtml.indexOf('data-content="general"');
+const blacklistContentStart = optionsHtml.indexOf('data-content="blacklist"');
+const labsContentStart = optionsHtml.indexOf('data-content="labs"');
+assert.ok(generalContentStart >= 0 && blacklistContentStart > generalContentStart && labsContentStart > blacklistContentStart);
+const generalContent = optionsHtml.slice(generalContentStart, blacklistContentStart);
+const blacklistContent = optionsHtml.slice(blacklistContentStart, labsContentStart);
+assert.ok(
+  !generalContent.includes('_x_extension_favicon_enhanced_fetch_toggle_2026_unique_'),
+  'favicon request controls should no longer appear in General settings'
 );
 assert.ok(
-  optionsHtml.includes('关闭后只使用浏览器缓存、Lumno 内置或通用图标，不会访问网站来获取图标或主题色。'),
-  'fallback HTML should truthfully describe strict mode'
+  blacklistContent.includes('_x_extension_favicon_enhanced_fetch_toggle_2026_unique_'),
+  'favicon request controls should live on the Blacklist page'
+);
+assert.match(
+  blacklistContent,
+  /data-i18n="blacklist_group_custom"[\s\S]*?data-i18n="settings_favicon_enhanced_fetch_title"[\s\S]*?id="_x_extension_favicon_blacklist_editor_2026_unique_"/,
+  'the favicon section should follow global blocking and keep the editor under its global switch'
+);
+assert.match(
+  blacklistContent,
+  /class="_x_extension_shortcut_group_title_2024_unique_ _x_extension_section_title_2024_unique_" data-i18n="settings_favicon_enhanced_fetch_title"/,
+  'the favicon section title should share the same hierarchy as Global blocking'
+);
+assert.ok(
+  blacklistContent.includes('data-i18n="favicon_blacklist_section_desc">按网站排除</p>'),
+  'the site exclusion row should keep only its secondary label'
+);
+assert.ok(!optionsHtml.includes('data-i18n="favicon_blacklist_section_title"'), 'the old nested title should be removed');
+assert.ok(
+  optionsHtml.includes('若遇到本地网络访问权限提示，可关闭此功能。关闭后仅使用浏览器缓存、Lumno 内置或通用图标。'),
+  'fallback HTML should describe the problem state before explaining strict mode'
+);
+assert.ok(
+  optionsHtml.includes('data-i18n="blacklist_section_desc">添加需要从搜索结果和新标签页中隐藏的网址。</p>'),
+  'global blocking copy should stay concise'
+);
+assert.match(
+  optionsHtml,
+  /#_x_extension_favicon_blacklist_editor_2026_unique_\s*\{[^}]*margin-top:\s*12px;/,
+  'the per-site exclusion row should have extra separation from the global favicon setting'
 );
 
 assert.match(optionsJs, /const FAVICON_REQUEST_BLACKLIST_STORAGE_KEY = '_x_extension_favicon_request_blacklist_2026_unique_';/);
@@ -60,7 +92,6 @@ assert.match(optionsJs, /loadFaviconRequestBlacklistItems\(\)\.then[\s\S]*?favic
 
 const requiredLocaleKeys = [
   'settings_favicon_enhanced_fetch_desc',
-  'favicon_blacklist_section_title',
   'favicon_blacklist_section_desc',
   'favicon_blacklist_add',
   'favicon_blacklist_removed_toast',
@@ -72,10 +103,10 @@ locales.forEach((messages, index) => {
     assert.ok(messages[key] && messages[key].message, `${localeNames[index]} missing ${key}`);
   });
 });
-assert.ok(locales[0].settings_favicon_enhanced_fetch_desc.message.includes('does not access websites'));
-assert.ok(locales[0].favicon_blacklist_section_desc.message.includes('searchable'));
-assert.ok(locales[2].settings_favicon_enhanced_fetch_desc.message.includes('不会访问网站'));
-assert.ok(locales[2].favicon_blacklist_section_desc.message.includes('仍可显示、搜索和打开'));
+assert.ok(locales[0].settings_favicon_enhanced_fetch_desc.message.startsWith('If you see a local network access prompt'));
+assert.strictEqual(locales[0].favicon_blacklist_section_desc.message, 'Exclude by website');
+assert.ok(locales[2].settings_favicon_enhanced_fetch_desc.message.startsWith('若遇到本地网络访问权限提示'));
+assert.strictEqual(locales[2].favicon_blacklist_section_desc.message, '按网站排除');
 
 const accessibleResources = manifest.web_accessible_resources.flatMap((entry) => entry.resources || []);
 assert.ok(accessibleResources.includes('src/shared/cursor-tooltip.css'), 'cursor tooltip CSS should be web accessible');

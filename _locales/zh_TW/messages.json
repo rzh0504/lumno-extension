@@ -117,13 +117,10 @@
     "message": "增強圖示與主題色取得"
   },
   "settings_favicon_enhanced_fetch_desc": {
-    "message": "關閉後只使用瀏覽器快取、Lumno 內建或通用圖示，不會存取網站來取得圖示或主題色。"
-  },
-  "favicon_blacklist_section_title": {
-    "message": "按網站排除"
+    "message": "若遇到本機網路存取權限提示，可關閉此功能。關閉後僅使用瀏覽器快取、Lumno 內建或通用圖示。"
   },
   "favicon_blacklist_section_desc": {
-    "message": "符合的網站仍可顯示、搜尋和開啟，但不會發出圖示或主題色請求。"
+    "message": "按網站排除"
   },
   "favicon_blacklist_add": {
     "message": "加入排除規則"
@@ -780,7 +777,7 @@
     "message": "搜尋與最近訪問黑名單"
   },
   "blacklist_section_desc": {
-    "message": "若要徹底禁止某些網址出現在 Lumno 的搜尋結果和新分頁中，請在此加入。"
+    "message": "加入要從搜尋結果和新分頁中隱藏的網址。"
   },
   "blacklist_group_custom": {
     "message": "全域停用"

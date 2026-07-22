@@ -49,7 +49,7 @@ const expectedMessages = {
   blacklist_empty: '非表示URLはまだありません',
   blacklist_removed_toast: '非表示リストから削除しました',
   settings_favicon_enhanced_fetch_title: 'アイコンとテーマカラーの拡張取得',
-  settings_favicon_enhanced_fetch_desc: 'オフの場合はブラウザのキャッシュ、内蔵、汎用アイコンだけを使い、アイコンやテーマカラーのためにサイトへアクセスしません。',
+  settings_favicon_enhanced_fetch_desc: 'ローカルネットワークへのアクセス許可を求められた場合は、この機能をオフにしてください。オフにすると、ブラウザのキャッシュ、Lumno 内蔵、または汎用アイコンのみを使用します。',
   settings_overlay_open_tabs_default_visible_title: 'Web ページで Lumno を開いたとき、開いているすべてのタブを既定で表示',
   blacklist_preview_title: '一致例',
   blacklist_match_suffix_tooltip: 'このサイトのすべてのページと下位ドメインを非表示\n────────\n例：baidu.com を入力すると、baidu.com/search と tieba.baidu.com は表示されません',

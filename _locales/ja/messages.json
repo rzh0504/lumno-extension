@@ -117,13 +117,10 @@
     "message": "アイコンとテーマカラーの拡張取得"
   },
   "settings_favicon_enhanced_fetch_desc": {
-    "message": "オフの場合はブラウザのキャッシュ、内蔵、汎用アイコンだけを使い、アイコンやテーマカラーのためにサイトへアクセスしません。"
-  },
-  "favicon_blacklist_section_title": {
-    "message": "サイトごとに除外"
+    "message": "ローカルネットワークへのアクセス許可を求められた場合は、この機能をオフにしてください。オフにすると、ブラウザのキャッシュ、Lumno 内蔵、または汎用アイコンのみを使用します。"
   },
   "favicon_blacklist_section_desc": {
-    "message": "一致したサイトは表示・検索・起動できますが、アイコンやテーマカラーのリクエストは行いません。"
+    "message": "サイトごとに除外"
   },
   "favicon_blacklist_add": {
     "message": "除外ルールを追加"
@@ -789,7 +786,7 @@
     "message": "検索結果と最近使ったサイトの非表示リスト"
   },
   "blacklist_section_desc": {
-    "message": "Lumnoの検索結果と新しいタブページに表示したくないURLを、ここに追加してください。"
+    "message": "検索結果と新しいタブページに表示しないサイトを追加します。"
   },
   "blacklist_group_custom": {
     "message": "全体で無効化"

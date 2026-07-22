@@ -1182,6 +1182,12 @@
         margin-top: 6px;
       }
 
+      #_x_extension_favicon_blacklist_editor_2026_unique_ {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        margin-top: 12px;
+      }
       #_x_extension_favicon_blacklist_editor_2026_unique_[aria-disabled="true"] {
         opacity: 0.55;
         pointer-events: none;
@@ -2368,73 +2374,6 @@
               <span class="_x_extension_switch_slider_2024_unique_" aria-hidden="true"></span>
             </label>
           </div>
-          <div class="_x_extension_setting_row_2024_unique_ _x_extension_setting_row_compact_2024_unique_">
-            <div>
-              <p class="_x_extension_setting_title_2024_unique_">
-                <span data-i18n="settings_favicon_enhanced_fetch_title">增强图标与主题色获取</span>
-              </p>
-              <p class="_x_extension_setting_desc_2024_unique_" data-i18n="settings_favicon_enhanced_fetch_desc">关闭后只使用浏览器缓存、Lumno 内置或通用图标，不会访问网站来获取图标或主题色。</p>
-            </div>
-            <label class="_x_extension_switch_2024_unique_" for="_x_extension_favicon_enhanced_fetch_toggle_2026_unique_">
-              <input id="_x_extension_favicon_enhanced_fetch_toggle_2026_unique_" type="checkbox" checked>
-              <span class="_x_extension_switch_slider_2024_unique_" aria-hidden="true"></span>
-            </label>
-          </div>
-          <div id="_x_extension_favicon_blacklist_editor_2026_unique_" class="_x_extension_setting_row_2024_unique_" aria-disabled="false">
-            <div class="_x_extension_shortcuts_section_block_2026_unique_">
-              <div class="_x_extension_shortcut_group_2024_unique_">
-                <div class="_x_extension_shortcut_group_header_2024_unique_">
-                  <div class="_x_extension_shortcut_group_title_2024_unique_ _x_extension_section_title_2024_unique_" data-i18n="favicon_blacklist_section_title">按网站排除</div>
-                  <button id="_x_extension_favicon_blacklist_clear_2026_unique_" class="_x_extension_shortcut_group_action_2024_unique_" type="button" aria-label="清空排除规则" data-tooltip="清空排除规则" data-i18n-tooltip="favicon_blacklist_clear">
-                    <i class="ri-icon ri-size-14 ri-delete-bin-4-line" aria-hidden="true"></i>
-                  </button>
-                </div>
-                <p class="_x_extension_setting_desc_2024_unique_ _x_extension_setting_desc_compact_2026_unique_" data-i18n="favicon_blacklist_section_desc">匹配的网站仍可显示、搜索和打开，但不会发起图标或主题色请求。</p>
-                <div id="_x_extension_favicon_blacklist_list_2026_unique_" class="_x_extension_shortcut_list_2024_unique_"></div>
-              </div>
-              <div id="_x_extension_favicon_blacklist_form_2026_unique_" class="_x_extension_shortcut_form_2024_unique_" data-expanded="false">
-                <div class="_x_extension_shortcut_form_trigger_2024_unique_">
-                  <button id="_x_extension_favicon_blacklist_expand_2026_unique_" class="_x_extension_shortcut_submit_2024_unique_" type="button" aria-expanded="false">
-                    <i class="ri-icon ri-size-14 ri-add-line" aria-hidden="true"></i>
-                    <span data-i18n="favicon_blacklist_add">添加排除规则</span>
-                  </button>
-                </div>
-                <div class="_x_extension_shortcut_form_fields_2024_unique_">
-                  <div class="_x_extension_shortcut_field_2024_unique_">
-                    <label class="_x_extension_shortcut_label_2024_unique_" for="_x_extension_favicon_blacklist_url_2026_unique_">
-                      <span id="_x_extension_favicon_blacklist_url_label_2026_unique_" data-i18n="blacklist_label_url">URL 规则</span><span class="_x_extension_shortcut_required_2024_unique_">*</span>
-                    </label>
-                    <div class="_x_extension_shortcut_input_affix_2026_unique_">
-                      <span id="_x_extension_favicon_blacklist_url_prefix_2026_unique_" class="_x_extension_shortcut_input_prefix_2026_unique_" style="display:none;">http(s)://</span>
-                      <input id="_x_extension_favicon_blacklist_url_2026_unique_" class="_x_extension_shortcut_input_2024_unique_" placeholder="example.com" data-i18n-placeholder="blacklist_placeholder_domain" />
-                    </div>
-                  </div>
-                  <div class="_x_extension_shortcut_field_2024_unique_">
-                    <div class="_x_extension_shortcut_label_2024_unique_" data-i18n="blacklist_match_label">匹配方式</div>
-                    <div class="_x_extension_checkbox_group_2026_unique_" data-align="start" data-gap="wide">
-                      <label class="_x_extension_checkbox_2026_unique_" id="_x_extension_favicon_blacklist_match_suffix_wrap_2026_unique_">
-                        <input id="_x_extension_favicon_blacklist_match_suffix_2026_unique_" type="checkbox" checked />
-                        <span data-i18n="blacklist_match_suffix">整个网站和子域名</span>
-                      </label>
-                      <label class="_x_extension_checkbox_2026_unique_" id="_x_extension_favicon_blacklist_match_exact_wrap_2026_unique_">
-                        <input id="_x_extension_favicon_blacklist_match_exact_2026_unique_" type="checkbox" />
-                        <span data-i18n="blacklist_match_exact">当前页面</span>
-                      </label>
-                      <label class="_x_extension_checkbox_2026_unique_" id="_x_extension_favicon_blacklist_match_prefix_wrap_2026_unique_">
-                        <input id="_x_extension_favicon_blacklist_match_prefix_2026_unique_" type="checkbox" />
-                        <span data-i18n="blacklist_match_prefix">当前站点路径</span>
-                      </label>
-                    </div>
-                  </div>
-                  <div class="_x_extension_shortcut_actions_row_2024_unique_">
-                    <button id="_x_extension_favicon_blacklist_cancel_2026_unique_" class="_x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_secondary_2024_unique_" style="display:none;" type="button" data-i18n="shortcuts_cancel">取消</button>
-                    <button id="_x_extension_favicon_blacklist_add_2026_unique_" class="_x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_submit_primary_2024_unique_" type="button" data-i18n="favicon_blacklist_add">添加排除规则</button>
-                  </div>
-                  <div id="_x_extension_favicon_blacklist_error_2026_unique_" class="_x_extension_shortcut_error_2024_unique_" style="display:none;"></div>
-                </div>
-              </div>
-            </div>
-          </div>
           <div class="_x_extension_setting_divider_wrap_2024_unique_" role="presentation">
             <div class="_x_extension_setting_divider_2024_unique_"></div>
           </div>
@@ -2791,7 +2730,7 @@
                   <i class="ri-icon ri-size-14 ri-delete-bin-4-line" aria-hidden="true"></i>
                 </button>
               </div>
-              <p class="_x_extension_setting_desc_2024_unique_ _x_extension_setting_desc_compact_2026_unique_" data-i18n="blacklist_section_desc">若要彻底禁止某些网址出现在 Lumno 的搜索结果和新标签页中，在此添加。</p>
+              <p class="_x_extension_setting_desc_2024_unique_ _x_extension_setting_desc_compact_2026_unique_" data-i18n="blacklist_section_desc">添加需要从搜索结果和新标签页中隐藏的网址。</p>
               <div id="_x_extension_blacklist_list_2026_unique_" class="_x_extension_shortcut_list_2024_unique_"></div>
             </div>
             <div id="_x_extension_blacklist_form_2026_unique_" class="_x_extension_shortcut_form_2024_unique_" data-expanded="false">
@@ -2842,6 +2781,71 @@
                   <button id="_x_extension_blacklist_add_2026_unique_" type="button" class="_x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_submit_primary_2024_unique_" data-i18n="blacklist_add">添加</button>
                 </div>
                 <div id="_x_extension_blacklist_error_2026_unique_" class="_x_extension_shortcut_error_2024_unique_" style="display:none;"></div>
+              </div>
+            </div>
+            <div class="_x_extension_setting_divider_wrap_2024_unique_" role="presentation">
+              <div class="_x_extension_setting_divider_2024_unique_"></div>
+            </div>
+            <div class="_x_extension_shortcut_group_2024_unique_">
+              <div class="_x_extension_shortcut_group_header_2024_unique_">
+                <div class="_x_extension_shortcut_group_title_2024_unique_ _x_extension_section_title_2024_unique_" data-i18n="settings_favicon_enhanced_fetch_title">增强图标与主题色获取</div>
+                <label class="_x_extension_switch_2024_unique_" for="_x_extension_favicon_enhanced_fetch_toggle_2026_unique_">
+                  <input id="_x_extension_favicon_enhanced_fetch_toggle_2026_unique_" type="checkbox" checked>
+                  <span class="_x_extension_switch_slider_2024_unique_" aria-hidden="true"></span>
+                </label>
+              </div>
+              <p class="_x_extension_setting_desc_2024_unique_ _x_extension_setting_desc_compact_2026_unique_" data-i18n="settings_favicon_enhanced_fetch_desc">若遇到本地网络访问权限提示，可关闭此功能。关闭后仅使用浏览器缓存、Lumno 内置或通用图标。</p>
+            </div>
+            <div id="_x_extension_favicon_blacklist_editor_2026_unique_" aria-disabled="false">
+              <div class="_x_extension_shortcut_group_2024_unique_">
+                <div class="_x_extension_shortcut_group_header_2024_unique_">
+                  <p class="_x_extension_setting_desc_2024_unique_ _x_extension_setting_desc_compact_2026_unique_" data-i18n="favicon_blacklist_section_desc">按网站排除</p>
+                  <button id="_x_extension_favicon_blacklist_clear_2026_unique_" class="_x_extension_shortcut_group_action_2024_unique_" type="button" aria-label="清空排除规则" data-tooltip="清空排除规则" data-i18n-tooltip="favicon_blacklist_clear">
+                    <i class="ri-icon ri-size-14 ri-delete-bin-4-line" aria-hidden="true"></i>
+                  </button>
+                </div>
+                <div id="_x_extension_favicon_blacklist_list_2026_unique_" class="_x_extension_shortcut_list_2024_unique_"></div>
+              </div>
+              <div id="_x_extension_favicon_blacklist_form_2026_unique_" class="_x_extension_shortcut_form_2024_unique_" data-expanded="false">
+                <div class="_x_extension_shortcut_form_trigger_2024_unique_">
+                  <button id="_x_extension_favicon_blacklist_expand_2026_unique_" class="_x_extension_shortcut_submit_2024_unique_" type="button" aria-expanded="false">
+                    <i class="ri-icon ri-size-14 ri-add-line" aria-hidden="true"></i>
+                    <span data-i18n="favicon_blacklist_add">添加排除规则</span>
+                  </button>
+                </div>
+                <div class="_x_extension_shortcut_form_fields_2024_unique_">
+                  <div class="_x_extension_shortcut_field_2024_unique_">
+                    <label class="_x_extension_shortcut_label_2024_unique_" for="_x_extension_favicon_blacklist_url_2026_unique_">
+                      <span id="_x_extension_favicon_blacklist_url_label_2026_unique_" data-i18n="blacklist_label_url">URL 规则</span><span class="_x_extension_shortcut_required_2024_unique_">*</span>
+                    </label>
+                    <div class="_x_extension_shortcut_input_affix_2026_unique_">
+                      <span id="_x_extension_favicon_blacklist_url_prefix_2026_unique_" class="_x_extension_shortcut_input_prefix_2026_unique_" style="display:none;">http(s)://</span>
+                      <input id="_x_extension_favicon_blacklist_url_2026_unique_" class="_x_extension_shortcut_input_2024_unique_" placeholder="example.com" data-i18n-placeholder="blacklist_placeholder_domain" />
+                    </div>
+                  </div>
+                  <div class="_x_extension_shortcut_field_2024_unique_">
+                    <div class="_x_extension_shortcut_label_2024_unique_" data-i18n="blacklist_match_label">匹配方式</div>
+                    <div class="_x_extension_checkbox_group_2026_unique_" data-align="start" data-gap="wide">
+                      <label class="_x_extension_checkbox_2026_unique_" id="_x_extension_favicon_blacklist_match_suffix_wrap_2026_unique_">
+                        <input id="_x_extension_favicon_blacklist_match_suffix_2026_unique_" type="checkbox" checked />
+                        <span data-i18n="blacklist_match_suffix">整个网站和子域名</span>
+                      </label>
+                      <label class="_x_extension_checkbox_2026_unique_" id="_x_extension_favicon_blacklist_match_exact_wrap_2026_unique_">
+                        <input id="_x_extension_favicon_blacklist_match_exact_2026_unique_" type="checkbox" />
+                        <span data-i18n="blacklist_match_exact">当前页面</span>
+                      </label>
+                      <label class="_x_extension_checkbox_2026_unique_" id="_x_extension_favicon_blacklist_match_prefix_wrap_2026_unique_">
+                        <input id="_x_extension_favicon_blacklist_match_prefix_2026_unique_" type="checkbox" />
+                        <span data-i18n="blacklist_match_prefix">当前站点路径</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div class="_x_extension_shortcut_actions_row_2024_unique_">
+                    <button id="_x_extension_favicon_blacklist_cancel_2026_unique_" class="_x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_secondary_2024_unique_" style="display:none;" type="button" data-i18n="shortcuts_cancel">取消</button>
+                    <button id="_x_extension_favicon_blacklist_add_2026_unique_" class="_x_extension_shortcut_submit_2024_unique_ _x_extension_shortcut_submit_primary_2024_unique_" type="button" data-i18n="favicon_blacklist_add">添加排除规则</button>
+                  </div>
+                  <div id="_x_extension_favicon_blacklist_error_2026_unique_" class="_x_extension_shortcut_error_2024_unique_" style="display:none;"></div>
+                </div>
               </div>
             </div>
           </div>
