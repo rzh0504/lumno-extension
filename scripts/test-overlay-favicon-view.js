@@ -94,6 +94,7 @@ function createRuntime(options) {
   const config = options || {};
   const preloadedUrls = [];
   const attachedDataUrls = [];
+  const warmedIconLists = [];
   const sandbox = {
     console,
     setTimeout,
@@ -132,8 +133,8 @@ function createRuntime(options) {
         canReuseCurrentFavicon() {
           return false;
         },
-        getLastWorkingFaviconSrc() {
-          return '';
+        getLastWorkingFaviconSrc(img) {
+          return img ? (img.getAttribute('data-favicon-current-src') || '') : '';
         },
         restoreWorkingFaviconOrFallback(img, previousSrc, options) {
           if (previousSrc) {
@@ -152,7 +153,9 @@ function createRuntime(options) {
         preloadIcon(url) {
           preloadedUrls.push(url);
         },
-        warmIconCache() {},
+        warmIconCache(list) {
+          warmedIconLists.push(list);
+        },
         detectDefaultExtensionFavicon() {
           return Promise.resolve(false);
         }
@@ -189,6 +192,7 @@ function createRuntime(options) {
     vpnGstaticUrl,
     preloadedUrls,
     attachedDataUrls,
+    warmedIconLists,
     runtime: sandbox.LumnoOverlayFaviconView.createOverlayFaviconViewRuntime({
       document: {
         createElement() {
@@ -242,7 +246,10 @@ function createRuntime(options) {
         const host = String(hostname || '').toLowerCase();
         return host === '127.0.0.1' || host === 'localhost';
       },
-      isEnhancedFaviconFetchEnabled() {
+      isEnhancedFaviconFetchEnabled(pageUrl) {
+        if (config.excludedPageUrl && pageUrl === config.excludedPageUrl) {
+          return false;
+        }
         return Object.prototype.hasOwnProperty.call(config, 'enhancedFaviconFetchEnabled')
           ? config.enhancedFaviconFetchEnabled
           : true;
@@ -272,8 +279,8 @@ function testOverlayRendererLoadsFaviconPolicyBeforeInitialTabs() {
   );
   assert.match(
     overlayJs,
-    /initialFaviconEnhancedFetchReady = new Promise[\s\S]*?storageArea\.get\(\[FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY\][\s\S]*?resolve\(\)/,
-    'overlay should expose a readiness promise for the initial favicon setting load'
+    /initialFaviconEnhancedFetchReady = new Promise[\s\S]*?FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY,[\s\S]*?FAVICON_REQUEST_BLACKLIST_STORAGE_KEY[\s\S]*?overlayFaviconRequestBlacklistItems[\s\S]*?resolve\(\)/,
+    'overlay should load the global setting and path-specific exclusions before first render'
   );
   assert.match(
     overlayJs,
@@ -297,8 +304,8 @@ function testOverlayRendererGuardsThemeSourcesInStrictMode() {
   const overlayJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/search-panel.js'), 'utf8');
   assert.match(
     overlayJs,
-    /function getOverlayFaviconUrlResolver\(\)[\s\S]*?isEnhancedFaviconFetchEnabled: \(\) => faviconEnhancedFetchEnabled/,
-    'overlay URL resolution should use the shared enhanced-fetch policy state'
+    /function getOverlayFaviconUrlResolver\(\)[\s\S]*?isEnhancedFaviconFetchEnabled: isOverlayEnhancedFaviconFetchEnabled/,
+    'overlay URL resolution should use the URL-specific enhanced-fetch policy state'
   );
   assert.match(
     overlayJs,
@@ -312,7 +319,7 @@ function testOverlayRendererGuardsThemeSourcesInStrictMode() {
   const defaultSearchFaviconSource = overlayJs.slice(defaultSearchFaviconStart, defaultSearchFaviconEnd);
   assert.match(
     defaultSearchFaviconSource,
-    /if \(!faviconEnhancedFetchEnabled\) \{\s*return '';\s*\}[\s\S]*?favicon\.ico/,
+    /if \(!isOverlayEnhancedFaviconFetchEnabled\(getDefaultSearchEngineThemeUrlForOverlay\(\)\)\) \{\s*return '';\s*\}[\s\S]*?favicon\.ico/,
     'strict mode should return before constructing a default search target /favicon.ico candidate'
   );
   assert.match(
@@ -324,6 +331,11 @@ function testOverlayRendererGuardsThemeSourcesInStrictMode() {
     overlayJs,
     /const safeModeSwitchFavicon = getSafeOverlayFaviconUrl\(suggestion\.favicon\)[\s\S]*?favicon\.src = safeModeSwitchFavicon/,
     'mode-switch rows should sanitize their favicon before direct image assignment'
+  );
+  assert.match(
+    overlayJs,
+    /attachFaviconData\(favicon,\s*iconUrl,\s*suggestionHost,\s*suggestion\.url \|\| ''\)/,
+    'suggestion favicon data requests should include the page URL for path-specific exclusions'
   );
 }
 
@@ -695,6 +707,69 @@ async function testOverlayFailsClosedBeforePolicyStateLoads() {
   assert.strictEqual(img.src, vpnExtensionUrl, 'unloaded favicon policy should be treated as strict mode');
 }
 
+async function testOverlayExcludedPathUsesStrictCandidatesWhileEnhancedIsOn() {
+  const requestedUrls = [];
+  const {
+    runtime,
+    vpnPageUrl,
+    vpnDirectFaviconUrl,
+    vpnExtensionUrl,
+    vpnGstaticUrl,
+    preloadedUrls,
+    attachedDataUrls,
+    warmedIconLists
+  } = createRuntime({
+    enhancedFaviconFetchEnabled: true,
+    excludedPageUrl: 'https://foo.example.com/',
+    requestFaviconData(url) {
+      requestedUrls.push(url);
+      return Promise.resolve(null);
+    }
+  });
+  const img = createFakeImage();
+
+  runtime.preloadIcon(vpnDirectFaviconUrl, vpnPageUrl);
+  runtime.preloadIcon(vpnGstaticUrl, vpnPageUrl);
+  runtime.preloadIcon(vpnExtensionUrl, vpnPageUrl);
+  runtime.attachFaviconData({}, vpnDirectFaviconUrl, 'foo.example.com', vpnPageUrl);
+  runtime.warmIconCache([{ url: vpnPageUrl, favicon: vpnDirectFaviconUrl }]);
+  runtime.attachResolvedFaviconWithFallbacks(
+    img,
+    vpnPageUrl,
+    'foo.example.com',
+    vpnDirectFaviconUrl
+  );
+
+  await wait(0);
+
+  assert.deepStrictEqual(preloadedUrls, [vpnExtensionUrl], 'excluded overlay paths should preload only browser-cache favicons');
+  assert.deepStrictEqual(attachedDataUrls, [], 'excluded overlay paths should not request direct favicon data');
+  assert.strictEqual(warmedIconLists[0][0].favicon, '', 'excluded overlay paths should remove direct icons before warming the cache');
+  assert.deepStrictEqual(requestedUrls, [], 'excluded overlay paths should not probe direct, proxy, or root candidates');
+  assert.strictEqual(img.src, vpnExtensionUrl, 'enhanced-on excluded paths should use the same strict candidate plan as global off');
+
+  const staleImg = createFakeImage();
+  staleImg.src = vpnDirectFaviconUrl;
+  staleImg.setAttribute('data-favicon-current-src', vpnDirectFaviconUrl);
+  runtime.attachResolvedFaviconWithFallbacks(staleImg, vpnPageUrl, 'foo.example.com', vpnDirectFaviconUrl);
+  staleImg._xOverlayThemeFaviconErrorHandler();
+  assert.notStrictEqual(
+    staleImg.src,
+    vpnDirectFaviconUrl,
+    'excluded overlay paths should not restore a previously working direct favicon after strict candidates fail'
+  );
+
+  const publicImg = createFakeImage();
+  const publicRuntime = createRuntime({ enhancedFaviconFetchEnabled: true });
+  publicRuntime.runtime.attachResolvedFaviconWithFallbacks(
+    publicImg,
+    publicRuntime.vpnPageUrl,
+    'foo.example.com',
+    publicRuntime.vpnDirectFaviconUrl
+  );
+  assert.strictEqual(publicImg.src, publicRuntime.vpnDirectFaviconUrl, 'nonexcluded enhanced-on paths should keep direct candidates');
+}
+
 async function testOverlayStrictModeReusesCachedFaviconData() {
   const faviconDataCache = new Map();
   const cachedDataUrl = 'data:image/png;base64,Y2FjaGVk';
@@ -983,6 +1058,7 @@ testOverlayResolvesLocalFaviconThroughDataUrl()
   .then(testOverlaySkipsRootIconProbeWhenEnhancedFetchDisabled)
   .then(testOverlayStrictModeUsesOnlyVirtualFaviconForVpnHostname)
   .then(testOverlayFailsClosedBeforePolicyStateLoads)
+  .then(testOverlayExcludedPathUsesStrictCandidatesWhileEnhancedIsOn)
   .then(testOverlayStrictModeReusesCachedFaviconData)
   .then(testOverlayPolicyEnableRecoversReplacedStrictFallback)
   .then(testOverlayOpenTabPolicyRecoveryIsSafeInBothDirections)

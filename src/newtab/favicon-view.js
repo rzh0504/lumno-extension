@@ -18,6 +18,15 @@
     const shouldAvoidDirectFaviconForHost = typeof config.shouldAvoidDirectFaviconForHost === 'function'
       ? config.shouldAvoidDirectFaviconForHost
       : (() => false);
+    const isEnhancedFaviconFetchEnabled = typeof config.isEnhancedFaviconFetchEnabled === 'function'
+      ? config.isEnhancedFaviconFetchEnabled
+      : (() => true);
+    const getStrictFaviconReason = typeof config.getStrictFaviconReason === 'function'
+      ? config.getStrictFaviconReason
+      : (() => '');
+    const logFaviconDecision = typeof config.logFaviconDecision === 'function'
+      ? config.logFaviconDecision
+      : noop;
     const getHostFromUrl = typeof config.getHostFromUrl === 'function' ? config.getHostFromUrl : (() => '');
     const setPersistedFaviconUrl = typeof config.setPersistedFaviconUrl === 'function' ? config.setPersistedFaviconUrl : noop;
     const setPersistedFaviconData = typeof config.setPersistedFaviconData === 'function' ? config.setPersistedFaviconData : noop;
@@ -38,7 +47,10 @@
         getChromeFaviconUrl,
         shouldBlockFaviconForHost,
         shouldAvoidDirectFaviconForHost,
-        isBlockedLocalFaviconUrl
+        isBlockedLocalFaviconUrl,
+        isEnhancedFaviconFetchEnabled,
+        getStrictFaviconReason,
+        logFaviconDecision
       })
       : null;
     const faviconViewCoreApi = global.LumnoFaviconViewCore || {};
@@ -327,20 +339,41 @@
       });
     }
 
-    function attachFaviconData(img, url, hostOverride) {
-      faviconViewCore.attachFaviconData(img, url, hostOverride);
+    function attachFaviconData(img, url, hostOverride, pageUrl) {
+      const safeUrl = faviconUrlResolver
+        ? faviconUrlResolver.getSafeFaviconCandidateUrl(url, pageUrl || url, 'data')
+        : String(url || '');
+      if (safeUrl) {
+        faviconViewCore.attachFaviconData(img, safeUrl, hostOverride);
+      }
     }
 
-    function preloadIcon(url) {
-      faviconViewCore.preloadIcon(url);
+    function preloadIcon(url, pageUrl) {
+      const safeUrl = faviconUrlResolver
+        ? faviconUrlResolver.getSafeFaviconCandidateUrl(url, pageUrl || url, 'preload')
+        : String(url || '');
+      if (safeUrl) {
+        faviconViewCore.preloadIcon(safeUrl);
+      }
     }
 
     function warmIconCache(list) {
-      faviconViewCore.warmIconCache(list);
+      const safeItems = (Array.isArray(list) ? list : []).map((item) => {
+        if (!item || !item.favicon) {
+          return item;
+        }
+        const safeUrl = faviconUrlResolver
+          ? faviconUrlResolver.getSafeFaviconCandidateUrl(item.favicon, item.url || '', 'preload')
+          : String(item.favicon || '');
+        return { ...item, favicon: safeUrl };
+      });
+      faviconViewCore.warmIconCache(safeItems);
     }
 
-    function getSafeFaviconCandidateUrl(value) {
-      return faviconUrlResolver ? faviconUrlResolver.getSafeFaviconCandidateUrl(value) : '';
+    function getSafeFaviconCandidateUrl(value, pageUrl, candidateKind) {
+      return faviconUrlResolver
+        ? faviconUrlResolver.getSafeFaviconCandidateUrl(value, pageUrl, candidateKind)
+        : '';
     }
 
     function getRuntimeExtensionFaviconUrl(pageUrl) {
@@ -359,15 +392,21 @@
       img._xThemeFaviconSession = (img._xThemeFaviconSession || 0) + 1;
       const session = img._xThemeFaviconSession;
       const hostKey = host || getHostFromUrl(url);
-      const previousWorkingSrc = getLastWorkingFaviconSrc(img);
+      const previousWorkingSrc = getSafeFaviconCandidateUrl(
+        getLastWorkingFaviconSrc(img),
+        url,
+        'previous'
+      );
 
       return {
         url: String(url || ''),
         hostKey: String(hostKey || ''),
         primaryUrl: getSafeFaviconCandidateUrl(
-          (optionsArg && (optionsArg.primaryUrl || optionsArg.fallbackUrl)) || ''
+          (optionsArg && (optionsArg.primaryUrl || optionsArg.fallbackUrl)) || '',
+          url,
+          'primary'
         ),
-        browserUrl: getSafeFaviconCandidateUrl((optionsArg && optionsArg.browserUrl) || '') ||
+        browserUrl: getSafeFaviconCandidateUrl((optionsArg && optionsArg.browserUrl) || '', url, 'browser') ||
           (/^https?:\/\//i.test(String(url || '')) ? '' : getRuntimeChromeFaviconUrl(url)),
         extensionFavicon: getRuntimeExtensionFaviconUrl(url),
         gstaticFavicon: getRuntimeGstaticFaviconUrl(url),

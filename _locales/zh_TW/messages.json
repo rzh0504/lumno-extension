@@ -117,7 +117,22 @@
     "message": "增強圖示與主題色取得"
   },
   "settings_favicon_enhanced_fetch_desc": {
-    "message": "內網或 VPN 頁面若出現「要求存取區域網路上的其他裝置」提示，可關閉此項。"
+    "message": "關閉後只使用瀏覽器快取、Lumno 內建或通用圖示，不會存取網站來取得圖示或主題色。"
+  },
+  "favicon_blacklist_section_title": {
+    "message": "按網站排除"
+  },
+  "favicon_blacklist_section_desc": {
+    "message": "符合的網站仍可顯示、搜尋和開啟，但不會發出圖示或主題色請求。"
+  },
+  "favicon_blacklist_add": {
+    "message": "加入排除規則"
+  },
+  "favicon_blacklist_removed_toast": {
+    "message": "已從圖示與主題色排除中移除"
+  },
+  "favicon_blacklist_clear": {
+    "message": "清空排除規則"
   },
   "search_result_priority_autocomplete": {
     "message": "補全優先"
@@ -970,6 +985,9 @@
   },
   "confirm_clear_blacklist": {
     "message": "確認清空隱藏規則？"
+  },
+  "confirm_clear_favicon_blacklist": {
+    "message": "確認清空排除規則？"
   },
   "confirm_reset_builtin": {
     "message": "確認重設內建清單？"

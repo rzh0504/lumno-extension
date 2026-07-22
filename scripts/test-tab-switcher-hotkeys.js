@@ -1467,6 +1467,11 @@ assert.match(
 );
 assert.match(
   triggerSwitcherBlock,
+  /Promise\.all\(\[\s*ensureTabSwitcherStateLoaded\(\),\s*loadFaviconRequestBlacklistItems\(\),\s*loadFaviconEnhancedFetchEnabled\(\)\s*\]\)[\s\S]*getRecentTabsForSwitcher/,
+  'Alt+Q should load favicon policy state before building synchronous switcher favicon payloads'
+);
+assert.match(
+  triggerSwitcherBlock,
   /clearScheduledSwitcherThumbnailCapture\(tab\.id\)[\s\S]*advanceExistingTabSwitcherOnTab/,
   'Alt+Q should cancel the active tab pending thumbnail timer before trying to open the visible switcher'
 );

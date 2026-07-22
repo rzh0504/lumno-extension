@@ -24,6 +24,12 @@
     const isEnhancedFaviconFetchEnabled = typeof config.isEnhancedFaviconFetchEnabled === 'function'
       ? config.isEnhancedFaviconFetchEnabled
       : (() => true);
+    const getStrictFaviconReason = typeof config.getStrictFaviconReason === 'function'
+      ? config.getStrictFaviconReason
+      : (() => '');
+    const logFaviconDecision = typeof config.logFaviconDecision === 'function'
+      ? config.logFaviconDecision
+      : noop;
     const isFaviconProxyUrl = typeof config.isFaviconProxyUrl === 'function' ? config.isFaviconProxyUrl : (() => false);
     const isBlockedLocalFaviconUrl = typeof config.isBlockedLocalFaviconUrl === 'function'
       ? config.isBlockedLocalFaviconUrl
@@ -59,15 +65,15 @@
       ? Math.max(0, config.faviconCandidateLoadTimeoutMs)
       : 2600;
     const faviconUtils = root.LumnoFaviconUtils || {};
-    function isSourceAllowedByEnhancedFetchPolicy(url) {
+    function isSourceAllowedByEnhancedFetchPolicy(url, pageUrl) {
       if (typeof faviconUtils.isFaviconSourceAllowedByEnhancedFetchPolicy === 'function') {
         return faviconUtils.isFaviconSourceAllowedByEnhancedFetchPolicy(
           url,
-          isEnhancedFaviconFetchEnabled(),
+          isEnhancedFaviconFetchEnabled(pageUrl || url),
           { chromeApi }
         );
       }
-      return isEnhancedFaviconFetchEnabled() === true ||
+      return isEnhancedFaviconFetchEnabled(pageUrl || url) === true ||
         String(url || '').startsWith('data:') ||
         /^chrome-extension:\/\/[^/]+\/_favicon\//i.test(String(url || '').trim()) ||
         isChromeMonogramFaviconUrl(url);
@@ -82,7 +88,9 @@
         shouldBlockFaviconForHost: shouldBlockOverlayFaviconForHost,
         shouldAvoidDirectFaviconForHost,
         isBlockedLocalFaviconUrl,
-        isEnhancedFaviconFetchEnabled
+        isEnhancedFaviconFetchEnabled,
+        getStrictFaviconReason,
+        logFaviconDecision
       })
       : null;
     const faviconViewCoreApi = root.LumnoFaviconViewCore || {};
@@ -254,8 +262,10 @@
       faviconViewCore.applyFaviconOpticalAlignment(img);
     }
 
-    function getSafeOverlayFaviconCandidateUrl(value) {
-      return faviconUrlResolver ? faviconUrlResolver.getSafeFaviconCandidateUrl(value) : '';
+    function getSafeOverlayFaviconCandidateUrl(value, pageUrl, candidateKind) {
+      return faviconUrlResolver
+        ? faviconUrlResolver.getSafeFaviconCandidateUrl(value, pageUrl, candidateKind)
+        : '';
     }
 
     function isBrowserInternalPageUrl(url) {
@@ -288,7 +298,7 @@
     }
 
     function getRuntimeGstaticFaviconDataSourceUrl(pageUrl) {
-      return isEnhancedFaviconFetchEnabled() === true && faviconUrlResolver
+      return isEnhancedFaviconFetchEnabled(pageUrl) === true && faviconUrlResolver
         ? faviconUrlResolver.getGstaticFaviconUrl(pageUrl)
         : '';
     }
@@ -384,8 +394,8 @@
       const normalizedHostKey = hostKey || getHostFromUrl(pageUrl);
       const rawFallbackUrl = String(fallbackUrl || '').trim();
       const cachedFallbackData = faviconDataCache.get(rawFallbackUrl);
-      const safeFallbackUrl = getSafeOverlayFaviconCandidateUrl(rawFallbackUrl) ||
-        getSafeOverlayFaviconCandidateUrl(cachedFallbackData);
+      const safeFallbackUrl = getSafeOverlayFaviconCandidateUrl(rawFallbackUrl, pageUrl, 'primary') ||
+        getSafeOverlayFaviconCandidateUrl(cachedFallbackData, pageUrl, 'cached-data');
 
       return {
         pageUrl: String(pageUrl || ''),
@@ -396,7 +406,11 @@
         extensionFavicon: getRuntimeExtensionFaviconUrl(pageUrl),
         browserUrl: /^https?:\/\//i.test(String(pageUrl || '')) ? '' : getRuntimeChromeFaviconUrl(pageUrl),
         gstaticFavicon: getRuntimeGstaticFaviconUrl(pageUrl),
-        previousWorkingSrc: getSafeOverlayFaviconCandidateUrl(getLastWorkingFaviconSrc(img)),
+        previousWorkingSrc: getSafeOverlayFaviconCandidateUrl(
+          getLastWorkingFaviconSrc(img),
+          pageUrl,
+          'previous'
+        ),
         hasFailedHandler: typeof onFailed === 'function',
         handleFailed: typeof onFailed === 'function' ? onFailed : function() {},
         isSessionCurrent() {
@@ -409,7 +423,7 @@
     }
 
     function getRootFaviconDataSourceUrls(pageUrl) {
-      if (!isEnhancedFaviconFetchEnabled()) {
+      if (!isEnhancedFaviconFetchEnabled(pageUrl)) {
         return [];
       }
       try {
@@ -437,7 +451,7 @@
         ...getRootFaviconDataSourceUrls(state.pageUrl)
       ].forEach((url) => {
         const value = String(url || '').trim();
-        if (!value || seen.has(value) || !isSourceAllowedByEnhancedFetchPolicy(value)) {
+        if (!value || seen.has(value) || !isSourceAllowedByEnhancedFetchPolicy(value, state.pageUrl)) {
           return;
         }
         seen.add(value);
@@ -743,15 +757,24 @@
       return rowsRerendered;
     }
 
-    function attachFaviconData(img, url, hostOverride) {
-      const safeUrl = getSafeOverlayFaviconCandidateUrl(url);
+    function attachFaviconData(img, url, hostOverride, pageUrl) {
+      const safeUrl = getSafeOverlayFaviconCandidateUrl(url, pageUrl || url, 'data');
       if (safeUrl) {
         faviconViewCore.attachFaviconData(img, safeUrl, hostOverride);
       }
     }
 
-    function preloadIcon(url) {
-      const safeUrl = getSafeOverlayFaviconCandidateUrl(url);
+    function preloadIcon(url, pageUrl) {
+      if (!isSourceAllowedByEnhancedFetchPolicy(url, pageUrl)) {
+        logFaviconDecision(url, getStrictFaviconReason(pageUrl) || 'global-off', {
+          pageUrl,
+          candidateKind: 'preload'
+        });
+        return;
+      }
+      const safeUrl = faviconUrlResolver
+        ? faviconUrlResolver.getSafeFaviconCandidateUrl(url, pageUrl, 'preload')
+        : getSafeOverlayFaviconCandidateUrl(url);
       if (safeUrl) {
         faviconViewCore.preloadIcon(safeUrl);
       }
@@ -767,7 +790,7 @@
         }
         return {
           ...item,
-          favicon: getSafeOverlayFaviconCandidateUrl(item.favicon)
+          favicon: getSafeOverlayFaviconCandidateUrl(item.favicon, item.url || '', 'preload')
         };
       }));
     }

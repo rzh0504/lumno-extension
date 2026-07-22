@@ -36,6 +36,7 @@ const extractedFunctions = [
   'loadFaviconEnhancedFetchEnabled',
   'getFaviconRequestMatchUrl',
   'isUrlBlockedByFaviconRequestBlacklist',
+  'isFaviconProxyUrl',
   'isAllowedFaviconProxyRequestUrl',
   'isFaviconRequestBlockedByBlacklist',
   'isBlockedLocalFaviconUrl',
@@ -144,7 +145,7 @@ async function run() {
     BLACKLIST_UTILS: blacklistUtils,
     FAVICON_UTILS: {
       getCanonicalPageUrlForFavicon(url) {
-        return String(url || '').trim();
+        return faviconUtils.getCanonicalPageUrlForFavicon(url);
       },
       isBlockedLocalFaviconUrl() {
         return false;
@@ -162,6 +163,7 @@ async function run() {
         const host = String(hostname || '').trim().toLowerCase();
         return host === '192.168.1.8' || host === 'service.internal';
       },
+      isFaviconProxyUrl: faviconUtils.isFaviconProxyUrl,
       isFaviconSourceAllowedByEnhancedFetchPolicy: faviconUtils.isFaviconSourceAllowedByEnhancedFetchPolicy
     },
     faviconRequestBlacklistCache: blacklistUtils.normalizeItems([
@@ -217,10 +219,9 @@ async function run() {
   assert.deepStrictEqual(
     result,
     [
-      'chrome-extension://test/_favicon/?pageUrl=https%3A%2F%2Fvpn.example.com%2Fprivate%2Fdoc',
-      'https://t2.gstatic.cn/faviconV2?url=https%3A%2F%2Fvpn.example.com%2Fprivate%2Fdoc'
+      'chrome-extension://test/_favicon/?pageUrl=https%3A%2F%2Fvpn.example.com%2Fprivate%2Fdoc'
     ],
-    'excluded page URLs should keep safe virtual and third-party favicon candidates'
+    'excluded page URLs should keep only the safe browser-cache favicon candidate'
   );
   assert.strictEqual(deps.fetchCalls.length, 0, 'blocked favicon candidate resolution should not fetch anything');
 
@@ -240,19 +241,12 @@ async function run() {
   );
 
   result = await api.fetchFaviconData('https://t2.gstatic.cn/faviconV2?url=https%3A%2F%2Ffoo.blocked.example.com%2Fpage');
-  assert.ok(
-    typeof result === 'string' && result.startsWith('data:image/png;base64,'),
-    'excluded page URLs should still allow third-party favicon proxy data for theme extraction'
-  );
-  assert.strictEqual(
-    deps.fetchCalls[1].url,
-    'https://t2.gstatic.cn/faviconV2?url=https%3A%2F%2Ffoo.blocked.example.com%2Fpage',
-    'third-party favicon proxy should be allowed for excluded page URLs'
-  );
+  assert.strictEqual(result, null, 'excluded page URLs should block third-party favicon proxy data');
+  assert.strictEqual(deps.fetchCalls.length, 1, 'excluded proxy data should not reach fetch');
 
   result = await api.resolveSiteThemeColor('http://192.168.1.8/dashboard', '', 'dark');
   assert.strictEqual(result, null, 'local network page theme color resolution should not fetch page HTML');
-  assert.strictEqual(deps.fetchCalls.length, 2, 'local network theme resolution should not reach the page network path');
+  assert.strictEqual(deps.fetchCalls.length, 1, 'local network theme resolution should not reach the page network path');
 
   result = await api.resolveFaviconCandidates('http://192.168.1.8/dashboard', '', 'http://192.168.1.8/favicon.ico');
   assert.deepStrictEqual(
@@ -266,7 +260,7 @@ async function run() {
 
   result = await api.resolveSiteThemeColor('https://public.example.com/page', '', 'light');
   assert.strictEqual(result, null, 'control theme color resolution should still run through the parser path');
-  assert.strictEqual(deps.fetchCalls.length, 3, 'non-blocked theme color resolution should fetch once after proxy favicon data');
+  assert.strictEqual(deps.fetchCalls.length, 2, 'non-blocked theme color resolution should fetch once after safe browser-cache data');
   assert.strictEqual(deps.themeParseCalls, 1, 'non-blocked theme color resolution should parse HTML candidates');
 
   result = await api.fetchFaviconData('https://public.example.com/favicon.ico');
@@ -274,7 +268,7 @@ async function run() {
     typeof result === 'string' && result.startsWith('data:image/png;base64,'),
     'non-blocked favicon data fetch should return a data URL'
   );
-  assert.strictEqual(deps.fetchCalls.length, 4, 'non-blocked favicon data fetch should reach the network path');
+  assert.strictEqual(deps.fetchCalls.length, 3, 'non-blocked favicon data fetch should reach the network path');
 
   deps.faviconEnhancedFetchEnabledCache = false;
   const disabledApi = factory(deps, Buffer);

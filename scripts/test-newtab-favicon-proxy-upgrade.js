@@ -2,6 +2,13 @@ const assert = require('assert');
 const fs = require('fs');
 const vm = require('vm');
 
+const suggestionsViewSource = fs.readFileSync('src/newtab/suggestions-view.js', 'utf8');
+assert.match(
+  suggestionsViewSource,
+  /preloadIcon\(tab\.favIconUrl,\s*tab\.url \|\| ''\)/,
+  'open-tab favicon preloads should include the page URL so path-specific exclusions are enforced'
+);
+
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -59,6 +66,9 @@ function createFakeImage() {
     }
   };
 }
+
+const preloadedIconUrls = [];
+const warmedIconLists = [];
 
 const sandbox = {
   console: {
@@ -151,8 +161,12 @@ sandbox.LumnoFaviconViewCore = {
         return false;
       },
       attachFaviconData() {},
-      preloadIcon() {},
-      warmIconCache() {},
+      preloadIcon(url) {
+        preloadedIconUrls.push(url);
+      },
+      warmIconCache(list) {
+        warmedIconLists.push(list);
+      },
       detectDefaultExtensionFavicon(img, url) {
         return typeof config.detectDefaultExtensionFavicon === 'function'
           ? config.detectDefaultExtensionFavicon(img, url)
@@ -218,6 +232,12 @@ function createRuntime(options) {
     shouldBlockFaviconForHost() {
       return false;
     },
+    isEnhancedFaviconFetchEnabled(targetPageUrl) {
+      if (config.excludedPageUrl && targetPageUrl === config.excludedPageUrl) {
+        return false;
+      }
+      return config.enhancedFaviconFetchEnabled !== false;
+    },
     isBlockedLocalFaviconUrl() {
       return false;
     },
@@ -234,6 +254,49 @@ function createRuntime(options) {
 }
 
 (async () => {
+  const excludedRuntime = createRuntime({
+    enhancedFaviconFetchEnabled: true,
+    excludedPageUrl: pageUrl
+  });
+  const excludedImg = createFakeImage();
+  excludedRuntime.attachFaviconWithFallbacks(excludedImg, pageUrl, 'futurecomm.cn', {
+    primaryUrl
+  });
+  assert.strictEqual(
+    excludedImg.src,
+    extensionUrl,
+    'enhanced-on excluded newtab paths should skip the direct target favicon'
+  );
+  excludedImg._xThemeFaviconErrorHandler();
+  assert.strictEqual(
+    excludedImg.src,
+    extensionUrl,
+    'enhanced-on excluded newtab paths should not retry gstatic after browser-cache failure'
+  );
+  excludedRuntime.preloadIcon(primaryUrl, pageUrl);
+  excludedRuntime.preloadIcon(extensionUrl, pageUrl);
+  assert.deepStrictEqual(
+    preloadedIconUrls.slice(-1),
+    [extensionUrl],
+    'excluded newtab paths should not preload direct target icons'
+  );
+  excludedRuntime.warmIconCache([{ url: pageUrl, favicon: primaryUrl }]);
+  assert.strictEqual(
+    warmedIconLists[warmedIconLists.length - 1][0].favicon,
+    '',
+    'excluded newtab paths should remove network icons before warming the cache'
+  );
+  const excludedStaleImg = createFakeImage();
+  excludedStaleImg.src = primaryUrl;
+  excludedStaleImg.setAttribute('data-favicon-current-src', primaryUrl);
+  excludedRuntime.attachFaviconWithFallbacks(excludedStaleImg, pageUrl, 'futurecomm.cn', { primaryUrl });
+  excludedStaleImg._xThemeFaviconErrorHandler();
+  assert.notStrictEqual(
+    excludedStaleImg.src,
+    primaryUrl,
+    'excluded newtab paths should not restore a previously working direct favicon after strict candidates fail'
+  );
+
   const runtime = createRuntime({
     requestFaviconData(url) {
       return Promise.resolve(url === gstaticUrl ? 'data:image/png;base64,real' : null);

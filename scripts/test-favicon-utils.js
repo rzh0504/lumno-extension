@@ -77,6 +77,36 @@ assert.strictEqual(
   'strict favicon mode should reject other extension assets'
 );
 
+const decisionLogs = [];
+const logFaviconDecision = utils.createFaviconDecisionLogger({
+  surface: 'test',
+  consoleObj: {
+    debug(prefix, payload) {
+      decisionLogs.push({ prefix, payload });
+    }
+  }
+});
+logFaviconDecision(
+  'https://user:secret@foo.example.com/private/icon.png?token=secret',
+  'exclusion',
+  { pageUrl: 'https://foo.example.com/private?credential=secret', candidateKind: 'direct' }
+);
+logFaviconDecision(
+  'https://foo.example.com/another-private-icon.png',
+  'exclusion',
+  { pageUrl: 'https://foo.example.com/private/child', candidateKind: 'direct' }
+);
+assert.strictEqual(decisionLogs.length, 1, 'favicon decision logs should dedupe identical surface/host/reason decisions');
+assert.strictEqual(decisionLogs[0].prefix, '[Lumno][favicon]');
+assert.deepStrictEqual(JSON.parse(JSON.stringify(decisionLogs[0].payload)), {
+  surface: 'test',
+  candidateKind: 'direct',
+  hostname: 'foo.example.com',
+  decision: 'blocked',
+  reason: 'exclusion'
+});
+assert.strictEqual(JSON.stringify(decisionLogs).includes('secret'), false, 'favicon logs must redact URL paths, queries, and credentials');
+
 assert.strictEqual(
   utils.getExtensionFaviconUrl('https://example.com/a b', {
     getRuntimeUrl: (path) => `chrome-extension://abc${path}`
@@ -138,6 +168,26 @@ assert.ok(
   }).some((candidate) => candidate.url.includes('gstatic.cn/faviconV2')),
   'enhanced mode should preserve the existing gstatic fallback behavior'
 );
+const excludedResolver = utils.createFaviconUrlResolver({
+  getRuntimeUrl: (path) => `chrome-extension://abc${path}`,
+  isEnhancedFaviconFetchEnabled: (pageUrl) => pageUrl !== 'https://foo.example.com/private',
+  getStrictFaviconReason: (pageUrl) => pageUrl === 'https://foo.example.com/private' ? 'exclusion' : ''
+});
+assert.deepStrictEqual(
+  JSON.parse(JSON.stringify(excludedResolver.buildFaviconCandidatePlan({
+    pageUrl: 'https://foo.example.com/private',
+    primaryUrl: 'https://foo.example.com/favicon.ico'
+  }).map((candidate) => candidate.url))),
+  ['chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Ffoo.example.com%2Fprivate&size=128'],
+  'a path-specific exclusion should block direct and gstatic candidates while keeping browser cache'
+);
+assert.ok(
+  excludedResolver.buildFaviconCandidatePlan({
+    pageUrl: 'https://foo.example.com/public',
+    primaryUrl: 'https://foo.example.com/favicon.ico'
+  }).some((candidate) => candidate.url.includes('gstatic.cn/faviconV2')),
+  'a nonexcluded path on the same hostname should preserve enhanced candidates'
+);
 assert.strictEqual(
   resolver.getExtensionFaviconUrl('https://example.com/docs'),
   'chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Fexample.com%2Fdocs&size=128'
@@ -177,6 +227,19 @@ assert.notStrictEqual(
   resolver.getPageFaviconCandidateUrl('chrome-extension://other/src/options/options.html'),
   'chrome-extension://abc/assets/images/lumno.png',
   'other extension pages should not use the Lumno icon'
+);
+assert.strictEqual(
+  resolver.getPageFaviconCandidateUrl('chrome-extension://other/src/options/options.html'),
+  '',
+  'other extension pages should use a generic UI fallback instead of chrome://favicon2'
+);
+assert.deepStrictEqual(
+  JSON.parse(JSON.stringify(resolver.getPageFaviconRenderCandidates(
+    'chrome-extension://other/src/options/options.html',
+    'chrome://favicon2/?pageUrl=chrome-extension%3A%2F%2Fother%2Fsrc%2Foptions%2Foptions.html'
+  ))),
+  { primaryUrl: '', browserUrl: '' },
+  'other extension render candidates should not expose chrome://favicon2'
 );
 assert.strictEqual(
   resolver.isBlockedFaviconUrl('chrome-extension://abc/_favicon/?pageUrl=chrome%3A%2F%2Fextensions%2F&size=128'),

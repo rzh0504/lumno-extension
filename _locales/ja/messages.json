@@ -117,7 +117,22 @@
     "message": "アイコンとテーマカラーの拡張取得"
   },
   "settings_favicon_enhanced_fetch_desc": {
-    "message": "社内ネットワークや VPN ページでローカルネットワークアクセスの確認が出る場合はオフにできます。"
+    "message": "オフの場合はブラウザのキャッシュ、内蔵、汎用アイコンだけを使い、アイコンやテーマカラーのためにサイトへアクセスしません。"
+  },
+  "favicon_blacklist_section_title": {
+    "message": "サイトごとに除外"
+  },
+  "favicon_blacklist_section_desc": {
+    "message": "一致したサイトは表示・検索・起動できますが、アイコンやテーマカラーのリクエストは行いません。"
+  },
+  "favicon_blacklist_add": {
+    "message": "除外ルールを追加"
+  },
+  "favicon_blacklist_removed_toast": {
+    "message": "アイコンとテーマの除外から削除しました"
+  },
+  "favicon_blacklist_clear": {
+    "message": "除外ルールを空にする"
   },
   "search_result_priority_autocomplete": {
     "message": "補完を優先"
@@ -970,6 +985,9 @@
   },
   "confirm_clear_blacklist": {
     "message": "隠すルールを空にしますか？"
+  },
+  "confirm_clear_favicon_blacklist": {
+    "message": "除外ルールを空にしますか？"
   },
   "confirm_reset_builtin": {
     "message": "内蔵リストをリセットしますか？"
