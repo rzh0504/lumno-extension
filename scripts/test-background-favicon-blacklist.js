@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const blacklistUtils = require('../src/shared/blacklist-utils.js');
+const faviconUtils = require('../src/shared/favicon-utils.js');
 
 const repoRoot = path.resolve(__dirname, '..');
 const backgroundSource = fs.readFileSync(path.join(repoRoot, 'src/background/background.js'), 'utf8');
@@ -57,6 +58,7 @@ const factory = new Function('deps', 'Buffer', `
   const FAVICON_REQUEST_BLACKLIST_STORAGE_KEY = '_x_extension_favicon_request_blacklist_2026_unique_';
   const FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY = '_x_extension_favicon_enhanced_fetch_enabled_2026_unique_';
   const storageArea = deps.storageArea;
+  const chrome = { runtime: { id: 'test' } };
   const faviconDataCache = new Map();
   const faviconPending = new Map();
   const siteThemeColorCache = new Map();
@@ -159,7 +161,8 @@ async function run() {
       shouldAvoidDirectFaviconForHost(hostname) {
         const host = String(hostname || '').trim().toLowerCase();
         return host === '192.168.1.8' || host === 'service.internal';
-      }
+      },
+      isFaviconSourceAllowedByEnhancedFetchPolicy: faviconUtils.isFaviconSourceAllowedByEnhancedFetchPolicy
     },
     faviconRequestBlacklistCache: blacklistUtils.normalizeItems([
       { pattern: 'blocked.example.com', matchModes: ['suffix'] },
@@ -291,11 +294,27 @@ async function run() {
   assert.deepStrictEqual(
     result,
     [
-      'chrome-extension://test/_favicon/?pageUrl=https%3A%2F%2Fpublic.example.com%2Fpage',
-      'https://t2.gstatic.cn/faviconV2?url=https%3A%2F%2Fpublic.example.com%2Fpage'
+      'chrome-extension://test/_favicon/?pageUrl=https%3A%2F%2Fpublic.example.com%2Fpage'
     ],
-    'disabled enhanced favicon fetching should keep safe proxies but skip direct fallback favicon URLs'
+    'disabled enhanced favicon fetching should keep only the extension virtual favicon candidate'
   );
+
+  result = await disabledApi.fetchFaviconData('https://foo.example.com/favicon.ico');
+  assert.strictEqual(result, null, 'strict mode should reject direct target-site favicon data requests');
+  result = await disabledApi.fetchFaviconData(
+    'https://t2.gstatic.cn/faviconV2?url=https%3A%2F%2Ffoo.example.com%2F'
+  );
+  assert.strictEqual(result, null, 'strict mode should reject third-party proxy favicon data requests');
+  assert.strictEqual(deps.fetchCalls.length, 0, 'strict mode should not network-fetch rejected favicon candidates');
+
+  result = await disabledApi.fetchFaviconData(
+    'chrome-extension://test/_favicon/?pageUrl=https%3A%2F%2Ffoo.example.com%2F'
+  );
+  assert.ok(
+    typeof result === 'string' && result.startsWith('data:image/png;base64,'),
+    'strict mode should still allow the extension virtual favicon endpoint'
+  );
+  assert.strictEqual(deps.fetchCalls.length, 1, 'strict mode should fetch only the extension virtual favicon endpoint');
 
   console.log('background favicon blacklist tests passed');
 }

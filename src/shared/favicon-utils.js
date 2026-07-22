@@ -47,6 +47,32 @@
     }
   }
 
+  function isFaviconSourceAllowedByEnhancedFetchPolicy(url, enhancedFetchEnabled, options) {
+    const raw = String(url || '').trim();
+    if (!raw) {
+      return false;
+    }
+    if (enhancedFetchEnabled === true) {
+      return true;
+    }
+    if (raw.startsWith('data:') || isSafeVirtualFaviconRequestUrl(raw)) {
+      return true;
+    }
+    try {
+      const parsed = new URL(raw);
+      const config = options || {};
+      const runtime = config.chromeApi && config.chromeApi.runtime ? config.chromeApi.runtime : null;
+      const ownExtensionId = String(config.ownExtensionId || (runtime && runtime.id) || '').trim();
+      return Boolean(
+        ownExtensionId &&
+        isBrowserExtensionProtocol(parsed.protocol) &&
+        String(parsed.hostname || '') === ownExtensionId
+      );
+    } catch (e) {
+      return false;
+    }
+  }
+
   function getHttpPageUrl(value) {
     const raw = String(value || '').trim();
     if (!raw) {
@@ -1020,6 +1046,16 @@
       ? config.getChromeFaviconUrl
       : null;
     const ownExtensionRuntime = getOwnExtensionRuntimeInfo(config, getRuntimeUrl);
+    const isEnhancedFaviconFetchEnabled = typeof config.isEnhancedFaviconFetchEnabled === 'function'
+      ? config.isEnhancedFaviconFetchEnabled
+      : (() => true);
+
+    function isSourceAllowedByEnhancedFetchPolicy(url) {
+      return isFaviconSourceAllowedByEnhancedFetchPolicy(url, isEnhancedFaviconFetchEnabled(), {
+        chromeApi: config.chromeApi,
+        ownExtensionId: ownExtensionRuntime.id
+      });
+    }
 
     function getCanonicalFaviconPage(pageUrl) {
       const raw = String(pageUrl || '').trim();
@@ -1117,6 +1153,9 @@
       const raw = String(url || '').trim();
       if (!raw) {
         return false;
+      }
+      if (!isSourceAllowedByEnhancedFetchPolicy(raw)) {
+        return true;
       }
       const policy = getFaviconUrlPolicy(raw, {
         shouldBlockFaviconForHost: shouldBlockHost,
@@ -1299,6 +1338,7 @@
     isChromeMonogramFaviconUrl,
     isFaviconProxyUrl,
     isAllowedFaviconProxyRequestUrl,
+    isFaviconSourceAllowedByEnhancedFetchPolicy,
     isSafeVirtualFaviconRequestUrl,
     isLocalNetworkHost,
     isSuspiciousLocalFaviconHost,

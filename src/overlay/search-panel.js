@@ -199,7 +199,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
   let overlaySearchResultPriorityMode = 'autocomplete';
   let overlaySizeMode = 'standard';
   let overlaySearchBlacklistItems = [];
-  let faviconEnhancedFetchEnabled = true;
+  let faviconEnhancedFetchEnabled = false;
+  let initialFaviconEnhancedFetchReady = Promise.resolve();
   let overlayOpenTabsDefaultVisible = true;
   let overlayOpenTabsDefaultVisibleLoaded = !storageArea;
   let initialOverlayOpenTabsDefaultVisibleReady = Promise.resolve();
@@ -734,6 +735,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         size: 128,
         shouldBlockFaviconForHost: shouldBlockOverlayFaviconForHost,
         shouldAvoidDirectFaviconForHost,
+        isEnhancedFaviconFetchEnabled: () => faviconEnhancedFetchEnabled,
         isBlockedLocalFaviconUrl: typeof FAVICON_UTILS.isBlockedLocalFaviconUrl === 'function'
           ? FAVICON_UTILS.isBlockedLocalFaviconUrl
           : null
@@ -2810,10 +2812,13 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     };
     chrome.storage.onChanged.addListener(overlaySearchBlacklistStorageListener);
     if (storageArea) {
-      storageArea.get([FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY], (result) => {
-        faviconEnhancedFetchEnabled = normalizeFaviconEnhancedFetchEnabled(
-          result ? result[FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY] : true
-        );
+      initialFaviconEnhancedFetchReady = new Promise((resolve) => {
+        storageArea.get([FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY], (result) => {
+          faviconEnhancedFetchEnabled = normalizeFaviconEnhancedFetchEnabled(
+            result ? result[FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY] : true
+          );
+          resolve();
+        });
       });
     }
     overlayFaviconEnhancedFetchStorageListener = (changes, areaName) => {
@@ -3031,7 +3036,9 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
 
     function getGstaticFaviconUrl(pageUrl) {
       const resolver = getOverlayFaviconUrlResolver();
-      return resolver ? resolver.getGstaticFaviconUrl(pageUrl) : '';
+      return resolver
+        ? resolver.getSafeFaviconCandidateUrl(resolver.getGstaticFaviconUrl(pageUrl))
+        : '';
     }
 
     function getChromeFaviconUrl(pageUrl) {
@@ -3876,6 +3883,9 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     function getSiteFaviconUrl(hostname) {
       const normalized = normalizeFaviconHost(hostname);
       if (!normalized) {
+        return '';
+      }
+      if (!faviconEnhancedFetchEnabled) {
         return '';
       }
       if (shouldAvoidDirectFaviconForHost(normalized)) {
@@ -6987,24 +6997,29 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
             iconNode = createSuggestionInlineIcon('ri-settings-3-line', 'subtext');
           } else if (suggestion.type === 'commandDocumentPip') {
             iconNode = createSuggestionInlineIcon('ri-scissors-cut-line', 'subtext');
-          } else if (suggestion.type === 'modeSwitch' && suggestion.favicon) {
-            const favicon = document.createElement('img');
-            favicon.className = 'x-ov-suggestion-favicon';
-            favicon.decoding = 'async';
-            favicon.loading = 'eager';
-            favicon.referrerPolicy = 'no-referrer';
-            if (index < 4) {
-              favicon.fetchPriority = 'high';
-            }
-            applyFaviconOpticalAlignment(favicon);
-            favicon.src = suggestion.favicon || '';
-            favicon.onerror = function() {
-              const fallbackDiv = createLinkIcon('subtext');
-              if (favicon.parentNode) {
-                favicon.parentNode.replaceChild(fallbackDiv, favicon);
+          } else if (suggestion.type === 'modeSwitch') {
+            const safeModeSwitchFavicon = getSafeOverlayFaviconUrl(suggestion.favicon);
+            if (safeModeSwitchFavicon) {
+              const favicon = document.createElement('img');
+              favicon.className = 'x-ov-suggestion-favicon';
+              favicon.decoding = 'async';
+              favicon.loading = 'eager';
+              favicon.referrerPolicy = 'no-referrer';
+              if (index < 4) {
+                favicon.fetchPriority = 'high';
               }
-            };
-            iconNode = favicon;
+              applyFaviconOpticalAlignment(favicon);
+              favicon.src = safeModeSwitchFavicon;
+              favicon.onerror = function() {
+                const fallbackDiv = createLinkIcon('subtext');
+                if (favicon.parentNode) {
+                  favicon.parentNode.replaceChild(fallbackDiv, favicon);
+                }
+              };
+              iconNode = favicon;
+            } else {
+              iconNode = createLinkIcon('subtext');
+            }
           } else if (suggestion.type === 'newtab' || suggestion.type === 'googleSuggest') {
             iconNode = createSearchIcon('subtext');
           } else {
@@ -7499,7 +7514,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     Promise.resolve(revealReady).then(revealOverlay).catch(revealOverlay);
     // Let the container paint first so the enter transition is visible on busy pages.
     const queueInitialOverlayRender = () => {
-      Promise.resolve(initialOverlayOpenTabsDefaultVisibleReady).then(() => {
+      Promise.all([initialOverlayOpenTabsDefaultVisibleReady, initialFaviconEnhancedFetchReady]).then(() => {
         if (!overlay.isConnected) {
           return;
         }

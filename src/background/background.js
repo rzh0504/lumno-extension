@@ -6353,7 +6353,9 @@ function buildFaviconFallbackCandidates(pageUrl, hostOverride, fallbackUrl, opti
   }
   if (inputUrl) {
     candidates.push({ url: getExtensionFaviconUrl(inputUrl), score: 20 });
-    candidates.push({ url: getGstaticFaviconUrl(inputUrl), score: 10 });
+    if (settings.enhancedFetchEnabled === true) {
+      candidates.push({ url: getGstaticFaviconUrl(inputUrl), score: 10 });
+    }
   }
   return candidates.filter((item) => item && item.url);
 }
@@ -6393,6 +6395,7 @@ function resolveFaviconCandidates(targetUrl, hostOverride, fallbackUrl) {
       return [];
     }
     return dedupeAndSortFaviconCandidates(buildFaviconFallbackCandidates(inputUrl, hostOverride, fallbackUrl, {
+      enhancedFetchEnabled,
       skipDirectFallback: !enhancedFetchEnabled || targetPolicy.requestBlacklisted || targetPolicy.avoidDirect,
       targetPolicy
     }));
@@ -6449,7 +6452,19 @@ function fetchFaviconData(url) {
   if (!url) {
     return Promise.resolve(null);
   }
-  return loadFaviconRequestBlacklistItems().then(() => {
+  return Promise.all([
+    loadFaviconRequestBlacklistItems(),
+    loadFaviconEnhancedFetchEnabled()
+  ]).then(([, enhancedFetchEnabled]) => {
+    const sourceAllowed = typeof FAVICON_UTILS.isFaviconSourceAllowedByEnhancedFetchPolicy === 'function'
+      ? FAVICON_UTILS.isFaviconSourceAllowedByEnhancedFetchPolicy(url, enhancedFetchEnabled, { chromeApi: chrome })
+      : enhancedFetchEnabled === true || (
+        typeof FAVICON_UTILS.isSafeVirtualFaviconRequestUrl === 'function' &&
+        FAVICON_UTILS.isSafeVirtualFaviconRequestUrl(url)
+      );
+    if (!sourceAllowed) {
+      return null;
+    }
     if (isBlockedLocalFaviconUrl(url) || isFaviconRequestBlockedByBlacklist(url)) {
       logBlockedLocalFavicon(url, 'fetchFaviconData');
       return null;
