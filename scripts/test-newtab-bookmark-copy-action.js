@@ -166,12 +166,17 @@ function testCopyActionIntegration() {
   );
   assert.match(
     html,
-    /\.x-nt-bookmark-cascade-row:not\(\.x-nt-bookmark-cascade-row--folder\):hover \.x-nt-bookmark-cascade-copy-trigger[\s\S]*?\.x-nt-bookmark-cascade-row:not\(\.x-nt-bookmark-cascade-row--folder\):focus-within \.x-nt-bookmark-cascade-copy-trigger[\s\S]*?opacity:\s*1[\s\S]*?pointer-events:\s*auto/,
-    'Hovering or focusing a URL row should reveal its copy icon without JavaScript visibility state'
+    /\.x-nt-bookmark-cascade-row:not\(\.x-nt-bookmark-cascade-row--folder\):hover \.x-nt-bookmark-cascade-copy-trigger,[\s\S]*?\.x-nt-bookmark-cascade-copy-trigger:focus-visible[\s\S]*?opacity:\s*1[\s\S]*?pointer-events:\s*auto/,
+    'Hovering a URL row or focusing the copy button should reveal its copy icon'
+  );
+  assert.doesNotMatch(
+    html,
+    /\.x-nt-bookmark-cascade-row:not\(\.x-nt-bookmark-cascade-row--folder\):focus-within \.x-nt-bookmark-cascade-copy-trigger/,
+    'Focusing the initially selected menu item should not leave its copy icon permanently visible'
   );
   assert.match(
     html,
-    /\.x-nt-bookmark-cascade-row:not\(\.x-nt-bookmark-cascade-row--folder\):hover \.x-nt-bookmark-cascade-label[\s\S]*?\.x-nt-bookmark-cascade-row:not\(\.x-nt-bookmark-cascade-row--folder\):focus-within \.x-nt-bookmark-cascade-label[\s\S]*?padding-right:\s*32px/,
+    /\.x-nt-bookmark-cascade-row:not\(\.x-nt-bookmark-cascade-row--folder\):hover \.x-nt-bookmark-cascade-label,[\s\S]*?\.x-nt-bookmark-cascade-row:has\(> \.x-nt-bookmark-cascade-copy-trigger:focus-visible\) \.x-nt-bookmark-cascade-label[\s\S]*?padding-right:\s*32px/,
     'Visible cascade copy icons should take space from the label so it truncates sooner'
   );
   assert.match(
@@ -205,11 +210,12 @@ function testCopyActionIntegration() {
     /\.x-nt-bookmark-cascade-copy-tooltip\s*\{[\s\S]*?--x-extension-tooltip-z-index:\s*10005/,
     'The dedicated copy tooltip should render above the cascade menu layer'
   );
-  assert.match(
-    html,
-    /\.x-nt-bookmark-cascade-copy-trigger:hover,[\s\S]*?\.x-nt-bookmark-cascade-copy-trigger:focus-visible\s*\{[\s\S]*?color:\s*#334155/,
-    'Cascade copy icon hover and focus states should use a neutral color'
+  const copyIconHoverRule = html.match(
+    /\.x-nt-bookmark-cascade-copy-trigger:hover,\s*\.x-nt-bookmark-cascade-copy-trigger:focus-visible\s*\{([^}]*)\}/
   );
+  assert.ok(copyIconHoverRule, 'Cascade copy icon should define hover and focus-visible states');
+  assert.match(copyIconHoverRule[1], /color:\s*#334155/, 'Cascade copy icon should use a neutral active color');
+  assert.doesNotMatch(copyIconHoverRule[1], /background\s*:/, 'Cascade copy icon should not add its own background');
   assert.doesNotMatch(
     cascadeSource,
     /x-nt-bookmark-cascade-copy-action/,

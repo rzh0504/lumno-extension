@@ -1927,7 +1927,7 @@
           color 140ms ease;
       }
       .x-nt-bookmark-cascade-row:not(.x-nt-bookmark-cascade-row--folder):hover .x-nt-bookmark-cascade-copy-trigger,
-      .x-nt-bookmark-cascade-row:not(.x-nt-bookmark-cascade-row--folder):focus-within .x-nt-bookmark-cascade-copy-trigger {
+      .x-nt-bookmark-cascade-copy-trigger:focus-visible {
         opacity: 1;
         transform: translate3d(0, -50%, 0) scale(1);
         pointer-events: auto;
@@ -1935,10 +1935,9 @@
       .x-nt-bookmark-cascade-copy-trigger:hover,
       .x-nt-bookmark-cascade-copy-trigger:focus-visible {
         color: #334155;
-        background: rgba(15, 23, 42, 0.08);
       }
       .x-nt-bookmark-cascade-row:not(.x-nt-bookmark-cascade-row--folder):hover .x-nt-bookmark-cascade-label,
-      .x-nt-bookmark-cascade-row:not(.x-nt-bookmark-cascade-row--folder):focus-within .x-nt-bookmark-cascade-label {
+      .x-nt-bookmark-cascade-row:has(> .x-nt-bookmark-cascade-copy-trigger:focus-visible) .x-nt-bookmark-cascade-label {
         box-sizing: border-box;
         padding-right: 32px;
       }
@@ -2052,7 +2051,6 @@
       body[data-theme="dark"] .x-nt-bookmark-cascade-copy-trigger:hover,
       body[data-theme="dark"] .x-nt-bookmark-cascade-copy-trigger:focus-visible {
         color: #f8fafc;
-        background: rgba(255, 255, 255, 0.1);
       }
       body[data-theme="dark"] .x-nt-bookmark-cascade-icon--folder,
       body[data-theme="dark"] .x-nt-bookmark-cascade-arrow,
