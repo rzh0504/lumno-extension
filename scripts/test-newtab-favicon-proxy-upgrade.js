@@ -69,6 +69,7 @@ function createFakeImage() {
 
 const preloadedIconUrls = [];
 const warmedIconLists = [];
+const attachedDataRequests = [];
 
 const sandbox = {
   console: {
@@ -160,7 +161,9 @@ sandbox.LumnoFaviconViewCore = {
         }
         return false;
       },
-      attachFaviconData() {},
+      attachFaviconData(_img, url, _hostOverride, pageUrlArg) {
+        attachedDataRequests.push({ url, pageUrl: pageUrlArg || '' });
+      },
       preloadIcon(url) {
         preloadedIconUrls.push(url);
       },
@@ -217,11 +220,11 @@ function createRuntime(options) {
     getRiSvg() {
       return '';
     },
-    getExtensionFaviconUrl() {
-      return extensionUrl;
+    getExtensionFaviconUrl(targetPageUrl) {
+      return `chrome-extension://abc/_favicon/?pageUrl=${encodeURIComponent(targetPageUrl)}&size=128`;
     },
-    getGstaticFaviconUrl() {
-      return gstaticUrl;
+    getGstaticFaviconUrl(targetPageUrl) {
+      return `https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=${encodeURIComponent(targetPageUrl)}&size=128`;
     },
     getHostFromUrl(url) {
       return new URL(url).hostname;
@@ -254,6 +257,61 @@ function createRuntime(options) {
 }
 
 (async () => {
+  const privatePageUrl = 'https://foo.example.com/private';
+  const publicPageUrl = 'https://foo.example.com/public';
+  const matrixDirectUrl = 'https://foo.example.com/favicon.ico';
+  const privateExtensionUrl = `chrome-extension://abc/_favicon/?pageUrl=${encodeURIComponent(privatePageUrl)}&size=128`;
+  const privateGstaticUrl = `https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=${encodeURIComponent(privatePageUrl)}&size=128`;
+  const publicGstaticUrl = `https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE%2CSIZE%2CURL&url=${encodeURIComponent(publicPageUrl)}&size=128`;
+  const matrixRuntime = createRuntime({
+    enhancedFaviconFetchEnabled: true,
+    excludedPageUrl: privatePageUrl
+  });
+  const preloadStart = preloadedIconUrls.length;
+  const warmStart = warmedIconLists.length;
+  const dataStart = attachedDataRequests.length;
+  const privateImg = createFakeImage();
+  matrixRuntime.attachFaviconWithFallbacks(privateImg, privatePageUrl, 'foo.example.com', {
+    primaryUrl: matrixDirectUrl
+  });
+  assert.strictEqual(privateImg.src, privateExtensionUrl, 'excluded newtab matrix path should render only Lumno browser cache');
+  privateImg._xThemeFaviconErrorHandler();
+  assert.notStrictEqual(privateImg.src, privateGstaticUrl, 'excluded newtab matrix path should not fall through to gstatic');
+  matrixRuntime.preloadIcon(matrixDirectUrl, privatePageUrl);
+  matrixRuntime.preloadIcon(privateGstaticUrl, privatePageUrl);
+  matrixRuntime.preloadIcon(privateExtensionUrl, privatePageUrl);
+  matrixRuntime.attachFaviconData(createFakeImage(), matrixDirectUrl, 'foo.example.com', privatePageUrl);
+  matrixRuntime.warmIconCache([{ url: privatePageUrl, favicon: matrixDirectUrl }]);
+  assert.deepStrictEqual(
+    preloadedIconUrls.slice(preloadStart),
+    [privateExtensionUrl],
+    'excluded newtab matrix path should not preload direct or gstatic sources'
+  );
+  assert.deepStrictEqual(attachedDataRequests.slice(dataStart), [], 'excluded newtab matrix path should not attach direct favicon data');
+  assert.strictEqual(warmedIconLists[warmStart][0].favicon, '', 'excluded newtab matrix path should strip warm-cache network sources');
+
+  const publicImg = createFakeImage();
+  matrixRuntime.attachFaviconWithFallbacks(publicImg, publicPageUrl, 'foo.example.com', {
+    primaryUrl: matrixDirectUrl
+  });
+  assert.strictEqual(publicImg.src, matrixDirectUrl, 'same-host nonexcluded newtab path should retain direct candidates');
+  matrixRuntime.preloadIcon(matrixDirectUrl, publicPageUrl);
+  matrixRuntime.preloadIcon(publicGstaticUrl, publicPageUrl);
+  matrixRuntime.attachFaviconData(createFakeImage(), matrixDirectUrl, 'foo.example.com', publicPageUrl);
+  matrixRuntime.warmIconCache([{ url: publicPageUrl, favicon: matrixDirectUrl }]);
+  assert.ok(preloadedIconUrls.includes(matrixDirectUrl), 'same-host nonexcluded newtab path should retain direct preloads');
+  assert.ok(preloadedIconUrls.includes(publicGstaticUrl), 'same-host nonexcluded newtab path should retain gstatic preloads');
+  assert.deepStrictEqual(
+    attachedDataRequests[attachedDataRequests.length - 1],
+    { url: matrixDirectUrl, pageUrl: publicPageUrl },
+    'same-host nonexcluded newtab path should retain page-scoped favicon data requests'
+  );
+  assert.strictEqual(
+    warmedIconLists[warmedIconLists.length - 1][0].favicon,
+    matrixDirectUrl,
+    'same-host nonexcluded newtab path should retain warm-cache sources'
+  );
+
   const excludedRuntime = createRuntime({
     enhancedFaviconFetchEnabled: true,
     excludedPageUrl: pageUrl

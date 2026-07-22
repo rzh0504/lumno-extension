@@ -52,24 +52,29 @@
     if (!raw) {
       return false;
     }
-    if (enhancedFetchEnabled === true) {
-      return true;
-    }
-    if (raw.startsWith('data:') || isSafeVirtualFaviconRequestUrl(raw)) {
+    if (raw.startsWith('data:') || isChromeMonogramFaviconUrl(raw)) {
       return true;
     }
     try {
       const parsed = new URL(raw);
+      if (!isBrowserExtensionProtocol(parsed.protocol)) {
+        return enhancedFetchEnabled === true;
+      }
       const config = options || {};
       const runtime = config.chromeApi && config.chromeApi.runtime ? config.chromeApi.runtime : null;
       const ownExtensionId = String(config.ownExtensionId || (runtime && runtime.id) || '').trim();
-      return Boolean(
+      const isOwnExtensionUrl = Boolean(
         ownExtensionId &&
         isBrowserExtensionProtocol(parsed.protocol) &&
         String(parsed.hostname || '') === ownExtensionId
       );
+      if (!isOwnExtensionUrl) {
+        return false;
+      }
+      const pathname = String(parsed.pathname || '').toLowerCase();
+      return pathname.startsWith('/_favicon/') || pathname === `/${LUMNO_EXTENSION_ICON_PATH.toLowerCase()}`;
     } catch (e) {
-      return false;
+      return enhancedFetchEnabled === true;
     }
   }
 
@@ -122,7 +127,7 @@
       const metadata = details || {};
       const hostname = getFaviconDecisionHostname(metadata.pageUrl, candidateUrl);
       const candidateKind = getFaviconCandidateKind(candidateUrl, metadata.candidateKind);
-      const key = `${surface}|${candidateKind}|${hostname}|${decisionReason}`;
+      const key = `${surface}|${hostname}|${decisionReason}`;
       if (seen.has(key)) {
         return false;
       }

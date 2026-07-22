@@ -1,6 +1,8 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const blacklistUtils = require('../src/shared/blacklist-utils.js');
+const settingsUtils = require('../src/shared/settings.js');
 
 const repoRoot = path.resolve(__dirname, '..');
 const read = (relativePath) => fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
@@ -78,4 +80,378 @@ assert.ok(locales[2].favicon_blacklist_section_desc.message.includes('仍可显�
 const accessibleResources = manifest.web_accessible_resources.flatMap((entry) => entry.resources || []);
 assert.ok(accessibleResources.includes('src/shared/cursor-tooltip.css'), 'cursor tooltip CSS should be web accessible');
 
-console.log('options favicon blacklist tests passed');
+function extractFunctionSource(source, name) {
+  const start = source.indexOf(`function ${name}(`);
+  assert.notStrictEqual(start, -1, `missing function ${name}`);
+  return extractBraceBlock(source, start);
+}
+
+function extractBraceBlock(source, start) {
+  const openBrace = source.indexOf('{', start);
+  assert.notStrictEqual(openBrace, -1, `missing opening brace after ${start}`);
+  let depth = 0;
+  for (let index = openBrace; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    if (source[index] === '}') depth -= 1;
+    if (depth === 0) return source.slice(start, index + 1);
+  }
+  throw new Error(`unterminated block after ${start}`);
+}
+
+function extractIfBlock(source, marker) {
+  const start = source.indexOf(marker);
+  assert.notStrictEqual(start, -1, `missing handler block ${marker}`);
+  return extractBraceBlock(source, start);
+}
+
+function createClassList(element) {
+  const values = new Set();
+  return {
+    add(...names) {
+      names.forEach((name) => values.add(name));
+      element.className = Array.from(values).join(' ');
+    },
+    remove(...names) {
+      names.forEach((name) => values.delete(name));
+      element.className = Array.from(values).join(' ');
+    },
+    contains(name) {
+      return values.has(name);
+    },
+    toggle(name, force) {
+      const enabled = typeof force === 'boolean' ? force : !values.has(name);
+      if (enabled) values.add(name);
+      else values.delete(name);
+      element.className = Array.from(values).join(' ');
+      return enabled;
+    }
+  };
+}
+
+function createFakeElement(tagName) {
+  const listeners = new Map();
+  const attributes = new Map();
+  let html = '';
+  const element = {
+    tagName: String(tagName || 'div').toUpperCase(),
+    parentNode: null,
+    children: [],
+    style: {},
+    className: '',
+    textContent: '',
+    value: '',
+    checked: false,
+    disabled: false,
+    inert: false,
+    focused: false,
+    appendChild(child) {
+      if (child.parentNode) {
+        const oldIndex = child.parentNode.children.indexOf(child);
+        if (oldIndex >= 0) child.parentNode.children.splice(oldIndex, 1);
+      }
+      child.parentNode = element;
+      element.children.push(child);
+      return child;
+    },
+    insertBefore(child, reference) {
+      if (child.parentNode) {
+        const oldIndex = child.parentNode.children.indexOf(child);
+        if (oldIndex >= 0) child.parentNode.children.splice(oldIndex, 1);
+      }
+      const index = element.children.indexOf(reference);
+      child.parentNode = element;
+      element.children.splice(index >= 0 ? index : element.children.length, 0, child);
+      return child;
+    },
+    setAttribute(name, value) {
+      attributes.set(String(name), String(value));
+    },
+    getAttribute(name) {
+      return attributes.has(String(name)) ? attributes.get(String(name)) : null;
+    },
+    removeAttribute(name) {
+      attributes.delete(String(name));
+    },
+    addEventListener(type, listener) {
+      const key = String(type);
+      if (!listeners.has(key)) listeners.set(key, []);
+      listeners.get(key).push(listener);
+    },
+    dispatchEvent(event) {
+      const currentEvent = event || {};
+      currentEvent.type = currentEvent.type || '';
+      currentEvent.target = currentEvent.target || element;
+      currentEvent.preventDefault = currentEvent.preventDefault || (() => {});
+      currentEvent.stopPropagation = currentEvent.stopPropagation || (() => {});
+      (listeners.get(currentEvent.type) || []).slice().forEach((listener) => listener(currentEvent));
+      return true;
+    },
+    click() {
+      return element.dispatchEvent({ type: 'click' });
+    },
+    focus() {
+      element.focused = true;
+    },
+    closest() {
+      return null;
+    }
+  };
+  element.classList = createClassList(element);
+  Object.defineProperty(element, 'innerHTML', {
+    get() {
+      return html;
+    },
+    set(value) {
+      html = String(value || '');
+      if (!html) {
+        element.children.forEach((child) => {
+          child.parentNode = null;
+        });
+        element.children = [];
+      }
+    }
+  });
+  return element;
+}
+
+function createOptionsBehaviorHarness(initialRules) {
+  const storageKey = '_x_extension_favicon_request_blacklist_2026_unique_';
+  const enhancedKey = '_x_extension_favicon_enhanced_fetch_enabled_2026_unique_';
+  const data = {
+    [storageKey]: initialRules,
+    [enhancedKey]: true
+  };
+  const writes = [];
+  const storageArea = {
+    get(keys, callback) {
+      const result = {};
+      (Array.isArray(keys) ? keys : [keys]).forEach((key) => {
+        if (Object.prototype.hasOwnProperty.call(data, key)) result[key] = data[key];
+      });
+      callback(result);
+    },
+    set(items, callback) {
+      Object.assign(data, items || {});
+      writes.push(items || {});
+      if (callback) callback();
+    }
+  };
+  const document = {
+    createElement: createFakeElement
+  };
+  const elements = {
+    editor: createFakeElement('div'),
+    list: createFakeElement('div'),
+    form: createFakeElement('div'),
+    formTrigger: createFakeElement('button'),
+    clearButton: createFakeElement('button'),
+    urlLabel: createFakeElement('span'),
+    urlPrefix: createFakeElement('span'),
+    urlInput: createFakeElement('input'),
+    exactInput: createFakeElement('input'),
+    prefixInput: createFakeElement('input'),
+    suffixInput: createFakeElement('input'),
+    exactWrap: createFakeElement('label'),
+    prefixWrap: createFakeElement('label'),
+    suffixWrap: createFakeElement('label'),
+    addButton: createFakeElement('button'),
+    cancelButton: createFakeElement('button'),
+    error: createFakeElement('div'),
+    enhancedToggle: createFakeElement('input')
+  };
+  elements.suffixInput.checked = true;
+  elements.enhancedToggle.checked = true;
+  const clearParent = createFakeElement('div');
+  clearParent.appendChild(elements.clearButton);
+
+  const functionNames = [
+    'normalizeBlacklistMatchModes',
+    'normalizeBlacklistPattern',
+    'normalizeFaviconRequestBlacklistItems',
+    'normalizeFaviconEnhancedFetchEnabled',
+    'buildBlacklistItemKey',
+    'getMessage',
+    'setFaviconBlacklistError',
+    'getFaviconBlacklistMatchModesFromForm',
+    'getBlacklistInputConfig',
+    'applyBlacklistInputPresentationToElements',
+    'updateFaviconBlacklistInputPresentation',
+    'syncBlacklistModeSelection',
+    'syncFaviconBlacklistMatchModeAvailability',
+    'setFaviconBlacklistFormExpanded',
+    'resetFaviconBlacklistForm',
+    'setFaviconBlacklistEditorEnabled',
+    'getBlacklistMatchBadgeConfig',
+    'formatBlacklistPatternForDisplay',
+    'setInlineError',
+    'buildBlacklistRuleDraft',
+    'closeActivePopconfirm',
+    'attachPopconfirm',
+    'loadFaviconRequestBlacklistItems',
+    'saveFaviconRequestBlacklistItems',
+    'renderFaviconRequestBlacklistList'
+  ];
+  const functionSource = functionNames.map((name) => extractFunctionSource(optionsJs, name)).join('\n\n');
+  const addHandlerStart = optionsJs.indexOf('  if (faviconBlacklistAddButton) {');
+  const addHandlerEnd = optionsJs.indexOf('  if (bookmarkCountSelect) {', addHandlerStart);
+  assert.ok(addHandlerStart >= 0 && addHandlerEnd > addHandlerStart, 'missing favicon add handler range');
+  const addHandlerSource = optionsJs.slice(addHandlerStart, addHandlerEnd);
+  const toggleHandlerSource = extractIfBlock(optionsJs, '  if (faviconEnhancedFetchToggle) {');
+  const clearHandlerSource = extractIfBlock(optionsJs, '  if (faviconBlacklistClearButton) {');
+  const startupSource = extractIfBlock(optionsJs, '  if (faviconBlacklistList) {');
+  const enhancedStorageChangeSource = extractIfBlock(
+    optionsJs,
+    '    if (changes[FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY] && faviconEnhancedFetchToggle) {'
+  );
+  const listStorageChangeSource = extractIfBlock(
+    optionsJs,
+    '    if (changes[FAVICON_REQUEST_BLACKLIST_STORAGE_KEY]) {'
+  );
+
+  const factory = new Function('deps', `
+    const document = deps.document;
+    const storageArea = deps.storageArea;
+    const BLACKLIST_UTILS = deps.BLACKLIST_UTILS;
+    const SETTINGS = deps.SETTINGS;
+    const FAVICON_REQUEST_BLACKLIST_STORAGE_KEY = deps.storageKey;
+    const FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY = deps.enhancedKey;
+    const SECONDARY_BUTTON_CLASS_NAME = 'secondary';
+    const chrome = { i18n: { getMessage: () => '' } };
+    const currentMessages = {};
+    const currentLanguageMode = 'system';
+    const faviconBlacklistEditor = deps.elements.editor;
+    const faviconBlacklistList = deps.elements.list;
+    const faviconBlacklistForm = deps.elements.form;
+    const faviconBlacklistFormTrigger = deps.elements.formTrigger;
+    const faviconBlacklistClearButton = deps.elements.clearButton;
+    const faviconBlacklistUrlLabel = deps.elements.urlLabel;
+    const faviconBlacklistUrlPrefix = deps.elements.urlPrefix;
+    const faviconBlacklistUrlInput = deps.elements.urlInput;
+    const faviconBlacklistMatchExactInput = deps.elements.exactInput;
+    const faviconBlacklistMatchPrefixInput = deps.elements.prefixInput;
+    const faviconBlacklistMatchSuffixInput = deps.elements.suffixInput;
+    const faviconBlacklistMatchExactWrap = deps.elements.exactWrap;
+    const faviconBlacklistMatchPrefixWrap = deps.elements.prefixWrap;
+    const faviconBlacklistMatchSuffixWrap = deps.elements.suffixWrap;
+    const faviconBlacklistAddButton = deps.elements.addButton;
+    const faviconBlacklistCancelButton = deps.elements.cancelButton;
+    const faviconBlacklistError = deps.elements.error;
+    const faviconEnhancedFetchToggle = deps.elements.enhancedToggle;
+    let faviconRequestBlacklistItems = [];
+    let faviconBlacklistFormExpanded = false;
+    let activePopconfirm = null;
+    const getRiSvg = () => '<svg></svg>';
+    const showToast = deps.showToast;
+
+    ${functionSource}
+    ${addHandlerSource}
+    ${toggleHandlerSource}
+    ${clearHandlerSource}
+    ${startupSource}
+
+    function applyEnhancedStorageChange(rawValue) {
+      const changes = { [FAVICON_ENHANCED_FETCH_ENABLED_STORAGE_KEY]: { newValue: rawValue } };
+      ${enhancedStorageChangeSource}
+    }
+
+    function applyListStorageChange(newValue) {
+      const changes = { [FAVICON_REQUEST_BLACKLIST_STORAGE_KEY]: { newValue } };
+      ${listStorageChangeSource}
+    }
+
+    return {
+      applyEnhancedStorageChange,
+      applyListStorageChange,
+      getItems: () => faviconRequestBlacklistItems.slice(),
+      confirmClear: () => {
+        faviconBlacklistClearButton.click();
+        const wrap = faviconBlacklistClearButton.parentNode;
+        const popconfirm = wrap.children[1];
+        const actions = popconfirm.children[1];
+        actions.children[1].click();
+      }
+    };
+  `);
+
+  const toasts = [];
+  const api = factory({
+    document,
+    storageArea,
+    BLACKLIST_UTILS: blacklistUtils,
+    SETTINGS: settingsUtils,
+    storageKey,
+    enhancedKey,
+    elements,
+    showToast(message, isError) {
+      toasts.push({ message, isError });
+    }
+  });
+  return { api, data, writes, elements, storageKey, enhancedKey, toasts };
+}
+
+async function flushPromises() {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
+async function testOptionsFaviconBlacklistBehavior() {
+  const legacyRule = { pattern: 'foo.example.com/private', matchModes: ['prefix'] };
+  const harness = createOptionsBehaviorHarness([legacyRule]);
+  await flushPromises();
+
+  assert.deepStrictEqual(harness.api.getItems(), [legacyRule], 'persisted legacy rules should load into editor state');
+  assert.strictEqual(harness.elements.list.children.length, 1, 'persisted legacy rules should render on startup');
+  assert.strictEqual(
+    harness.elements.list.children[0].children[0].children[0].children[0].children[1].textContent,
+    'http(s)://foo.example.com/private',
+    'legacy prefix rules should retain their display semantics'
+  );
+
+  harness.elements.formTrigger.click();
+  harness.elements.urlInput.value = 'bar.example.com';
+  harness.elements.addButton.click();
+  await flushPromises();
+  assert.deepStrictEqual(
+    harness.data[harness.storageKey],
+    [
+      { pattern: 'bar.example.com', matchModes: ['suffix'] },
+      legacyRule
+    ],
+    'add handler should persist a suffix rule without dropping legacy rules'
+  );
+  assert.strictEqual(harness.elements.list.children.length, 2, 'add handler should rerender the saved list');
+
+  const firstRemoveButton = harness.elements.list.children[0].children[0].children[1];
+  firstRemoveButton.click();
+  await flushPromises();
+  assert.deepStrictEqual(harness.data[harness.storageKey], [legacyRule], 'remove handler should persist the remaining rule');
+  assert.strictEqual(harness.elements.list.children.length, 1, 'remove handler should rerender the remaining rule');
+
+  harness.elements.enhancedToggle.checked = false;
+  harness.elements.enhancedToggle.dispatchEvent({ type: 'change' });
+  assert.strictEqual(harness.data[harness.enhancedKey], false, 'global toggle handler should persist OFF');
+  assert.strictEqual(harness.elements.editor.inert, true, 'global OFF should make the editor inert');
+  assert.strictEqual(harness.elements.editor.getAttribute('aria-disabled'), 'true', 'global OFF should expose aria-disabled');
+
+  harness.api.applyEnhancedStorageChange(true);
+  assert.strictEqual(harness.elements.editor.inert, false, 'external global ON changes should restore editor interaction');
+  assert.strictEqual(harness.elements.editor.getAttribute('aria-disabled'), 'false');
+  harness.api.applyEnhancedStorageChange(false);
+  assert.strictEqual(harness.elements.editor.inert, true, 'external global OFF changes should make the editor inert');
+  assert.strictEqual(harness.elements.editor.getAttribute('aria-disabled'), 'true');
+  harness.api.applyEnhancedStorageChange(true);
+  harness.api.applyListStorageChange([legacyRule]);
+  assert.strictEqual(harness.elements.list.children.length, 1, 'external list storage changes should rerender saved rules');
+
+  harness.api.confirmClear();
+  await flushPromises();
+  assert.deepStrictEqual(harness.data[harness.storageKey], [], 'clear confirmation should persist an empty rule list');
+  assert.strictEqual(harness.elements.list.children.length, 0, 'clear confirmation should empty the rendered list');
+}
+
+testOptionsFaviconBlacklistBehavior()
+  .then(() => console.log('options favicon blacklist tests passed'))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });

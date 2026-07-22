@@ -5373,6 +5373,7 @@ function handleFaviconMessage(request, sender, sendResponse) {
     }
     case 'getFaviconData': {
       const targetUrl = request.url || '';
+      const pageUrl = request.pageUrl || '';
       if (!targetUrl || typeof targetUrl !== 'string' || targetUrl.startsWith('data:')) {
         sendResponse({ data: '' });
         return;
@@ -5392,7 +5393,7 @@ function handleFaviconMessage(request, sender, sendResponse) {
         } catch (e) {
           // Ignore parse failures and continue with non-local handling.
         }
-        fetchFaviconData(targetUrl).then((dataUrl) => {
+        fetchFaviconData(targetUrl, pageUrl).then((dataUrl) => {
           sendResponse({ data: dataUrl || '' });
         }).catch(() => {
           sendResponse({ data: '' });
@@ -6489,7 +6490,7 @@ function renderHighlightedText(target, text, query, styles) {
   });
 }
 
-function fetchFaviconData(url) {
+function fetchFaviconData(url, pageUrl) {
   if (!url) {
     return Promise.resolve(null);
   }
@@ -6497,7 +6498,7 @@ function fetchFaviconData(url) {
     loadFaviconRequestBlacklistItems(),
     loadFaviconEnhancedFetchEnabled()
   ]).then(([, enhancedFetchEnabled]) => {
-    const canonicalPageUrl = getFaviconRequestMatchUrl(url);
+    const canonicalPageUrl = getFaviconRequestMatchUrl(pageUrl || url);
     const requestExcluded = isUrlBlockedByFaviconRequestBlacklist(canonicalPageUrl);
     const effectiveEnhancedFetchEnabled = enhancedFetchEnabled && !requestExcluded;
     const sourceAllowed = typeof FAVICON_UTILS.isFaviconSourceAllowedByEnhancedFetchPolicy === 'function'

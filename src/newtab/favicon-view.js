@@ -317,8 +317,8 @@
       });
     }
 
-    function requestFaviconData(url) {
-      return faviconViewCore.requestFaviconData(url);
+    function requestFaviconData(url, pageUrl) {
+      return faviconViewCore.requestFaviconData(url, pageUrl);
     }
 
     function setFaviconSrcWithAnimation(img, nextSrc, optionsArg) {
@@ -344,7 +344,7 @@
         ? faviconUrlResolver.getSafeFaviconCandidateUrl(url, pageUrl || url, 'data')
         : String(url || '');
       if (safeUrl) {
-        faviconViewCore.attachFaviconData(img, safeUrl, hostOverride);
+        faviconViewCore.attachFaviconData(img, safeUrl, hostOverride, pageUrl || url);
       }
     }
 
@@ -512,7 +512,7 @@
           }
           const defaultCheckPromise = faviconProxyCheckKind === 'extension'
             ? faviconViewCore.detectDefaultExtensionFavicon(img, nextSrc)
-            : faviconViewCore.requestFaviconData(nextSrc).then((dataUrl) => !dataUrl);
+            : faviconViewCore.requestFaviconData(nextSrc, state.url).then((dataUrl) => !dataUrl);
           defaultCheckPromise.catch(() => false).then((isDefault) => {
             if (!img || !state.isSessionCurrent()) {
               return;

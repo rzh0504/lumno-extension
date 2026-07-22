@@ -48,10 +48,29 @@ assert.strictEqual(
 assert.strictEqual(
   utils.isFaviconSourceAllowedByEnhancedFetchPolicy(
     'chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Ffoo.example.com%2F',
-    false
+    false,
+    { ownExtensionId: 'abc' }
   ),
   true,
-  'strict favicon mode should keep the Chrome extension _favicon endpoint'
+  'strict favicon mode should keep Lumno-owned _favicon endpoints'
+);
+assert.strictEqual(
+  utils.isFaviconSourceAllowedByEnhancedFetchPolicy(
+    'chrome-extension://other/_favicon/?pageUrl=https%3A%2F%2Ffoo.example.com%2F',
+    false,
+    { ownExtensionId: 'abc' }
+  ),
+  false,
+  'strict favicon mode should reject other extensions\' _favicon endpoints'
+);
+assert.strictEqual(
+  utils.isFaviconSourceAllowedByEnhancedFetchPolicy(
+    'chrome-extension://other/_favicon/?pageUrl=https%3A%2F%2Ffoo.example.com%2F',
+    true,
+    { ownExtensionId: 'abc' }
+  ),
+  false,
+  'enhanced favicon mode should still reject other extensions\' _favicon endpoints'
 );
 assert.strictEqual(
   utils.isFaviconSourceAllowedByEnhancedFetchPolicy('data:image/png;base64,c2FmZQ=='),
@@ -76,6 +95,24 @@ assert.strictEqual(
   false,
   'strict favicon mode should reject other extension assets'
 );
+assert.strictEqual(
+  utils.isFaviconSourceAllowedByEnhancedFetchPolicy(
+    'chrome-extension://abc/src/options/options.html',
+    false,
+    { ownExtensionId: 'abc' }
+  ),
+  false,
+  'strict favicon mode should reject arbitrary own-extension paths outside approved favicon assets'
+);
+assert.strictEqual(
+  utils.isFaviconSourceAllowedByEnhancedFetchPolicy(
+    'chrome-extension://abc/src/options/options.html',
+    true,
+    { ownExtensionId: 'abc' }
+  ),
+  false,
+  'enhanced favicon mode should reject arbitrary own-extension paths outside approved favicon assets'
+);
 
 const decisionLogs = [];
 const logFaviconDecision = utils.createFaviconDecisionLogger({
@@ -95,6 +132,11 @@ logFaviconDecision(
   'https://foo.example.com/another-private-icon.png',
   'exclusion',
   { pageUrl: 'https://foo.example.com/private/child', candidateKind: 'direct' }
+);
+logFaviconDecision(
+  'https://t2.gstatic.cn/faviconV2?url=https%3A%2F%2Ffoo.example.com%2Fprivate',
+  'exclusion',
+  { pageUrl: 'https://foo.example.com/private', candidateKind: 'third-party-proxy' }
 );
 assert.strictEqual(decisionLogs.length, 1, 'favicon decision logs should dedupe identical surface/host/reason decisions');
 assert.strictEqual(decisionLogs[0].prefix, '[Lumno][favicon]');
@@ -159,6 +201,24 @@ assert.strictEqual(
   strictPlanBeforeSettingsLoad.map((candidate) => candidate.url).join('\n'),
   'chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Ffoo.example.com%2F&size=128',
   'favicon candidate resolution should fail closed before settings load without direct or gstatic sources'
+);
+assert.strictEqual(
+  strictResolver.getSafeFaviconCandidateUrl(
+    'chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Ffoo.example.com%2F',
+    'https://foo.example.com/',
+    'browser-cache'
+  ),
+  'chrome-extension://abc/_favicon/?pageUrl=https%3A%2F%2Ffoo.example.com%2F',
+  'strict resolver should retain Lumno-owned _favicon sources'
+);
+assert.strictEqual(
+  strictResolver.getSafeFaviconCandidateUrl(
+    'chrome-extension://other/_favicon/?pageUrl=https%3A%2F%2Ffoo.example.com%2F',
+    'https://foo.example.com/',
+    'browser-cache'
+  ),
+  '',
+  'strict resolver should turn other-extension _favicon sources into generic fallback'
 );
 strictEnhancedFetchState = true;
 assert.ok(

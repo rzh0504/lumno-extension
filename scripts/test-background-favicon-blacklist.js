@@ -310,6 +310,66 @@ async function run() {
   );
   assert.strictEqual(deps.fetchCalls.length, 1, 'strict mode should fetch only the extension virtual favicon endpoint');
 
+  const privatePageUrl = 'https://foo.example.com/private';
+  const publicPageUrl = 'https://foo.example.com/public';
+  const rootIconUrl = 'https://foo.example.com/favicon.ico';
+  const matrixDeps = {
+    ...deps,
+    faviconRequestBlacklistCache: blacklistUtils.normalizeItems([
+      { pattern: 'foo.example.com/private', matchModes: ['prefix'] }
+    ], 'prefix'),
+    storageArea: {
+      get(_keys, callback) {
+        callback({
+          _x_extension_favicon_request_blacklist_2026_unique_: [],
+          _x_extension_favicon_enhanced_fetch_enabled_2026_unique_: true
+        });
+      }
+    },
+    blockedLogs: [],
+    fetchCalls: [],
+    themeParseCalls: 0,
+    themeResolveCalls: 0,
+    persistCalls: 0,
+    faviconEnhancedFetchEnabledCache: true
+  };
+  const matrixApi = factory(matrixDeps, Buffer);
+
+  result = await matrixApi.resolveSiteThemeColor(privatePageUrl, '', 'dark');
+  assert.strictEqual(result, null, 'excluded background paths should not resolve theme colors');
+  assert.deepStrictEqual(
+    matrixDeps.fetchCalls,
+    [],
+    'excluded background paths should not fetch page HTML, manifests, or root favicon candidates'
+  );
+  result = await matrixApi.resolveFaviconCandidates(privatePageUrl, '', rootIconUrl);
+  assert.deepStrictEqual(
+    result,
+    [`chrome-extension://test/_favicon/?pageUrl=${encodeURIComponent(privatePageUrl)}`],
+    'excluded background paths should keep only Lumno browser-cache favicon candidates'
+  );
+  result = await matrixApi.fetchFaviconData(rootIconUrl, privatePageUrl);
+  assert.strictEqual(result, null, 'excluded background paths should block direct root favicon data requests');
+  assert.strictEqual(matrixDeps.fetchCalls.length, 0, 'excluded background favicon data requests should not reach fetch');
+
+  result = await matrixApi.resolveFaviconCandidates(publicPageUrl, '', rootIconUrl);
+  assert.ok(result.includes(rootIconUrl), 'same-host nonexcluded background paths should retain direct favicon candidates');
+  assert.ok(
+    result.some((url) => url.includes('gstatic.cn/faviconV2')),
+    'same-host nonexcluded background paths should retain enhanced proxy candidates'
+  );
+  result = await matrixApi.resolveSiteThemeColor(publicPageUrl, '', 'dark');
+  assert.strictEqual(result, null, 'public control theme resolution should complete through the test parser');
+  assert.ok(
+    matrixDeps.fetchCalls.some((entry) => entry.url === publicPageUrl),
+    'same-host nonexcluded background paths should retain page theme fetching'
+  );
+  result = await matrixApi.fetchFaviconData(rootIconUrl, publicPageUrl);
+  assert.ok(
+    typeof result === 'string' && result.startsWith('data:image/png;base64,'),
+    'same-host nonexcluded background paths should retain direct favicon data fetching'
+  );
+
   console.log('background favicon blacklist tests passed');
 }
 

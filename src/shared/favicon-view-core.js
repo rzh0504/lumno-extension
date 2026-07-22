@@ -245,12 +245,12 @@
       }
     }
 
-    function requestFaviconData(url) {
+    function requestFaviconData(url, pageUrl) {
       if (!url || url.startsWith('data:') || isBlockedLocalFaviconUrl(url)) {
         return Promise.resolve(null);
       }
       if (customRequestFaviconData) {
-        return Promise.resolve(customRequestFaviconData(url)).catch(() => null);
+        return Promise.resolve(customRequestFaviconData(url, pageUrl)).catch(() => null);
       }
       if (faviconDataCache.has(url)) {
         return Promise.resolve(faviconDataCache.get(url));
@@ -264,7 +264,7 @@
           resolve(null);
           return;
         }
-        chromeApi.runtime.sendMessage({ action: 'getFaviconData', url: url }, (response) => {
+        chromeApi.runtime.sendMessage({ action: 'getFaviconData', url: url, pageUrl: pageUrl || '' }, (response) => {
           const dataUrl = response && response.data ? response.data : '';
           if (dataUrl) {
             faviconDataCache.set(url, dataUrl);
@@ -431,7 +431,7 @@
       return false;
     }
 
-    function attachFaviconData(img, url, hostOverride) {
+    function attachFaviconData(img, url, hostOverride, pageUrl) {
       if (!img || !url) {
         return;
       }
@@ -445,7 +445,7 @@
         preloadThemeFromFavicon(url, cached, hostOverride);
         return;
       }
-      requestFaviconData(url).then((dataUrl) => {
+      requestFaviconData(url, pageUrl).then((dataUrl) => {
         if (!dataUrl || !isCurrentFaviconSource(img, sourceUrl)) {
           return;
         }
