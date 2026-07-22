@@ -5153,6 +5153,17 @@
       maxWidth: 360
     })
     : null;
+  const bookmarkCascadeCopyTooltipController = globalThis.LumnoTooltip &&
+      typeof globalThis.LumnoTooltip.createController === 'function'
+    ? globalThis.LumnoTooltip.createController({
+      documentObj: document,
+      windowObj: window,
+      id: '_x_extension_newtab_bookmark_cascade_copy_tooltip_2026_unique_',
+      className: 'x-nt-bookmark-cascade-copy-tooltip',
+      appendTo: document.body,
+      maxWidth: 200
+    })
+    : null;
   const bookmarkCursorTooltipController = globalThis.LumnoCursorTooltip &&
       typeof globalThis.LumnoCursorTooltip.createController === 'function'
     ? globalThis.LumnoCursorTooltip.createController({
@@ -6988,6 +6999,7 @@
     bindCursorTooltip,
     hideCursorTooltip,
     copyUrl: copyBookmarkUrl,
+    copyTooltipController: bookmarkCascadeCopyTooltipController,
     showTopActionTooltip,
     hideTopActionTooltip
   });

@@ -331,11 +331,20 @@ async function flushPromises() {
     getChromeFaviconUrl: (url) => `chrome://favicon2/?pageUrl=${encodeURIComponent(url)}&size=128`,
     ensureReady: () => Promise.resolve(true),
     getItems: (folderId) => itemsByFolder[String(folderId || '')] || [],
-    showTopActionTooltip(target, text, options) {
-      tooltipCalls.push({ type: 'show', target, text, placement: options && options.placement });
-    },
-    hideTopActionTooltip() {
-      tooltipCalls.push({ type: 'hide' });
+    copyTooltipController: {
+      show(target, text, options) {
+        tooltipCalls.push({
+          type: 'show',
+          target,
+          text,
+          placement: options && options.placement,
+          maxWidth: options && options.maxWidth,
+          spacing: options && options.spacing
+        });
+      },
+      hide() {
+        tooltipCalls.push({ type: 'hide' });
+      }
     },
     copyUrl(url) {
       copyCalls.push(url);
@@ -355,6 +364,11 @@ async function flushPromises() {
   let levels = documentObj.body.querySelectorAll('.x-nt-bookmark-cascade-level');
   assert.strictEqual(levels.length, 1, 'opening a cascade should render the root menu level');
   let rootItems = getMenuItems(levels[0]);
+  assert.strictEqual(
+    levels[0].style.getPropertyValue('width'),
+    '210px',
+    'each cascade level should lock its initial rendered width before hover styles can affect truncation'
+  );
   assert.strictEqual(getLevelTitle(levels[0]), 'Root', 'opening a cascade should render the trigger folder title');
   assert.strictEqual(rootItems.length, 4, 'folder titles should not be counted as keyboard menu items');
   assert.ok(
@@ -373,16 +387,25 @@ async function flushPromises() {
   const archiveCopyTrigger = rootCopyTriggers[0];
   const archiveCopyRow = archiveCopyTrigger.parentNode;
   assert.strictEqual(archiveCopyTrigger.getAttribute('aria-label'), 'Copy link');
-  archiveCopyTrigger.dispatchEvent(createFakeEvent('pointerenter'));
+  const tooltipCallCountBeforeRowHover = tooltipCalls.length;
+  archiveCopyRow.dispatchEvent(createFakeEvent('pointerenter'));
   assert.strictEqual(
-    archiveCopyRow.getAttribute('data-bookmark-copy-action-visible'),
-    'true',
-    'entering the trailing copy hit area should reveal its icon'
+    tooltipCalls.length,
+    tooltipCallCountBeforeRowHover,
+    'hovering the bookmark row should reveal the icon through CSS without showing its tooltip'
   );
+  archiveCopyTrigger.dispatchEvent(createFakeEvent('pointerenter'));
   assert.deepStrictEqual(
     tooltipCalls[tooltipCalls.length - 1],
-    { type: 'show', target: archiveCopyTrigger, text: 'Copy link', placement: 'top' },
-    'revealing the copy icon should show its Copy link tooltip'
+    {
+      type: 'show',
+      target: archiveCopyTrigger,
+      text: 'Copy link',
+      placement: 'top',
+      maxWidth: 200,
+      spacing: 8
+    },
+    'hovering the copy icon should show its dedicated Copy link tooltip'
   );
   const copyClick = createFakeEvent('click');
   archiveCopyTrigger.dispatchEvent(copyClick);
@@ -391,16 +414,19 @@ async function flushPromises() {
   assert.ok(copyClick.defaultPrevented, 'copy clicks should not open the bookmark');
   assert.ok(copyClick.propagationStopped, 'copy clicks should not bubble into the bookmark row');
   archiveCopyTrigger.dispatchEvent(createFakeEvent('pointerleave'));
-  assert.strictEqual(
-    archiveCopyRow.getAttribute('data-bookmark-copy-action-visible'),
-    '',
-    'leaving the copy hit area should hide the icon when it is not keyboard-focused'
-  );
+  assert.deepStrictEqual(tooltipCalls[tooltipCalls.length - 1], { type: 'hide' });
   archiveCopyTrigger.focus();
-  assert.strictEqual(
-    archiveCopyRow.getAttribute('data-bookmark-copy-action-visible'),
-    'true',
-    'keyboard focus should reveal the copy icon'
+  assert.deepStrictEqual(
+    tooltipCalls[tooltipCalls.length - 1],
+    {
+      type: 'show',
+      target: archiveCopyTrigger,
+      text: 'Copy link',
+      placement: 'top',
+      maxWidth: 200,
+      spacing: 8
+    },
+    'keyboard focus on the copy icon should show the same dedicated tooltip'
   );
   archiveCopyTrigger.dispatchEvent(createFakeEvent('blur'));
   rootItems[0].focus();

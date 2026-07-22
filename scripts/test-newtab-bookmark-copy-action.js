@@ -166,8 +166,13 @@ function testCopyActionIntegration() {
   );
   assert.match(
     html,
-    /\.x-nt-bookmark-cascade-row\[data-bookmark-copy-action-visible="true"\] \.x-nt-bookmark-cascade-label[\s\S]*?padding-right:\s*32px/,
-    'Visible cascade copy actions should reserve space before long labels are truncated'
+    /\.x-nt-bookmark-cascade-row:not\(\.x-nt-bookmark-cascade-row--folder\):hover \.x-nt-bookmark-cascade-copy-trigger[\s\S]*?\.x-nt-bookmark-cascade-row:not\(\.x-nt-bookmark-cascade-row--folder\):focus-within \.x-nt-bookmark-cascade-copy-trigger[\s\S]*?opacity:\s*1[\s\S]*?pointer-events:\s*auto/,
+    'Hovering or focusing a URL row should reveal its copy icon without JavaScript visibility state'
+  );
+  assert.match(
+    html,
+    /\.x-nt-bookmark-cascade-row:not\(\.x-nt-bookmark-cascade-row--folder\):hover \.x-nt-bookmark-cascade-label[\s\S]*?\.x-nt-bookmark-cascade-row:not\(\.x-nt-bookmark-cascade-row--folder\):focus-within \.x-nt-bookmark-cascade-label[\s\S]*?padding-right:\s*32px/,
+    'Visible cascade copy icons should take space from the label so it truncates sooner'
   );
   assert.match(
     html,
@@ -177,8 +182,33 @@ function testCopyActionIntegration() {
   assert.match(cascadeSource, /x-nt-bookmark-cascade-copy-trigger/);
   assert.match(
     cascadeSource,
-    /showTopActionTooltip\(copyButton, copyLabel, \{ placement: 'top' \}\)/,
-    'Cascade copy actions should explain themselves with a Copy link tooltip'
+    /getRiSvg\('ri-file-copy-line', 'ri-size-16'\)/,
+    'Cascade copy actions should use the Remix file-copy icon'
+  );
+  assert.match(
+    cascadeSource,
+    /copyTooltipController\.show\(copyButton, copyLabel/,
+    'Cascade copy actions should show a component-specific tooltip only from the icon interaction'
+  );
+  assert.match(
+    cascadeSource,
+    /lockBookmarkCascadeLevelWidth\(levelElement\)/,
+    'Cascade levels should lock their initial width before hover styles shorten labels'
+  );
+  assert.match(
+    newtabSource,
+    /className:\s*'x-nt-bookmark-cascade-copy-tooltip'/,
+    'New tab should create a dedicated shared-tooltip controller for cascade copy actions'
+  );
+  assert.match(
+    html,
+    /\.x-nt-bookmark-cascade-copy-tooltip\s*\{[\s\S]*?--x-extension-tooltip-z-index:\s*10005/,
+    'The dedicated copy tooltip should render above the cascade menu layer'
+  );
+  assert.match(
+    html,
+    /\.x-nt-bookmark-cascade-copy-trigger:hover,[\s\S]*?\.x-nt-bookmark-cascade-copy-trigger:focus-visible\s*\{[\s\S]*?color:\s*#334155/,
+    'Cascade copy icon hover and focus states should use a neutral color'
   );
   assert.doesNotMatch(
     cascadeSource,
@@ -186,6 +216,7 @@ function testCopyActionIntegration() {
     'Cascade copy actions should use their independent trigger implementation'
   );
   assert.match(newtabSource, /copyUrl: copyBookmarkUrl/);
+  assert.match(newtabSource, /copyTooltipController: bookmarkCascadeCopyTooltipController/);
   assert.doesNotMatch(html, /bookmark-context-menu\.js/);
 }
 

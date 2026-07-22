@@ -87,6 +87,7 @@
     const hideCursorTooltip = getFunction(config, 'hideCursorTooltip');
     const showTopActionTooltip = getFunction(config, 'showTopActionTooltip');
     const hideTopActionTooltip = getFunction(config, 'hideTopActionTooltip');
+    const copyTooltipController = getOption(config, 'copyTooltipController', null);
     const copyUrl = getFunction(config, 'copyUrl', function() {
       return Promise.resolve(false);
     });
@@ -678,6 +679,9 @@
       cancelBookmarkCascadeDelayedClose();
       hideCursorTooltip();
       hideTopActionTooltip();
+      if (copyTooltipController && typeof copyTooltipController.hide === 'function') {
+        copyTooltipController.hide();
+      }
       bookmarkCascadeKeyboardLevelIndex = 0;
       if (bookmarkCascadeDebugLabelFrame) {
         cancelFrame(bookmarkCascadeDebugLabelFrame);
@@ -754,6 +758,22 @@
       levelElement.setAttribute('data-menu-surface-width', 'content');
       levelElement.style.setProperty('--x-extension-menu-surface-min-width', `${BOOKMARK_CASCADE_MENU_MIN_WIDTH_PX}px`);
       levelElement.style.setProperty('--x-extension-menu-surface-max-width', `${BOOKMARK_CASCADE_MENU_MAX_WIDTH_PX}px`);
+    }
+
+    function lockBookmarkCascadeLevelWidth(levelElement) {
+      if (!levelElement || !levelElement.style || typeof levelElement.style.setProperty !== 'function') {
+        return 0;
+      }
+      const rect = typeof levelElement.getBoundingClientRect === 'function'
+        ? levelElement.getBoundingClientRect()
+        : null;
+      const measuredWidth = Number(levelElement.offsetWidth) || Number(rect && rect.width) || 0;
+      if (!Number.isFinite(measuredWidth) || measuredWidth <= 0) {
+        return 0;
+      }
+      const lockedWidth = Math.ceil(measuredWidth);
+      levelElement.style.setProperty('width', `${lockedWidth}px`);
+      return lockedWidth;
     }
 
     function openBookmarkCascadeLevelSurface(levelElement) {
@@ -1169,26 +1189,21 @@
       }
       const copyLabel = t('bookmarks_copy_url', 'Copy link');
       const copyButton = documentObj.createElement('button');
-      let copyActionFocused = false;
-
-      const setCopyActionVisible = (visible) => {
-        if (visible) {
-          itemRow.setAttribute('data-bookmark-copy-action-visible', 'true');
-          return;
-        }
-        itemRow.removeAttribute('data-bookmark-copy-action-visible');
-      };
-      const showCopyAction = () => {
+      const showCopyTooltip = () => {
         cancelBookmarkCascadeHoverIntent();
         hideCursorTooltip();
         activateLeafItem();
-        setCopyActionVisible(true);
-        showTopActionTooltip(copyButton, copyLabel, { placement: 'top' });
+        if (copyTooltipController && typeof copyTooltipController.show === 'function') {
+          copyTooltipController.show(copyButton, copyLabel, {
+            placement: 'top',
+            maxWidth: 200,
+            spacing: 8
+          });
+        }
       };
-      const hideCopyAction = () => {
-        hideTopActionTooltip();
-        if (!copyActionFocused) {
-          setCopyActionVisible(false);
+      const hideCopyTooltip = () => {
+        if (copyTooltipController && typeof copyTooltipController.hide === 'function') {
+          copyTooltipController.hide();
         }
       };
 
@@ -1197,16 +1212,10 @@
       copyButton.innerHTML = getRiSvg('ri-file-copy-line', 'ri-size-16');
       copyButton.setAttribute('aria-label', copyLabel);
       copyButton.setAttribute('data-tooltip', copyLabel);
-      copyButton.addEventListener('pointerenter', showCopyAction);
-      copyButton.addEventListener('pointerleave', hideCopyAction);
-      copyButton.addEventListener('focus', () => {
-        copyActionFocused = true;
-        showCopyAction();
-      });
-      copyButton.addEventListener('blur', () => {
-        copyActionFocused = false;
-        hideCopyAction();
-      });
+      copyButton.addEventListener('pointerenter', showCopyTooltip);
+      copyButton.addEventListener('pointerleave', hideCopyTooltip);
+      copyButton.addEventListener('focus', showCopyTooltip);
+      copyButton.addEventListener('blur', hideCopyTooltip);
       copyButton.addEventListener('pointerdown', (event) => {
         event.stopPropagation();
       });
@@ -1214,7 +1223,7 @@
         event.preventDefault();
         event.stopPropagation();
         hideCursorTooltip();
-        hideTopActionTooltip();
+        hideCopyTooltip();
         Promise.resolve().then(() => copyUrl(item.url)).catch(noop);
       });
       itemRow.appendChild(copyButton);
@@ -1418,6 +1427,7 @@
       });
 
       bookmarkCascadeMenu.appendChild(levelElement);
+      lockBookmarkCascadeLevelWidth(levelElement);
       const entry = {
         folderId: String(folderId || ''),
         levelIndex: safeLevelIndex,
