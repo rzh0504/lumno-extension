@@ -179,6 +179,10 @@ function testCopyActionIntegration() {
     /\.x-nt-bookmark-cascade-row:not\(\.x-nt-bookmark-cascade-row--folder\):hover \.x-nt-bookmark-cascade-label,[\s\S]*?\.x-nt-bookmark-cascade-row:has\(> \.x-nt-bookmark-cascade-copy-trigger:focus-visible\) \.x-nt-bookmark-cascade-label[\s\S]*?padding-right:\s*32px/,
     'Visible cascade copy icons should take space from the label so it truncates sooner'
   );
+  const copyIconBaseRule = html.match(/\.x-nt-bookmark-cascade-copy-trigger\s*\{([^}]*)\}/);
+  assert.ok(copyIconBaseRule, 'Cascade copy icon should define its base styles');
+  assert.match(copyIconBaseRule[1], /margin-top:\s*-14px/, 'Cascade copy icon should remain vertically centered');
+  assert.doesNotMatch(copyIconBaseRule[1], /\btransform\b/, 'Cascade copy icon should not animate position or scale');
   assert.match(
     html,
     /\.x-nt-bookmark-cascade-content[\s\S]*?scrollbar-gutter:\s*auto/,
