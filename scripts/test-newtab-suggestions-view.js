@@ -2059,6 +2059,28 @@ function testOverlayDirectOpenTabsUseShiftAwareSwitchAction() {
   );
 }
 
+function testOverlayFocusedInputIsolatesUnmodifiedKeyboardEvents() {
+  const overlayJs = fs.readFileSync(path.join(repoRoot, 'src/overlay/search-panel.js'), 'utf8');
+  assert.ok(
+    /function handleSearchInputKeydown\(e\)[\s\S]*searchInput\.addEventListener\('keydown', handleSearchInputKeydown\)/.test(overlayJs),
+    'overlay search input keydown behavior should be reusable from the capture-phase isolation handler'
+  );
+  assert.ok(
+    /overlayKeyCaptureHandler = function\(e\)[\s\S]*document\.activeElement !== searchInput && activeInRoot !== searchInput[\s\S]*e\.metaKey \|\| e\.ctrlKey \|\| e\.altKey[\s\S]*e\.type === 'keydown'[\s\S]*handleSearchInputKeydown\(e\)[\s\S]*e\.type === 'keyup'[\s\S]*syncSuggestionActionModifiersFromEvent\(e\)[\s\S]*e\.stopImmediatePropagation\(\)/.test(overlayJs),
+    'focused overlay input should stop unmodified keyboard events during window capture before page or extension shortcuts run'
+  );
+  ['keydown', 'keypress', 'keyup'].forEach((eventName) => {
+    assert.ok(
+      overlayJs.includes(`window.addEventListener('${eventName}', overlayKeyCaptureHandler, true);`),
+      `overlay should capture ${eventName} while its search input is focused`
+    );
+    assert.ok(
+      overlayJs.includes(`window.removeEventListener('${eventName}', overlayKeyCaptureHandler, true);`),
+      `overlay should remove its ${eventName} capture listener when it closes`
+    );
+  });
+}
+
 function testNewtabIncrementalSearchSuggestionContract() {
   const newtabJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/newtab.js'), 'utf8');
   assert.ok(
@@ -2103,6 +2125,7 @@ testNewtabShiftEnterOpensMatchedTabInNewTab();
 testNewtabCommandEnterOpensFocusedResultInBackgroundTab();
 testOverlayCommandEnterOpensFocusedResultInBackgroundTab();
 testOverlayDirectOpenTabsUseShiftAwareSwitchAction();
+testOverlayFocusedInputIsolatesUnmodifiedKeyboardEvents();
 testNewtabIncrementalSearchSuggestionContract();
 
 testLocalUrlSuggestionUsesFallbackTheme()

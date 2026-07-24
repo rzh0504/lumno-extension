@@ -1140,6 +1140,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     }
     if (overlayKeyCaptureHandler) {
       window.removeEventListener('keydown', overlayKeyCaptureHandler, true);
+      window.removeEventListener('keypress', overlayKeyCaptureHandler, true);
+      window.removeEventListener('keyup', overlayKeyCaptureHandler, true);
       overlayKeyCaptureHandler = null;
     }
     if (overlayModifierBlurHandler) {
@@ -5196,7 +5198,7 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
     };
     document.addEventListener('keydown', captureTabHandler, true);
 
-    searchInput.addEventListener('keydown', function(e) {
+    function handleSearchInputKeydown(e) {
       syncSuggestionActionModifiersFromEvent(e);
       if (!e.metaKey && !e.ctrlKey && !e.altKey) {
         e.stopPropagation();
@@ -5237,7 +5239,8 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
         latestRawInputValue = searchInput.value;
         latestOverlayQuery = searchInput.value.trim();
       }
-    });
+    }
+    searchInput.addEventListener('keydown', handleSearchInputKeydown);
     searchInput.addEventListener('keypress', function(e) {
       if (!e.metaKey && !e.ctrlKey && !e.altKey) {
         e.stopPropagation();
@@ -5582,18 +5585,20 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
       if (isImeCompositionEvent(e)) {
         return;
       }
-      if (e.key === 'Tab') {
-        handleTabKey(e);
-        e.stopImmediatePropagation();
+      if (e.metaKey || e.ctrlKey || e.altKey) {
         return;
       }
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
-        keydownHandler(e);
-        e.stopImmediatePropagation();
+      if (e.type === 'keydown') {
+        handleSearchInputKeydown(e);
+      } else if (e.type === 'keyup') {
+        syncSuggestionActionModifiersFromEvent(e);
       }
+      e.stopImmediatePropagation();
     };
 
     window.addEventListener('keydown', overlayKeyCaptureHandler, true);
+    window.addEventListener('keypress', overlayKeyCaptureHandler, true);
+    window.addEventListener('keyup', overlayKeyCaptureHandler, true);
     document.addEventListener('keydown', keydownHandler);
     document.addEventListener('keyup', keyupHandler);
     overlayModifierBlurHandler = function() {
@@ -6885,6 +6890,13 @@ window._x_extension_toggleSearchOverlay_2026_unique_ = function(tabs, overlayCon
           commandMatches.forEach((command) => {
             preSuggestions.push(buildCommandSuggestion(command));
           });
+        } else if (!siteSearchQueryModeActive) {
+          const directUrlSuggestion = getDirectUrlSuggestion(query);
+          if (directUrlSuggestion && !isCurrentOverlayTabUrl(directUrlSuggestion.url)) {
+            preSuggestions.push(directUrlSuggestion);
+          }
+          const keywordSuggestions = buildKeywordSuggestions(query, rules);
+          preSuggestions.push(...keywordSuggestions);
         }
 
         const providersForTags = (siteSearchProvidersCache && siteSearchProvidersCache.length > 0)

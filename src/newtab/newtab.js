@@ -5497,6 +5497,17 @@
       maxWidth: 360
     })
     : null;
+  const shortcutDialogTooltipController = globalThis.LumnoTooltip &&
+      typeof globalThis.LumnoTooltip.createController === 'function'
+    ? globalThis.LumnoTooltip.createController({
+      documentObj: document,
+      windowObj: window,
+      id: '_x_extension_newtab_shortcut_dialog_tooltip_2026_unique_',
+      className: 'x-nt-shortcut-dialog-tooltip',
+      appendTo: document.body,
+      maxWidth: 320
+    })
+    : null;
   const bookmarkCascadeCopyTooltipController = globalThis.LumnoTooltip &&
       typeof globalThis.LumnoTooltip.createController === 'function'
     ? globalThis.LumnoTooltip.createController({
@@ -5577,6 +5588,22 @@
       return;
     }
     shortcutTooltipController.hide();
+  }
+
+  function bindShortcutDialogTooltip(target, getText, options) {
+    if (!shortcutDialogTooltipController || !target) {
+      return null;
+    }
+    return shortcutDialogTooltipController.bind(target, getText, Object.assign({
+      placement: 'top',
+      maxWidth: 320
+    }, options || {}));
+  }
+
+  function hideShortcutDialogTooltip() {
+    if (shortcutDialogTooltipController) {
+      shortcutDialogTooltipController.hide();
+    }
   }
 
   function bindCursorTooltip(target, getText, options) {
@@ -7221,6 +7248,9 @@
       documentObj: document,
       windowObj: window,
       t,
+      getRiSvg,
+      bindTooltip: bindShortcutDialogTooltip,
+      hideTooltip: hideShortcutDialogTooltip,
       prepareIconFile: shortcutIconStore.prepareFile,
       onSubmit(payload) {
         return saveShortcutFromDialog(payload.title, payload.url, {
@@ -8246,6 +8276,7 @@
       state.dropTarget.markerElement.style.removeProperty('--x-nt-bookmark-insert-line-left');
       state.dropTarget.markerElement.style.removeProperty('--x-nt-bookmark-insert-line-top');
       state.dropTarget.markerElement.style.removeProperty('--x-nt-bookmark-insert-line-height');
+      state.dropTarget.markerElement.removeAttribute('data-bookmark-insert-motion');
     }
     if (bookmarkCascadeRuntime && typeof bookmarkCascadeRuntime.clearDragTarget === 'function') {
       bookmarkCascadeRuntime.clearDragTarget();
@@ -8389,10 +8420,27 @@
   }
 
   function setBookmarkDragDropTarget(state, target) {
+    const previousTarget = state && state.dropTarget ? state.dropTarget : null;
     const previousElement = state && state.dropTarget ? state.dropTarget.element : null;
     const previousMarker = state && state.dropTarget ? state.dropTarget.markerElement : null;
     const nextElement = target ? target.element : null;
     const nextMarker = target ? target.markerElement : null;
+    const previousInsertMotion = previousMarker
+      ? previousMarker.getAttribute('data-bookmark-insert-motion')
+      : null;
+    const isNewGridInsertionTarget = Boolean(
+      target &&
+      target.kind === 'insertion' &&
+      target.surface === 'grid' &&
+      (
+        !previousTarget ||
+        previousTarget.kind !== 'insertion' ||
+        previousTarget.surface !== 'grid' ||
+        previousTarget.markerElement !== nextMarker ||
+        previousTarget.markerPosition !== target.markerPosition ||
+        Number(previousTarget.markerOffsetPx) !== Number(target.markerOffsetPx)
+      )
+    );
     if (previousElement && previousElement !== nextElement) {
       previousElement.removeAttribute('data-bookmark-drop-target');
     }
@@ -8404,6 +8452,7 @@
       previousMarker.style.removeProperty('--x-nt-bookmark-insert-line-left');
       previousMarker.style.removeProperty('--x-nt-bookmark-insert-line-top');
       previousMarker.style.removeProperty('--x-nt-bookmark-insert-line-height');
+      previousMarker.removeAttribute('data-bookmark-insert-motion');
     }
     if (!state) {
       return;
@@ -8431,6 +8480,12 @@
         nextMarker.style.removeProperty('--x-nt-bookmark-insert-line-left');
         nextMarker.style.removeProperty('--x-nt-bookmark-insert-line-top');
         nextMarker.style.removeProperty('--x-nt-bookmark-insert-line-height');
+      }
+      if (isNewGridInsertionTarget) {
+        nextMarker.setAttribute(
+          'data-bookmark-insert-motion',
+          previousInsertMotion === 'a' ? 'b' : 'a'
+        );
       }
     }
   }
@@ -12136,6 +12191,13 @@
         commandMatches.forEach((command) => {
           preSuggestions.push(buildCommandSuggestion(command));
         });
+      } else if (!siteSearchQueryModeActive) {
+        const directUrlSuggestion = getDirectUrlSuggestion(query);
+        if (directUrlSuggestion) {
+          preSuggestions.push(directUrlSuggestion);
+        }
+        const keywordSuggestions = buildKeywordSuggestions(query, rules);
+        preSuggestions.push(...keywordSuggestions);
       }
 
       const providersForTags = (siteSearchProvidersCache && siteSearchProvidersCache.length > 0)

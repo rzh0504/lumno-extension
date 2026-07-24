@@ -193,12 +193,20 @@ async function run() {
   });
   trigger.focus();
   const submissions = [];
+  const tooltipBindings = [];
   const controller = component.createShortcutDialog({
     documentObj,
     windowObj,
     closeDelayMs: 0,
     t(key, fallback) {
       return fallback || key;
+    },
+    getRiSvg(id, sizeClass) {
+      return `<i class="ri-icon ${sizeClass} ${id}" aria-hidden="true"></i>`;
+    },
+    bindTooltip(target, getText, options) {
+      tooltipBindings.push({ target, getText, options });
+      return target;
     },
     onSubmit(payload) {
       submissions.push(payload);
@@ -234,24 +242,39 @@ async function run() {
   const inputs = findAll(controller.element, (element) => element.tagName === 'INPUT');
   const buttons = findAll(controller.element, (element) => element.tagName === 'BUTTON');
   const doneButton = findByClass(controller.element, 'x-nt-shortcut-dialog-button--primary');
-  const iconChooseButton = findByClass(controller.element, 'x-nt-shortcut-icon-choose');
+  const iconUploadTile = findByClass(controller.element, 'x-nt-shortcut-icon-upload-tile');
   const iconRemoveButton = findByClass(controller.element, 'x-nt-shortcut-icon-remove');
   const iconInput = findByClass(controller.element, 'x-nt-shortcut-icon-input');
-  const iconPreview = findByClass(controller.element, 'x-nt-shortcut-icon-preview');
-  const iconInfoTooltip = findByClass(controller.element, 'x-nt-shortcut-icon-info-tooltip');
+  const iconInfoButton = findByClass(controller.element, 'x-nt-shortcut-icon-info');
+  const iconInfoDescription = findByClass(controller.element, 'x-nt-shortcut-visually-hidden');
   const title = findByClass(controller.element, 'x-nt-shortcut-dialog-title');
   const error = findByClass(controller.element, 'x-nt-shortcut-error');
   assert.strictEqual(inputs.length, 3);
-  assert.strictEqual(buttons.length, 5);
+  assert.strictEqual(buttons.length, 4);
   assert.strictEqual(documentObj.activeElement, inputs[0], 'opening should focus the name field');
   assert.strictEqual(title.textContent, 'Add shortcut');
   assert.strictEqual(doneButton.textContent, 'Done');
-  assert.strictEqual(iconChooseButton.textContent, 'Choose image');
-  assert.strictEqual(iconPreview.getAttribute('data-has-icon'), 'false');
+  assert.strictEqual(iconUploadTile.getAttribute('aria-label'), 'Choose image');
+  assert.strictEqual(iconUploadTile.getAttribute('data-has-icon'), 'false');
   assert.ok(
-    iconInfoTooltip.textContent.includes('chrome.storage.sync quota'),
-    'the info tooltip should explain why local icons do not sync'
+    iconInfoDescription.textContent.includes('chrome.storage.sync') &&
+      iconInfoDescription.textContent.includes('4096 × 4096 px'),
+    'the accessible info description should explain why local icons do not sync'
   );
+  assert.strictEqual(
+    iconInfoButton.className.includes('x-nt-appearance-info-button'),
+    true,
+    'the info trigger should reuse the New Tab appearance info-button pattern'
+  );
+  assert.strictEqual(tooltipBindings.length, 2, 'shared Tooltip should bind the info trigger and upload tile');
+  assert.strictEqual(tooltipBindings[0].target, iconInfoButton);
+  assert.ok(
+    tooltipBindings[0].getText().includes('chrome.storage.sync') &&
+      tooltipBindings[0].getText().includes('4096 × 4096 px'),
+    'the shared Tooltip should resolve the local-only storage explanation'
+  );
+  assert.strictEqual(tooltipBindings[1].target, iconUploadTile);
+  assert.strictEqual(tooltipBindings[1].getText(), 'Choose image');
 
   controller.setError('Invalid URL');
   assert.strictEqual(error.textContent, 'Invalid URL');
@@ -284,8 +307,8 @@ async function run() {
   }];
   iconInput.dispatch('change');
   await new Promise((resolve) => setImmediate(resolve));
-  assert.strictEqual(iconPreview.getAttribute('data-has-icon'), 'true');
-  assert.strictEqual(iconChooseButton.textContent, 'Replace image');
+  assert.strictEqual(iconUploadTile.getAttribute('data-has-icon'), 'true');
+  assert.strictEqual(iconUploadTile.getAttribute('aria-label'), 'Replace image');
   assert.strictEqual(iconRemoveButton.hidden, false);
 
   inputs[0].value = 'Edited';
@@ -362,9 +385,14 @@ async function run() {
   );
   assert.ok(
     componentCss.includes('.x-nt-shortcut-dialog {') &&
-      componentCss.includes('.x-nt-shortcut-icon-info-tooltip {') &&
+      componentCss.includes('.x-nt-shortcut-dialog-tooltip {') &&
+      componentCss.includes('.x-nt-shortcut-icon-upload-tile {') &&
       componentCss.includes('@media (prefers-reduced-motion: reduce)'),
-    'component CSS should own the dialog surface, icon info tooltip, and reduced-motion behavior'
+    'component CSS should own the dialog surface, shared Tooltip layer, upload-tile adaptation, and reduced-motion behavior'
+  );
+  assert.ok(
+    !componentCss.includes('.x-nt-shortcut-icon-info-tooltip {'),
+    'component CSS should not rebuild the shared Tooltip surface'
   );
   assert.ok(
     /\.x-nt-shortcut-dialog\s*\{[\s\S]*?border:\s*0;/.test(componentCss),
@@ -373,6 +401,11 @@ async function run() {
   assert.ok(
     newtabJs.includes('NEWTAB_SHORTCUT_DIALOG.createShortcutDialog({'),
     'newtab should instantiate the extracted component'
+  );
+  assert.ok(
+    newtabJs.includes('bindTooltip: bindShortcutDialogTooltip') &&
+      newtabJs.includes("className: 'x-nt-shortcut-dialog-tooltip'"),
+    'newtab should provide the shared Lumno Tooltip controller to the dialog'
   );
   assert.ok(
     newtabJs.includes('shortcutDialogController.mount(document.body);'),

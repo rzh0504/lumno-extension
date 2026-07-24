@@ -196,6 +196,27 @@ assert.ok(
   'the bookmark grid should draw one independent vertical insertion line at the measured boundary'
 );
 assert.ok(
+  /\.x-nt-bookmark-card--folder\[data-bookmark-drop-target="true"\]\s*\{[^}]*border-color:[^}]*box-shadow:\s*none;/s
+    .test(newtabHtml) &&
+    newtabHtml.includes('_x_nt_bookmark_insert_line_extend_a_2026_unique_') &&
+    newtabHtml.includes('_x_nt_bookmark_insert_line_extend_b_2026_unique_') &&
+    /@keyframes _x_nt_bookmark_insert_line_extend_a_2026_unique_\s*\{[^}]*transform:\s*scaleY\(0\);[\s\S]*?transform:\s*scaleY\(1\);/s
+      .test(newtabHtml),
+  'folder targets should keep a crisp edge while grid insertion lines extend into place'
+);
+assert.ok(
+    newtabJs.includes("previousTarget.markerPosition !== target.markerPosition") &&
+    newtabJs.includes("previousTarget.markerOffsetPx) !== Number(target.markerOffsetPx") &&
+    newtabJs.includes("'data-bookmark-insert-motion'") &&
+    newtabJs.includes("previousInsertMotion === 'a' ? 'b' : 'a'"),
+  'each newly targeted grid boundary should restart the insertion-line extension'
+);
+assert.ok(
+  /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?#_x_extension_newtab_bookmarks_grid_2024_unique_\[data-bookmark-insert-position\]::after\s*\{[^}]*animation:\s*none;/s
+    .test(newtabHtml),
+  'the grid insertion-line motion should respect reduced-motion preferences'
+);
+assert.ok(
   bookmarkDragJs.includes('DEFAULT_GRID_INSERTION_HIT_ZONE_PX = 8') &&
     bookmarkDragJs.includes('pointerY >= item.rect.top && pointerY <= item.rect.bottom') &&
     bookmarkDragJs.includes('nearestBoundaryDistance > hitZonePx'),

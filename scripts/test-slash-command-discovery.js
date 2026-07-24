@@ -65,6 +65,45 @@ function assertSlashCommandDiscovery(source, expectedTypes, surface) {
   );
 }
 
+function assertPlainNavigationSuggestionsPreserved(source, surface, options) {
+  const preSuggestionsStart = source.indexOf('const preSuggestions = [];');
+  assert.ok(preSuggestionsStart >= 0, `${surface} should define pre-suggestions`);
+  const providersStart = source.indexOf('const providersForTags', preSuggestionsStart);
+  assert.ok(providersStart > preSuggestionsStart, `${surface} should compose pre-suggestions before provider matching`);
+  const block = source.slice(preSuggestionsStart, providersStart);
+  const slashBranchIndex = block.indexOf('else if (slashCommandModeActive && !siteSearchQueryModeActive)');
+  const plainBranchIndex = block.indexOf('else if (!siteSearchQueryModeActive)');
+  assert.ok(slashBranchIndex >= 0, `${surface} should keep a slash-only command branch`);
+  assert.ok(
+    plainBranchIndex > slashBranchIndex,
+    `${surface} should restore ordinary navigation suggestions outside slash command mode`
+  );
+  const plainBranch = block.slice(plainBranchIndex);
+  assert.match(
+    plainBranch,
+    /const directUrlSuggestion = getDirectUrlSuggestion\(query\);/,
+    `${surface} should build a direct URL candidate for ordinary input`
+  );
+  if (options && options.excludeCurrentUrl) {
+    assert.match(
+      plainBranch,
+      /if \(directUrlSuggestion && !isCurrentOverlayTabUrl\(directUrlSuggestion\.url\)\)/,
+      `${surface} should avoid suggesting the current page as a direct URL`
+    );
+  } else {
+    assert.match(
+      plainBranch,
+      /if \(directUrlSuggestion\)/,
+      `${surface} should retain recognized direct URL candidates`
+    );
+  }
+  assert.match(
+    plainBranch,
+    /const keywordSuggestions = buildKeywordSuggestions\(query, rules\);[\s\S]*?preSuggestions\.push\(\.\.\.keywordSuggestions\);/,
+    `${surface} should retain ordinary keyword navigation candidates`
+  );
+}
+
 function createOverlayEmptyStateRenderer() {
   const suggestionsContainer = {
     childNodes: [],
@@ -120,6 +159,8 @@ assertSlashCommandDiscovery(
   ['commandNewTab', 'commandSettings', 'modeSwitch', 'commandOpenTabs', 'commandCopyUrl', 'commandDocumentPip'],
   'overlay'
 );
+assertPlainNavigationSuggestionsPreserved(newtabSource, 'New Tab');
+assertPlainNavigationSuggestionsPreserved(overlaySource, 'overlay', { excludeCurrentUrl: true });
 
 const getNewtabCommandMatches = createCommandMatcher(newtabSource, false);
 assert.deepStrictEqual(

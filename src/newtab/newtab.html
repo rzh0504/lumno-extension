@@ -1186,14 +1186,16 @@
         z-index: 8;
       }
       .x-nt-bookmark-card--folder[data-bookmark-drop-target="true"] {
-        border-color: rgba(37, 99, 235, 0.5);
-        box-shadow:
-          inset 0 0 0 1px rgba(37, 99, 235, 0.18),
-          var(--x-nt-bookmark-card-shadow, 0 8px 20px rgba(15, 23, 42, 0.08));
+        border-color: rgba(37, 99, 235, 0.78);
+        box-shadow: none;
       }
       .x-nt-bookmark-card--folder[data-bookmark-drop-target="true"]::before {
-        background: rgba(37, 99, 235, 0.1);
+        background: rgba(37, 99, 235, 0.08);
         opacity: 1;
+      }
+      body[data-theme="dark"] .x-nt-bookmark-card--folder[data-bookmark-drop-target="true"] {
+        border-color: rgba(96, 165, 250, 0.86);
+        box-shadow: none;
       }
       #_x_extension_newtab_bookmarks_grid_2024_unique_[data-bookmark-insert-position]::after {
         content: "";
@@ -1206,6 +1208,44 @@
         background: var(--x-nt-bookmark-insert-indicator, #7a8491);
         pointer-events: none;
         z-index: 12;
+        transform: scaleY(0);
+        transform-origin: center;
+        animation-duration: 140ms;
+        animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+        animation-fill-mode: forwards;
+      }
+      #_x_extension_newtab_bookmarks_grid_2024_unique_[data-bookmark-insert-motion="a"]::after {
+        animation-name: _x_nt_bookmark_insert_line_extend_a_2026_unique_;
+      }
+      #_x_extension_newtab_bookmarks_grid_2024_unique_[data-bookmark-insert-motion="b"]::after {
+        animation-name: _x_nt_bookmark_insert_line_extend_b_2026_unique_;
+      }
+      @keyframes _x_nt_bookmark_insert_line_extend_a_2026_unique_ {
+        from {
+          opacity: 0;
+          transform: scaleY(0);
+        }
+        to {
+          opacity: 1;
+          transform: scaleY(1);
+        }
+      }
+      @keyframes _x_nt_bookmark_insert_line_extend_b_2026_unique_ {
+        from {
+          opacity: 0;
+          transform: scaleY(0);
+        }
+        to {
+          opacity: 1;
+          transform: scaleY(1);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #_x_extension_newtab_bookmarks_grid_2024_unique_[data-bookmark-insert-position]::after {
+          opacity: 1;
+          transform: scaleY(1);
+          animation: none;
+        }
       }
       #_x_extension_newtab_bookmarks_grid_2024_unique_[data-bookmark-dragging="true"] .x-nt-bookmark-card.x-nt-bookmark-card--hover:not([aria-expanded="true"]):not([data-bookmark-dragging="true"]):not([data-bookmark-dropping="true"]) {
         transform: translate3d(0, 0, 0);

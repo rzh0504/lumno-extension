@@ -79,6 +79,11 @@
     const prepareIconFile = getFunction(opts, 'prepareIconFile', function() {
       return Promise.reject(new Error('Shortcut icon processing is unavailable.'));
     });
+    const getRiSvg = getFunction(opts, 'getRiSvg', function(id, sizeClass) {
+      return `<i class="ri-icon ${sizeClass || 'ri-size-16'} ${id}" aria-hidden="true"></i>`;
+    });
+    const bindTooltip = getFunction(opts, 'bindTooltip', noop);
+    const hideTooltip = getFunction(opts, 'hideTooltip', noop);
     const closeDelayMs = Number.isFinite(Number(opts.closeDelayMs))
       ? Math.max(0, Number(opts.closeDelayMs))
       : DEFAULT_CLOSE_DELAY_MS;
@@ -158,58 +163,62 @@
     const iconLabelRow = documentObj.createElement('div');
     iconLabelRow.className = 'x-nt-shortcut-icon-label-row';
     const iconLabel = documentObj.createElement('span');
-    const iconInfoWrap = documentObj.createElement('span');
-    iconInfoWrap.className = 'x-nt-shortcut-icon-info-wrap';
     const iconInfoButton = documentObj.createElement('button');
     iconInfoButton.type = 'button';
-    iconInfoButton.className = 'x-nt-shortcut-icon-info';
-    const iconInfoGlyph = documentObj.createElement('i');
-    iconInfoGlyph.className = 'ri-information-line';
-    iconInfoGlyph.setAttribute('aria-hidden', 'true');
-    const iconInfoTooltip = documentObj.createElement('span');
-    iconInfoTooltip.id = `${idPrefix}_icon_info`;
-    iconInfoTooltip.className = 'x-nt-shortcut-icon-info-tooltip';
-    iconInfoTooltip.setAttribute('role', 'tooltip');
-    iconInfoButton.setAttribute('aria-describedby', iconInfoTooltip.id);
-    iconInfoButton.appendChild(iconInfoGlyph);
-    iconInfoWrap.appendChild(iconInfoButton);
-    iconInfoWrap.appendChild(iconInfoTooltip);
+    iconInfoButton.className = 'x-nt-appearance-info-button x-nt-shortcut-icon-info';
+    iconInfoButton.innerHTML = getRiSvg('ri-information-line', 'ri-size-14');
+    const iconInfoDescription = documentObj.createElement('span');
+    iconInfoDescription.id = `${idPrefix}_icon_info`;
+    iconInfoDescription.className = 'x-nt-shortcut-visually-hidden';
+    iconInfoButton.setAttribute('aria-describedby', iconInfoDescription.id);
     iconLabelRow.appendChild(iconLabel);
-    iconLabelRow.appendChild(iconInfoWrap);
+    iconLabelRow.appendChild(iconInfoButton);
 
     const iconControl = documentObj.createElement('div');
     iconControl.className = 'x-nt-shortcut-icon-control';
-    const iconPreview = documentObj.createElement('div');
-    iconPreview.className = 'x-nt-shortcut-icon-preview';
-    iconPreview.setAttribute('data-has-icon', 'false');
+    const iconUploadTile = documentObj.createElement('div');
+    iconUploadTile.className = [
+      'x-nt-wallpaper-tile',
+      'x-nt-wallpaper-upload-tile',
+      'x-nt-wallpaper-custom-tile',
+      'x-nt-shortcut-icon-upload-tile'
+    ].join(' ');
+    iconUploadTile.setAttribute('role', 'button');
+    iconUploadTile.setAttribute('tabindex', '0');
+    iconUploadTile.setAttribute('data-upload', 'true');
+    iconUploadTile.setAttribute('data-loading', 'false');
+    iconUploadTile.setAttribute('data-has-icon', 'false');
+    iconUploadTile.setAttribute('aria-disabled', 'false');
+    const iconPreview = documentObj.createElement('span');
+    iconPreview.className = [
+      'x-nt-wallpaper-thumb',
+      'x-nt-wallpaper-upload-thumb',
+      'x-nt-shortcut-icon-preview'
+    ].join(' ');
     const iconPreviewImage = documentObj.createElement('img');
+    iconPreviewImage.className = 'x-nt-shortcut-icon-preview-image';
     iconPreviewImage.alt = '';
     iconPreviewImage.draggable = false;
-    const iconPreviewPlaceholder = documentObj.createElement('i');
-    iconPreviewPlaceholder.className = 'ri-image-add-line';
-    iconPreviewPlaceholder.setAttribute('aria-hidden', 'true');
+    const iconPreviewPlaceholder = documentObj.createElement('span');
+    iconPreviewPlaceholder.className = 'x-nt-wallpaper-upload-placeholder x-nt-shortcut-icon-placeholder';
+    iconPreviewPlaceholder.innerHTML = getRiSvg('ri-add-large-line', 'ri-size-18');
     iconPreview.appendChild(iconPreviewImage);
     iconPreview.appendChild(iconPreviewPlaceholder);
 
-    const iconActions = documentObj.createElement('div');
-    iconActions.className = 'x-nt-shortcut-icon-actions';
-    const iconChooseButton = documentObj.createElement('button');
-    iconChooseButton.type = 'button';
-    iconChooseButton.className = 'x-lumno-action-button x-lumno-action-button--secondary x-nt-shortcut-icon-choose';
     const iconRemoveButton = documentObj.createElement('button');
     iconRemoveButton.type = 'button';
-    iconRemoveButton.className = 'x-nt-shortcut-icon-remove';
+    iconRemoveButton.className = 'x-nt-wallpaper-delete-button x-nt-shortcut-icon-remove';
+    iconRemoveButton.innerHTML = getRiSvg('ri-subtract-line', 'ri-size-14');
     iconRemoveButton.hidden = true;
     const iconInput = documentObj.createElement('input');
     iconInput.type = 'file';
     iconInput.accept = 'image/png,image/jpeg,image/webp';
     iconInput.className = 'x-nt-shortcut-icon-input';
     iconInput.tabIndex = -1;
-    iconActions.appendChild(iconChooseButton);
-    iconActions.appendChild(iconRemoveButton);
-    iconActions.appendChild(iconInput);
-    iconControl.appendChild(iconPreview);
-    iconControl.appendChild(iconActions);
+    iconUploadTile.appendChild(iconPreview);
+    iconUploadTile.appendChild(iconRemoveButton);
+    iconControl.appendChild(iconUploadTile);
+    iconControl.appendChild(iconInput);
 
     const iconError = documentObj.createElement('div');
     iconError.id = `${idPrefix}_icon_error`;
@@ -217,9 +226,11 @@
     iconError.setAttribute('data-visible', 'false');
     iconError.setAttribute('role', 'alert');
     iconError.setAttribute('aria-live', 'polite');
-    iconInput.setAttribute('aria-describedby', `${iconInfoTooltip.id} ${iconError.id}`);
+    iconUploadTile.setAttribute('aria-describedby', `${iconInfoDescription.id} ${iconError.id}`);
+    iconInput.setAttribute('aria-describedby', `${iconInfoDescription.id} ${iconError.id}`);
     iconField.appendChild(iconLabelRow);
     iconField.appendChild(iconControl);
+    iconField.appendChild(iconInfoDescription);
     iconField.appendChild(iconError);
 
     const error = documentObj.createElement('div');
@@ -254,7 +265,7 @@
       nameInput,
       urlInput,
       iconInfoButton,
-      iconChooseButton,
+      iconUploadTile,
       iconRemoveButton,
       cancelButton,
       doneButton
@@ -311,12 +322,16 @@
 
     function updateIconPreview() {
       const hasIcon = Boolean(iconDataUrl);
-      iconPreview.setAttribute('data-has-icon', hasIcon ? 'true' : 'false');
-      iconPreviewImage.src = hasIcon ? iconDataUrl : '';
-      iconRemoveButton.hidden = !hasIcon;
-      iconChooseButton.textContent = hasIcon
+      const chooseText = hasIcon
         ? t('newtab_shortcuts_icon_replace', 'Replace image')
         : t('newtab_shortcuts_icon_choose', 'Choose image');
+      iconUploadTile.setAttribute('data-has-icon', hasIcon ? 'true' : 'false');
+      iconUploadTile.setAttribute('aria-label', chooseText);
+      iconUploadTile.setAttribute('data-tooltip', chooseText);
+      iconPreviewImage.src = hasIcon ? iconDataUrl : '';
+      iconPreviewImage.hidden = !hasIcon;
+      iconPreviewPlaceholder.hidden = hasIcon;
+      iconRemoveButton.hidden = !hasIcon;
     }
 
     function updateLanguage() {
@@ -333,11 +348,14 @@
         'aria-label',
         t('newtab_shortcuts_icon_info_label', 'About local shortcut icons')
       );
-      iconInfoTooltip.textContent = t(
+      iconInfoDescription.textContent = t(
         'newtab_shortcuts_icon_info',
-        'A square PNG at 128 × 128 px or larger with a transparent background is recommended. JPG and WebP are also supported, up to 1 MB. Because of the chrome.storage.sync quota, this icon is saved only on this device and cannot sync to other devices.'
+        'A square PNG at 128 × 128 px or larger with a transparent background is recommended. JPG and WebP are also supported. Files must be 1 MB or smaller, with dimensions no larger than 4096 × 4096 px.\nBecause Chrome extension sync storage (chrome.storage.sync) has a limited quota, this icon is saved only on this device and cannot sync to other devices.'
       );
-      iconRemoveButton.textContent = t('newtab_shortcuts_icon_remove', 'Remove');
+      iconRemoveButton.setAttribute(
+        'aria-label',
+        t('newtab_shortcuts_icon_remove', 'Remove')
+      );
       updateIconPreview();
       cancelButton.textContent = t('newtab_shortcuts_cancel', 'Cancel');
       doneButton.textContent = isEditMode
@@ -345,20 +363,23 @@
         : t('newtab_shortcuts_done', 'Done');
     }
 
+    function updateIconControlState() {
+      const disabled = busy || iconBusy;
+      iconUploadTile.setAttribute('data-loading', disabled ? 'true' : 'false');
+      iconUploadTile.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+      iconRemoveButton.disabled = disabled;
+      doneButton.disabled = disabled;
+      form.setAttribute('aria-busy', disabled ? 'true' : 'false');
+    }
+
     function setBusy(nextBusy) {
       busy = Boolean(nextBusy);
-      iconChooseButton.disabled = busy || iconBusy;
-      iconRemoveButton.disabled = busy || iconBusy;
-      doneButton.disabled = busy || iconBusy;
-      form.setAttribute('aria-busy', busy || iconBusy ? 'true' : 'false');
+      updateIconControlState();
     }
 
     function setIconBusy(nextBusy) {
       iconBusy = Boolean(nextBusy);
-      iconChooseButton.disabled = busy || iconBusy;
-      iconRemoveButton.disabled = busy || iconBusy;
-      doneButton.disabled = busy || iconBusy;
-      form.setAttribute('aria-busy', busy || iconBusy ? 'true' : 'false');
+      updateIconControlState();
     }
 
     function setMode(nextMode, shortcut) {
@@ -425,6 +446,7 @@
         closeTimer = 0;
       }
       backdrop.setAttribute('data-open', 'false');
+      hideTooltip();
       if (backdrop.hidden || closeDelayMs === 0) {
         backdrop.hidden = true;
       } else {
@@ -571,18 +593,35 @@
     }
 
     function handleIconChoose() {
+      if (busy || iconBusy) {
+        return;
+      }
       setIconError('');
       if (typeof iconInput.click === 'function') {
         iconInput.click();
       }
     }
 
-    function handleIconRemove() {
+    function handleIconChooseKeydown(event) {
+      if (!event || (event.key !== 'Enter' && event.key !== ' ')) {
+        return;
+      }
+      event.preventDefault();
+      handleIconChoose();
+    }
+
+    function handleIconRemove(event) {
+      if (event && typeof event.preventDefault === 'function') {
+        event.preventDefault();
+      }
+      if (event && typeof event.stopPropagation === 'function') {
+        event.stopPropagation();
+      }
       iconAction = 'remove';
       iconDataUrl = '';
       setIconError('');
       updateIconPreview();
-      focusElement(iconChooseButton);
+      focusElement(iconUploadTile);
     }
 
     function handleIconChange() {
@@ -629,7 +668,8 @@
       destroyed = true;
       form.removeEventListener('submit', handleSubmit);
       cancelButton.removeEventListener('click', handleCancel);
-      iconChooseButton.removeEventListener('click', handleIconChoose);
+      iconUploadTile.removeEventListener('click', handleIconChoose);
+      iconUploadTile.removeEventListener('keydown', handleIconChooseKeydown);
       iconRemoveButton.removeEventListener('click', handleIconRemove);
       iconInput.removeEventListener('change', handleIconChange);
       backdrop.removeEventListener('pointerdown', handleBackdropPointerDown);
@@ -641,11 +681,20 @@
 
     form.addEventListener('submit', handleSubmit);
     cancelButton.addEventListener('click', handleCancel);
-    iconChooseButton.addEventListener('click', handleIconChoose);
+    iconUploadTile.addEventListener('click', handleIconChoose);
+    iconUploadTile.addEventListener('keydown', handleIconChooseKeydown);
     iconRemoveButton.addEventListener('click', handleIconRemove);
     iconInput.addEventListener('change', handleIconChange);
     backdrop.addEventListener('pointerdown', handleBackdropPointerDown);
     backdrop.addEventListener('keydown', handleKeydown);
+    bindTooltip(iconInfoButton, () => iconInfoDescription.textContent, {
+      placement: 'top',
+      maxWidth: 320
+    });
+    bindTooltip(iconUploadTile, () => iconUploadTile.getAttribute('data-tooltip'), {
+      placement: 'top',
+      maxWidth: 260
+    });
     updateLanguage();
 
     return Object.freeze({
