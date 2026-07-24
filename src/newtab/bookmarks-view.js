@@ -144,6 +144,7 @@
     const openUrl = getFunction(options, 'openUrl', function(url) {
       navigateToUrl(url);
     });
+    const onItemContextMenu = getFunction(options, 'onItemContextMenu');
 
     function shouldOpenUrlInBackground(event) {
       return Boolean(event && (event.metaKey || event.ctrlKey || Number(event.button) === 1));
@@ -390,44 +391,45 @@
         (isMenuVisualLocked || card.getAttribute('aria-expanded') === 'true')
       );
       const isHoverSuppressed = (event) => shouldSuppressHover(card, event) === true;
-      const setFolderExpanded = (active) => {
+      const setFolderExpanded = (active, visualOptions) => {
         const nextActive = Boolean(active);
         if (!folderIcon || isFolderExpanded === nextActive) {
           return;
         }
         isFolderExpanded = nextActive;
         card.classList.toggle('x-nt-bookmark-card--folder-expanded', nextActive);
-        playFolderPathMorph(folderIcon, nextActive);
+        playFolderPathMorph(folderIcon, nextActive, visualOptions);
       };
-      const syncFolderExpandedState = () => {
+      const syncFolderExpandedState = (visualOptions) => {
         setFolderExpanded(
-          shouldKeepMenuVisualActive() || (folderIconsVisible && isHoverVisualActive)
+          shouldKeepMenuVisualActive() || (folderIconsVisible && isHoverVisualActive),
+          visualOptions
         );
       };
-      const setHoverVisualActive = (active) => {
+      const setHoverVisualActive = (active, visualOptions) => {
         const nextActive = Boolean(active);
         if (isHoverVisualActive === nextActive) {
-          syncFolderExpandedState();
+          syncFolderExpandedState(visualOptions);
           return;
         }
         isHoverVisualActive = nextActive;
         card.classList.toggle('x-nt-bookmark-card--hover', nextActive);
-        syncFolderExpandedState();
+        syncFolderExpandedState(visualOptions);
       };
-      const setMenuVisualLocked = (active) => {
+      const setMenuVisualLocked = (active, visualOptions) => {
         const nextActive = Boolean(active);
         if (isMenuVisualLocked === nextActive) {
           if (nextActive) {
-            setHoverVisualActive(true);
-            setFolderExpanded(true);
+            setHoverVisualActive(true, visualOptions);
+            setFolderExpanded(true, visualOptions);
           }
           return;
         }
         isMenuVisualLocked = nextActive;
         clearHoverIntentTimer();
-        setHoverVisualActive(nextActive);
+        setHoverVisualActive(nextActive, visualOptions);
         if (nextActive) {
-          setFolderExpanded(true);
+          setFolderExpanded(true, visualOptions);
         }
       };
       const deactivateBookmarkHoverVisual = () => {
@@ -493,6 +495,14 @@
       });
       card.addEventListener('dragstart', (event) => {
         event.preventDefault();
+      });
+      card.addEventListener('contextmenu', (event) => {
+        onItemContextMenu({
+          event,
+          item,
+          element: card,
+          sourceKind: 'card'
+        });
       });
       bindCursorTooltip(card, () => card._xTitleText || titleText, {
         maxWidth: 460,

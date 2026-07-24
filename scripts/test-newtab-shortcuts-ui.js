@@ -6,6 +6,8 @@ const vm = require('vm');
 const repoRoot = path.resolve(__dirname, '..');
 const newtabJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/newtab.js'), 'utf8');
 const newtabHtml = fs.readFileSync(path.join(repoRoot, 'src/newtab/newtab.html'), 'utf8');
+const shortcutDialogJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/shortcut-dialog.js'), 'utf8');
+const shortcutDialogCss = fs.readFileSync(path.join(repoRoot, 'src/newtab/shortcut-dialog.css'), 'utf8');
 const wallpaperAdaptiveToneJs = fs.readFileSync(path.join(repoRoot, 'src/newtab/wallpaper-adaptive-tone.js'), 'utf8');
 const tooltipJs = fs.readFileSync(path.join(repoRoot, 'src/shared/tooltip.js'), 'utf8');
 const optionsHtml = fs.readFileSync(path.join(repoRoot, 'src/options/options.html'), 'utf8');
@@ -434,33 +436,49 @@ assert.ok(
   'shortcuts store should load before newtab.js'
 );
 
+assertContains(
+  newtabHtml,
+  '<script src="shortcut-icon-store.js"></script>',
+  'new tab page should load the local shortcut icon store'
+);
+
+assert.ok(
+  newtabHtml.indexOf('<script src="shortcut-icon-store.js"></script>') <
+    newtabHtml.indexOf('<script src="shortcut-dialog.js"></script>'),
+  'shortcut icon processing should load before the dialog component'
+);
+
 [
   '.x-nt-shortcuts-section',
   '.x-nt-shortcut-tile',
   '.x-nt-shortcut-tile--add',
   '.x-nt-shortcut-favicon-mask',
-  '.x-nt-shortcut-context-menu',
+  '.x-nt-shortcut-context-menu'
+].forEach((selector) => {
+  assertContains(newtabHtml, selector, `${selector} should be styled`);
+});
+
+[
   '.x-nt-shortcut-dialog',
   '.x-nt-shortcut-dialog-backdrop',
   '.x-lumno-action-button',
   '.x-lumno-action-button--primary',
   '.x-lumno-action-button--secondary'
 ].forEach((selector) => {
-  assertContains(newtabHtml, selector, `${selector} should be styled`);
+  assertContains(shortcutDialogCss, selector, `${selector} should be owned by the dialog component stylesheet`);
 });
 
 assertContains(
-  newtabHtml,
+  shortcutDialogCss,
   'background: var(--x-nt-shortcut-dialog-bg, rgb(255 255 255 / 0.98));',
   'shortcut dialog should use a more solid floating panel surface color'
 );
 
 const wallpaperPanelRule = getCssRuleBlock(newtabHtml, '.x-nt-wallpaper-panel');
-const shortcutDialogRule = getCssRuleBlock(newtabHtml, '.x-nt-shortcut-dialog');
+const shortcutDialogRule = getCssRuleBlock(shortcutDialogCss, '.x-nt-shortcut-dialog');
 const settingsPanelRule = getCssRuleBlock(optionsHtml, '#_x_extension_settings_panel_2024_unique_');
 [
   'border-radius',
-  'border',
   'box-shadow'
 ].forEach((property) => {
   assert.strictEqual(
@@ -469,6 +487,12 @@ const settingsPanelRule = getCssRuleBlock(optionsHtml, '#_x_extension_settings_p
     `shortcut dialog ${property} should match the bottom-right floating panel`
   );
 });
+
+assert.strictEqual(
+  getCssDeclaration(shortcutDialogRule, 'border'),
+  'border: 0;',
+  'shortcut dialog should preserve the current borderless floating surface'
+);
 
 [
   '--input-focus-color',
@@ -486,19 +510,19 @@ const settingsPanelRule = getCssRuleBlock(optionsHtml, '#_x_extension_settings_p
 });
 
 assertContains(
-  newtabHtml,
+  shortcutDialogCss,
   'transform: translate3d(var(--x-nt-shortcut-dialog-enter-x, 0px), var(--x-nt-shortcut-dialog-enter-y, 12px), 0) scale(0.98);',
   'shortcut dialog should open from a trigger-aware direction'
 );
 
 assertContains(
-  newtabHtml,
+  shortcutDialogCss,
   '._x_extension_shortcut_input_2024_unique_',
   'shortcut dialog inputs should reuse the settings text input component class'
 );
 
 const optionsAffixRule = getCssRuleBlock(optionsHtml, '._x_extension_shortcut_input_affix_2026_unique_');
-const newtabAffixRule = getCssRuleBlock(newtabHtml, '.x-nt-shortcut-dialog ._x_extension_shortcut_input_affix_2026_unique_');
+const newtabAffixRule = getCssRuleBlock(shortcutDialogCss, '.x-nt-shortcut-dialog ._x_extension_shortcut_input_affix_2026_unique_');
 [
   'display',
   'align-items',
@@ -521,7 +545,7 @@ const optionsAffixInputRule = getCssRuleBlock(
   '._x_extension_shortcut_input_affix_2026_unique_ ._x_extension_shortcut_input_2024_unique_'
 );
 const newtabAffixInputRule = getCssRuleBlock(
-  newtabHtml,
+  shortcutDialogCss,
   '.x-nt-shortcut-dialog ._x_extension_shortcut_input_affix_2026_unique_ ._x_extension_shortcut_input_2024_unique_'
 );
 [
@@ -540,19 +564,19 @@ const newtabAffixInputRule = getCssRuleBlock(
 });
 
 assertContains(
-  newtabHtml,
+  shortcutDialogCss,
   '.x-nt-shortcut-dialog-backdrop[data-open="true"] .x-nt-shortcut-dialog',
   'shortcut dialog should animate into its open state'
 );
 
 assertContains(
-  newtabHtml,
+  shortcutDialogCss,
   '.x-nt-shortcut-dialog-backdrop[data-preparing="true"] .x-nt-shortcut-dialog',
   'shortcut dialog should disable transitions while its trigger-aware start position is prepared'
 );
 
 assertContains(
-  newtabHtml,
+  shortcutDialogCss,
   '@media (prefers-reduced-motion: reduce)',
   'shortcut dialog motion should respect reduced-motion preferences'
 );
@@ -961,6 +985,12 @@ assertContains(
   newtabJs,
   'img.draggable = false;',
   'shortcut favicon images should not be individually draggable'
+);
+
+assertContains(
+  getFunctionSource(newtabJs, 'renderShortcutTile'),
+  "tile.setAttribute('data-shortcut-custom-icon', 'true');",
+  'shortcut tiles should mark and render a locally uploaded icon before favicon fallbacks'
 );
 
 assertContains(
@@ -1698,13 +1728,13 @@ assertContains(
 
 assertContains(
   newtabJs,
-  'function saveEditedShortcutFromDialog(title, url) {',
+  'function saveEditedShortcutFromDialog(title, url, shortcutId, iconState) {',
   'shortcut dialog should have a dedicated edit save path'
 );
 
 assertContains(
   getFunctionSource(newtabJs, 'saveShortcutFromDialog'),
-  'return saveEditedShortcutFromDialog(title, url);',
+  'return saveEditedShortcutFromDialog(title, url, dialogState.shortcutId, iconState);',
   'shortcut dialog submit should branch cleanly between add and edit modes'
 );
 
@@ -1716,84 +1746,84 @@ assertContains(
 
 assertContains(
   newtabJs,
-  'function persistShortcuts(nextShortcuts, toastMessage) {',
+  'function persistShortcuts(nextShortcuts, toastMessage, iconChange) {',
   'shortcut edit/remove should share one normalized persistence helper'
 );
 
 assertContains(
   newtabJs,
-  'function openShortcutDialog()',
-  'newtab runtime should open a modal dialog for shortcut creation'
+  'NEWTAB_SHORTCUT_DIALOG.createShortcutDialog({',
+  'newtab runtime should instantiate the shortcut dialog component'
 );
 
 assertContains(
-  newtabJs,
-  'function setShortcutDialogEnterDirection(sourceElement)',
-  'shortcut dialog should calculate its enter direction from the trigger position'
+  shortcutDialogJs,
+  'function setEnterDirection(sourceElement)',
+  'shortcut dialog component should calculate its enter direction from the trigger position'
 );
 
 assertContains(
-  newtabJs,
-  "shortcutDialog.style.setProperty('--x-nt-shortcut-dialog-enter-x'",
+  shortcutDialogJs,
+  "dialog.style.setProperty('--x-nt-shortcut-dialog-enter-x'",
   'shortcut dialog should write a trigger-aware x enter offset'
 );
 
 assertContains(
-  newtabJs,
-  "shortcutDialog.style.setProperty('--x-nt-shortcut-dialog-enter-y'",
+  shortcutDialogJs,
+  "dialog.style.setProperty('--x-nt-shortcut-dialog-enter-y'",
   'shortcut dialog should write a trigger-aware y enter offset'
 );
 
 assertContains(
-  newtabJs,
-  "shortcutDialogBackdrop.setAttribute('data-open', 'false');\n    shortcutDialogBackdrop.hidden = false;",
+  shortcutDialogJs,
+  "backdrop.setAttribute('data-open', 'false');\n      backdrop.hidden = false;",
   'shortcut dialog should start closed before animating open'
 );
 
 assertContains(
-  newtabJs,
-  "shortcutDialogBackdrop.setAttribute('data-preparing', 'true');",
+  shortcutDialogJs,
+  "backdrop.setAttribute('data-preparing', 'true');",
   'shortcut dialog should prepare its start position before transitions are enabled'
 );
 
 assertContains(
-  newtabJs,
-  "setShortcutDialogEnterDirection(options && options.sourceElement);",
+  shortcutDialogJs,
+  'setEnterDirection(openOpts.sourceElement);',
   'shortcut dialog should set its enter direction before animating open'
 );
 
 assertContains(
-  newtabJs,
-  "shortcutDialogBackdrop.removeAttribute('data-preparing');",
+  shortcutDialogJs,
+  "backdrop.removeAttribute('data-preparing');",
   'shortcut dialog should re-enable transitions before opening'
 );
 
 assertContains(
-  newtabJs,
-  "shortcutDialogBackdrop.setAttribute('data-open', 'true');",
+  shortcutDialogJs,
+  "backdrop.setAttribute('data-open', 'true');",
   'shortcut dialog should move into its animated open state'
 );
 
 assertContains(
-  newtabJs,
-  'function handleShortcutFormSubmit(event)',
-  'newtab runtime should handle shortcut form submission'
+  shortcutDialogJs,
+  'function handleSubmit(event)',
+  'shortcut dialog component should own form submission behavior'
 );
 
 assertContains(
   newtabJs,
-  'NEWTAB_SHORTCUTS_STORE.saveShortcut(',
-  'newtab runtime should persist new shortcuts through the store'
+  'shortcutIconStore.writeAll(nextIcons)',
+  'newtab runtime should persist custom icons in the local-only icon store'
 );
 
 assertContains(
   newtabJs,
-  'const shortcutsReadyPromise = loadShortcuts();',
-  'newtab runtime should start loading shortcuts before the ready transition'
+  'return Promise.all([loadShortcuts(), loadShortcutIcons()]).then(() => {',
+  'newtab runtime should load shortcut metadata and local icons together'
 );
 
 assert.ok(
-  newtabJs.indexOf('const shortcutsReadyPromise = loadShortcuts();') <
+  newtabJs.indexOf('const shortcutsReadyPromise = loadNewtabShortcutsVisibility().then(loadVisibleShortcuts);') <
     newtabJs.indexOf('markNewtabReady();'),
   'newtab runtime should not mark the page ready before shortcut loading starts'
 );
@@ -1805,49 +1835,49 @@ assert.match(
 );
 
 assertContains(
-  newtabJs,
-  "shortcutCancelButton.className = 'x-lumno-action-button x-lumno-action-button--secondary x-nt-shortcut-dialog-button x-nt-shortcut-dialog-button--secondary';",
+  shortcutDialogJs,
+  "cancelButton.className = 'x-lumno-action-button x-lumno-action-button--secondary x-nt-shortcut-dialog-button x-nt-shortcut-dialog-button--secondary';",
   'shortcut cancel button should use the Lumno secondary button component'
 );
 
 assertContains(
-  newtabJs,
-  "shortcutDoneButton.className = 'x-lumno-action-button x-lumno-action-button--primary x-nt-shortcut-dialog-button x-nt-shortcut-dialog-button--primary';",
+  shortcutDialogJs,
+  "doneButton.className = 'x-lumno-action-button x-lumno-action-button--primary x-nt-shortcut-dialog-button x-nt-shortcut-dialog-button--primary';",
   'shortcut done button should use the Lumno primary button component'
 );
 
 assertContains(
-  newtabJs,
-  "shortcutNameInput.className = '_x_extension_shortcut_input_2024_unique_';",
+  shortcutDialogJs,
+  "nameInput.className = '_x_extension_shortcut_input_2024_unique_';",
   'shortcut name input should reuse the settings text input component'
 );
 
 assertContains(
-  newtabJs,
+  shortcutDialogJs,
   "nameInputShell.className = '_x_extension_shortcut_input_affix_2026_unique_';",
   'shortcut name input should use the options input affix wrapper'
 );
 
 assertContains(
-  newtabJs,
+  shortcutDialogJs,
   "nameInputShell.setAttribute('data-has-prefix', 'false');",
   'shortcut name input affix should use the no-prefix options mode'
 );
 
 assertContains(
-  newtabJs,
-  "shortcutUrlInput.className = '_x_extension_shortcut_input_2024_unique_';",
+  shortcutDialogJs,
+  "urlInput.className = '_x_extension_shortcut_input_2024_unique_';",
   'shortcut url input should reuse the settings text input component'
 );
 
 assertContains(
-  newtabJs,
+  shortcutDialogJs,
   "urlInputShell.className = '_x_extension_shortcut_input_affix_2026_unique_';",
   'shortcut url input should use the options input affix wrapper'
 );
 
 assertContains(
-  newtabJs,
+  shortcutDialogJs,
   "urlInputShell.setAttribute('data-has-prefix', 'false');",
   'shortcut url input affix should use the no-prefix options mode'
 );
@@ -1878,6 +1908,17 @@ assertContains(
   'newtab_shortcuts_dialog_title',
   'newtab_shortcuts_name_label',
   'newtab_shortcuts_url_label',
+  'newtab_shortcuts_icon_label',
+  'newtab_shortcuts_icon_info_label',
+  'newtab_shortcuts_icon_info',
+  'newtab_shortcuts_icon_choose',
+  'newtab_shortcuts_icon_replace',
+  'newtab_shortcuts_icon_remove',
+  'newtab_shortcuts_icon_unsupported',
+  'newtab_shortcuts_icon_file_too_large',
+  'newtab_shortcuts_icon_dimensions_too_large',
+  'newtab_shortcuts_icon_invalid',
+  'newtab_shortcuts_icon_storage_error',
   'newtab_shortcuts_cancel',
   'newtab_shortcuts_done',
   'newtab_shortcuts_save',

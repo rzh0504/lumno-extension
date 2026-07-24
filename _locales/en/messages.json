@@ -626,8 +626,17 @@
   "newtab_feedback_wechat_panel_title": {
     "message": "Bug reports & feature requests"
   },
-  "newtab_feedback_wechat_collapse_aria": {
-    "message": "Collapse feedback panel"
+  "newtab_feedback_wechat_refresh_tooltip": {
+    "message": "Refresh QR code"
+  },
+  "newtab_feedback_wechat_refresh_success": {
+    "message": "Latest QR code loaded"
+  },
+  "newtab_feedback_wechat_refresh_error": {
+    "message": "Couldn't refresh. Try again."
+  },
+  "newtab_feedback_wechat_close_tooltip": {
+    "message": "Close"
   },
   "newtab_feedback_discord_label": {
     "message": "Discord"
@@ -1057,6 +1066,33 @@
   },
   "bookmarks_copy_url_failed": {
     "message": "Could not copy link"
+  },
+  "bookmarks_delete": {
+    "message": "Delete"
+  },
+  "bookmarks_context_menu_label": {
+    "message": "Bookmark actions"
+  },
+  "bookmarks_delete_undone": {
+    "message": "Deletion undone · {shortcut} to delete again"
+  },
+  "bookmarks_delete_redone": {
+    "message": "Deletion restored · {shortcut} to undo"
+  },
+  "bookmarks_delete_failed": {
+    "message": "Could not delete bookmark"
+  },
+  "bookmarks_move_success": {
+    "message": "Moved “{title}” · {shortcut} to undo"
+  },
+  "bookmarks_move_undone": {
+    "message": "Move undone · {shortcut} to redo"
+  },
+  "bookmarks_move_redone": {
+    "message": "Move restored · {shortcut} to undo"
+  },
+  "bookmarks_move_failed": {
+    "message": "Could not move bookmark"
   },
   "search_tag_history": {
     "message": "History"
@@ -1526,6 +1562,39 @@
   "newtab_shortcuts_url_placeholder": {
     "message": "https://example.com"
   },
+  "newtab_shortcuts_icon_label": {
+    "message": "Icon (optional)"
+  },
+  "newtab_shortcuts_icon_info_label": {
+    "message": "About local shortcut icons"
+  },
+  "newtab_shortcuts_icon_info": {
+    "message": "A square PNG at 128×128 px or larger with a transparent background is recommended. JPG and WebP are also supported, up to 1 MB. Because of the chrome.storage.sync quota, this icon is saved only on this device and cannot sync to other devices."
+  },
+  "newtab_shortcuts_icon_choose": {
+    "message": "Choose image"
+  },
+  "newtab_shortcuts_icon_replace": {
+    "message": "Replace image"
+  },
+  "newtab_shortcuts_icon_remove": {
+    "message": "Remove"
+  },
+  "newtab_shortcuts_icon_unsupported": {
+    "message": "Choose a PNG, JPG, or WebP image"
+  },
+  "newtab_shortcuts_icon_file_too_large": {
+    "message": "The image must be 1 MB or smaller"
+  },
+  "newtab_shortcuts_icon_dimensions_too_large": {
+    "message": "The image must be no larger than 4096×4096 px"
+  },
+  "newtab_shortcuts_icon_invalid": {
+    "message": "This image could not be used. Choose another image"
+  },
+  "newtab_shortcuts_icon_storage_error": {
+    "message": "The local icon could not be saved. Try another image"
+  },
   "newtab_shortcuts_cancel": {
     "message": "Cancel"
   },
@@ -1558,5 +1627,10 @@
   },
   "settings_tab_switcher_desc": {
     "message": "Press Alt/⌥+Q to switch recent tabs."
-  }
+  },
+  "slash_command_empty": { "message": "No matching commands" },
+  "command_tabs_title": { "message": "Search open tabs only" },
+  "command_tabs_action": { "message": "Search tabs" },
+  "command_copy_title": { "message": "Copy current page link" },
+  "command_copy_action": { "message": "Copy link" }
 }

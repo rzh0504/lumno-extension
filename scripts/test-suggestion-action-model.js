@@ -5,11 +5,30 @@ require('../src/shared/suggestion-action-model.js');
 const actionModel = globalThis.LumnoSuggestionActionModel;
 
 assert.ok(actionModel, 'suggestion action model should be exported');
-assert.strictEqual(
-  actionModel.getVisitButtonAction({ type: 'zenSwitch' }),
-  null,
-  'Zen mode commands should not render a navigation action button'
-);
+[
+  'commandNewTab',
+  'commandSettings',
+  'modeSwitch',
+  'zenSwitch',
+  'commandOpenTabs',
+  'commandCopyUrl',
+  'commandDocumentPip'
+].forEach((type) => {
+  assert.strictEqual(
+    actionModel.getVisitButtonAction({ type }),
+    null,
+    `${type} command rows should not render a redundant action button`
+  );
+  const commandModel = actionModel.createSearchActionModel({
+    suggestion: { type },
+    isPrimaryHighlight: true,
+    primaryHighlightReason: 'command'
+  });
+  assert.strictEqual(commandModel.alwaysHideVisitButton, true,
+    `${type} command rows should keep the right-side action hidden`);
+  assert.deepStrictEqual(commandModel.actionTags, [],
+    `${type} command rows should not replace the removed action with an Enter tag`);
+});
 assert.strictEqual(
   actionModel.getModifierAdjustedAction('openNewTab', { openInCurrentTab: true }),
   'go',

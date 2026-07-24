@@ -123,6 +123,7 @@ const windowObj = {
 };
 const openedFolders = [];
 const morphStates = [];
+const morphOptions = [];
 const cards = [];
 const view = createBookmarksView({
   documentObj,
@@ -139,8 +140,9 @@ const view = createBookmarksView({
   getRiSvg: () => '',
   getFigmaFolderSvg: () => '',
   initFolderPathMorph() {},
-  playFolderPathMorph: (_folderIcon, active) => {
+  playFolderPathMorph: (_folderIcon, active, options) => {
     morphStates.push(Boolean(active));
+    morphOptions.push(options || null);
   },
   stableHashCode: () => 0,
   normalizeHost: (host) => host,
@@ -293,6 +295,29 @@ assert.deepStrictEqual(
   morphStates,
   [true, false, true, false, true],
   'direct folder navigation should play the opening animation when hover previews are disabled'
+);
+
+const reboundCard = view.buildCard(
+  { id: 'rebound', title: 'Rebound', type: 'folder', previewUrls: [] },
+  2,
+  { viewMode: 'list', menuMode: true }
+);
+reboundCard.setAttribute('aria-expanded', 'true');
+reboundCard._xSetBookmarkMenuVisualActive(true, { instant: true });
+assert.strictEqual(
+  reboundCard.classList.contains('x-nt-bookmark-card--hover'),
+  true,
+  'a rebound cascade anchor should synchronously inherit the active card state'
+);
+assert.strictEqual(
+  reboundCard.classList.contains('x-nt-bookmark-card--folder-expanded'),
+  true,
+  'a rebound cascade anchor should synchronously inherit the expanded folder state'
+);
+assert.deepStrictEqual(
+  morphOptions[morphOptions.length - 1],
+  { instant: true },
+  'rebinding a cascade anchor should restore its folder icon without replaying the morph animation'
 );
 
 console.log('newtab bookmark folder menu state tests passed');

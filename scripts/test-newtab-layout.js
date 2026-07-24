@@ -509,6 +509,11 @@ function testBottomDockCssDefinesAdaptiveDensityVariables() {
   );
   assert.match(
     newtabHtml,
+    /\.x-nt-folder-preview\s*\{[\s\S]*?margin-right:\s*-2px;[\s\S]*?\.x-nt-bookmark-card--folder\.x-nt-bookmark-card--folder-expanded \.x-nt-folder-preview\s*\{[\s\S]*?padding:\s*2px 0 2px 3px;/,
+    'folder preview favicons should align their right edge while preserving left-side rotation clearance'
+  );
+  assert.match(
+    newtabHtml,
     /\.x-nt-recent-inner\s*\{[\s\S]*?padding:\s*var\(--x-nt-dock-recent-inner-padding,\s*13px 13px 14px 15px\);[\s\S]*?height:\s*var\(--x-nt-dock-recent-inner-height,\s*104px\);/,
     'recent cards should consume adaptive dock sizing tokens'
   );

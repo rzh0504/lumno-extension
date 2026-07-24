@@ -626,8 +626,17 @@
   "newtab_feedback_wechat_panel_title": {
     "message": "不具合・要望"
   },
-  "newtab_feedback_wechat_collapse_aria": {
-    "message": "フィードバック欄を折りたたむ"
+  "newtab_feedback_wechat_refresh_tooltip": {
+    "message": "QRコードを更新"
+  },
+  "newtab_feedback_wechat_refresh_success": {
+    "message": "最新のQRコードを取得しました"
+  },
+  "newtab_feedback_wechat_refresh_error": {
+    "message": "更新できませんでした。もう一度お試しください"
+  },
+  "newtab_feedback_wechat_close_tooltip": {
+    "message": "閉じる"
   },
   "newtab_feedback_discord_label": {
     "message": "Discord"
@@ -1057,6 +1066,33 @@
   },
   "bookmarks_copy_url_failed": {
     "message": "リンクをコピーできませんでした"
+  },
+  "bookmarks_delete": {
+    "message": "削除"
+  },
+  "bookmarks_context_menu_label": {
+    "message": "ブックマークの操作"
+  },
+  "bookmarks_delete_undone": {
+    "message": "削除を元に戻しました · {shortcut} でもう一度削除"
+  },
+  "bookmarks_delete_redone": {
+    "message": "削除をやり直しました · {shortcut} で元に戻す"
+  },
+  "bookmarks_delete_failed": {
+    "message": "ブックマークを削除できませんでした"
+  },
+  "bookmarks_move_success": {
+    "message": "「{title}」を移動しました · {shortcut} で元に戻す"
+  },
+  "bookmarks_move_undone": {
+    "message": "移動を元に戻しました · {shortcut} でやり直す"
+  },
+  "bookmarks_move_redone": {
+    "message": "移動をやり直しました · {shortcut} で元に戻す"
+  },
+  "bookmarks_move_failed": {
+    "message": "ブックマークを移動できませんでした"
   },
   "search_tag_history": {
     "message": "履歴"
@@ -1526,6 +1562,39 @@
   "newtab_shortcuts_url_placeholder": {
     "message": "https://example.com"
   },
+  "newtab_shortcuts_icon_label": {
+    "message": "アイコン（任意）"
+  },
+  "newtab_shortcuts_icon_info_label": {
+    "message": "ローカルアイコンについて"
+  },
+  "newtab_shortcuts_icon_info": {
+    "message": "背景が透明な 128×128 px 以上の正方形 PNG を推奨します。JPG と WebP にも対応し、ファイルは最大 1 MB です。chrome.storage.sync の同期ストレージ割り当て上限により、このアイコンはこのデバイスにのみ保存され、ほかのデバイスには同期されません。"
+  },
+  "newtab_shortcuts_icon_choose": {
+    "message": "画像を選択"
+  },
+  "newtab_shortcuts_icon_replace": {
+    "message": "画像を変更"
+  },
+  "newtab_shortcuts_icon_remove": {
+    "message": "削除"
+  },
+  "newtab_shortcuts_icon_unsupported": {
+    "message": "PNG、JPG、または WebP 画像を選択してください"
+  },
+  "newtab_shortcuts_icon_file_too_large": {
+    "message": "画像は 1 MB 以下にしてください"
+  },
+  "newtab_shortcuts_icon_dimensions_too_large": {
+    "message": "画像サイズは 4096×4096 px 以下にしてください"
+  },
+  "newtab_shortcuts_icon_invalid": {
+    "message": "この画像は使用できません。別の画像を選択してください"
+  },
+  "newtab_shortcuts_icon_storage_error": {
+    "message": "ローカルアイコンを保存できませんでした。別の画像をお試しください"
+  },
   "newtab_shortcuts_cancel": {
     "message": "キャンセル"
   },
@@ -1558,5 +1627,10 @@
   },
   "settings_tab_switcher_desc": {
     "message": "Alt/⌥+Q で最近のタブをすばやく切り替えます。"
-  }
+  },
+  "slash_command_empty": { "message": "一致するコマンドはありません" },
+  "command_tabs_title": { "message": "開いているタブのみを検索" },
+  "command_tabs_action": { "message": "タブを検索" },
+  "command_copy_title": { "message": "現在のページのリンクをコピー" },
+  "command_copy_action": { "message": "リンクをコピー" }
 }

@@ -626,8 +626,17 @@
   "newtab_feedback_wechat_panel_title": {
     "message": "Bug 反馈 & 新功能提需"
   },
-  "newtab_feedback_wechat_collapse_aria": {
-    "message": "收起反馈面板"
+  "newtab_feedback_wechat_refresh_tooltip": {
+    "message": "刷新二维码"
+  },
+  "newtab_feedback_wechat_refresh_success": {
+    "message": "已拉取最新二维码"
+  },
+  "newtab_feedback_wechat_refresh_error": {
+    "message": "刷新失败，请稍后重试"
+  },
+  "newtab_feedback_wechat_close_tooltip": {
+    "message": "关闭"
   },
   "newtab_feedback_discord_label": {
     "message": "Discord"
@@ -1057,6 +1066,33 @@
   },
   "bookmarks_copy_url_failed": {
     "message": "复制链接失败，请重试"
+  },
+  "bookmarks_delete": {
+    "message": "删除"
+  },
+  "bookmarks_context_menu_label": {
+    "message": "书签操作"
+  },
+  "bookmarks_delete_undone": {
+    "message": "已撤回删除 · {shortcut} 重新删除"
+  },
+  "bookmarks_delete_redone": {
+    "message": "已恢复删除 · {shortcut} 撤回"
+  },
+  "bookmarks_delete_failed": {
+    "message": "无法删除书签"
+  },
+  "bookmarks_move_success": {
+    "message": "已移动“{title}” · {shortcut} 撤回"
+  },
+  "bookmarks_move_undone": {
+    "message": "已撤回移动 · {shortcut} 恢复"
+  },
+  "bookmarks_move_redone": {
+    "message": "已恢复移动 · {shortcut} 撤回"
+  },
+  "bookmarks_move_failed": {
+    "message": "无法移动书签"
   },
   "search_tag_history": {
     "message": "历史"
@@ -1526,6 +1562,39 @@
   "newtab_shortcuts_url_placeholder": {
     "message": "https://example.com"
   },
+  "newtab_shortcuts_icon_label": {
+    "message": "图标（可选）"
+  },
+  "newtab_shortcuts_icon_info_label": {
+    "message": "本地图标说明"
+  },
+  "newtab_shortcuts_icon_info": {
+    "message": "推荐使用 128×128 px 或更大的透明背景正方形 PNG；也支持 JPG、WebP，文件最大 1 MB。受 chrome.storage.sync 同步存储配额限制，本地图标仅保存在此设备，无法同步到其他设备。"
+  },
+  "newtab_shortcuts_icon_choose": {
+    "message": "选择图片"
+  },
+  "newtab_shortcuts_icon_replace": {
+    "message": "更换图片"
+  },
+  "newtab_shortcuts_icon_remove": {
+    "message": "移除"
+  },
+  "newtab_shortcuts_icon_unsupported": {
+    "message": "请选择 PNG、JPG 或 WebP 图片"
+  },
+  "newtab_shortcuts_icon_file_too_large": {
+    "message": "图片大小不能超过 1 MB"
+  },
+  "newtab_shortcuts_icon_dimensions_too_large": {
+    "message": "图片尺寸不能超过 4096×4096 px"
+  },
+  "newtab_shortcuts_icon_invalid": {
+    "message": "无法使用该图片，请选择其他图片"
+  },
+  "newtab_shortcuts_icon_storage_error": {
+    "message": "本地图标保存失败，请尝试其他图片"
+  },
   "newtab_shortcuts_cancel": {
     "message": "取消"
   },
@@ -1558,5 +1627,10 @@
   },
   "settings_tab_switcher_desc": {
     "message": "按 Alt/⌥+Q 快速切换最近标签页"
-  }
+  },
+  "slash_command_empty": { "message": "无匹配命令" },
+  "command_tabs_title": { "message": "仅搜索已打开的标签页" },
+  "command_tabs_action": { "message": "搜索标签页" },
+  "command_copy_title": { "message": "复制当前页面链接" },
+  "command_copy_action": { "message": "复制链接" }
 }

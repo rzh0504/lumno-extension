@@ -80,8 +80,8 @@ assert.match(
 
 assert.match(
   actionModelJs,
-  /if \(suggestion\.type === 'commandDocumentPip'\) \{[\s\S]*?return 'commandDocumentPip';/,
-  'suggestion action model should expose a command-specific action for web clip'
+  /const COMMAND_SUGGESTION_TYPES = new Set\(\[[\s\S]*?'commandDocumentPip'[\s\S]*?\]\);[\s\S]*?COMMAND_SUGGESTION_TYPES\.has\(suggestion\.type\)[\s\S]*?return null;/,
+  'web clip command rows should rely on whole-row activation without a redundant action button'
 );
 
 ['en', 'ja', 'zh_CN', 'zh_TW'].forEach((locale) => {

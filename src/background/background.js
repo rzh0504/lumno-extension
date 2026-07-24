@@ -4287,9 +4287,11 @@ function getConfiguredCopyUrlCommandShortcut(callback) {
   });
 }
 
-function triggerCopyCurrentUrlForTab(activeTab, source) {
+function triggerCopyCurrentUrlForTab(activeTab, source, callback) {
+  const finish = typeof callback === 'function' ? callback : function() {};
   if (!activeTab || typeof activeTab.id !== 'number') {
     logHotkeyDebug('copy-url-no-active-tab', { source: source || '' });
+    finish(false);
     return;
   }
   chrome.tabs.sendMessage(activeTab.id, { action: 'copyCurrentPageUrlFromCommand' }, (response) => {
@@ -4299,6 +4301,7 @@ function triggerCopyCurrentUrlForTab(activeTab, source) {
         source: source || '',
         error: chrome.runtime.lastError.message || 'unknown'
       });
+      finish(false);
       return;
     }
     logHotkeyDebug('copy-url-triggered', {
@@ -4306,6 +4309,7 @@ function triggerCopyCurrentUrlForTab(activeTab, source) {
       source: source || '',
       ok: Boolean(response && response.ok)
     });
+    finish(Boolean(response && response.ok));
   });
 }
 
@@ -4695,6 +4699,7 @@ const BACKGROUND_MESSAGE_ROUTE_GROUPS = Object.freeze({
     actions: [
       'getShowSearchShortcut',
       'getCopyCurrentUrlCommandShortcut',
+      'copyCurrentPageUrl',
       'triggerShowSearchFromPageHotkey',
       'getShortcutRules'
     ],
@@ -4912,6 +4917,13 @@ function handleShortcutMessage(request, sender, sendResponse) {
     case 'getCopyCurrentUrlCommandShortcut': {
       getConfiguredCopyUrlCommandShortcut((shortcut) => {
         sendResponse({ shortcut: shortcut || '' });
+      });
+      return true;
+    }
+    case 'copyCurrentPageUrl': {
+      const senderTab = sender && sender.tab ? sender.tab : null;
+      triggerCopyCurrentUrlForTab(senderTab, 'slash-command', (ok) => {
+        sendResponse({ ok: Boolean(ok) });
       });
       return true;
     }

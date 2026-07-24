@@ -135,27 +135,41 @@ assertContains(
   'wechat detail state should hide the four feedback icons'
 );
 
-assertContains(
-  newtabJs,
-  'x-nt-feedback-detail-collapse',
-  'wechat detail should expose a collapse button'
-);
-
-assertContains(
-  newtabJs,
-  "collapseButton.className = 'x-nt-feedback-action x-nt-feedback-detail-collapse';",
-  'wechat detail collapse button should reuse the existing feedback icon button treatment'
-);
-
 assert.ok(
-  !newtabHtml.includes('.x-nt-feedback-detail-collapse {'),
-  'wechat detail collapse button should not define a custom button surface'
+  !newtabJs.includes('x-nt-feedback-detail-collapse') &&
+    !newtabHtml.includes('x-nt-feedback-detail-collapse') &&
+    !newtabJs.includes('ri-arrow-down-s-line'),
+  'wechat detail should remove the former top-left collapse button'
+);
+
+assertContains(
+  newtabJs,
+  "feedbackDetailRefreshButton.innerHTML = getRiSvg('ri-refresh-line', 'ri-size-16');",
+  'wechat detail should place a refresh icon in the header actions'
+);
+
+assertContains(
+  newtabJs,
+  "feedbackDetailCloseButton.innerHTML = getRiSvg('ri-close-line', 'ri-size-16');",
+  'wechat detail should place a close icon after the refresh icon'
+);
+
+assert.match(
+  newtabJs,
+  /actions\.appendChild\(feedbackDetailRefreshButton\);\s*actions\.appendChild\(feedbackDetailCloseButton\);/,
+  'wechat detail should place refresh to the left of close'
+);
+
+assertContains(
+  newtabHtml,
+  '.x-nt-feedback-detail-actions {',
+  'wechat detail should align its icon actions at the right side of the header'
 );
 
 assert.match(
   newtabHtml,
-  /\.x-nt-feedback-detail-collapse:hover \{[\s\S]*?transform: none;/,
-  'wechat detail collapse button should not lift on hover'
+  /\.x-nt-feedback-detail-action \{[\s\S]*?width: 28px;[\s\S]*?background: transparent;/,
+  'wechat detail header icons should use compact transparent hit targets'
 );
 
 assertContains(
@@ -166,8 +180,8 @@ assertContains(
 
 assertContains(
   newtabJs,
-  "collapseButton.innerHTML = getRiSvg('ri-arrow-down-s-line', 'ri-size-16');",
-  'wechat detail collapse button should use a chevron-down icon'
+  "closeFeedbackPopover({ restoreFocus: true });",
+  'wechat detail close icon should close the whole feedback popover and restore focus'
 );
 
 assertContains(
@@ -232,6 +246,48 @@ assertContains(
   'wechat QR image should reserve its published height before loading'
 );
 
+assert.match(
+  newtabJs,
+  /async function handleFeedbackQrRefresh\(event\)[\s\S]*?loadFeedbackLinks\(\{ force: true \}\)/,
+  'wechat refresh should force a new remote community-links request'
+);
+
+assertContains(
+  newtabJs,
+  "url.searchParams.set('_lumno_refresh', String(Date.now()));",
+  'wechat refresh should cache-bust a QR URL even when the server reuses the same path'
+);
+
+assert.match(
+  newtabJs,
+  /const loaded = await preloadFeedbackQrImage\(refreshedUrl\);[\s\S]*?feedbackQrImage\.src = refreshedUrl;/,
+  'wechat refresh should only replace the visible QR image after the fresh image loads'
+);
+
+assertContains(
+  newtabJs,
+  "t('newtab_feedback_wechat_refresh_success', 'Latest QR code loaded')",
+  'wechat refresh should show a success tooltip after the latest image loads'
+);
+
+assertContains(
+  newtabJs,
+  "t('newtab_feedback_wechat_refresh_error', 'Could not refresh. Try again.')",
+  'wechat refresh should show an error tooltip when the fresh image cannot be loaded'
+);
+
+assert.match(
+  newtabJs,
+  /setFeedbackActionLabel\(\s*feedbackDetailRefreshButton,[\s\S]*?newtab_feedback_wechat_refresh_tooltip/,
+  'wechat refresh icon should expose a localized tooltip and accessible label'
+);
+
+assert.match(
+  newtabJs,
+  /setFeedbackActionLabel\(\s*feedbackDetailCloseButton,[\s\S]*?newtab_feedback_wechat_close_tooltip/,
+  'wechat close icon should expose a localized tooltip and accessible label'
+);
+
 assertContains(
   newtabJs,
   "t('newtab_feedback_wechat_panel_title', 'Bug reports & feature requests')",
@@ -264,6 +320,70 @@ assert.strictEqual(
   '不具合・要望',
   'ja should label the expanded wechat panel clearly'
 );
+
+[
+  [
+    zhCnMessages,
+    {
+      refresh: '刷新二维码',
+      success: '已拉取最新二维码',
+      error: '刷新失败，请稍后重试',
+      close: '关闭'
+    },
+    'zh-CN'
+  ],
+  [
+    zhTwMessages,
+    {
+      refresh: '重新整理 QR Code',
+      success: '已取得最新 QR Code',
+      error: '重新整理失敗，請稍後再試',
+      close: '關閉'
+    },
+    'zh-TW'
+  ],
+  [
+    enMessages,
+    {
+      refresh: 'Refresh QR code',
+      success: 'Latest QR code loaded',
+      error: "Couldn't refresh. Try again.",
+      close: 'Close'
+    },
+    'en'
+  ],
+  [
+    jaMessages,
+    {
+      refresh: 'QRコードを更新',
+      success: '最新のQRコードを取得しました',
+      error: '更新できませんでした。もう一度お試しください',
+      close: '閉じる'
+    },
+    'ja'
+  ]
+].forEach(([messages, expected, locale]) => {
+  assert.strictEqual(
+    getMessage(messages, 'newtab_feedback_wechat_refresh_tooltip'),
+    expected.refresh,
+    `${locale} should label the QR refresh icon`
+  );
+  assert.strictEqual(
+    getMessage(messages, 'newtab_feedback_wechat_refresh_success'),
+    expected.success,
+    `${locale} should confirm a successful QR refresh`
+  );
+  assert.strictEqual(
+    getMessage(messages, 'newtab_feedback_wechat_refresh_error'),
+    expected.error,
+    `${locale} should explain a failed QR refresh`
+  );
+  assert.strictEqual(
+    getMessage(messages, 'newtab_feedback_wechat_close_tooltip'),
+    expected.close,
+    `${locale} should label the feedback close icon`
+  );
+});
 
 assert.strictEqual(
   getMessage(zhCnMessages, 'newtab_feedback_chrome_review_label'),

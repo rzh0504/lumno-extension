@@ -125,6 +125,25 @@
       return Boolean(event && (event.metaKey || event.ctrlKey || Number(event.button) === 1));
     }
 
+    function isRecentTitleTruncated(titleElement) {
+      if (!titleElement) {
+        return false;
+      }
+      const scrollWidth = Number(titleElement.scrollWidth);
+      const clientWidth = Number(titleElement.clientWidth);
+      const scrollHeight = Number(titleElement.scrollHeight);
+      const clientHeight = Number(titleElement.clientHeight);
+      const hasHorizontalOverflow = Number.isFinite(scrollWidth) &&
+        Number.isFinite(clientWidth) &&
+        clientWidth > 0 &&
+        scrollWidth > clientWidth + 1;
+      const hasVerticalOverflow = Number.isFinite(scrollHeight) &&
+        Number.isFinite(clientHeight) &&
+        clientHeight > 0 &&
+        scrollHeight > clientHeight + 1;
+      return hasHorizontalOverflow || hasVerticalOverflow;
+    }
+
     function buildCard(item, index) {
       if (!item || !item.url || !documentObj) {
         return null;
@@ -189,7 +208,6 @@
       title.className = 'x-nt-recent-title';
       const safeTitleText = sanitizeDisplayText(titleText);
       title.textContent = safeTitleText;
-      title.title = safeTitleText;
 
       const urlLine = documentObj.createElement('div');
       urlLine.className = 'x-nt-recent-url';
@@ -227,6 +245,7 @@
 
       let isCardPointerActive = false;
       let hasNavigateAttempted = false;
+      let isTooltipSuppressedAfterActivation = false;
       let suppressClickAfterPointerNavigation = false;
       let rollbackTimerId = null;
       let hoverUnlockTimerId = null;
@@ -281,6 +300,9 @@
         }, 0);
       };
       const navigateFromCard = (event) => {
+        isTooltipSuppressedAfterActivation = true;
+        hideTopActionTooltip();
+        hideCursorTooltip();
         if (hasNavigateAttempted) {
           return;
         }
@@ -331,6 +353,7 @@
       card.addEventListener('pointerleave', () => {
         hideTopActionTooltip();
         hideCursorTooltip();
+        isTooltipSuppressedAfterActivation = false;
         if (!hasNavigateAttempted && !isHoverLocked) {
           card.classList.remove(rollbackClassName);
         }
@@ -344,7 +367,11 @@
       documentObj.addEventListener('visibilitychange', onVisibilityChange);
       windowObj.addEventListener('pagehide', markNavigationSuccess, { once: true });
       bindCursorTooltip(card, () => card._xTitleText || safeTitleText, {
-        maxWidth: 460
+        maxWidth: 460,
+        shouldShow: () => !isTooltipSuppressedAfterActivation && isRecentTitleTruncated(title)
+      });
+      card.addEventListener('blur', () => {
+        isTooltipSuppressedAfterActivation = false;
       });
       card.addEventListener('click', (event) => {
         if (suppressClickAfterPointerNavigation) {

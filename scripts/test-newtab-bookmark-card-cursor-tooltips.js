@@ -91,8 +91,37 @@ assertContains(
 );
 assertContains(
   newtabJs,
-  "bookmarkGrid.addEventListener('pointermove', handleBookmarkDragPointerMove);",
-  'bookmark grid should listen for drag movement'
+  "document.addEventListener('pointermove', handleBookmarkDragPointerMove, true);",
+  'active bookmark drags should keep tracking movement when card reordering releases pointer capture'
+);
+assertContains(
+  newtabJs,
+  "document.addEventListener('pointerup', handleBookmarkDragPointerUp, true);",
+  'active bookmark drags should finish from the document pointer lifecycle'
+);
+assertContains(
+  newtabJs,
+  "document.addEventListener('pointercancel', handleBookmarkDragPointerCancel, true);",
+  'active bookmark drags should cancel from the document pointer lifecycle'
+);
+assertContains(
+  newtabJs,
+  "document.removeEventListener('pointermove', handleBookmarkDragPointerMove, true);",
+  'bookmark drag movement tracking should be removed after the drag ends'
+);
+assertContains(
+  newtabJs,
+  "document.removeEventListener('pointerup', handleBookmarkDragPointerUp, true);",
+  'bookmark drag completion tracking should be removed after the drag ends'
+);
+assertContains(
+  newtabJs,
+  "document.removeEventListener('pointercancel', handleBookmarkDragPointerCancel, true);",
+  'bookmark drag cancellation tracking should be removed after the drag ends'
+);
+assert.ok(
+  !newtabJs.includes("bookmarkGrid.addEventListener('pointermove', handleBookmarkDragPointerMove"),
+  'bookmark grid should only initiate bookmark drags instead of owning their pointer lifecycle'
 );
 assertContains(
   newtabJs,

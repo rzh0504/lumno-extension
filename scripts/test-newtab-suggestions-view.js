@@ -1231,6 +1231,113 @@ async function testModeSwitchImageFallbackUsesLinkIcon() {
   assert.strictEqual(iconSlot.childNodes[0].innerHTML, 'ri-link');
 }
 
+async function testCommandSuggestionRendersFixedHeightTwoLineHierarchy() {
+  const document = createFakeDocument();
+  const container = document.createElement('div');
+  container.setConnected(true);
+  const items = [];
+  const defaultTheme = faviconTheme.createDefaultTheme();
+
+  const view = suggestionsView.createSuggestionsView({
+    document,
+    container,
+    items,
+    t: (key, fallback) => fallback || key,
+    getRiSvg: (iconName) => iconName,
+    sanitizeDisplayText: (value) => String(value || ''),
+    getHostFromUrl,
+    getThemeHostForSuggestion: (suggestion) => getHostFromUrl(suggestion && suggestion.url),
+    shouldBlockFaviconForHost: () => false,
+    getImmediateThemeForSuggestion: () => defaultTheme,
+    getThemeForSuggestion: () => Promise.resolve(defaultTheme),
+    getThemeForMode: (theme) => faviconTheme.getThemeForMode(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    getHoverColors: (theme) => faviconTheme.getHoverColors(theme, {
+      defaultTheme,
+      isDarkMode: () => false
+    }),
+    applyThemeVariables: (target, theme) => applyThemeVariables(target, theme, defaultTheme),
+    applyMarkVariables: () => {},
+    defaultTheme
+  });
+
+  view.render({
+    query: '/',
+    primaryHighlightIndex: 0,
+    primaryHighlightReason: 'command',
+    suggestions: [{
+      type: 'commandNewTab',
+      title: '新建标签页',
+      commandText: '/new',
+      commandAliases: ['/n'],
+      url: ''
+    }]
+  });
+
+  const item = view.getItems()[0];
+  assert.ok(item, 'command suggestion should render');
+  assert.strictEqual(item.getAttribute('data-command-row'), 'true');
+  assert.ok(item._xCommandLabel, 'command suggestion should expose its primary command label');
+  assert.strictEqual(item._xCommandLabel.textContent, '/new');
+  assert.strictEqual(item._xTitle, item._xCommandLabel, 'selection emphasis should target the command line');
+  const textWrapper = item._xCommandLabel.parentNode;
+  assert.ok(textWrapper, 'command label should be mounted inside the text wrapper');
+  assert.strictEqual(textWrapper.childNodes[0], item._xCommandLabel, 'command should be the first line');
+  assert.strictEqual(
+    textWrapper.childNodes[1].className,
+    'x-nt-suggestion-title x-nt-suggestion-command-description',
+    'the existing result title should become the smaller second line'
+  );
+  assert.strictEqual(textWrapper.childNodes[1].textContent, '新建标签页');
+  assert.strictEqual(
+    item._xVisitButton.getAttribute('data-visible'),
+    'false',
+    'command suggestion should not render a redundant arrow-and-label action button'
+  );
+}
+
+async function testCommandEmptyStateDoesNotCreateSelectableSuggestion() {
+  const document = createFakeDocument();
+  const container = document.createElement('div');
+  container.setConnected(true);
+  const items = [];
+  let visible = false;
+  const view = suggestionsView.createSuggestionsView({
+    document,
+    container,
+    items,
+    t: (key, fallback) => fallback || key,
+    getRiSvg: (iconName) => iconName,
+    sanitizeDisplayText: (value) => String(value || ''),
+    setSuggestionsVisible: (nextVisible) => {
+      visible = Boolean(nextVisible);
+    }
+  });
+
+  view.render({
+    query: '/unknown',
+    suggestions: [],
+    emptyMessage: '无匹配命令'
+  });
+
+  assert.strictEqual(items.length, 0, 'command empty state should not become a selectable result');
+  assert.strictEqual(container.childNodes.length, 1, 'command empty state should render one status row');
+  assert.strictEqual(container.childNodes[0].className, 'x-nt-empty-state');
+  assert.strictEqual(container.childNodes[0].childNodes[1].textContent, '无匹配命令');
+  assert.strictEqual(visible, true, 'command empty state should keep the result panel visible');
+
+  view.render({
+    query: '/unknown',
+    suggestions: [],
+    emptyMessage: '无匹配命令',
+    canAppend: true
+  });
+  assert.strictEqual(container.childNodes.length, 1,
+    're-rendering the same New Tab command empty state should replace rather than append it');
+}
+
 async function testProxyFallbackFaviconUsesFallbackTheme() {
   const document = createFakeDocument();
   const container = document.createElement('div');
@@ -2008,6 +2115,8 @@ testLocalUrlSuggestionUsesFallbackTheme()
   .then(testHighlightedSiteSearchUsesFaviconFallbackChain)
   .then(testAiSiteSearchUsesFaviconFallbackChain)
   .then(testModeSwitchImageFallbackUsesLinkIcon)
+  .then(testCommandSuggestionRendersFixedHeightTwoLineHierarchy)
+  .then(testCommandEmptyStateDoesNotCreateSelectableSuggestion)
   .then(testProxyFallbackFaviconUsesFallbackTheme)
   .then(testVisitButtonAndEnterTagShareOverlayVisibilityRules)
   .then(testRemovableSearchSuggestionsUseHoverDeleteAction)

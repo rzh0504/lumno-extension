@@ -340,6 +340,47 @@
   vertical-align: baseline;
 }
 
+:is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-item[data-command-row="true"] {
+  height: var(--x-ov-suggestion-row-height, 52px);
+  min-height: var(--x-ov-suggestion-row-height, 52px);
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+:is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-item[data-command-row="true"] .x-ov-suggestion-text {
+  align-items: flex-start;
+  justify-content: center;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+}
+
+:is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-command {
+  all: unset;
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--x-ov-text, #111827);
+  font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+:is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-item[data-row-state="active"] .x-ov-suggestion-command {
+  font-weight: 600;
+}
+
+:is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-command-description {
+  color: var(--x-ov-subtext, #6B7280);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 15px;
+}
+
 :is(#_x_extension_overlay_2024_unique_, #_x_extension_onboarding_overlay_demo_2026_unique_) .x-ov-suggestion-reason {
   all: unset;
   color: var(--x-ov-subtext, #6B7280);

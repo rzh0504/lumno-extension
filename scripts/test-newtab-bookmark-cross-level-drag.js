@@ -1,0 +1,416 @@
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+
+const repoRoot = path.resolve(__dirname, '..');
+const newtabJs = fs.readFileSync(path.join(repoRoot, 'src', 'newtab', 'newtab.js'), 'utf8');
+const newtabHtml = fs.readFileSync(path.join(repoRoot, 'src', 'newtab', 'newtab.html'), 'utf8');
+const bookmarkDragJs = fs.readFileSync(
+  path.join(repoRoot, 'src', 'newtab', 'bookmark-drag.js'),
+  'utf8'
+);
+const cascadeJs = fs.readFileSync(path.join(repoRoot, 'src', 'newtab', 'bookmark-cascade-menu.js'), 'utf8');
+const bookmarksViewJs = fs.readFileSync(path.join(repoRoot, 'src', 'newtab', 'bookmarks-view.js'), 'utf8');
+const {
+  canMoveBookmarkToLocation,
+  canMoveBookmarkToFolder,
+  createBookmarkMoveHistory,
+  createMoveRecord,
+  getMoveApiDestinationIndex,
+  isFolderInsideBookmark,
+  normalizeMoveDestinationIndex
+} = require(path.join(repoRoot, 'src', 'newtab', 'bookmark-move-history.js'));
+
+const nodeMap = new Map([
+  ['1', { id: '1', parentId: '0' }],
+  ['design', { id: 'design', parentId: '1' }],
+  ['research', { id: 'research', parentId: 'design' }],
+  ['archive', { id: 'archive', parentId: '1' }],
+  ['link', { id: 'link', parentId: 'design' }]
+]);
+
+assert.strictEqual(
+  isFolderInsideBookmark(nodeMap, 'design', 'research'),
+  true,
+  'a nested folder should be recognized as a descendant of the dragged folder'
+);
+assert.strictEqual(
+  canMoveBookmarkToFolder({
+    bookmarkId: 'design',
+    sourceParentId: '1',
+    targetFolderId: 'research',
+    nodeMap
+  }),
+  false,
+  'a folder must not be moved into one of its descendants'
+);
+assert.strictEqual(
+  canMoveBookmarkToFolder({
+    bookmarkId: 'link',
+    sourceParentId: 'design',
+    targetFolderId: 'design',
+    nodeMap
+  }),
+  false,
+  'dropping on the current parent should remain a no-op'
+);
+assert.strictEqual(
+  canMoveBookmarkToFolder({
+    bookmarkId: 'link',
+    sourceParentId: 'design',
+    targetFolderId: 'archive',
+    nodeMap
+  }),
+  true,
+  'a bookmark should be movable to a different folder'
+);
+assert.strictEqual(
+  canMoveBookmarkToFolder({
+    bookmarkId: 'link',
+    sourceParentId: 'research',
+    targetFolderId: 'design',
+    nodeMap
+  }),
+  true,
+  'a nested bookmark should be movable into an ancestor folder'
+);
+assert.strictEqual(
+  normalizeMoveDestinationIndex({
+    sourceParentId: 'design',
+    sourceIndex: 1,
+    targetParentId: 'design',
+    targetIndex: 4
+  }),
+  3,
+  'same-parent insertion indexes should account for removing the source item first'
+);
+assert.strictEqual(
+  getMoveApiDestinationIndex({
+    sourceParentId: 'design',
+    sourceIndex: 0,
+    targetParentId: 'design',
+    targetIndex: 2
+  }),
+  3,
+  'Chrome should receive the original insertion boundary when moving forward within one parent'
+);
+assert.strictEqual(
+  getMoveApiDestinationIndex({
+    sourceParentId: 'design',
+    sourceIndex: 1,
+    targetParentId: 'design',
+    targetIndex: 8
+  }),
+  9,
+  'moving forward to the next page start should keep the bookmark at that page start after removal'
+);
+assert.deepStrictEqual(
+  (() => {
+    const items = ['1', '2', '3', '4'];
+    const moved = items.splice(0, 1)[0];
+    items.splice(normalizeMoveDestinationIndex({
+      sourceParentId: 'design',
+      sourceIndex: 0,
+      targetParentId: 'design',
+      targetIndex: 3
+    }), 0, moved);
+    return items;
+  })(),
+  ['2', '3', '1', '4'],
+  'dragging 1 to the 3-4 boundary should leave it directly between 3 and 4'
+);
+assert.strictEqual(
+  canMoveBookmarkToLocation({
+    bookmarkId: 'link',
+    sourceParentId: 'design',
+    sourceIndex: 1,
+    targetParentId: 'design',
+    targetIndex: 0,
+    nodeMap
+  }),
+  true,
+  'same-folder reordering should be valid when the final index changes'
+);
+assert.strictEqual(
+  canMoveBookmarkToLocation({
+    bookmarkId: 'link',
+    sourceParentId: 'design',
+    sourceIndex: 1,
+    targetParentId: 'design',
+    targetIndex: 2,
+    nodeMap
+  }),
+  false,
+  'an insertion boundary that resolves to the current index should remain a no-op'
+);
+
+const history = createBookmarkMoveHistory({ maxEntries: 2 });
+const firstMove = createMoveRecord({
+  bookmarkId: 'link',
+  title: 'Lumno',
+  from: { parentId: 'design', index: 1 },
+  to: { parentId: 'archive', index: 0 }
+});
+assert.strictEqual(history.push(firstMove), true);
+assert.deepStrictEqual(history.peekUndo(), firstMove);
+assert.strictEqual(history.peekRedo(), null);
+assert.deepStrictEqual(history.commitUndo(), firstMove);
+assert.deepStrictEqual(history.peekRedo(), firstMove);
+assert.deepStrictEqual(history.commitRedo(), firstMove);
+assert.deepStrictEqual(history.peekUndo(), firstMove);
+
+assert.ok(
+  newtabHtml.includes('<script src="bookmark-move-history.js"></script>'),
+  'new tab should load bookmark move history before the main runtime'
+);
+assert.ok(
+  newtabHtml.indexOf('<script src="bookmark-drag.js"></script>') <
+    newtabHtml.indexOf('<script src="newtab.js"></script>'),
+  'new tab should load the bookmark drag runtime before the main runtime'
+);
+assert.ok(
+  newtabHtml.includes('.x-nt-bookmarks-crumb[data-bookmark-drop-target="true"]'),
+  'breadcrumb folders should have a restrained explicit drop-target state'
+);
+assert.ok(
+  newtabHtml.includes('.x-nt-bookmark-card--folder[data-bookmark-drop-target="true"]'),
+  'folder cards should have an explicit drop-target state'
+);
+assert.ok(
+  newtabHtml.includes('.x-nt-bookmark-cascade-item--folder[data-bookmark-drop-target="true"]'),
+  'cascade folders should have an explicit drop-target state'
+);
+assert.ok(
+  newtabHtml.includes('.x-nt-bookmark-cascade-menu[data-drag-mode="true"] .x-nt-bookmark-cascade-level'),
+  'cascade menu motion should be disabled while dragging'
+);
+assert.ok(
+  newtabHtml.includes('[data-bookmark-insert-position="before"]') &&
+    newtabHtml.includes('[data-bookmark-insert-position="after"]'),
+  'bookmark cards and cascade rows should show explicit insertion lines'
+);
+assert.ok(
+  /#_x_extension_newtab_bookmarks_grid_2024_unique_\[data-bookmark-insert-position\]::after\s*\{[^}]*width:\s*2px;[^}]*height:\s*var\(--x-nt-bookmark-insert-line-height/s
+    .test(newtabHtml) &&
+    !/\.x-nt-bookmark-card\[data-bookmark-insert-position\]::after/s.test(newtabHtml),
+  'the bookmark grid should draw one independent vertical insertion line at the measured boundary'
+);
+assert.ok(
+  bookmarkDragJs.includes('DEFAULT_GRID_INSERTION_HIT_ZONE_PX = 8') &&
+    bookmarkDragJs.includes('pointerY >= item.rect.top && pointerY <= item.rect.bottom') &&
+    bookmarkDragJs.includes('nearestBoundaryDistance > hitZonePx'),
+  'bookmark grid insertion targets should exist only near horizontal card boundaries'
+);
+assert.ok(
+  newtabJs.includes('restoreBookmarkDragPreview(state);'),
+  'leaving a valid target should restore the original preview order'
+);
+assert.ok(
+  newtabJs.includes("document.addEventListener('pointermove', handleBookmarkDragPointerMove, true)") &&
+    newtabJs.includes("document.addEventListener('pointerup', handleBookmarkDragPointerUp, true)"),
+  'drag lifecycle should stay on document when live reordering releases element pointer capture'
+);
+assert.ok(
+  !newtabJs.includes('scheduleBookmarkFolderDragOpen') &&
+    !newtabJs.includes('openBookmarkCascadeMenu(item, target.element, {') &&
+    !newtabJs.includes('const relativeY = (pointerY - folderRect.top)'),
+  'a main-grid folder card should remain a whole-card drop target without opening its cascade'
+);
+assert.ok(
+  newtabJs.includes("persistBookmarkCrossLevelMove(state, dropTarget)"),
+  'dropping on a folder target should persist a cross-level move'
+);
+assert.ok(
+  newtabJs.includes('const rawTargetIndex =') &&
+    newtabJs.includes('target.isPageStartBoundary === true') &&
+    newtabJs.includes('Number(state.originalIndex) < rawTargetIndex') &&
+    newtabJs.includes('getMoveApiDestinationIndex({') &&
+    newtabJs.includes('index: destinationIndex'),
+  'a forward cross-page drop at the visible page start should compensate for source removal exactly once'
+);
+assert.ok(
+  newtabJs.includes("const shouldKeepCascadeOpen = state.sourceKind === 'cascade';") &&
+    newtabJs.includes('bookmarkCascadeRuntime.refresh') &&
+    newtabJs.includes('markBookmarkTreeDirty({ preserveCascadeOpen: keepCascadeOpen })'),
+  'successful moves from the cascade should keep and refresh the open menu'
+);
+assert.ok(
+  newtabJs.includes("eventName === 'onMoved'") &&
+    newtabJs.includes("eventName === 'onChildrenReordered'") &&
+    newtabJs.includes('bookmarkControlledMutationDepth > 0') &&
+    newtabJs.includes('markBookmarkTreeDirty({ preserveCascadeOpen })'),
+  'controlled browser move events should mark data dirty without triggering a second render'
+);
+assert.ok(
+  newtabJs.includes('BOOKMARK_DRAG_CLICK_SUPPRESS_MS = 420') &&
+    newtabJs.includes('card._xBookmarkSuppressClickTimer'),
+  'a completed drag should suppress the synthetic click long enough to keep the cascade open'
+);
+assert.ok(
+  !newtabJs.includes('showBookmarkMoveToast(record);'),
+  'a normal drag move should not show an undo toast before the user presses the shortcut'
+);
+assert.ok(
+  bookmarkDragJs.includes("kind: 'insertion'") &&
+    newtabJs.includes('getBookmarkGridInsertionDropTarget') &&
+    bookmarkDragJs.includes('markerOffsetPx: nearestBoundary.x - gridRect.left') &&
+    bookmarkDragJs.includes('firstItem.rect.left - (columnGap / 2)') &&
+    bookmarkDragJs.includes('lastItem.rect.right + (columnGap / 2)') &&
+    bookmarkDragJs.includes('itemIndex === Number(config.pageStartIndex)') &&
+    newtabHtml.includes('--x-nt-bookmark-insert-line-left'),
+  'the main bookmark grid should center insertion lines in card gaps, including the outer page edges'
+);
+assert.ok(
+  newtabHtml.includes('--x-nt-bookmark-insert-indicator: #7a8491') &&
+    newtabHtml.includes('--x-nt-bookmark-insert-indicator: #a8b0bc') &&
+    !/data-bookmark-insert-position[^}]*background:\s*#2563eb/s.test(newtabHtml),
+  'grid and cascade insertion lines should use neutral solid gray instead of blue'
+);
+assert.ok(
+  newtabHtml.includes('.x-nt-bookmark-card[data-bookmark-draggable="true"]') &&
+    newtabHtml.includes('.x-nt-bookmark-cascade-item[data-bookmark-draggable="true"]') &&
+    newtabJs.includes("document.addEventListener('selectstart', handleBookmarkDragSelectStart, true)") &&
+    newtabJs.includes('event.preventDefault();'),
+  'bookmark drag sources should prevent native text selection before and during pointer tracking'
+);
+assert.ok(
+  bookmarkDragJs.includes("'x-nt-bookmark-card-drag-preview'") &&
+    newtabHtml.includes('.x-nt-bookmark-card-drag-preview') &&
+    bookmarkDragJs.includes('DEFAULT_PREVIEW_POINTER_GAP_PX = 10') &&
+    bookmarkDragJs.includes('top = pointerY - previewHeight - pointerGapPx'),
+  'card drags should use a compact floating preview that stays close to the pointer'
+);
+assert.ok(
+  bookmarkDragJs.includes('function resetPreviewFolderVisual(state, preview, options)') &&
+    newtabJs.includes('getFigmaFolderSvg(`${bookmarkId}-drag-preview`)') &&
+    newtabJs.includes('setFolderPathMorphState(folderIcon, false);') &&
+    bookmarkDragJs.includes('resetPreviewFolderVisual(state, preview, config);'),
+  'folder drag previews should rebuild an independent closed-folder icon'
+);
+assert.ok(
+    bookmarkDragJs.includes(
+      'const horizontalHitPadding = (columnGap / 2) + hitZonePx;'
+    ) &&
+    bookmarkDragJs.includes('pointerX < gridRect.left - horizontalHitPadding') &&
+    newtabJs.indexOf(
+      'const insertionTarget = getBookmarkGridInsertionDropTarget(state, pointerX, pointerY);'
+    ) < newtabJs.indexOf('if (!isValidBookmarkFolderDropTarget(state, target))') &&
+    newtabJs.includes(
+      'return isValidBookmarkInsertionDropTarget(state, insertionTarget)'
+    ),
+  'the complete outer grid gap should accept insertion before a first item, ahead of folder-card targeting'
+);
+assert.ok(
+  newtabJs.includes('BOOKMARK_DRAG_PAGE_SWITCH_DELAY_MS = 640') &&
+    newtabJs.includes('function getBookmarkDragPageSwitchDirection(pointerX, pointerY)') &&
+    newtabJs.includes('function scheduleBookmarkDragPageSwitch(state, direction)') &&
+    newtabJs.includes('switchBookmarkPageDuringDrag(bookmarkCurrentPage + normalizedDirection)') &&
+    newtabJs.includes('clearBookmarkDragPageSwitch(state);') &&
+    newtabHtml.includes('[data-bookmark-drag-page-target="true"]'),
+  'holding a dragged bookmark over an available pager button should switch pages without the normal page animation'
+);
+assert.ok(
+  newtabHtml.includes('.x-nt-bookmark-card.x-nt-bookmark-card--hover:not([aria-expanded="true"])'),
+  'drag mode should not shift the folder card anchoring an open cascade menu'
+);
+assert.ok(
+  newtabJs.includes("performBookmarkMoveHistoryAction(direction)") &&
+    newtabJs.includes("isEditableElement(activeElement)") &&
+    newtabJs.includes("activeElement.blur();"),
+  'bookmark moves should expose keyboard undo and redo handling immediately after a drag'
+);
+assert.ok(
+  cascadeJs.includes('isBookmarkCascadePointInsideInteractiveArea(point)'),
+  'cascade drag routing should preserve the existing safe-area behavior'
+);
+assert.ok(
+  newtabJs.includes("target && target.kind === 'blocked'") &&
+    newtabJs.includes('cascadeBlocked = true;') &&
+    newtabJs.includes('isBookmarkCascadeSurfaceAtPoint(pointerX, pointerY)') &&
+    newtabJs.indexOf('target = getBookmarkElementDropTarget(pointerX, pointerY);') <
+      newtabJs.indexOf('if (cascadeBlocked && isBookmarkCascadeSurfaceAtPoint(pointerX, pointerY))'),
+  'cascade safe-area blocking should still allow explicit parent cards and visible grid gaps'
+);
+assert.ok(
+  cascadeJs.includes('BOOKMARK_CASCADE_DRAG_OPEN_DELAY_MS = 420'),
+  'nested folders should use a deliberate hover delay during drag navigation'
+);
+assert.ok(
+  cascadeJs.includes("itemButton.setAttribute('data-bookmark-parent-id'") &&
+    cascadeJs.includes("itemButton.addEventListener('pointerdown'") &&
+    cascadeJs.includes('onItemPointerDown({'),
+  'cascade menu items should expose bookmark metadata and initiate pointer drags'
+);
+assert.ok(
+  cascadeJs.includes('setDragMode: setBookmarkCascadeDragMode'),
+  'an already-open cascade should be able to enter drag routing mode'
+);
+assert.ok(
+  newtabJs.includes("const shouldKeepCascadeOpen = state.sourceKind === 'cascade';") &&
+    cascadeJs.includes('cancelBookmarkCascadeDelayedClose();'),
+  'a cascade drag should remain open after moving to an explicit parent or grid target'
+);
+assert.ok(
+  cascadeJs.includes('rebindAnchor: rebindBookmarkCascadeAnchor') &&
+    cascadeJs.includes('getRootFolderId: getBookmarkCascadeRootFolderId') &&
+    newtabJs.includes('syncOpenBookmarkCascadeAnchorVisual();') &&
+    newtabJs.includes('bookmarkCascadeRuntime.rebindAnchor(nextAnchor, { instant: true })'),
+  'an open cascade should rebind its active folder card synchronously after bookmark rendering'
+);
+assert.ok(
+  newtabJs.includes('function setFolderPathMorphState(folderIcon, toHover)') &&
+    newtabJs.includes('morphOptions && morphOptions.instant === true') &&
+    bookmarksViewJs.includes('playFolderPathMorph(folderIcon, nextActive, visualOptions)'),
+  'a rebound folder icon should inherit its open state without replaying the morph animation'
+);
+assert.ok(
+  cascadeJs.includes('refresh: refreshBookmarkCascadeMenu'),
+  'an open cascade should expose an in-place refresh after bookmark moves'
+);
+assert.ok(
+  cascadeJs.includes('bookmarkCascadeRefreshInProgress') &&
+    cascadeJs.includes("bookmarkCascadeMenu.setAttribute('data-refreshing', 'true')") &&
+    newtabHtml.includes('.x-nt-bookmark-cascade-menu[data-refreshing="true"] .x-nt-bookmark-cascade-level'),
+  'refreshing a reordered cascade should not replay the menu opening transition'
+);
+assert.ok(
+  newtabJs.includes('draggedBookmarkId: state.bookmarkId') &&
+    newtabJs.includes('draggedRect: state.draggedVisualRect') &&
+    newtabJs.includes('const isDraggedCard = Boolean(') &&
+    cascadeJs.includes('playBookmarkCascadeRowLayoutAnimation') &&
+    cascadeJs.includes('BOOKMARK_CASCADE_REORDER_ANIMATION_MS = 180'),
+  'cross-page and cross-level drops should animate the dragged preview and displaced destination items'
+);
+assert.ok(
+  cascadeJs.includes("kind: 'insertion'") &&
+    cascadeJs.includes("data-bookmark-insert-position"),
+  'cascade menu levels should expose before and after insertion targets'
+);
+assert.ok(
+  cascadeJs.includes('BOOKMARK_CASCADE_FOLDER_DROP_MIN_RATIO = 0.38') &&
+    cascadeJs.includes('BOOKMARK_CASCADE_FOLDER_DROP_MAX_RATIO = 0.62') &&
+    cascadeJs.includes('(previousRect.bottom + rect.top) / 2') &&
+    cascadeJs.includes('(rect.bottom + nextRect.top) / 2'),
+  'cascade reorder targets should use broad edge zones and absorb the gaps between rows'
+);
+assert.ok(
+  newtabJs.includes('onItemPointerDown: handleBookmarkCascadeItemPointerDown') &&
+    newtabJs.includes("beginBookmarkDragPointerTracking(event, element, item, 'cascade')"),
+  'new tab should track cascade menu rows as bookmark drag sources'
+);
+assert.ok(
+  newtabJs.includes("bookmarkHeading.setAttribute('data-bookmark-drop-folder-id'") &&
+    !newtabJs.includes("bookmarkHeading.removeAttribute('data-bookmark-drop-folder-id')"),
+  'the root bookmark heading should remain a parent-folder drop target at the root view'
+);
+
+['en', 'zh_CN', 'zh_TW', 'ja'].forEach((locale) => {
+  const messages = JSON.parse(fs.readFileSync(
+    path.join(repoRoot, '_locales', locale, 'messages.json'),
+    'utf8'
+  ));
+  ['bookmarks_move_success', 'bookmarks_move_undone', 'bookmarks_move_redone', 'bookmarks_move_failed']
+    .forEach((key) => assert.ok(messages[key] && messages[key].message, `${locale} should include ${key}`));
+});
+
+console.log('New tab cross-level bookmark drag tests passed.');

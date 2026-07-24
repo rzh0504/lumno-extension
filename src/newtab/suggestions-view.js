@@ -1075,6 +1075,26 @@
         markAutocompleteTop(primaryHighlightIndex);
       }
 
+      if (suggestions.length === 0 && renderPayload.emptyMessage) {
+        container.innerHTML = '';
+        items.length = 0;
+        onSetSelectedIndex(-1);
+        const emptyState = documentRef.createElement('div');
+        emptyState.className = 'x-nt-empty-state';
+        const emptyIcon = documentRef.createElement('span');
+        emptyIcon.className = 'x-nt-empty-state__icon';
+        emptyIcon.innerHTML = getRiSvg('ri-file-3-line', 'ri-size-16');
+        const emptyText = documentRef.createElement('span');
+        emptyText.className = 'x-nt-empty-state__text';
+        emptyText.textContent = sanitizeDisplayText(renderPayload.emptyMessage);
+        emptyState.appendChild(emptyIcon);
+        emptyState.appendChild(emptyText);
+        container.appendChild(emptyState);
+        syncSuggestionLastState();
+        setSuggestionsVisible(true);
+        return;
+      }
+
       suggestions.forEach(function(suggestion, index) {
         if (index < startIndex) {
           return;
@@ -1210,12 +1230,30 @@
         const textWrapper = documentRef.createElement('div');
         textWrapper.className = 'x-nt-suggestion-text';
 
+        const isCommandSuggestion = Boolean(suggestion.commandText);
+        let commandLabel = null;
+        if (isCommandSuggestion) {
+          suggestionItem.setAttribute('data-command-row', 'true');
+          commandLabel = documentRef.createElement('span');
+          const commandText = sanitizeDisplayText(suggestion.commandText || '');
+          renderHighlightedText(commandLabel, commandText, query);
+          commandLabel.className = 'x-nt-suggestion-command';
+          suggestionItem._xCommandLabel = commandLabel;
+          suggestionItem._xTitle = commandLabel;
+          textWrapper.appendChild(commandLabel);
+        }
+
         const title = documentRef.createElement('span');
         title.textContent = '';
         const titleText = sanitizeDisplayText(suggestion.title || '');
-        renderHighlightedText(title, titleText, query);
-        title.className = 'x-nt-suggestion-title';
-        suggestionItem._xTitle = title;
+        if (isCommandSuggestion) {
+          title.textContent = titleText;
+          title.className = 'x-nt-suggestion-title x-nt-suggestion-command-description';
+        } else {
+          renderHighlightedText(title, titleText, query);
+          title.className = 'x-nt-suggestion-title';
+          suggestionItem._xTitle = title;
+        }
         bindSuggestionTitleCursorTooltip(title, titleText, query);
 
         textWrapper.appendChild(title);

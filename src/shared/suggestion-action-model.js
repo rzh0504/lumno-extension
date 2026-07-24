@@ -11,6 +11,16 @@
     'siteSearchPrompt'
   ]);
 
+  const COMMAND_SUGGESTION_TYPES = new Set([
+    'commandNewTab',
+    'commandSettings',
+    'modeSwitch',
+    'zenSwitch',
+    'commandOpenTabs',
+    'commandCopyUrl',
+    'commandDocumentPip'
+  ]);
+
   const PRIMARY_ENTER_REASONS = new Set([
     'topSite',
     'inline',
@@ -35,20 +45,11 @@
     if (!suggestion) {
       return null;
     }
-    if (suggestion.type === 'modeSwitch' || suggestion.type === 'zenSwitch') {
+    if (COMMAND_SUGGESTION_TYPES.has(suggestion.type)) {
       return null;
     }
     if (suggestion.type === 'newtab') {
       return 'search';
-    }
-    if (suggestion.type === 'commandNewTab') {
-      return 'commandNewTab';
-    }
-    if (suggestion.type === 'commandSettings') {
-      return 'commandSettings';
-    }
-    if (suggestion.type === 'commandDocumentPip') {
-      return 'commandDocumentPip';
     }
     if (config.shouldSwitchMatchedTab) {
       return 'switch';

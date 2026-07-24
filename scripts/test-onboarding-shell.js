@@ -2189,6 +2189,11 @@ assert.match(
   'newtab preview hover classes should mirror plugin recent-card and bookmark-folder hover styling'
 );
 assert.match(
+  html,
+  /\.newtab-preview-viewport \.x-nt-folder-preview\s*\{[\s\S]*?margin-right:\s*-2px;[\s\S]*?\.newtab-preview-viewport \.x-nt-bookmark-card--folder\.x-nt-bookmark-card--hover \.x-nt-folder-preview\s*\{[\s\S]*?padding:\s*2px 0 2px 3px;/,
+  'newtab preview should mirror the plugin folder favicon edge alignment and left-side rotation clearance'
+);
+assert.match(
   script,
   /cursorLayer\.dataset\.cursorMode = slide\.cursor\.enabled \? slide\.id : '';/,
   'cursor renderer should expose the active slide as a cursor animation mode'

@@ -1,0 +1,157 @@
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+
+const repoRoot = path.resolve(__dirname, '..');
+const newtabJs = fs.readFileSync(path.join(repoRoot, 'src', 'newtab', 'newtab.js'), 'utf8');
+const newtabHtml = fs.readFileSync(path.join(repoRoot, 'src', 'newtab', 'newtab.html'), 'utf8');
+const bookmarkDragJs = fs.readFileSync(
+  path.join(repoRoot, 'src', 'newtab', 'bookmark-drag.js'),
+  'utf8'
+);
+const bookmarksViewJs = fs.readFileSync(path.join(repoRoot, 'src', 'newtab', 'bookmarks-view.js'), 'utf8');
+const cascadeJs = fs.readFileSync(path.join(repoRoot, 'src', 'newtab', 'bookmark-cascade-menu.js'), 'utf8');
+const {
+  cloneBookmarkSnapshot,
+  createBookmarkMoveHistory,
+  createDeleteRecord
+} = require(path.join(repoRoot, 'src', 'newtab', 'bookmark-move-history.js'));
+
+const sourceTree = {
+  id: 'folder-a',
+  parentId: '1',
+  index: 3,
+  title: 'Folder A',
+  children: [
+    {
+      id: 'link-a',
+      title: 'Link A',
+      url: 'https://example.com/a'
+    },
+    {
+      id: 'folder-b',
+      title: 'Folder B',
+      children: [
+        {
+          id: 'link-b',
+          title: 'Link B',
+          url: 'https://example.com/b'
+        }
+      ]
+    }
+  ]
+};
+const snapshot = cloneBookmarkSnapshot(sourceTree);
+assert.deepStrictEqual(snapshot, {
+  title: 'Folder A',
+  url: '',
+  children: [
+    {
+      title: 'Link A',
+      url: 'https://example.com/a',
+      children: []
+    },
+    {
+      title: 'Folder B',
+      url: '',
+      children: [
+        {
+          title: 'Link B',
+          url: 'https://example.com/b',
+          children: []
+        }
+      ]
+    }
+  ]
+});
+assert.ok(Object.isFrozen(snapshot) && Object.isFrozen(snapshot.children));
+
+const deleteRecord = createDeleteRecord({
+  bookmarkId: sourceTree.id,
+  title: sourceTree.title,
+  parentId: sourceTree.parentId,
+  index: sourceTree.index,
+  snapshot: sourceTree
+});
+assert.strictEqual(deleteRecord.kind, 'delete');
+assert.strictEqual(deleteRecord.parentId, '1');
+assert.strictEqual(deleteRecord.index, 3);
+assert.strictEqual(deleteRecord.runtime.currentBookmarkId, '');
+
+const history = createBookmarkMoveHistory({ maxEntries: 4 });
+assert.strictEqual(history.push(deleteRecord), true);
+const storedRecord = history.peekUndo();
+assert.strictEqual(storedRecord.kind, 'delete');
+storedRecord.runtime.currentBookmarkId = 'restored-folder-a';
+assert.strictEqual(history.commitUndo().runtime.currentBookmarkId, 'restored-folder-a');
+assert.strictEqual(history.peekRedo().runtime.currentBookmarkId, 'restored-folder-a');
+
+assert.ok(
+  bookmarksViewJs.includes("card.addEventListener('contextmenu'") &&
+    bookmarksViewJs.includes('onItemContextMenu({'),
+  'bookmark cards should expose the shared context-menu action'
+);
+assert.ok(
+  cascadeJs.includes("itemButton.addEventListener('contextmenu'") &&
+    cascadeJs.includes("sourceKind: 'cascade'"),
+  'every cascade level should expose the same context-menu action'
+);
+assert.ok(
+  newtabJs.includes("className: 'x-nt-shortcut-context-menu x-nt-bookmark-context-menu'") &&
+    newtabJs.includes("label: t('bookmarks_delete', 'Delete')"),
+  'bookmark deletion should reuse the shortcut context-menu surface'
+);
+assert.ok(
+  newtabJs.includes('removeChromeBookmarkNode(record.bookmarkId, !record.snapshot.url)') &&
+    newtabJs.includes('restoreChromeBookmarkSnapshot(record.snapshot, record.parentId, record.index)'),
+  'deletion should remove folders recursively and restore the complete snapshot at its original location'
+);
+assert.ok(
+  newtabJs.includes("if (record.kind === 'delete')") &&
+    newtabJs.includes("'bookmarks_delete_undone'") &&
+    newtabJs.includes("'bookmarks_delete_redone'"),
+  'keyboard undo and redo should handle deletion records and show feedback only after the shortcut'
+);
+assert.ok(
+  bookmarkDragJs.includes('visualElement.style.left = `${position.left}px`') &&
+    bookmarkDragJs.includes("visualElement.style.transform = 'translate3d(0, 0, 0)'") &&
+    newtabJs.includes('draggedLayoutRect && !state.dragPreviewElement'),
+  'the floating drag preview should stay in viewport coordinates across page rerenders'
+);
+assert.ok(
+  newtabJs.includes('function queueBookmarkLayoutAnimation(excludedBookmarkId, animationOptions)') &&
+    newtabJs.includes('function playPendingBookmarkLayoutAnimation()') &&
+    newtabJs.includes('draggedBookmarkId: state.bookmarkId'),
+  'a completed drag should animate the dragged card and other cards from their pre-drop positions'
+);
+assert.ok(
+  newtabHtml.includes('[data-bookmark-context-menu-open="true"]') &&
+    cascadeJs.includes('shouldKeepOpenForExternalNode(target)'),
+  'the source item should remain visibly active and an open cascade should survive context-menu interaction'
+);
+assert.ok(
+  newtabJs.includes('isControlledBookmarkMutation') &&
+    newtabJs.includes('bookmarkControlledMutationDepth > 0') &&
+    newtabJs.includes("eventName === 'onCreated'") &&
+    newtabJs.includes("eventName === 'onRemoved'") &&
+    newtabJs.includes('markBookmarkTreeDirty({ preserveCascadeOpen })'),
+  'Chrome bookmark events from controlled moves, deletes, or restores should not repeatedly refresh the cascade'
+);
+
+['en', 'zh_CN', 'zh_TW', 'ja'].forEach((locale) => {
+  const messages = JSON.parse(fs.readFileSync(
+    path.join(repoRoot, '_locales', locale, 'messages.json'),
+    'utf8'
+  ));
+  [
+    'bookmarks_delete',
+    'bookmarks_context_menu_label',
+    'bookmarks_delete_undone',
+    'bookmarks_delete_redone',
+    'bookmarks_delete_failed'
+  ].forEach((key) => {
+    assert.ok(messages[key] && messages[key].message, `${locale} should include ${key}`);
+  });
+});
+
+console.log('New tab bookmark delete and undo tests passed.');
